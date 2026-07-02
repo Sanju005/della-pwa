@@ -3588,17 +3588,15 @@ export function PaymentsScreen() {
               <p className="mt-3 whitespace-nowrap text-[2.45rem] font-black tracking-[-0.06em]">
                 RM 320.00
               </p>
-              <p className="mt-2 text-[14px] text-white/88">Available to withdraw</p>
-              <button
-                type="button"
-                onClick={() => setModal("withdraw")}
-                className="mt-5 inline-flex min-h-[3.35rem] items-center gap-3 rounded-[18px] bg-white px-4 py-3 text-[15px] font-extrabold text-[#8E5EB5] shadow-[0_14px_28px_rgba(255,255,255,0.2)]"
-              >
+              <p className="mt-2 text-[14px] leading-6 text-white/88">
+                Coming soon: online transfer / card payment earnings minus commission.
+              </p>
+              <div className="mt-5 inline-flex min-h-[3.35rem] items-center gap-3 rounded-[18px] bg-white/96 px-4 py-3 text-[15px] font-extrabold text-[#8E5EB5] shadow-[0_14px_28px_rgba(255,255,255,0.2)] opacity-85">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-[14px] bg-[#f4ecfd]">
                   <Wallet className="h-4.5 w-4.5" />
                 </span>
-                Withdraw Funds
-              </button>
+                Coming Soon
+              </div>
             </div>
 
             <div className="pointer-events-none relative ml-auto hidden sm:block">
