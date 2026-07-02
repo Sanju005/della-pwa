@@ -615,6 +615,7 @@ export function useProviderAppData() {
 
 export function ProviderBottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isLedgerView, setIsLedgerView] = useState(false);
 
   useEffect(() => {
@@ -675,23 +676,51 @@ export function ProviderBottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] border-t border-[#ede4f7] bg-white/97 px-3 pb-[calc(0.8rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
       <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#7f849f]">
         {items.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex min-w-[3.1rem] flex-col items-center gap-1 transition ${
-              item.active ? "text-[#8E5EB5]" : "text-[#7f849f]"
-            }`}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-            <span className="flex h-3 items-end">
-              <span
-                className={`rounded-full transition-all ${
-                  item.active ? "h-[3px] w-10 bg-[#8E5EB5]" : "h-[3px] w-6 bg-transparent"
-                }`}
-              />
-            </span>
-          </Link>
+          item.label === "Ledger" || item.label === "Payments" ? (
+            <button
+              key={item.href}
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.location.assign(item.href);
+                  return;
+                }
+
+                router.push(item.href);
+              }}
+              className={`flex min-w-[3.1rem] flex-col items-center gap-1 transition ${
+                item.active ? "text-[#8E5EB5]" : "text-[#7f849f]"
+              }`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              <span className="flex h-3 items-end">
+                <span
+                  className={`rounded-full transition-all ${
+                    item.active ? "h-[3px] w-10 bg-[#8E5EB5]" : "h-[3px] w-6 bg-transparent"
+                  }`}
+                />
+              </span>
+            </button>
+          ) : (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex min-w-[3.1rem] flex-col items-center gap-1 transition ${
+                item.active ? "text-[#8E5EB5]" : "text-[#7f849f]"
+              }`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              <span className="flex h-3 items-end">
+                <span
+                  className={`rounded-full transition-all ${
+                    item.active ? "h-[3px] w-10 bg-[#8E5EB5]" : "h-[3px] w-6 bg-transparent"
+                  }`}
+                />
+              </span>
+            </Link>
+          )
         ))}
       </div>
     </nav>
