@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -3235,12 +3235,15 @@ function ProviderPaymentModalShell({
 export function PaymentsScreen() {
   const state = useProviderAppData();
   const router = useRouter();
+  const companyProofInputRef = useRef<HTMLInputElement | null>(null);
   const [activeTab, setActiveTab] = useState<ProviderPaymentTab>("overview");
   const [activeRange, setActiveRange] = useState<ProviderPaymentRange>("custom");
   const [modal, setModal] = useState<ProviderPaymentModal>(null);
   const [customStartDate, setCustomStartDate] = useState("2026-07-01");
   const [customEndDate, setCustomEndDate] = useState("2026-07-01");
   const [showLedger, setShowLedger] = useState(false);
+  const [companyProofName, setCompanyProofName] = useState("");
+  const [companyProofError, setCompanyProofError] = useState("");
 
   const walletBalance = 320;
   const totalEarnings = 1250;
@@ -3304,6 +3307,44 @@ export function PaymentsScreen() {
     cashJobs: 2,
     otherPayments: 3,
   };
+
+  function resetCompanyProofState() {
+    setCompanyProofName("");
+    setCompanyProofError("");
+    if (companyProofInputRef.current) {
+      companyProofInputRef.current.value = "";
+    }
+  }
+
+  function handleCompanyProofChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      setCompanyProofName("");
+      setCompanyProofError("");
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "application/pdf"];
+    const maxBytes = 2 * 1024 * 1024;
+
+    if (!allowedTypes.includes(file.type)) {
+      setCompanyProofName("");
+      setCompanyProofError("Upload JPG, JPEG, or PDF only.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > maxBytes) {
+      setCompanyProofName("");
+      setCompanyProofError("File must be 2MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    setCompanyProofName(file.name);
+    setCompanyProofError("");
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -3962,8 +4003,11 @@ export function PaymentsScreen() {
       {modal === "company" ? (
         <ProviderPaymentModalShell
           title="Pay Company Commission"
-          subtitle="Clean placeholder for company payment proof and mark-as-paid flow."
-          onClose={() => setModal(null)}
+          subtitle="Upload payment slip first, then mark it as payment in process for admin approval."
+          onClose={() => {
+            setModal(null);
+            resetCompanyProofState();
+          }}
         >
           <div className="space-y-4">
             <div className="rounded-[22px] border border-[#ffd8d8] bg-[#fff7f7] p-4">
@@ -3976,28 +4020,65 @@ export function PaymentsScreen() {
             </div>
             <div className="rounded-[20px] border border-dashed border-[#e3d5f4] bg-[#fbf8ff] p-4">
               <p className="text-[13px] font-semibold text-[#1d1633]">
-                Payment method placeholder
+                Upload payment slip
               </p>
               <p className="mt-1 text-[13px] leading-6 text-[#7b748f]">
-                Bank transfer / online receipt selection will be connected later.
+                Select from gallery or camera. Accepted: JPG, JPEG, PDF up to 2MB.
               </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+              <input
+                ref={companyProofInputRef}
+                type="file"
+                accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf"
+                capture="environment"
+                onChange={handleCompanyProofChange}
+                className="hidden"
+              />
               <button
                 type="button"
-                onClick={() => setModal(null)}
-                className="inline-flex min-h-[3rem] items-center justify-center rounded-[16px] border border-[#e7dcf4] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                onClick={() => companyProofInputRef.current?.click()}
+                className="mt-4 inline-flex min-h-[3rem] w-full items-center justify-center rounded-[16px] bg-[#f4ecfd] px-4 text-[14px] font-bold text-[#8E5EB5]"
               >
-                Mark as Paid
+                Upload Payment Slip
               </button>
+              {companyProofName ? (
+                <p className="mt-3 rounded-[14px] border border-[#ddd1f1] bg-white px-3 py-2 text-[13px] font-semibold text-[#1d1633]">
+                  Selected: {companyProofName}
+                </p>
+              ) : null}
+              {companyProofError ? (
+                <p className="mt-3 text-[12px] font-semibold text-[#dc2626]">
+                  {companyProofError}
+                </p>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => setModal(null)}
-                className="inline-flex min-h-[3rem] items-center justify-center rounded-[16px] bg-[#f4ecfd] px-4 text-[14px] font-bold text-[#8E5EB5]"
+                onClick={() => companyProofInputRef.current?.click()}
+                className="inline-flex min-h-[3rem] items-center justify-center rounded-[16px] border border-[#e7dcf4] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
               >
                 Upload Proof
               </button>
+              <button
+                type="button"
+                disabled={!companyProofName}
+                onClick={() => {
+                  setModal(null);
+                  resetCompanyProofState();
+                  state.setNotice("Payment slip uploaded. Waiting for admin approval before marking as paid.");
+                }}
+                className={`inline-flex min-h-[3rem] items-center justify-center rounded-[16px] px-4 text-[14px] font-bold ${
+                  companyProofName
+                    ? "bg-[#8E5EB5] text-white"
+                    : "bg-[#efe7f8] text-[#b8a9cf]"
+                }`}
+              >
+                Mark as Payment Process
+              </button>
             </div>
+            <p className="text-[12px] leading-5 text-[#7b748f]">
+              After admin approval, this company payment will move to paid status.
+            </p>
           </div>
         </ProviderPaymentModalShell>
       ) : null}
