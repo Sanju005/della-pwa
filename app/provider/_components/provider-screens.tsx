@@ -3585,10 +3585,7 @@ export function PaymentsScreen() {
           <div className="relative grid grid-cols-[minmax(0,1fr)_7rem] gap-x-3 gap-y-5 sm:grid-cols-[minmax(0,1fr)_7.25rem_7.25rem] sm:items-center">
             <div className="min-w-0">
               <p className="text-[14px] font-medium text-white/90">Wallet Balance</p>
-              <p className="mt-3 whitespace-nowrap text-[2.45rem] font-black tracking-[-0.06em]">
-                RM 320.00
-              </p>
-              <p className="mt-2 text-[14px] leading-6 text-white/88">
+              <p className="mt-4 text-[14px] leading-6 text-white/88">
                 Coming soon: online transfer / card payment earnings minus commission.
               </p>
               <div className="mt-5 inline-flex min-h-[3.35rem] items-center gap-3 rounded-[18px] bg-white/96 px-4 py-3 text-[15px] font-extrabold text-[#8E5EB5] shadow-[0_14px_28px_rgba(255,255,255,0.2)] opacity-85">
