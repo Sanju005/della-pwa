@@ -442,13 +442,6 @@ export async function PATCH(
       ? paymentBreakdown.reduce((sum, row) => sum + row.amount, 0)
       : null);
 
-  if (!nextStatus) {
-    return NextResponse.json(
-      { error: "Booking status is required." },
-      { status: 400 }
-    );
-  }
-
   let { data: booking, error: bookingError } = await verified.adminClient
     .from("bookings")
     .select("id, customer_id, provider_id, booking_status, service_label, quoted_amount, booking_price")
@@ -578,6 +571,13 @@ export async function PATCH(
     }
 
     return NextResponse.json({ success: true });
+  }
+
+  if (!nextStatus) {
+    return NextResponse.json(
+      { error: "Booking status is required." },
+      { status: 400 }
+    );
   }
 
   if (current.booking_status === nextStatus) {
