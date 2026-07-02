@@ -18,6 +18,19 @@ type CommissionProofPayload = {
   depositedAmount?: number;
 };
 
+function isMissingCommissionPaymentSchemaError(message?: string | null) {
+  const normalized = message?.trim().toLowerCase() ?? "";
+  return (
+    normalized.includes("schema cache") ||
+    normalized.includes("could not find") ||
+    normalized.includes("column")
+  ) && (
+    normalized.includes("provider_company_payment_amount") ||
+    normalized.includes("admin_company_received_amount") ||
+    normalized.includes("company_payment_requested_at")
+  );
+}
+
 function isProviderRole(role: string | null | undefined) {
   return role === "provider" || role === "service_provider";
 }
@@ -115,19 +128,57 @@ export async function POST(
     );
   }
 
-  const { error } = await verified.adminClient
+  const { data: paymentRecord, error: paymentLookupError } = await verified.adminClient
     .from("payments")
-    .update({
-      company_payment_status: "payment_process",
-      company_payment_requested_at: new Date().toISOString(),
-      provider_company_payment_amount: depositedAmount,
-      provider_company_payment_proof_data_url: payload.proofDataUrl?.trim() || null,
-      provider_company_payment_proof_file_name: payload.proofFileName?.trim() || null,
-      provider_company_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
-    })
+    .select("id, status")
     .eq("booking_id", params.id)
     .eq("provider_id", verified.profile.id)
-    .eq("status", "paid");
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (paymentLookupError || !paymentRecord) {
+    return NextResponse.json(
+      { error: paymentLookupError?.message || "No payment record was found for this booking." },
+      { status: 404 },
+    );
+  }
+
+  if (paymentRecord.status !== "paid") {
+    return NextResponse.json(
+      { error: "Customer cash payment must be marked as paid before company payment submission." },
+      { status: 400 },
+    );
+  }
+
+  const fullUpdatePayload = {
+    company_payment_status: "payment_process",
+    company_payment_requested_at: new Date().toISOString(),
+    provider_company_payment_amount: depositedAmount,
+    provider_company_payment_proof_data_url: payload.proofDataUrl?.trim() || null,
+    provider_company_payment_proof_file_name: payload.proofFileName?.trim() || null,
+    provider_company_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
+  };
+  const fallbackUpdatePayload = {
+    company_payment_status: "payment_process",
+    provider_company_payment_proof_data_url: payload.proofDataUrl?.trim() || null,
+    provider_company_payment_proof_file_name: payload.proofFileName?.trim() || null,
+    provider_company_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
+  };
+
+  let { error } = await verified.adminClient
+    .from("payments")
+    .update(fullUpdatePayload)
+    .eq("id", paymentRecord.id);
+
+  if (error && isMissingCommissionPaymentSchemaError(error.message)) {
+    const fallbackUpdate = await verified.adminClient
+      .from("payments")
+      .update(fallbackUpdatePayload)
+      .eq("id", paymentRecord.id);
+
+    error = fallbackUpdate.error;
+  }
 
   if (error) {
     return NextResponse.json(

@@ -3356,6 +3356,8 @@ export function PaymentsScreen() {
     ) ?? state.bookings.find((booking) => booking.companyCommissionAmount > 0);
   const isCompanyPaymentProcessing =
     pendingCommissionBooking?.companyPaymentStatus === "payment_process";
+  const isSubmittingCompanyPayment =
+    Boolean(pendingCommissionBooking) && state.actionBookingId === pendingCommissionBooking?.id;
   const pendingCompanyAmount = pendingCommissionBooking?.companyCommissionAmount || 75;
   const companyDepositAmountValue = Number(companyDepositAmount);
   const canSubmitCompanyPayment =
@@ -4216,6 +4218,11 @@ export function PaymentsScreen() {
                   {companyProofError}
                 </p>
               ) : null}
+              {state.error ? (
+                <p className="mt-3 text-[12px] font-semibold text-[#dc2626]">
+                  {state.error}
+                </p>
+              ) : null}
             </div>
             <label className="block rounded-[20px] border border-[#ece3f7] bg-white p-4">
               <span className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7d84a0]">
@@ -4239,7 +4246,7 @@ export function PaymentsScreen() {
             <div className="grid grid-cols-1 gap-3">
               <button
                 type="button"
-                disabled={!canSubmitCompanyPayment}
+                disabled={!canSubmitCompanyPayment || isSubmittingCompanyPayment}
                 onClick={async () => {
                   if (!pendingCommissionBooking) {
                     state.setError("No company commission booking was found for submission.");
@@ -4264,12 +4271,12 @@ export function PaymentsScreen() {
                   }
                 }}
                 className={`inline-flex min-h-[3rem] items-center justify-center rounded-[16px] px-4 text-[14px] font-bold ${
-                  canSubmitCompanyPayment
+                  canSubmitCompanyPayment && !isSubmittingCompanyPayment
                     ? "bg-[#8E5EB5] text-white"
                     : "bg-[#efe7f8] text-[#b8a9cf]"
                 }`}
               >
-                Mark as Payment Process
+                {isSubmittingCompanyPayment ? "Submitting..." : "Mark as Payment Process"}
               </button>
             </div>
             <p className="text-[12px] leading-5 text-[#7b748f]">
