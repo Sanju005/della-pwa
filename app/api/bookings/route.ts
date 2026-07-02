@@ -201,6 +201,56 @@ function isMissingTaskPathSchemaError(message: string | null | undefined) {
   );
 }
 
+function isMissingPaymentSchemaError(message: string | null | undefined) {
+  const normalized = message?.toLowerCase() ?? "";
+  return (
+    normalized.includes("schema cache") ||
+    normalized.includes("could not find") ||
+    normalized.includes("column")
+  ) && (
+    normalized.includes("company_payment_status") ||
+    normalized.includes("provider_company_payment_amount") ||
+    normalized.includes("admin_company_received_amount") ||
+    normalized.includes("customer_payment_proof_data_url") ||
+    normalized.includes("customer_payment_proof_file_name") ||
+    normalized.includes("customer_payment_proof_mime_type") ||
+    normalized.includes("provider_company_payment_proof_data_url") ||
+    normalized.includes("provider_company_payment_proof_file_name") ||
+    normalized.includes("provider_company_payment_proof_mime_type") ||
+    normalized.includes("company_commission_amount") ||
+    normalized.includes("provider_net_amount")
+  );
+}
+
+const CUSTOMER_PAYMENT_RECORDS_SELECT_FULL = `
+  amount,
+  payment_method,
+  payment_option,
+  status,
+  paid_at,
+  company_commission_amount,
+  provider_net_amount,
+  company_payment_status,
+  provider_company_payment_amount,
+  admin_company_received_amount,
+  customer_payment_proof_data_url,
+  customer_payment_proof_file_name,
+  customer_payment_proof_mime_type,
+  provider_company_payment_proof_data_url,
+  provider_company_payment_proof_file_name,
+  provider_company_payment_proof_mime_type,
+  created_at
+`;
+
+const CUSTOMER_PAYMENT_RECORDS_SELECT_FALLBACK = `
+  amount,
+  payment_method,
+  payment_option,
+  status,
+  paid_at,
+  created_at
+`;
+
 function isMissingNewBookingStatusError(message: string | null | undefined) {
   const normalized = message?.toLowerCase() ?? "";
   return normalized.includes("invalid input value for enum") && normalized.includes("booking_status");
@@ -781,12 +831,12 @@ export async function GET(request: Request) {
       on_the_way_at,
       arrived_at,
       completed_at,
-      payment_records:payments(amount, payment_method, payment_option, status, paid_at, company_commission_amount, provider_net_amount, company_payment_status, provider_company_payment_amount, admin_company_received_amount, customer_payment_proof_data_url, customer_payment_proof_file_name, customer_payment_proof_mime_type, provider_company_payment_proof_data_url, provider_company_payment_proof_file_name, provider_company_payment_proof_mime_type, created_at)
+      payment_records:payments(${CUSTOMER_PAYMENT_RECORDS_SELECT_FULL})
     `)
     .eq("customer_id", verified.profile.id)
     .order("created_at", { ascending: false });
 
-  if (error && isMissingTaskPathSchemaError(error.message)) {
+  if (error && (isMissingTaskPathSchemaError(error.message) || isMissingPaymentSchemaError(error.message))) {
     const fallbackRead = await verified.adminClient
       .from("bookings")
       .select(`
@@ -809,7 +859,7 @@ export async function GET(request: Request) {
         on_the_way_at,
         arrived_at,
         completed_at,
-        payment_records:payments(amount, payment_method, payment_option, status, paid_at, company_commission_amount, provider_net_amount, company_payment_status, provider_company_payment_amount, admin_company_received_amount, customer_payment_proof_data_url, customer_payment_proof_file_name, customer_payment_proof_mime_type, provider_company_payment_proof_data_url, provider_company_payment_proof_file_name, provider_company_payment_proof_mime_type, created_at)
+        payment_records:payments(${CUSTOMER_PAYMENT_RECORDS_SELECT_FALLBACK})
       `)
       .eq("customer_id", verified.profile.id)
       .order("created_at", { ascending: false });
