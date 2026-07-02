@@ -3354,6 +3354,8 @@ export function PaymentsScreen() {
         (booking.companyPaymentStatus === "pending" ||
           booking.companyPaymentStatus === "payment_process"),
     ) ?? state.bookings.find((booking) => booking.companyCommissionAmount > 0);
+  const isCompanyPaymentProcessing =
+    pendingCommissionBooking?.companyPaymentStatus === "payment_process";
   const pendingCompanyAmount = pendingCommissionBooking?.companyCommissionAmount || 75;
   const companyDepositAmountValue = Number(companyDepositAmount);
   const canSubmitCompanyPayment =
@@ -3770,6 +3772,18 @@ export function PaymentsScreen() {
           </div>
         </section>
 
+        {state.notice ? (
+          <section className="rounded-[20px] border border-[#d8f0de] bg-[#f3fff6] px-4 py-3 text-[14px] font-semibold text-[#18794e] shadow-[0_10px_22px_rgba(24,121,78,0.08)]">
+            {state.notice}
+          </section>
+        ) : null}
+
+        {state.error ? (
+          <section className="rounded-[20px] border border-[#ffd7d7] bg-[#fff6f6] px-4 py-3 text-[14px] font-semibold text-[#dc2626] shadow-[0_10px_22px_rgba(220,38,38,0.08)]">
+            {state.error}
+          </section>
+        ) : null}
+
         {pendingCompanyAmount > 0 ? (
           <section className="rounded-[28px] border border-[#ffd9d5] bg-[linear-gradient(180deg,#fffefe_0%,#fff8f8_100%)] px-5 py-5 shadow-[0_18px_36px_rgba(255,89,89,0.08)]">
             <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
@@ -3778,24 +3792,32 @@ export function PaymentsScreen() {
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="max-w-[14rem] text-[1.05rem] font-black leading-6 tracking-[-0.04em] text-[#d62839] sm:max-w-none">
-                  Amount to Pay Company
+                  {isCompanyPaymentProcessing ? "Company Payment In Process" : "Amount to Pay Company"}
                 </h2>
                 <p className="mt-1 max-w-[15rem] text-[14px] leading-6 text-[#5d6278] sm:max-w-none">
-                  You have pending amount to pay as company commission.
+                  {isCompanyPaymentProcessing
+                    ? "Your uploaded payment slip is under admin review."
+                    : "You have pending amount to pay as company commission."}
                 </p>
               </div>
               <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:block sm:text-right">
                 <p className="whitespace-nowrap text-[1.15rem] font-black tracking-[-0.04em] text-[#d62839]">
-                  RM 75.00
+                  {formatCurrency(pendingCompanyAmount)}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setModal("company")}
-                  className="inline-flex min-h-[2.95rem] items-center gap-2 rounded-[16px] bg-[linear-gradient(180deg,#ec3349_0%,#d81d35_100%)] px-4 py-2 text-[14px] font-extrabold text-white shadow-[0_16px_28px_rgba(216,29,53,0.24)] sm:mt-3"
-                >
-                  Pay Now
-                  <ChevronRight className="h-4.5 w-4.5" />
-                </button>
+                {isCompanyPaymentProcessing ? (
+                  <span className="inline-flex min-h-[2.95rem] items-center rounded-[16px] bg-[#f8e9ea] px-4 py-2 text-[14px] font-extrabold text-[#d62839] sm:mt-3">
+                    Payment Process
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setModal("company")}
+                    className="inline-flex min-h-[2.95rem] items-center gap-2 rounded-[16px] bg-[linear-gradient(180deg,#ec3349_0%,#d81d35_100%)] px-4 py-2 text-[14px] font-extrabold text-white shadow-[0_16px_28px_rgba(216,29,53,0.24)] sm:mt-3"
+                  >
+                    Pay Now
+                    <ChevronRight className="h-4.5 w-4.5" />
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -4218,7 +4240,7 @@ export function PaymentsScreen() {
               <button
                 type="button"
                 disabled={!canSubmitCompanyPayment}
-                onClick={() => {
+                onClick={async () => {
                   if (!pendingCommissionBooking) {
                     state.setError("No company commission booking was found for submission.");
                     return;
@@ -4229,14 +4251,17 @@ export function PaymentsScreen() {
                     return;
                   }
 
-                  void state.handleCommissionSettlement(pendingCommissionBooking.id, {
+                  const success = await state.handleCommissionSettlement(pendingCommissionBooking.id, {
                     proofDataUrl: companyProofDataUrl,
                     proofFileName: companyProofName,
                     proofMimeType: companyProofMimeType,
                     depositedAmount: companyDepositAmountValue,
                   });
-                  setModal(null);
-                  resetCompanyProofState();
+
+                  if (success) {
+                    setModal(null);
+                    resetCompanyProofState();
+                  }
                 }}
                 className={`inline-flex min-h-[3rem] items-center justify-center rounded-[16px] px-4 text-[14px] font-bold ${
                   canSubmitCompanyPayment

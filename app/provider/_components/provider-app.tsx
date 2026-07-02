@@ -523,7 +523,7 @@ export function useProviderAppData() {
     });
   }
 
-  function handleCommissionSettlement(
+  async function handleCommissionSettlement(
     bookingId: string,
     proof?: {
       proofDataUrl?: string;
@@ -533,51 +533,49 @@ export function useProviderAppData() {
     },
   ) {
     const client = getSupabaseClient();
+    setError("");
+    setNotice("");
+    setActionBookingId(bookingId);
 
-    startTransition(async () => {
-      setError("");
-      setNotice("");
-      setActionBookingId(bookingId);
-
-      if (!client) {
-        setError("Supabase is not configured yet.");
-        setActionBookingId("");
-        return;
-      }
-
-      const {
-        data: { session },
-      } = await client.auth.getSession();
-
-      if (!session) {
-        router.replace("/login");
-        setActionBookingId("");
-        return;
-      }
-
-      const response = await fetch(`/api/provider/bookings/${bookingId}/settle-commission`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(proof ?? {}),
-      }).catch(() => null);
-
-      const result = response
-        ? ((await response.json().catch(() => ({}))) as { success?: true; error?: string })
-        : null;
-
-      if (!response || !response.ok || !result?.success) {
-        setError(result?.error || "Unable to settle company commission.");
-        setActionBookingId("");
-        return;
-      }
-
-      await reloadWorkspace();
-      setNotice("Company commission submitted for admin approval.");
+    if (!client) {
+      setError("Supabase is not configured yet.");
       setActionBookingId("");
-    });
+      return false;
+    }
+
+    const {
+      data: { session },
+    } = await client.auth.getSession();
+
+    if (!session) {
+      router.replace("/login");
+      setActionBookingId("");
+      return false;
+    }
+
+    const response = await fetch(`/api/provider/bookings/${bookingId}/settle-commission`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(proof ?? {}),
+    }).catch(() => null);
+
+    const result = response
+      ? ((await response.json().catch(() => ({}))) as { success?: true; error?: string })
+      : null;
+
+    if (!response || !response.ok || !result?.success) {
+      setError(result?.error || "Unable to settle company commission.");
+      setActionBookingId("");
+      return false;
+    }
+
+    await reloadWorkspace();
+    setNotice("Company commission submitted for admin approval.");
+    setActionBookingId("");
+    return true;
   }
 
   async function handleSignOut() {
