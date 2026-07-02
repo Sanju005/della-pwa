@@ -3784,7 +3784,7 @@ export function PaymentsScreen() {
                       type="button"
                       onClick={() => {
                         setShowLedger(true);
-                        router.push("/provider/payments?view=ledger");
+                        router.push("https://app.dellaapp.com/provider/payments?view=ledger");
                       }}
                       className="inline-flex items-center gap-2 text-[14px] font-semibold text-[#8E5EB5]"
                     >
