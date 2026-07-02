@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   BriefcaseBusiness,
   CalendarDays,
+  Landmark,
   MessageCircleMore,
   UserRound,
   Wallet,
@@ -611,6 +612,9 @@ export function useProviderAppData() {
 
 export function ProviderBottomNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isLedgerView =
+    pathname === "/provider/payments" && searchParams.get("view") === "ledger";
   const items = [
     {
       href: "/provider/dashboard",
@@ -625,17 +629,17 @@ export function ProviderBottomNav() {
       active: pathname === "/provider/bookings" || pathname === "/provider/calendar",
     },
     {
-      href: "/provider/messages",
-      label: "Messages",
-      icon: <MessageCircleMore className="h-5 w-5" />,
-      active: pathname === "/provider/messages",
+      href: "/provider/payments?view=ledger",
+      label: "Ledger",
+      icon: <Landmark className="h-5 w-5" />,
+      active: isLedgerView,
     },
     {
       href: "/provider/payments",
       label: "Payments",
       icon: <Wallet className="h-5 w-5" />,
       active:
-        pathname === "/provider/payments" ||
+        (pathname === "/provider/payments" && !isLedgerView) ||
         pathname === "/provider/tasks" ||
         pathname === "/provider/earnings",
     },
