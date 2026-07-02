@@ -3258,6 +3258,58 @@ function formatProviderLedgerDate(booking: ProviderBookingItem) {
   }).format(parsed);
 }
 
+function toIsoDate(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(
+    value.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function getTodayIsoDate() {
+  return toIsoDate(new Date());
+}
+
+function addDays(value: Date, amount: number) {
+  const next = new Date(value);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function getWeekStartIsoDate() {
+  const today = new Date();
+  const start = addDays(today, -today.getDay());
+  return toIsoDate(start);
+}
+
+function getWeekEndIsoDate() {
+  const today = new Date();
+  const end = addDays(today, 6 - today.getDay());
+  return toIsoDate(end);
+}
+
+function getMonthStartIsoDate() {
+  const today = new Date();
+  return toIsoDate(new Date(today.getFullYear(), today.getMonth(), 1));
+}
+
+function getMonthEndIsoDate() {
+  const today = new Date();
+  return toIsoDate(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+}
+
+function formatIsoDateLabel(value: string) {
+  const parsed = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(parsed);
+}
+
 function ProviderPaymentModalShell({
   title,
   subtitle,
@@ -3301,8 +3353,8 @@ export function PaymentsScreen() {
   const [activeTab, setActiveTab] = useState<ProviderPaymentTab>("overview");
   const [activeRange, setActiveRange] = useState<ProviderPaymentRange>("custom");
   const [modal, setModal] = useState<ProviderPaymentModal>(null);
-  const [customStartDate, setCustomStartDate] = useState("2026-07-01");
-  const [customEndDate, setCustomEndDate] = useState("2026-07-01");
+  const [customStartDate, setCustomStartDate] = useState(getTodayIsoDate);
+  const [customEndDate, setCustomEndDate] = useState(getTodayIsoDate);
   const [showLedger, setShowLedger] = useState(false);
   const [paymentHistorySection, setPaymentHistorySection] =
     useState<ProviderPaymentMethodSection>("cash");
@@ -3331,11 +3383,6 @@ export function PaymentsScreen() {
   const [companyProofMimeType, setCompanyProofMimeType] = useState("");
   const [companyDepositAmount, setCompanyDepositAmount] = useState("");
 
-  const walletBalance = 320;
-  const totalEarnings = 1250;
-  const totalWithdrawn = 930;
-  const pendingAmount = 150;
-  const displayDate = "01 Jul 2026";
   const fallback = LoadingOrError(state);
 
   const allPaymentTransactions = useMemo<ProviderPaymentTransaction[]>(() => {
@@ -3406,6 +3453,36 @@ export function PaymentsScreen() {
       }))
       .sort((left, right) => right.date.localeCompare(left.date));
   }, [state.bookings]);
+  const activeStartDate = useMemo(() => {
+    if (activeRange === "today") {
+      return getTodayIsoDate();
+    }
+
+    if (activeRange === "week") {
+      return getWeekStartIsoDate();
+    }
+
+    if (activeRange === "month") {
+      return getMonthStartIsoDate();
+    }
+
+    return customStartDate;
+  }, [activeRange, customStartDate]);
+  const activeEndDate = useMemo(() => {
+    if (activeRange === "today") {
+      return getTodayIsoDate();
+    }
+
+    if (activeRange === "week") {
+      return getWeekEndIsoDate();
+    }
+
+    if (activeRange === "month") {
+      return getMonthEndIsoDate();
+    }
+
+    return customEndDate;
+  }, [activeRange, customEndDate]);
   const filteredTransactions = useMemo(() => {
     const visibleKinds =
       activeTab === "payments"
@@ -3414,34 +3491,18 @@ export function PaymentsScreen() {
           ? (["withdrawal"] satisfies ProviderPaymentTransactionKind[])
           : (["payment", "commission", "withdrawal"] satisfies ProviderPaymentTransactionKind[]);
 
-    const startDate =
-      activeRange === "today"
-        ? "2026-07-01"
-        : activeRange === "week"
-          ? "2026-06-29"
-          : activeRange === "month"
-            ? "2026-07-01"
-            : customStartDate;
-    const endDate =
-      activeRange === "today"
-        ? "2026-07-01"
-        : activeRange === "week"
-          ? "2026-07-05"
-          : activeRange === "month"
-            ? "2026-07-31"
-            : customEndDate;
-
     return allPaymentTransactions.filter(
       (transaction) =>
         visibleKinds.includes(transaction.kind) &&
-        transaction.date >= startDate &&
-        transaction.date <= endDate,
+        transaction.date >= activeStartDate &&
+        transaction.date <= activeEndDate,
     );
-  }, [activeRange, activeTab, allPaymentTransactions, customEndDate, customStartDate]);
+  }, [activeEndDate, activeStartDate, activeTab, allPaymentTransactions]);
 
+  const summaryDateIso = filteredTransactions[0]?.date || activeEndDate;
   const summaryTransactions = useMemo(
-    () => allPaymentTransactions.filter((transaction) => transaction.date === "2026-07-01"),
-    [allPaymentTransactions],
+    () => allPaymentTransactions.filter((transaction) => transaction.date === summaryDateIso),
+    [allPaymentTransactions, summaryDateIso],
   );
   const overviewTransactions = allPaymentTransactions;
   const paymentHistoryTransactions = useMemo(() => {
@@ -3489,6 +3550,20 @@ export function PaymentsScreen() {
     cashJobs: ledgerSourceRows.filter((row) => row.paymentMethod === "Cash").length,
     otherPayments: ledgerSourceRows.filter((row) => row.paymentMethod !== "Cash").length,
   };
+  const walletBalance = state.bookings
+    .filter(
+      (booking) =>
+        booking.paymentOption === "online" &&
+        (booking.paymentStatus === "paid" || Boolean(booking.paidAt)),
+    )
+    .reduce(
+      (sum, booking) =>
+        sum +
+        (booking.providerNetAmount > 0
+          ? booking.providerNetAmount
+          : Math.max(0, booking.quotedAmount - booking.companyCommissionAmount)),
+      0,
+    );
   const pendingCompanyAmount = companyPayableSummary.payableAmount;
   const processingCompanyAmount = companyPayableSummary.processingAmount;
   const isCompanyPaymentProcessing = processingCompanyAmount > 0;
@@ -3730,7 +3805,7 @@ export function PaymentsScreen() {
                   <Calendar className="h-5 w-5 text-[#7d84a0]" />
                   <input
                     type="text"
-                    value="01/07/2026"
+                    value={formatIsoDateLabel(activeStartDate)}
                     readOnly
                     className="w-full bg-transparent text-[15px] font-semibold text-[#1c1530] outline-none"
                   />
@@ -3742,7 +3817,7 @@ export function PaymentsScreen() {
                   <Calendar className="h-5 w-5 text-[#7d84a0]" />
                   <input
                     type="text"
-                    value="07/07/2026"
+                    value={formatIsoDateLabel(activeEndDate)}
                     readOnly
                     className="w-full bg-transparent text-[15px] font-semibold text-[#1c1530] outline-none"
                   />
@@ -4088,7 +4163,7 @@ export function PaymentsScreen() {
                       Daily Summary
                     </h2>
                     <span className="text-[0.98rem] font-medium text-[#6f748b]">
-                      ({displayDate})
+                      ({formatIsoDateLabel(summaryDateIso)})
                     </span>
                     <Calendar className="ml-auto h-4.5 w-4.5 text-[#7c819d]" />
                   </div>
@@ -4165,7 +4240,7 @@ export function PaymentsScreen() {
                           <div
                             key={transaction.id}
                             className={`flex items-center gap-3 px-4 py-4 ${
-                              index < filteredTransactions.length - 1
+                              index < overviewTransactions.length - 1
                                 ? "border-b border-[#f3edf9]"
                                 : ""
                             }`}
