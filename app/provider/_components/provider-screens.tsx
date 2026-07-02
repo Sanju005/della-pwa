@@ -3192,6 +3192,72 @@ function getProviderPaymentIcon(
   };
 }
 
+function getProviderLedgerMethodFromBooking(
+  booking: ProviderBookingItem,
+): ProviderLedgerMethod {
+  return booking.paymentOption === "online" ? "Online" : "Cash";
+}
+
+function getProviderBookingEventDate(booking: ProviderBookingItem) {
+  return (
+    booking.paidAt ||
+    booking.paymentReceivedByProviderAt ||
+    booking.cashPaidByUserAt ||
+    booking.paymentSentAt ||
+    booking.completedAt ||
+    booking.scheduledDate ||
+    booking.createdAt
+  );
+}
+
+function getProviderBookingEventDateOnly(booking: ProviderBookingItem) {
+  const rawValue = getProviderBookingEventDate(booking);
+  return rawValue ? rawValue.slice(0, 10) : booking.scheduledDate;
+}
+
+function formatProviderBookingDateLabel(booking: ProviderBookingItem) {
+  const rawValue = getProviderBookingEventDate(booking);
+
+  if (!rawValue) {
+    return booking.schedule;
+  }
+
+  const parsed = new Date(rawValue);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return booking.schedule;
+  }
+
+  return new Intl.DateTimeFormat("en-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(parsed);
+}
+
+function formatProviderLedgerDate(booking: ProviderBookingItem) {
+  const rawValue = getProviderBookingEventDate(booking);
+
+  if (!rawValue) {
+    return booking.scheduledDate;
+  }
+
+  const parsed = new Date(rawValue);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return booking.scheduledDate;
+  }
+
+  return new Intl.DateTimeFormat("en-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(parsed);
+}
+
 function ProviderPaymentModalShell({
   title,
   subtitle,
@@ -3272,6 +3338,74 @@ export function PaymentsScreen() {
   const displayDate = "01 Jul 2026";
   const fallback = LoadingOrError(state);
 
+  const allPaymentTransactions = useMemo<ProviderPaymentTransaction[]>(() => {
+    return state.bookings
+      .flatMap((booking) => {
+        const transactions: ProviderPaymentTransaction[] = [];
+        const date = getProviderBookingEventDateOnly(booking);
+        const timeLabel = formatProviderBookingDateLabel(booking);
+        const paymentMethod = getProviderLedgerMethodFromBooking(booking);
+        const bookingLabel = `Booking #${booking.id.slice(0, 8).toUpperCase()}`;
+        const paymentCompleted =
+          booking.paymentStatus === "paid" ||
+          Boolean(booking.paidAt || booking.paymentReceivedByProviderAt || booking.cashPaidByUserAt);
+
+        if (paymentCompleted && booking.quotedAmount > 0) {
+          transactions.push({
+            id: `payment-${booking.id}`,
+            kind: "payment",
+            title: "Payment Received",
+            bookingLabel,
+            date,
+            timeLabel,
+            amount: booking.quotedAmount,
+            direction: "in",
+            status: "Completed",
+            paymentMethod,
+          });
+        }
+
+        if (booking.companyCommissionAmount > 0) {
+          transactions.push({
+            id: `commission-${booking.id}`,
+            kind: "commission",
+            title: "Commission to Company",
+            bookingLabel,
+            date,
+            timeLabel,
+            amount: booking.companyCommissionAmount,
+            direction: "out",
+            status:
+              booking.companyPaymentStatus === "paid"
+                ? "Paid"
+                : booking.companyPaymentStatus === "payment_process"
+                  ? "Pending"
+                  : "Pending",
+            paymentMethod,
+          });
+        }
+
+        return transactions;
+      })
+      .sort((left, right) => right.date.localeCompare(left.date));
+  }, [state.bookings]);
+  const ledgerSourceRows = useMemo<ProviderLedgerRow[]>(() => {
+    return state.bookings
+      .filter((booking) => booking.quotedAmount > 0)
+      .map((booking) => ({
+        id: `ledger-${booking.id}`,
+        date: formatProviderLedgerDate(booking),
+        bookingId: booking.id.slice(0, 8).toUpperCase(),
+        paymentMethod: getProviderLedgerMethodFromBooking(booking),
+        earned: booking.quotedAmount,
+        toCompany: booking.companyCommissionAmount,
+        netEarned:
+          booking.providerNetAmount > 0
+            ? booking.providerNetAmount
+            : Math.max(0, booking.quotedAmount - booking.companyCommissionAmount),
+      }))
+      .sort((left, right) => right.date.localeCompare(left.date));
+  }, [state.bookings]);
   const filteredTransactions = useMemo(() => {
     const visibleKinds =
       activeTab === "payments"
@@ -3297,19 +3431,19 @@ export function PaymentsScreen() {
             ? "2026-07-31"
             : customEndDate;
 
-    return PROVIDER_PAYMENT_TRANSACTIONS.filter(
+    return allPaymentTransactions.filter(
       (transaction) =>
         visibleKinds.includes(transaction.kind) &&
         transaction.date >= startDate &&
         transaction.date <= endDate,
     );
-  }, [activeRange, activeTab, customEndDate, customStartDate]);
+  }, [activeRange, activeTab, allPaymentTransactions, customEndDate, customStartDate]);
 
   const summaryTransactions = useMemo(
-    () => PROVIDER_PAYMENT_TRANSACTIONS.filter((transaction) => transaction.date === "2026-07-01"),
-    [],
+    () => allPaymentTransactions.filter((transaction) => transaction.date === "2026-07-01"),
+    [allPaymentTransactions],
   );
-  const overviewTransactions = PROVIDER_PAYMENT_TRANSACTIONS;
+  const overviewTransactions = allPaymentTransactions;
   const paymentHistoryTransactions = useMemo(() => {
     if (activeTab !== "payments") {
       return filteredTransactions;
@@ -3323,10 +3457,10 @@ export function PaymentsScreen() {
   }, [activeTab, filteredTransactions, paymentHistorySection]);
   const ledgerRows = useMemo(
     () =>
-      PROVIDER_LEDGER_ROWS.filter((row) =>
+      ledgerSourceRows.filter((row) =>
         ledgerSection === "cash" ? row.paymentMethod === "Cash" : row.paymentMethod !== "Cash",
       ),
-    [ledgerSection],
+    [ledgerSection, ledgerSourceRows],
   );
   const ledgerTotals = useMemo(
     () => ({
@@ -3349,11 +3483,11 @@ export function PaymentsScreen() {
     .filter((transaction) => transaction.kind === "commission")
     .reduce((total, transaction) => total + transaction.amount, 0);
   const ledgerSummary = {
-    totalEarned: 405,
-    toCompany: 45,
-    netEarned: 360,
-    cashJobs: 2,
-    otherPayments: 3,
+    totalEarned: ledgerSourceRows.reduce((total, row) => total + row.earned, 0),
+    toCompany: ledgerSourceRows.reduce((total, row) => total + row.toCompany, 0),
+    netEarned: ledgerSourceRows.reduce((total, row) => total + row.netEarned, 0),
+    cashJobs: ledgerSourceRows.filter((row) => row.paymentMethod === "Cash").length,
+    otherPayments: ledgerSourceRows.filter((row) => row.paymentMethod !== "Cash").length,
   };
   const pendingCompanyAmount = companyPayableSummary.payableAmount;
   const processingCompanyAmount = companyPayableSummary.processingAmount;
@@ -3625,7 +3759,7 @@ export function PaymentsScreen() {
                 </div>
                 <p className="mt-4 text-[12px] text-[#5f6480]">Total Earned</p>
                 <p className="mt-2 whitespace-nowrap text-[1rem] font-black text-[#8E5EB5]">
-                  RM 405.00
+                  {formatCurrency(ledgerSummary.totalEarned)}
                 </p>
               </div>
               <div className="px-3 py-3 text-center">
@@ -3634,7 +3768,7 @@ export function PaymentsScreen() {
                 </div>
                 <p className="mt-4 text-[12px] text-[#5f6480]">To Company</p>
                 <p className="mt-2 whitespace-nowrap text-[1rem] font-black text-[#f97316]">
-                  RM 45.00
+                  {formatCurrency(ledgerSummary.toCompany)}
                 </p>
               </div>
               <div className="px-3 py-3 text-center">
@@ -3643,7 +3777,7 @@ export function PaymentsScreen() {
                 </div>
                 <p className="mt-4 text-[12px] text-[#5f6480]">Net Earned</p>
                 <p className="mt-2 whitespace-nowrap text-[1rem] font-black text-[#16a34a]">
-                  RM 360.00
+                  {formatCurrency(ledgerSummary.netEarned)}
                 </p>
               </div>
               <div className="px-3 py-3 text-center">
@@ -3652,7 +3786,7 @@ export function PaymentsScreen() {
                 </div>
                 <p className="mt-4 text-[12px] text-[#5f6480]">Cash Jobs</p>
                 <p className="mt-2 whitespace-nowrap text-[1rem] font-black text-[#3157c9]">
-                  2
+                  {ledgerSummary.cashJobs}
                 </p>
               </div>
               <div className="px-3 py-3 text-center">
@@ -3661,7 +3795,7 @@ export function PaymentsScreen() {
                 </div>
                 <p className="mt-4 text-[12px] text-[#5f6480]">Other Payments</p>
                 <p className="mt-2 whitespace-nowrap text-[1rem] font-black text-[#7c3aed]">
-                  3
+                  {ledgerSummary.otherPayments}
                 </p>
               </div>
             </div>
