@@ -3013,6 +3013,7 @@ type ProviderPaymentRange = "today" | "week" | "month" | "custom";
 type ProviderPaymentModal = "withdraw" | "company" | null;
 type ProviderPaymentTransactionKind = "payment" | "commission" | "withdrawal";
 type ProviderPaymentStatus = "Completed" | "Pending" | "Paid";
+type ProviderPaymentMethodSection = "cash" | "others";
 
 type ProviderPaymentTransaction = {
   id: string;
@@ -3024,6 +3025,7 @@ type ProviderPaymentTransaction = {
   amount: number;
   direction: "in" | "out";
   status: ProviderPaymentStatus;
+  paymentMethod?: ProviderLedgerMethod;
 };
 
 type ProviderLedgerMethod = "Cash" | "Card" | "Online" | "Wallet";
@@ -3049,6 +3051,7 @@ const PROVIDER_PAYMENT_TRANSACTIONS: ProviderPaymentTransaction[] = [
     amount: 80,
     direction: "in",
     status: "Completed",
+    paymentMethod: "Cash",
   },
   {
     id: "commission-bk-10021",
@@ -3060,6 +3063,7 @@ const PROVIDER_PAYMENT_TRANSACTIONS: ProviderPaymentTransaction[] = [
     amount: 15,
     direction: "out",
     status: "Pending",
+    paymentMethod: "Cash",
   },
   {
     id: "withdrawal-bank-10001",
@@ -3081,6 +3085,7 @@ const PROVIDER_PAYMENT_TRANSACTIONS: ProviderPaymentTransaction[] = [
     amount: 60,
     direction: "in",
     status: "Completed",
+    paymentMethod: "Card",
   },
   {
     id: "commission-bk-10020",
@@ -3092,6 +3097,7 @@ const PROVIDER_PAYMENT_TRANSACTIONS: ProviderPaymentTransaction[] = [
     amount: 12,
     direction: "out",
     status: "Paid",
+    paymentMethod: "Card",
   },
 ];
 
@@ -3242,6 +3248,9 @@ export function PaymentsScreen() {
   const [customStartDate, setCustomStartDate] = useState("2026-07-01");
   const [customEndDate, setCustomEndDate] = useState("2026-07-01");
   const [showLedger, setShowLedger] = useState(false);
+  const [paymentHistorySection, setPaymentHistorySection] =
+    useState<ProviderPaymentMethodSection>("cash");
+  const [ledgerSection, setLedgerSection] = useState<ProviderPaymentMethodSection>("cash");
   const [companyProofName, setCompanyProofName] = useState("");
   const [companyProofError, setCompanyProofError] = useState("");
   const [companyProofDataUrl, setCompanyProofDataUrl] = useState("");
@@ -3252,7 +3261,6 @@ export function PaymentsScreen() {
   const totalEarnings = 1250;
   const totalWithdrawn = 930;
   const pendingAmount = 150;
-  const pendingCompanyAmount = 75;
   const displayDate = "01 Jul 2026";
   const fallback = LoadingOrError(state);
 
@@ -3294,6 +3302,35 @@ export function PaymentsScreen() {
     [],
   );
   const overviewTransactions = PROVIDER_PAYMENT_TRANSACTIONS;
+  const paymentHistoryTransactions = useMemo(() => {
+    if (activeTab !== "payments") {
+      return filteredTransactions;
+    }
+
+    return filteredTransactions.filter((transaction) =>
+      paymentHistorySection === "cash"
+        ? transaction.paymentMethod === "Cash"
+        : transaction.paymentMethod !== "Cash",
+    );
+  }, [activeTab, filteredTransactions, paymentHistorySection]);
+  const ledgerRows = useMemo(
+    () =>
+      PROVIDER_LEDGER_ROWS.filter((row) =>
+        ledgerSection === "cash" ? row.paymentMethod === "Cash" : row.paymentMethod !== "Cash",
+      ),
+    [ledgerSection],
+  );
+  const ledgerTotals = useMemo(
+    () => ({
+      earned: ledgerRows.reduce((total, row) => total + row.earned, 0),
+      toCompany: ledgerRows.reduce((total, row) => total + row.toCompany, 0),
+      netEarned: ledgerRows.reduce((total, row) => total + row.netEarned, 0),
+      bookingCount: ledgerRows.length,
+      cashCount: ledgerRows.filter((row) => row.paymentMethod === "Cash").length,
+      otherCount: ledgerRows.filter((row) => row.paymentMethod !== "Cash").length,
+    }),
+    [ledgerRows],
+  );
   const earningsToday = summaryTransactions
     .filter((transaction) => transaction.kind === "payment")
     .reduce((total, transaction) => total + transaction.amount, 0);
@@ -3310,12 +3347,14 @@ export function PaymentsScreen() {
     cashJobs: 2,
     otherPayments: 3,
   };
-  const pendingCommissionBooking = state.bookings.find(
-    (booking) =>
-      booking.companyCommissionAmount > 0 &&
-      (booking.companyPaymentStatus === "pending" ||
-        booking.companyPaymentStatus === "payment_process"),
-  );
+  const pendingCommissionBooking =
+    state.bookings.find(
+      (booking) =>
+        booking.companyCommissionAmount > 0 &&
+        (booking.companyPaymentStatus === "pending" ||
+          booking.companyPaymentStatus === "payment_process"),
+    ) ?? state.bookings.find((booking) => booking.companyCommissionAmount > 0);
+  const pendingCompanyAmount = pendingCommissionBooking?.companyCommissionAmount || 75;
   const companyDepositAmountValue = Number(companyDepositAmount);
   const canSubmitCompanyPayment =
     Boolean(companyProofName) &&
@@ -3323,7 +3362,6 @@ export function PaymentsScreen() {
     companyDepositAmount.trim().length > 0 &&
     Number.isFinite(companyDepositAmountValue) &&
     companyDepositAmountValue > 0 &&
-    Boolean(pendingCommissionBooking) &&
     (!pendingCommissionBooking || state.actionBookingId !== pendingCommissionBooking.id);
 
   function resetCompanyProofState() {
@@ -3423,6 +3461,22 @@ export function PaymentsScreen() {
     { key: "week", label: "This Week" },
     { key: "month", label: "This Month" },
     { key: "custom", label: "Custom Range" },
+  ];
+  const methodSections: Array<{
+    key: ProviderPaymentMethodSection;
+    label: string;
+    icon: React.ReactNode;
+  }> = [
+    {
+      key: "cash",
+      label: "Cash",
+      icon: <Wallet className="h-4.5 w-4.5" />,
+    },
+    {
+      key: "others",
+      label: "Others",
+      icon: <CreditCard className="h-4.5 w-4.5" />,
+    },
   ];
 
   if (fallback) {
@@ -3559,6 +3613,25 @@ export function PaymentsScreen() {
           </section>
 
           <section className="overflow-hidden rounded-[28px] bg-white shadow-[0_20px_44px_rgba(91,45,144,0.08)] ring-1 ring-[#efe7f8]">
+            <div className="border-b border-[#f0e9f8] px-4 py-4">
+              <div className="grid grid-cols-2 overflow-hidden rounded-[18px] border border-[#ede4f7] bg-[#fffefe]">
+                {methodSections.map((section, index) => (
+                  <button
+                    key={`ledger-section-${section.key}`}
+                    type="button"
+                    onClick={() => setLedgerSection(section.key)}
+                    className={`flex min-h-[3.2rem] items-center justify-center gap-2 px-3 text-[14px] font-semibold transition ${
+                      ledgerSection === section.key
+                        ? "bg-[#8E5EB5] text-white"
+                        : "bg-white text-[#666b86]"
+                    } ${index === 0 ? "border-r border-[#ede4f7]" : ""}`}
+                  >
+                    {section.icon}
+                    {section.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <div className="min-w-[790px]">
                 <div className="grid grid-cols-[110px_120px_130px_120px_130px_130px] border-b-2 border-[#8E5EB5] px-3 py-4 text-[13px] font-semibold text-[#5f5d87]">
@@ -3570,7 +3643,7 @@ export function PaymentsScreen() {
                   <p className="px-2">Net Earned</p>
                 </div>
 
-                {PROVIDER_LEDGER_ROWS.map((row) => (
+                {ledgerRows.map((row) => (
                   <div
                     key={row.id}
                     className="grid grid-cols-[110px_120px_130px_120px_130px_130px] border-b border-[#f0ebf8] px-3 py-5 text-[14px] text-[#17153b]"
@@ -3601,17 +3674,19 @@ export function PaymentsScreen() {
                     <p className="text-[14px] font-black text-[#6d3bb5]">Total for Selected Range</p>
                   </div>
                   <div className="col-span-2 px-2">
-                    <p className="text-[14px] font-black">5 bookings</p>
-                    <p className="mt-1 text-[13px] text-[#4f4c75]">2 Cash / 3 Other</p>
+                    <p className="text-[14px] font-black">{ledgerTotals.bookingCount} bookings</p>
+                    <p className="mt-1 text-[13px] text-[#4f4c75]">
+                      {ledgerTotals.cashCount} Cash / {ledgerTotals.otherCount} Other
+                    </p>
                   </div>
                   <p className="px-2 whitespace-nowrap text-[15px] font-black text-[#16a34a]">
-                    RM 405.00
+                    {formatCurrency(ledgerTotals.earned)}
                   </p>
                   <p className="px-2 whitespace-nowrap text-[15px] font-black text-[#f97316]">
-                    RM 45.00
+                    {formatCurrency(ledgerTotals.toCompany)}
                   </p>
                   <p className="px-2 whitespace-nowrap text-[15px] font-black text-[#16a34a]">
-                    RM 360.00
+                    {formatCurrency(ledgerTotals.netEarned)}
                   </p>
                 </div>
               </div>
@@ -3939,12 +4014,45 @@ export function PaymentsScreen() {
                       : "Showing withdrawal transactions only."}
                   </p>
                 </div>
-                {filteredTransactions.length === 0 ? (
+                {activeTab === "payments" ? (
+                  <div className="border-b border-[#f3edf9] px-4 py-4">
+                    <div className="grid grid-cols-2 overflow-hidden rounded-[18px] border border-[#ede4f7] bg-[#fffefe]">
+                      {methodSections.map((section, index) => (
+                        <button
+                          key={`payment-section-${section.key}`}
+                          type="button"
+                          onClick={() => setPaymentHistorySection(section.key)}
+                          className={`flex min-h-[3rem] items-center justify-center gap-2 px-3 text-[14px] font-semibold transition ${
+                            paymentHistorySection === section.key
+                              ? "bg-[#8E5EB5] text-white"
+                              : "bg-white text-[#666b86]"
+                          } ${index === 0 ? "border-r border-[#ede4f7]" : ""}`}
+                        >
+                          {section.icon}
+                          {section.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-[13px] font-semibold text-[#1d1633]">
+                      {paymentHistorySection === "cash"
+                        ? "Cash Payment History"
+                        : "Other Payment History"}
+                    </p>
+                    <p className="mt-1 text-[12px] leading-5 text-[#7b748f]">
+                      {paymentHistorySection === "cash"
+                        ? "Cash bookings create company payable after collection."
+                        : "Card, online transfer, and wallet payouts are grouped here."}
+                    </p>
+                  </div>
+                ) : null}
+                {(activeTab === "payments" ? paymentHistoryTransactions : filteredTransactions)
+                  .length === 0 ? (
                   <div className="px-5 py-8 text-center text-[14px] text-[#7b748f]">
                     No transactions found for this date range.
                   </div>
                 ) : (
-                  filteredTransactions.map((transaction, index) => {
+                  (activeTab === "payments" ? paymentHistoryTransactions : filteredTransactions).map(
+                    (transaction, index, list) => {
                     const iconData = getProviderPaymentIcon(
                       transaction.kind,
                       transaction.direction,
@@ -3954,7 +4062,7 @@ export function PaymentsScreen() {
                       <div
                         key={transaction.id}
                         className={`flex items-center gap-3 px-4 py-4 ${
-                          index < filteredTransactions.length - 1
+                          index < list.length - 1
                             ? "border-b border-[#f3edf9]"
                             : ""
                         }`}
