@@ -3564,8 +3564,29 @@ export function PaymentsScreen() {
           : Math.max(0, booking.quotedAmount - booking.companyCommissionAmount)),
       0,
     );
-  const pendingCompanyAmount = companyPayableSummary.payableAmount;
-  const processingCompanyAmount = companyPayableSummary.processingAmount;
+  const derivedPendingCompanyAmount = state.bookings
+    .filter(
+      (booking) =>
+        booking.companyCommissionAmount > 0 &&
+        booking.companyPaymentStatus !== "paid" &&
+        booking.companyPaymentStatus !== "payment_process",
+    )
+    .reduce((sum, booking) => sum + Number(booking.companyCommissionAmount ?? 0), 0);
+  const derivedProcessingCompanyAmount = state.bookings
+    .filter(
+      (booking) =>
+        booking.companyCommissionAmount > 0 &&
+        booking.companyPaymentStatus === "payment_process",
+    )
+    .reduce((sum, booking) => sum + Number(booking.companyCommissionAmount ?? 0), 0);
+  const pendingCompanyAmount =
+    companyPayableSummary.payableAmount > 0
+      ? companyPayableSummary.payableAmount
+      : derivedPendingCompanyAmount;
+  const processingCompanyAmount =
+    companyPayableSummary.processingAmount > 0
+      ? companyPayableSummary.processingAmount
+      : derivedProcessingCompanyAmount;
   const isCompanyPaymentProcessing = processingCompanyAmount > 0;
   const isSubmittingCompanyPayment = state.actionBookingId === "provider-company-payment";
   const companyDepositAmountValue = Number(companyDepositAmount);
