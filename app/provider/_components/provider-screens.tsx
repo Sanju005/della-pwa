@@ -2685,13 +2685,19 @@ export function EarningsScreen() {
 
     try {
       for (const booking of payableBookings) {
-        const response = await fetch(`/api/provider/bookings/${booking.id}/settle-commission`, {
-          method: "POST",
+        const response = await fetch(`/api/provider/bookings/${booking.id}`, {
+          method: "PATCH",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({}),
+          body: JSON.stringify({
+            action: "settle_company_commission",
+            proofDataUrl: "daily-company-payment-placeholder",
+            proofFileName: "daily-company-payment.txt",
+            proofMimeType: "text/plain",
+            depositedAmount: booking.companyCommissionAmount,
+          }),
         });
 
         const result = (await response.json().catch(() => ({}))) as { success?: true; error?: string };

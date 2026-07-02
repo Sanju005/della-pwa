@@ -553,13 +553,16 @@ export function useProviderAppData() {
       return false;
     }
 
-    const response = await fetch(`/api/provider/bookings/${bookingId}/settle-commission`, {
-      method: "POST",
+    const response = await fetch(`/api/provider/bookings/${bookingId}`, {
+      method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify(proof ?? {}),
+      body: JSON.stringify({
+        action: "settle_company_commission",
+        ...(proof ?? {}),
+      }),
     }).catch(() => null);
 
     const result = response
