@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   BriefcaseBusiness,
@@ -3235,12 +3235,12 @@ function ProviderPaymentModalShell({
 export function PaymentsScreen() {
   const state = useProviderAppData();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<ProviderPaymentTab>("overview");
   const [activeRange, setActiveRange] = useState<ProviderPaymentRange>("custom");
   const [modal, setModal] = useState<ProviderPaymentModal>(null);
   const [customStartDate, setCustomStartDate] = useState("2026-07-01");
   const [customEndDate, setCustomEndDate] = useState("2026-07-01");
+  const [showLedger, setShowLedger] = useState(false);
 
   const walletBalance = 320;
   const totalEarnings = 1250;
@@ -3304,7 +3304,24 @@ export function PaymentsScreen() {
     cashJobs: 2,
     otherPayments: 3,
   };
-  const showLedger = searchParams.get("view") === "ledger";
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncLedgerView = () => {
+      const params = new URLSearchParams(window.location.search);
+      setShowLedger(params.get("view") === "ledger");
+    };
+
+    syncLedgerView();
+    window.addEventListener("popstate", syncLedgerView);
+
+    return () => {
+      window.removeEventListener("popstate", syncLedgerView);
+    };
+  }, []);
 
   const paymentTabs: Array<{ key: ProviderPaymentTab; label: string; icon: React.ReactNode }> = [
     {
@@ -3342,7 +3359,10 @@ export function PaymentsScreen() {
             <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-start gap-3">
               <button
                 type="button"
-                onClick={() => router.push("/provider/payments")}
+                onClick={() => {
+                  setShowLedger(false);
+                  router.push("/provider/payments");
+                }}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f8f2ff] text-[#8E5EB5]"
                 aria-label="Back to Payments"
               >
@@ -3762,7 +3782,10 @@ export function PaymentsScreen() {
                     </h2>
                     <button
                       type="button"
-                      onClick={() => router.push("/provider/payments?view=ledger")}
+                      onClick={() => {
+                        setShowLedger(true);
+                        router.push("/provider/payments?view=ledger");
+                      }}
                       className="inline-flex items-center gap-2 text-[14px] font-semibold text-[#8E5EB5]"
                     >
                       View All

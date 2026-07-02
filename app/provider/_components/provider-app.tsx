@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -612,9 +612,26 @@ export function useProviderAppData() {
 
 export function ProviderBottomNav() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const isLedgerView =
-    pathname === "/provider/payments" && searchParams.get("view") === "ledger";
+  const [isLedgerView, setIsLedgerView] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncLedgerView = () => {
+      const params = new URLSearchParams(window.location.search);
+      setIsLedgerView(pathname === "/provider/payments" && params.get("view") === "ledger");
+    };
+
+    syncLedgerView();
+    window.addEventListener("popstate", syncLedgerView);
+
+    return () => {
+      window.removeEventListener("popstate", syncLedgerView);
+    };
+  }, [pathname]);
+
   const items = [
     {
       href: "/provider/dashboard",
