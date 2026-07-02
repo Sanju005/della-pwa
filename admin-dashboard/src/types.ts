@@ -253,6 +253,17 @@ export type ProviderPayoutRow = {
   status: string;
 };
 
+export type ProviderCommissionRow = {
+  paymentId: string;
+  bookingId: string;
+  commissionAmount: string;
+  depositedAmount: string;
+  adminReceivedAmount: string;
+  submittedAt: string;
+  status: "pending" | "payment_process" | "paid";
+  proofName: string;
+};
+
 export type ProviderDetailRecord = {
   providerId: string;
   name: string;
@@ -302,6 +313,7 @@ export type ProviderDetailRecord = {
   completedTaskRows: ProviderTaskRow[];
   upcomingTaskRows: ProviderUpcomingTaskRow[];
   payoutRows: ProviderPayoutRow[];
+  commissionRows?: ProviderCommissionRow[];
   recentActions: UserActionItem[];
   activityLog: UserTimelineItem[];
 };

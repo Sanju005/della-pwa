@@ -119,7 +119,9 @@ type BookingRow = {
     paid_at: string | null;
     company_commission_amount: number | null;
     provider_net_amount: number | null;
-    company_payment_status: "pending" | "paid" | null;
+    company_payment_status: "pending" | "payment_process" | "paid" | null;
+    provider_company_payment_amount: number | null;
+    admin_company_received_amount: number | null;
     customer_payment_proof_data_url: string | null;
     customer_payment_proof_file_name: string | null;
     customer_payment_proof_mime_type: string | null;
@@ -667,7 +669,12 @@ function mapLiveBookingToUi(
       typeof paymentRecord?.provider_net_amount === "number"
         ? Number(paymentRecord.provider_net_amount)
         : 0,
-    companyPaymentStatus: paymentRecord?.company_payment_status === "paid" ? "paid" : "pending",
+    companyPaymentStatus:
+      paymentRecord?.company_payment_status === "paid"
+        ? "paid"
+        : paymentRecord?.company_payment_status === "payment_process"
+          ? "payment_process"
+          : "pending",
     customerPaymentProofDataUrl: paymentRecord?.customer_payment_proof_data_url ?? "",
     customerPaymentProofFileName: paymentRecord?.customer_payment_proof_file_name ?? "",
     customerPaymentProofMimeType: paymentRecord?.customer_payment_proof_mime_type ?? "",
@@ -774,7 +781,7 @@ export async function GET(request: Request) {
       on_the_way_at,
       arrived_at,
       completed_at,
-      payment_records:payments(amount, payment_method, payment_option, status, paid_at, company_commission_amount, provider_net_amount, company_payment_status, customer_payment_proof_data_url, customer_payment_proof_file_name, customer_payment_proof_mime_type, provider_company_payment_proof_data_url, provider_company_payment_proof_file_name, provider_company_payment_proof_mime_type, created_at)
+      payment_records:payments(amount, payment_method, payment_option, status, paid_at, company_commission_amount, provider_net_amount, company_payment_status, provider_company_payment_amount, admin_company_received_amount, customer_payment_proof_data_url, customer_payment_proof_file_name, customer_payment_proof_mime_type, provider_company_payment_proof_data_url, provider_company_payment_proof_file_name, provider_company_payment_proof_mime_type, created_at)
     `)
     .eq("customer_id", verified.profile.id)
     .order("created_at", { ascending: false });
@@ -802,7 +809,7 @@ export async function GET(request: Request) {
         on_the_way_at,
         arrived_at,
         completed_at,
-        payment_records:payments(amount, payment_method, payment_option, status, paid_at, company_commission_amount, provider_net_amount, company_payment_status, customer_payment_proof_data_url, customer_payment_proof_file_name, customer_payment_proof_mime_type, provider_company_payment_proof_data_url, provider_company_payment_proof_file_name, provider_company_payment_proof_mime_type, created_at)
+        payment_records:payments(amount, payment_method, payment_option, status, paid_at, company_commission_amount, provider_net_amount, company_payment_status, provider_company_payment_amount, admin_company_received_amount, customer_payment_proof_data_url, customer_payment_proof_file_name, customer_payment_proof_mime_type, provider_company_payment_proof_data_url, provider_company_payment_proof_file_name, provider_company_payment_proof_mime_type, created_at)
       `)
       .eq("customer_id", verified.profile.id)
       .order("created_at", { ascending: false });

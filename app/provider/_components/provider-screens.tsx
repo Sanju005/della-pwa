@@ -3244,6 +3244,9 @@ export function PaymentsScreen() {
   const [showLedger, setShowLedger] = useState(false);
   const [companyProofName, setCompanyProofName] = useState("");
   const [companyProofError, setCompanyProofError] = useState("");
+  const [companyProofDataUrl, setCompanyProofDataUrl] = useState("");
+  const [companyProofMimeType, setCompanyProofMimeType] = useState("");
+  const [companyDepositAmount, setCompanyDepositAmount] = useState("");
 
   const walletBalance = 320;
   const totalEarnings = 1250;
@@ -3307,42 +3310,65 @@ export function PaymentsScreen() {
     cashJobs: 2,
     otherPayments: 3,
   };
+  const pendingCommissionBooking = state.bookings.find(
+    (booking) =>
+      booking.companyCommissionAmount > 0 && booking.companyPaymentStatus === "pending",
+  );
 
   function resetCompanyProofState() {
     setCompanyProofName("");
     setCompanyProofError("");
+    setCompanyProofDataUrl("");
+    setCompanyProofMimeType("");
+    setCompanyDepositAmount("");
     if (companyProofInputRef.current) {
       companyProofInputRef.current.value = "";
     }
   }
 
-  function handleCompanyProofChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleCompanyProofChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     if (!file) {
       setCompanyProofName("");
       setCompanyProofError("");
+      setCompanyProofDataUrl("");
+      setCompanyProofMimeType("");
       return;
     }
 
-    const allowedTypes = ["image/jpeg", "application/pdf"];
-    const maxBytes = 2 * 1024 * 1024;
-
-    if (!allowedTypes.includes(file.type)) {
+    if (!isPaymentProofMimeType(file.type)) {
       setCompanyProofName("");
+      setCompanyProofDataUrl("");
+      setCompanyProofMimeType("");
       setCompanyProofError("Upload JPG, JPEG, or PDF only.");
       event.target.value = "";
       return;
     }
 
-    if (file.size > maxBytes) {
+    if (file.size > PAYMENT_PROOF_MAX_BYTES) {
       setCompanyProofName("");
+      setCompanyProofDataUrl("");
+      setCompanyProofMimeType("");
       setCompanyProofError("File must be 2MB or smaller.");
       event.target.value = "";
       return;
     }
 
+    const dataUrl = await readFileAsDataUrl(file).catch(() => "");
+
+    if (!dataUrl) {
+      setCompanyProofName("");
+      setCompanyProofDataUrl("");
+      setCompanyProofMimeType("");
+      setCompanyProofError("Unable to read the payment slip file.");
+      event.target.value = "";
+      return;
+    }
+
     setCompanyProofName(file.name);
+    setCompanyProofDataUrl(dataUrl);
+    setCompanyProofMimeType(file.type);
     setCompanyProofError("");
   }
 
@@ -4029,7 +4055,6 @@ export function PaymentsScreen() {
                 ref={companyProofInputRef}
                 type="file"
                 accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf"
-                capture="environment"
                 onChange={handleCompanyProofChange}
                 className="hidden"
               />
@@ -4051,24 +4076,47 @@ export function PaymentsScreen() {
                 </p>
               ) : null}
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="block rounded-[20px] border border-[#ece3f7] bg-white p-4">
+              <span className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#7d84a0]">
+                Deposited Amount
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={companyDepositAmount}
+                onChange={(event) => setCompanyDepositAmount(event.target.value)}
+                placeholder="Enter deposited amount"
+                className="mt-3 block w-full bg-transparent text-[15px] font-semibold text-[#1d1633] outline-none"
+              />
+            </label>
+            <div className="grid grid-cols-1 gap-3">
               <button
                 type="button"
-                onClick={() => companyProofInputRef.current?.click()}
-                className="inline-flex min-h-[3rem] items-center justify-center rounded-[16px] border border-[#e7dcf4] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
-              >
-                Upload Proof
-              </button>
-              <button
-                type="button"
-                disabled={!companyProofName}
+                disabled={
+                  !companyProofName ||
+                  !companyProofDataUrl ||
+                  !companyDepositAmount.trim() ||
+                  !pendingCommissionBooking ||
+                  state.actionBookingId === pendingCommissionBooking.id
+                }
                 onClick={() => {
+                  if (!pendingCommissionBooking) {
+                    state.setError("No pending company commission booking was found.");
+                    return;
+                  }
+
+                  void state.handleCommissionSettlement(pendingCommissionBooking.id, {
+                    proofDataUrl: companyProofDataUrl,
+                    proofFileName: companyProofName,
+                    proofMimeType: companyProofMimeType,
+                    depositedAmount: Number(companyDepositAmount),
+                  });
                   setModal(null);
                   resetCompanyProofState();
-                  state.setNotice("Payment slip uploaded. Waiting for admin approval before marking as paid.");
                 }}
                 className={`inline-flex min-h-[3rem] items-center justify-center rounded-[16px] px-4 text-[14px] font-bold ${
-                  companyProofName
+                  companyProofName && companyProofDataUrl && companyDepositAmount.trim()
                     ? "bg-[#8E5EB5] text-white"
                     : "bg-[#efe7f8] text-[#b8a9cf]"
                 }`}

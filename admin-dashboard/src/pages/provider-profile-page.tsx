@@ -27,6 +27,7 @@ import { InfoRow, MetricTile, MiniStatus, PillBadge, SurfaceCard, TableShell } f
 import { providerDetailRecords } from "../data/provider-detail-mocks";
 import {
   getProviderProfileWithFallback,
+  markCompanyPaymentReceived,
   setProviderSuspended,
   setProviderVisibility,
   updateProviderProfile,
@@ -137,6 +138,8 @@ export function ProviderProfilePage() {
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [receivingPaymentId, setReceivingPaymentId] = useState("");
+  const [receivedAmounts, setReceivedAmounts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: provider?.name ?? "",
@@ -288,6 +291,42 @@ export function ProviderProfilePage() {
     window.setTimeout(() => {
       navigate("/service-providers");
     }, 500);
+  }
+
+  async function handleMarkCompanyPaymentReceived(paymentId: string) {
+    const rawAmount = receivedAmounts[paymentId] ?? "";
+
+    if (!rawAmount.trim()) {
+      flash("Enter the received amount before marking payment received.");
+      return;
+    }
+
+    setReceivingPaymentId(paymentId);
+    const result = await markCompanyPaymentReceived(paymentId, Number(rawAmount), detail.providerId);
+    setReceivingPaymentId("");
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    setProvider((current) =>
+      current
+        ? {
+            ...current,
+            commissionRows: (current.commissionRows ?? []).map((row) =>
+              row.paymentId === paymentId
+                ? {
+                    ...row,
+                    status: "paid",
+                    adminReceivedAmount: `RM ${Number(rawAmount).toFixed(2)}`,
+                  }
+                : row,
+            ),
+          }
+        : current,
+    );
+    flash("Company payment marked as received.");
   }
 
   function renderOverview() {
@@ -797,10 +836,81 @@ export function ProviderProfilePage() {
           )
         : null}
       {activeTab === "Payments & Withdrawals"
-        ? renderSimpleRows(
-            "Payments & Withdrawals",
-            ["ID", "Type", "Amount", "Date", "Status"],
-            detail.payoutRows.map((row) => [row.id, row.type, row.amount, row.date, row.status])
+        ? (
+            <div className="space-y-4">
+              {renderSimpleRows(
+                "Payments & Withdrawals",
+                ["ID", "Type", "Amount", "Date", "Status"],
+                detail.payoutRows.map((row) => [row.id, row.type, row.amount, row.date, row.status])
+              )}
+              <TableShell title="Company Commission Payments">
+                <table className="min-w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400">
+                      <th className="pb-3 font-semibold">Booking</th>
+                      <th className="pb-3 font-semibold">Commission</th>
+                      <th className="pb-3 font-semibold">Provider Deposited</th>
+                      <th className="pb-3 font-semibold">Admin Received</th>
+                      <th className="pb-3 font-semibold">Slip</th>
+                      <th className="pb-3 font-semibold">Submitted</th>
+                      <th className="pb-3 font-semibold">Status</th>
+                      <th className="pb-3 font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detail.commissionRows ?? []).length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-4 text-slate-500">
+                          No company commission payments yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      detail.commissionRows?.map((row) => (
+                        <tr key={row.paymentId} className="border-b border-slate-50 align-top">
+                          <td className="py-3 font-semibold text-slate-700">{row.bookingId || "-"}</td>
+                          <td className="py-3">{row.commissionAmount}</td>
+                          <td className="py-3">{row.depositedAmount}</td>
+                          <td className="py-3">
+                            {row.status === "paid" ? (
+                              row.adminReceivedAmount
+                            ) : (
+                              <input
+                                value={receivedAmounts[row.paymentId] ?? ""}
+                                onChange={(event) =>
+                                  setReceivedAmounts((current) => ({
+                                    ...current,
+                                    [row.paymentId]: event.target.value,
+                                  }))
+                                }
+                                placeholder="RM amount"
+                                className="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                              />
+                            )}
+                          </td>
+                          <td className="py-3 text-slate-500">{row.proofName}</td>
+                          <td className="py-3 text-slate-500">{row.submittedAt}</td>
+                          <td className="py-3"><MiniStatus status={row.status === "payment_process" ? "Pending" : row.status} /></td>
+                          <td className="py-3">
+                            {row.status === "payment_process" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleMarkCompanyPaymentReceived(row.paymentId)}
+                                disabled={receivingPaymentId === row.paymentId}
+                                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                              >
+                                {receivingPaymentId === row.paymentId ? "Saving..." : "Mark Received"}
+                              </button>
+                            ) : (
+                              <span className="text-slate-400">Completed</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </TableShell>
+            </div>
           )
         : null}
       {activeTab === "Reviews"

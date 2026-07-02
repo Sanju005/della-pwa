@@ -103,7 +103,7 @@ export type Booking = {
   paymentStatus?: "pending" | "paid" | "failed" | "cancelled" | "refunded";
   companyCommissionAmount?: number;
   providerNetAmount?: number;
-  companyPaymentStatus?: "pending" | "paid";
+  companyPaymentStatus?: "pending" | "payment_process" | "paid";
   customerPaymentProofDataUrl?: string;
   customerPaymentProofFileName?: string;
   customerPaymentProofMimeType?: string;

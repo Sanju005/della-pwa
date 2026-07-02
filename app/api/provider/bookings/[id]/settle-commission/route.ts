@@ -15,6 +15,7 @@ type CommissionProofPayload = {
   proofDataUrl?: string;
   proofFileName?: string;
   proofMimeType?: string;
+  depositedAmount?: number;
 };
 
 function isProviderRole(role: string | null | undefined) {
@@ -98,12 +99,28 @@ export async function POST(
 
   const payload = (await request.json().catch(() => ({}))) as CommissionProofPayload;
   const params = await context.params;
+  const depositedAmount = Number(payload.depositedAmount ?? 0);
+
+  if (!payload.proofDataUrl?.trim() || !payload.proofFileName?.trim() || !payload.proofMimeType?.trim()) {
+    return NextResponse.json(
+      { error: "Payment slip is required before submitting company payment." },
+      { status: 400 },
+    );
+  }
+
+  if (!Number.isFinite(depositedAmount) || depositedAmount <= 0) {
+    return NextResponse.json(
+      { error: "Deposited amount is required." },
+      { status: 400 },
+    );
+  }
 
   const { error } = await verified.adminClient
     .from("payments")
     .update({
-      company_payment_status: "paid",
-      company_paid_at: new Date().toISOString(),
+      company_payment_status: "payment_process",
+      company_payment_requested_at: new Date().toISOString(),
+      provider_company_payment_amount: depositedAmount,
       provider_company_payment_proof_data_url: payload.proofDataUrl?.trim() || null,
       provider_company_payment_proof_file_name: payload.proofFileName?.trim() || null,
       provider_company_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
@@ -116,6 +133,23 @@ export async function POST(
     return NextResponse.json(
       { error: error.message || "Unable to settle company commission." },
       { status: 500 },
+    );
+  }
+
+  const { data: adminProfiles } = await verified.adminClient
+    .from("profiles")
+    .select("id")
+    .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+
+  if (adminProfiles?.length) {
+    await verified.adminClient.from("notifications").insert(
+      adminProfiles.map((admin) => ({
+        user_id: admin.id,
+        booking_id: params.id,
+        notification_type: "company_payment_submitted",
+        title: "Company payment submitted",
+        body: `Provider uploaded a payment slip and submitted RM ${depositedAmount.toFixed(2)} for company commission review.`,
+      })),
     );
   }
 

@@ -2,6 +2,7 @@ import { bookings, payments, providers as mockProviders, reviews as mockReviews 
 import { providerDetailRecords } from "../data/provider-detail-mocks";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import type {
+  ProviderCommissionRow,
   ProviderDetailRecord,
   ProviderDocumentItem,
   ProviderPayoutRow,
@@ -95,6 +96,13 @@ type LivePaymentRow = {
   created_at?: string | null;
   customer_id?: string | null;
   provider_id?: string | null;
+  booking_id?: string | null;
+  company_commission_amount?: number | null;
+  company_payment_status?: "pending" | "payment_process" | "paid" | null;
+  provider_company_payment_amount?: number | null;
+  admin_company_received_amount?: number | null;
+  provider_company_payment_proof_file_name?: string | null;
+  company_payment_requested_at?: string | null;
 };
 
 type LiveReviewRow = {
@@ -582,7 +590,7 @@ async function tryFetchProviderPayments(providerId: string) {
 
   const { data, error } = await supabase
     .from("payments")
-    .select("id, status, amount, payment_method, created_at, provider_id")
+    .select("id, booking_id, status, amount, payment_method, created_at, provider_id, company_commission_amount, company_payment_status, provider_company_payment_amount, admin_company_received_amount, provider_company_payment_proof_file_name, company_payment_requested_at")
     .eq("provider_id", providerId)
     .order("created_at", { ascending: false })
     .limit(30);
@@ -658,6 +666,26 @@ function buildPayoutRows(livePayments: LivePaymentRow[]): ProviderPayoutRow[] {
     date: formatDate(row.created_at),
     status: formatStatus(row.status),
   }));
+}
+
+function buildCommissionRows(livePayments: LivePaymentRow[]): ProviderCommissionRow[] {
+  return livePayments
+    .filter((row) => Number(row.company_commission_amount ?? 0) > 0)
+    .map((row) => ({
+      paymentId: row.id,
+      bookingId: row.booking_id ?? "",
+      commissionAmount: formatCurrency(row.company_commission_amount ?? 0),
+      depositedAmount: formatCurrency(row.provider_company_payment_amount ?? 0),
+      adminReceivedAmount: formatCurrency(row.admin_company_received_amount ?? 0),
+      submittedAt: formatDateTime(row.company_payment_requested_at ?? row.created_at),
+      status:
+        row.company_payment_status === "paid"
+          ? "paid"
+          : row.company_payment_status === "payment_process"
+            ? "payment_process"
+            : "pending",
+      proofName: row.provider_company_payment_proof_file_name?.trim() || "No slip uploaded",
+    }));
 }
 
 function buildReviewRows(liveReviews: LiveReviewRow[], customerNames: Map<string, string>): UserReviewItem[] {
@@ -779,6 +807,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   ]);
   const taskRows = liveTasks?.length ? buildTaskRows(liveTasks, customerNames) : null;
   const payoutRows = livePayments?.length ? buildPayoutRows(livePayments) : fallback.payoutRows;
+  const commissionRows = livePayments?.length ? buildCommissionRows(livePayments) : [];
   const reviewRows = liveReviews?.length
     ? buildReviewRows(liveReviews, customerNames)
     : getMockProviderReviews(fallback.name).length
@@ -857,6 +886,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     completedTaskRows: taskRows?.completedTaskRows.length ? taskRows.completedTaskRows : fallback.completedTaskRows,
     upcomingTaskRows: taskRows?.upcomingTaskRows.length ? taskRows.upcomingTaskRows : fallback.upcomingTaskRows,
     payoutRows,
+    commissionRows,
   };
 
   if (reviewRows.length) {
@@ -934,6 +964,58 @@ export async function setProviderVisibility(providerId: string, active: boolean)
 
   if (error) {
     return { error: error.message || "Unable to update provider visibility." };
+  }
+
+  return { error: null };
+}
+
+export async function markCompanyPaymentReceived(
+  paymentId: string,
+  receivedAmount: number,
+  providerId: string,
+) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const safeAmount = Number(receivedAmount);
+  if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
+    return { error: "Received amount is required." };
+  }
+
+  const { data: paymentRow, error: paymentReadError } = await supabase
+    .from("payments")
+    .select("provider_id, booking_id")
+    .eq("id", paymentId)
+    .eq("provider_id", providerId)
+    .maybeSingle();
+
+  if (paymentReadError || !paymentRow) {
+    return { error: paymentReadError?.message || "Payment record was not found." };
+  }
+
+  const { error } = await supabase
+    .from("payments")
+    .update({
+      company_payment_status: "paid",
+      admin_company_received_amount: safeAmount,
+      company_paid_at: new Date().toISOString(),
+    })
+    .eq("id", paymentId)
+    .eq("provider_id", providerId);
+
+  if (error) {
+    return { error: error.message || "Unable to mark company payment as received." };
+  }
+
+  if (paymentRow.booking_id) {
+    await supabase.from("notifications").insert({
+      user_id: providerId,
+      booking_id: paymentRow.booking_id,
+      notification_type: "company_payment_received",
+      title: "Company payment approved",
+      body: `Admin recorded RM ${safeAmount.toFixed(2)} and marked your company payment as received.`,
+    });
   }
 
   return { error: null };

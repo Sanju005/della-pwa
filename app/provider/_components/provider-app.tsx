@@ -89,7 +89,9 @@ export type ProviderBookingItem = {
   paymentStatus?: "pending" | "paid" | "failed" | "cancelled" | "refunded";
   paymentOption?: "cash" | "online";
   companyCommissionAmount: number;
-  companyPaymentStatus: "pending" | "paid";
+  companyPaymentStatus: "pending" | "payment_process" | "paid";
+  providerCompanyPaymentAmount?: number;
+  adminCompanyReceivedAmount?: number;
   providerNetAmount: number;
   customerPaymentProofDataUrl?: string;
   customerPaymentProofFileName?: string;
@@ -527,6 +529,7 @@ export function useProviderAppData() {
       proofDataUrl?: string;
       proofFileName?: string;
       proofMimeType?: string;
+      depositedAmount?: number;
     },
   ) {
     const client = getSupabaseClient();
@@ -572,7 +575,7 @@ export function useProviderAppData() {
       }
 
       await reloadWorkspace();
-      setNotice("Company commission marked as paid.");
+      setNotice("Company commission submitted for admin approval.");
       setActionBookingId("");
     });
   }
