@@ -3814,7 +3814,7 @@ export function PaymentsScreen() {
                   <button
                     type="button"
                     onClick={() => setModal("company")}
-                    className="inline-flex min-h-[2.95rem] items-center gap-2 rounded-[16px] bg-[linear-gradient(180deg,#ec3349_0%,#d81d35_100%)] px-4 py-2 text-[14px] font-extrabold text-white shadow-[0_16px_28px_rgba(216,29,53,0.24)] sm:mt-3"
+                    className="inline-flex min-h-[2.95rem] items-center gap-2 rounded-[16px] bg-[linear-gradient(180deg,#ec3349_0%,#d81d35_100%)] px-4 py-2 text-[14px] font-extrabold text-white sm:mt-3"
                   >
                     Pay Now
                     <ChevronRight className="h-4.5 w-4.5" />
