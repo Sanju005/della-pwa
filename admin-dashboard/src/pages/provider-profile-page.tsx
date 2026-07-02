@@ -293,16 +293,16 @@ export function ProviderProfilePage() {
     }, 500);
   }
 
-  async function handleMarkCompanyPaymentReceived(paymentId: string) {
-    const rawAmount = receivedAmounts[paymentId] ?? "";
+  async function handleMarkCompanyPaymentReceived(submissionId: string) {
+    const rawAmount = receivedAmounts[submissionId] ?? "";
 
     if (!rawAmount.trim()) {
       flash("Enter the received amount before marking payment received.");
       return;
     }
 
-    setReceivingPaymentId(paymentId);
-    const result = await markCompanyPaymentReceived(paymentId, Number(rawAmount), detail.providerId);
+    setReceivingPaymentId(submissionId);
+    const result = await markCompanyPaymentReceived(submissionId, Number(rawAmount), detail.providerId);
     setReceivingPaymentId("");
 
     if (result.error) {
@@ -315,7 +315,7 @@ export function ProviderProfilePage() {
         ? {
             ...current,
             commissionRows: (current.commissionRows ?? []).map((row) =>
-              row.paymentId === paymentId
+              row.submissionId === submissionId
                 ? {
                     ...row,
                     status: "paid",
@@ -847,8 +847,7 @@ export function ProviderProfilePage() {
                 <table className="min-w-full text-left text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400">
-                      <th className="pb-3 font-semibold">Booking</th>
-                      <th className="pb-3 font-semibold">Commission</th>
+                      <th className="pb-3 font-semibold">Payable</th>
                       <th className="pb-3 font-semibold">Provider Deposited</th>
                       <th className="pb-3 font-semibold">Admin Received</th>
                       <th className="pb-3 font-semibold">Slip</th>
@@ -860,26 +859,25 @@ export function ProviderProfilePage() {
                   <tbody>
                     {(detail.commissionRows ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-4 text-slate-500">
+                        <td colSpan={7} className="py-4 text-slate-500">
                           No company commission payments yet.
                         </td>
                       </tr>
                     ) : (
                       detail.commissionRows?.map((row) => (
-                        <tr key={row.paymentId} className="border-b border-slate-50 align-top">
-                          <td className="py-3 font-semibold text-slate-700">{row.bookingId || "-"}</td>
-                          <td className="py-3">{row.commissionAmount}</td>
+                        <tr key={row.submissionId} className="border-b border-slate-50 align-top">
+                          <td className="py-3 font-semibold text-slate-700">{row.payableAmount}</td>
                           <td className="py-3">{row.depositedAmount}</td>
                           <td className="py-3">
                             {row.status === "paid" ? (
                               row.adminReceivedAmount
                             ) : (
                               <input
-                                value={receivedAmounts[row.paymentId] ?? ""}
+                                value={receivedAmounts[row.submissionId] ?? ""}
                                 onChange={(event) =>
                                   setReceivedAmounts((current) => ({
                                     ...current,
-                                    [row.paymentId]: event.target.value,
+                                    [row.submissionId]: event.target.value,
                                   }))
                                 }
                                 placeholder="RM amount"
@@ -889,16 +887,16 @@ export function ProviderProfilePage() {
                           </td>
                           <td className="py-3 text-slate-500">{row.proofName}</td>
                           <td className="py-3 text-slate-500">{row.submittedAt}</td>
-                          <td className="py-3"><MiniStatus status={row.status === "payment_process" ? "Pending" : row.status} /></td>
+                          <td className="py-3"><MiniStatus status={row.status === "processing" ? "Pending" : row.status} /></td>
                           <td className="py-3">
-                            {row.status === "payment_process" ? (
+                            {row.status === "processing" ? (
                               <button
                                 type="button"
-                                onClick={() => void handleMarkCompanyPaymentReceived(row.paymentId)}
-                                disabled={receivingPaymentId === row.paymentId}
+                                onClick={() => void handleMarkCompanyPaymentReceived(row.submissionId)}
+                                disabled={receivingPaymentId === row.submissionId}
                                 className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
                               >
-                                {receivingPaymentId === row.paymentId ? "Saving..." : "Mark Received"}
+                                {receivingPaymentId === row.submissionId ? "Saving..." : "Mark Received"}
                               </button>
                             ) : (
                               <span className="text-slate-400">Completed</span>

@@ -524,8 +524,15 @@ export function useProviderAppData() {
   }
 
   async function handleCommissionSettlement(
-    bookingId: string,
-    proof?: {
+    bookingIdOrProof?:
+      | string
+      | {
+          proofDataUrl?: string;
+          proofFileName?: string;
+          proofMimeType?: string;
+          depositedAmount?: number;
+        },
+    maybeProof?: {
       proofDataUrl?: string;
       proofFileName?: string;
       proofMimeType?: string;
@@ -533,9 +540,12 @@ export function useProviderAppData() {
     },
   ) {
     const client = getSupabaseClient();
+    const proof =
+      typeof bookingIdOrProof === "string" ? (maybeProof ?? {}) : (bookingIdOrProof ?? {});
+    const actionKey = typeof bookingIdOrProof === "string" ? bookingIdOrProof : "provider-company-payment";
     setError("");
     setNotice("");
-    setActionBookingId(bookingId);
+    setActionBookingId(actionKey);
 
     if (!client) {
       setError("Supabase is not configured yet.");
@@ -553,16 +563,13 @@ export function useProviderAppData() {
       return false;
     }
 
-    const response = await fetch(`/api/provider/bookings/${bookingId}`, {
-      method: "PATCH",
+    const response = await fetch("/api/provider/company-payments", {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        action: "settle_company_commission",
-        ...(proof ?? {}),
-      }),
+      body: JSON.stringify(proof),
     }).catch(() => null);
 
     const result = response

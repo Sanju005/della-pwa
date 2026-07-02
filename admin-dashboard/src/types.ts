@@ -254,13 +254,12 @@ export type ProviderPayoutRow = {
 };
 
 export type ProviderCommissionRow = {
-  paymentId: string;
-  bookingId: string;
-  commissionAmount: string;
+  submissionId: string;
+  payableAmount: string;
   depositedAmount: string;
   adminReceivedAmount: string;
   submittedAt: string;
-  status: "pending" | "payment_process" | "paid";
+  status: "processing" | "paid";
   proofName: string;
 };
 

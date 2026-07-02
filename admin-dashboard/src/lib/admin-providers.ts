@@ -105,6 +105,18 @@ type LivePaymentRow = {
   company_payment_requested_at?: string | null;
 };
 
+type LiveCompanyPaymentSubmissionRow = {
+  id: string;
+  provider_id?: string | null;
+  payable_amount_snapshot?: number | null;
+  submitted_amount?: number | null;
+  admin_received_amount?: number | null;
+  status?: "processing" | "paid" | null;
+  proof_file_name?: string | null;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+};
+
 type LiveReviewRow = {
   id: string;
   rating?: number | null;
@@ -602,6 +614,25 @@ async function tryFetchProviderPayments(providerId: string) {
   return data as LivePaymentRow[];
 }
 
+async function tryFetchProviderCompanyPaymentSubmissions(providerId: string) {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("provider_company_payment_submissions")
+    .select("id, provider_id, payable_amount_snapshot, submitted_amount, admin_received_amount, status, proof_file_name, submitted_at, reviewed_at")
+    .eq("provider_id", providerId)
+    .order("submitted_at", { ascending: false })
+    .limit(30);
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as LiveCompanyPaymentSubmissionRow[];
+}
+
 async function tryFetchProviderReviews(providerId: string) {
   if (!supabase) {
     return null;
@@ -668,24 +699,18 @@ function buildPayoutRows(livePayments: LivePaymentRow[]): ProviderPayoutRow[] {
   }));
 }
 
-function buildCommissionRows(livePayments: LivePaymentRow[]): ProviderCommissionRow[] {
-  return livePayments
-    .filter((row) => Number(row.company_commission_amount ?? 0) > 0)
-    .map((row) => ({
-      paymentId: row.id,
-      bookingId: row.booking_id ?? "",
-      commissionAmount: formatCurrency(row.company_commission_amount ?? 0),
-      depositedAmount: formatCurrency(row.provider_company_payment_amount ?? 0),
-      adminReceivedAmount: formatCurrency(row.admin_company_received_amount ?? 0),
-      submittedAt: formatDateTime(row.company_payment_requested_at ?? row.created_at),
-      status:
-        row.company_payment_status === "paid"
-          ? "paid"
-          : row.company_payment_status === "payment_process"
-            ? "payment_process"
-            : "pending",
-      proofName: row.provider_company_payment_proof_file_name?.trim() || "No slip uploaded",
-    }));
+function buildCommissionRows(
+  liveSubmissions: LiveCompanyPaymentSubmissionRow[],
+): ProviderCommissionRow[] {
+  return liveSubmissions.map((row) => ({
+    submissionId: row.id,
+    payableAmount: formatCurrency(row.payable_amount_snapshot ?? 0),
+    depositedAmount: formatCurrency(row.submitted_amount ?? 0),
+    adminReceivedAmount: formatCurrency(row.admin_received_amount ?? 0),
+    submittedAt: formatDateTime(row.submitted_at ?? row.reviewed_at),
+    status: row.status === "paid" ? "paid" : "processing",
+    proofName: row.proof_file_name?.trim() || "No slip uploaded",
+  }));
 }
 
 function buildReviewRows(liveReviews: LiveReviewRow[], customerNames: Map<string, string>): UserReviewItem[] {
@@ -800,6 +825,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
 
   const liveTasks = await tryFetchProviderTasks(providerId);
   const livePayments = await tryFetchProviderPayments(providerId);
+  const liveCompanyPaymentSubmissions = await tryFetchProviderCompanyPaymentSubmissions(providerId);
   const liveReviews = await tryFetchProviderReviews(providerId);
   const customerNames = await fetchProfileNameMap([
     ...(liveTasks?.map((row) => row.customer_id) ?? []),
@@ -807,7 +833,9 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   ]);
   const taskRows = liveTasks?.length ? buildTaskRows(liveTasks, customerNames) : null;
   const payoutRows = livePayments?.length ? buildPayoutRows(livePayments) : fallback.payoutRows;
-  const commissionRows = livePayments?.length ? buildCommissionRows(livePayments) : [];
+  const commissionRows = liveCompanyPaymentSubmissions?.length
+    ? buildCommissionRows(liveCompanyPaymentSubmissions)
+    : [];
   const reviewRows = liveReviews?.length
     ? buildReviewRows(liveReviews, customerNames)
     : getMockProviderReviews(fallback.name).length
@@ -970,7 +998,7 @@ export async function setProviderVisibility(providerId: string, active: boolean)
 }
 
 export async function markCompanyPaymentReceived(
-  paymentId: string,
+  submissionId: string,
   receivedAmount: number,
   providerId: string,
 ) {
@@ -983,40 +1011,50 @@ export async function markCompanyPaymentReceived(
     return { error: "Received amount is required." };
   }
 
-  const { data: paymentRow, error: paymentReadError } = await supabase
-    .from("payments")
-    .select("provider_id, booking_id")
-    .eq("id", paymentId)
+  const { data: submissionRow, error: submissionReadError } = await supabase
+    .from("provider_company_payment_submissions")
+    .select("id, provider_id")
+    .eq("id", submissionId)
     .eq("provider_id", providerId)
     .maybeSingle();
 
-  if (paymentReadError || !paymentRow) {
-    return { error: paymentReadError?.message || "Payment record was not found." };
+  if (submissionReadError || !submissionRow) {
+    return { error: submissionReadError?.message || "Company payment submission was not found." };
   }
 
-  const { error } = await supabase
+  const { error: submissionUpdateError } = await supabase
+    .from("provider_company_payment_submissions")
+    .update({
+      status: "paid",
+      admin_received_amount: safeAmount,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", submissionId)
+    .eq("provider_id", providerId);
+
+  if (submissionUpdateError) {
+    return { error: submissionUpdateError.message || "Unable to mark company payment as received." };
+  }
+
+  const { error: paymentUpdateError } = await supabase
     .from("payments")
     .update({
       company_payment_status: "paid",
-      admin_company_received_amount: safeAmount,
-      company_paid_at: new Date().toISOString(),
     })
-    .eq("id", paymentId)
-    .eq("provider_id", providerId);
+    .eq("provider_id", providerId)
+    .eq("company_payment_submission_id", submissionId);
 
-  if (error) {
-    return { error: error.message || "Unable to mark company payment as received." };
+  if (paymentUpdateError) {
+    return { error: paymentUpdateError.message || "Submission saved but linked payable rows could not be updated." };
   }
 
-  if (paymentRow.booking_id) {
-    await supabase.from("notifications").insert({
-      user_id: providerId,
-      booking_id: paymentRow.booking_id,
-      notification_type: "company_payment_received",
-      title: "Company payment approved",
-      body: `Admin recorded RM ${safeAmount.toFixed(2)} and marked your company payment as received.`,
-    });
-  }
+  await supabase.from("notifications").insert({
+    user_id: providerId,
+    booking_id: null,
+    notification_type: "company_payment_received",
+    title: "Company payment approved",
+    body: `Admin recorded RM ${safeAmount.toFixed(2)} and marked your company payment as received.`,
+  });
 
   return { error: null };
 }

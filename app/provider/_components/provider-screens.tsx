@@ -1947,28 +1947,12 @@ export function BookingsScreen({
                 />
                 {selectedBooking.companyPaymentStatus !== "paid" ? (
                   <div className="space-y-3">
-                    <label className="block rounded-[16px] border border-dashed border-[#d9c7ef] bg-white px-4 py-3 text-[13px] font-semibold text-[#6d6480]">
-                      Attach company payment proof (optional): transfer slip or receipt, JPG/PNG/GIF/WebP/PDF up to 5MB.
-                      <input
-                        type="file"
-                        accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,application/pdf,image/jpeg,image/png,image/gif,image/webp"
-                        className="mt-3 block w-full text-[12px] text-[#6d6480]"
-                        onChange={(event) => void handleCommissionProofChange(event)}
-                      />
-                    </label>
                     <BookingActionBar>
                       <AppButton
                         className="flex-1"
-                        disabled={state.actionBookingId === selectedBooking.id}
-                        onClick={() =>
-                          void state.handleCommissionSettlement(selectedBooking.id, {
-                            proofDataUrl: commissionProofDataUrl,
-                            proofFileName: commissionProofFileName,
-                            proofMimeType: commissionProofMimeType,
-                          })
-                        }
+                        onClick={() => router.push("/provider/payments")}
                       >
-                        Pay / Settle Company Commission
+                        Open Provider Payments
                       </AppButton>
                     </BookingActionBar>
                   </div>
@@ -2684,31 +2668,31 @@ export function EarningsScreen() {
     state.setNotice("");
 
     try {
-      for (const booking of payableBookings) {
-        const response = await fetch(`/api/provider/bookings/${booking.id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            action: "settle_company_commission",
-            proofDataUrl: "daily-company-payment-placeholder",
-            proofFileName: "daily-company-payment.txt",
-            proofMimeType: "text/plain",
-            depositedAmount: booking.companyCommissionAmount,
-          }),
-        });
+      const response = await fetch("/api/provider/company-payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          proofDataUrl: "daily-company-payment-placeholder",
+          proofFileName: "daily-company-payment.txt",
+          proofMimeType: "text/plain",
+          depositedAmount: payableBookings.reduce(
+            (sum, booking) => sum + Number(booking.companyCommissionAmount ?? 0),
+            0,
+          ),
+        }),
+      });
 
-        const result = (await response.json().catch(() => ({}))) as { success?: true; error?: string };
+      const result = (await response.json().catch(() => ({}))) as { success?: true; error?: string };
 
-        if (!response.ok || !result?.success) {
-          throw new Error(result?.error || `Unable to settle company payment for booking ${booking.id}.`);
-        }
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || "Unable to submit company payment.");
       }
 
       await state.reloadWorkspace();
-      state.setNotice("Daily company payment marked as paid for the selected total.");
+      state.setNotice("Daily company payment submitted for admin approval.");
     } catch (error) {
       state.setError(error instanceof Error ? error.message : "Unable to settle daily company payment.");
     } finally {
@@ -3257,6 +3241,24 @@ export function PaymentsScreen() {
   const [paymentHistorySection, setPaymentHistorySection] =
     useState<ProviderPaymentMethodSection>("cash");
   const [ledgerSection, setLedgerSection] = useState<ProviderPaymentMethodSection>("cash");
+  const [companyPayableSummary, setCompanyPayableSummary] = useState<{
+    payableAmount: number;
+    processingAmount: number;
+    latestSubmission: null | {
+      id: string;
+      payableAmountSnapshot: number;
+      submittedAmount: number;
+      adminReceivedAmount: number;
+      status: string;
+      proofFileName: string;
+      submittedAt: string;
+      reviewedAt: string;
+    };
+  }>({
+    payableAmount: 0,
+    processingAmount: 0,
+    latestSubmission: null,
+  });
   const [companyProofName, setCompanyProofName] = useState("");
   const [companyProofError, setCompanyProofError] = useState("");
   const [companyProofDataUrl, setCompanyProofDataUrl] = useState("");
@@ -3353,18 +3355,10 @@ export function PaymentsScreen() {
     cashJobs: 2,
     otherPayments: 3,
   };
-  const pendingCommissionBooking =
-    state.bookings.find(
-      (booking) =>
-        booking.companyCommissionAmount > 0 &&
-        (booking.companyPaymentStatus === "pending" ||
-          booking.companyPaymentStatus === "payment_process"),
-    ) ?? state.bookings.find((booking) => booking.companyCommissionAmount > 0);
-  const isCompanyPaymentProcessing =
-    pendingCommissionBooking?.companyPaymentStatus === "payment_process";
-  const isSubmittingCompanyPayment =
-    Boolean(pendingCommissionBooking) && state.actionBookingId === pendingCommissionBooking?.id;
-  const pendingCompanyAmount = pendingCommissionBooking?.companyCommissionAmount || 75;
+  const pendingCompanyAmount = companyPayableSummary.payableAmount;
+  const processingCompanyAmount = companyPayableSummary.processingAmount;
+  const isCompanyPaymentProcessing = processingCompanyAmount > 0;
+  const isSubmittingCompanyPayment = state.actionBookingId === "provider-company-payment";
   const companyDepositAmountValue = Number(companyDepositAmount);
   const canSubmitCompanyPayment =
     Boolean(companyProofName) &&
@@ -3372,7 +3366,7 @@ export function PaymentsScreen() {
     companyDepositAmount.trim().length > 0 &&
     Number.isFinite(companyDepositAmountValue) &&
     companyDepositAmountValue > 0 &&
-    (!pendingCommissionBooking || state.actionBookingId !== pendingCommissionBooking.id);
+    pendingCompanyAmount > 0;
 
   function resetCompanyProofState() {
     setCompanyProofName("");
@@ -3448,6 +3442,57 @@ export function PaymentsScreen() {
       window.removeEventListener("popstate", syncLedgerView);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCompanyPayableSummary() {
+      const accessToken = await getProviderAccessToken();
+
+      if (!accessToken) {
+        return;
+      }
+
+      const response = await fetch("/api/provider/company-payments", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }).catch(() => null);
+
+      const result = response
+        ? ((await response.json().catch(() => ({}))) as {
+            payableAmount?: number;
+            processingAmount?: number;
+            latestSubmission?: {
+              id: string;
+              payableAmountSnapshot: number;
+              submittedAmount: number;
+              adminReceivedAmount: number;
+              status: string;
+              proofFileName: string;
+              submittedAt: string;
+              reviewedAt: string;
+            } | null;
+          })
+        : null;
+
+      if (!active || !response?.ok || !result) {
+        return;
+      }
+
+      setCompanyPayableSummary({
+        payableAmount: Number(result.payableAmount ?? 0),
+        processingAmount: Number(result.processingAmount ?? 0),
+        latestSubmission: result.latestSubmission ?? null,
+      });
+    }
+
+    void loadCompanyPayableSummary();
+
+    return () => {
+      active = false;
+    };
+  }, [state.bookings, state.notice]);
 
   const paymentTabs: Array<{ key: ProviderPaymentTab; label: string; icon: React.ReactNode }> = [
     {
@@ -3792,7 +3837,7 @@ export function PaymentsScreen() {
           </section>
         ) : null}
 
-        {pendingCompanyAmount > 0 ? (
+        {pendingCompanyAmount > 0 || processingCompanyAmount > 0 ? (
           <section className="rounded-[28px] border border-[#ffd9d5] bg-[linear-gradient(180deg,#fffefe_0%,#fff8f8_100%)] px-5 py-5 shadow-[0_18px_36px_rgba(255,89,89,0.08)]">
             <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#fff1f3_0%,#ffe6eb_100%)] text-[#d61f45]">
@@ -3810,7 +3855,7 @@ export function PaymentsScreen() {
               </div>
               <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:block sm:text-right">
                 <p className="whitespace-nowrap text-[1.15rem] font-black tracking-[-0.04em] text-[#d62839]">
-                  {formatCurrency(pendingCompanyAmount)}
+                  {formatCurrency(isCompanyPaymentProcessing ? processingCompanyAmount : pendingCompanyAmount)}
                 </p>
                 {isCompanyPaymentProcessing ? (
                   <span className="inline-flex min-h-[2.95rem] items-center rounded-[16px] bg-[#f8e9ea] px-4 py-2 text-[14px] font-extrabold text-[#d62839] sm:mt-3">
@@ -4254,17 +4299,12 @@ export function PaymentsScreen() {
                 type="button"
                 disabled={!canSubmitCompanyPayment || isSubmittingCompanyPayment}
                 onClick={async () => {
-                  if (!pendingCommissionBooking) {
-                    state.setError("No company commission booking was found for submission.");
-                    return;
-                  }
-
                   if (!Number.isFinite(companyDepositAmountValue) || companyDepositAmountValue <= 0) {
                     state.setError("Enter a valid deposited amount.");
                     return;
                   }
 
-                  const success = await state.handleCommissionSettlement(pendingCommissionBooking.id, {
+                  const success = await state.handleCommissionSettlement({
                     proofDataUrl: companyProofDataUrl,
                     proofFileName: companyProofName,
                     proofMimeType: companyProofMimeType,
