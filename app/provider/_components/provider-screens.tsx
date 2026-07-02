@@ -3312,8 +3312,19 @@ export function PaymentsScreen() {
   };
   const pendingCommissionBooking = state.bookings.find(
     (booking) =>
-      booking.companyCommissionAmount > 0 && booking.companyPaymentStatus === "pending",
+      booking.companyCommissionAmount > 0 &&
+      (booking.companyPaymentStatus === "pending" ||
+        booking.companyPaymentStatus === "payment_process"),
   );
+  const companyDepositAmountValue = Number(companyDepositAmount);
+  const canSubmitCompanyPayment =
+    Boolean(companyProofName) &&
+    Boolean(companyProofDataUrl) &&
+    companyDepositAmount.trim().length > 0 &&
+    Number.isFinite(companyDepositAmountValue) &&
+    companyDepositAmountValue > 0 &&
+    Boolean(pendingCommissionBooking) &&
+    (!pendingCommissionBooking || state.actionBookingId !== pendingCommissionBooking.id);
 
   function resetCompanyProofState() {
     setCompanyProofName("");
@@ -4081,11 +4092,16 @@ export function PaymentsScreen() {
                 Deposited Amount
               </span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={companyDepositAmount}
-                onChange={(event) => setCompanyDepositAmount(event.target.value)}
+                onChange={(event) => {
+                  const nextValue = event.target.value.replace(/[^\d.]/g, "");
+                  const [whole = "", decimal = ""] = nextValue.split(".");
+                  const normalizedValue =
+                    decimal.length > 0 ? `${whole}.${decimal.slice(0, 2)}` : whole;
+                  setCompanyDepositAmount(normalizedValue);
+                }}
                 placeholder="Enter deposited amount"
                 className="mt-3 block w-full bg-transparent text-[15px] font-semibold text-[#1d1633] outline-none"
               />
@@ -4093,16 +4109,15 @@ export function PaymentsScreen() {
             <div className="grid grid-cols-1 gap-3">
               <button
                 type="button"
-                disabled={
-                  !companyProofName ||
-                  !companyProofDataUrl ||
-                  !companyDepositAmount.trim() ||
-                  !pendingCommissionBooking ||
-                  state.actionBookingId === pendingCommissionBooking.id
-                }
+                disabled={!canSubmitCompanyPayment}
                 onClick={() => {
                   if (!pendingCommissionBooking) {
-                    state.setError("No pending company commission booking was found.");
+                    state.setError("No company commission booking was found for submission.");
+                    return;
+                  }
+
+                  if (!Number.isFinite(companyDepositAmountValue) || companyDepositAmountValue <= 0) {
+                    state.setError("Enter a valid deposited amount.");
                     return;
                   }
 
@@ -4110,13 +4125,13 @@ export function PaymentsScreen() {
                     proofDataUrl: companyProofDataUrl,
                     proofFileName: companyProofName,
                     proofMimeType: companyProofMimeType,
-                    depositedAmount: Number(companyDepositAmount),
+                    depositedAmount: companyDepositAmountValue,
                   });
                   setModal(null);
                   resetCompanyProofState();
                 }}
                 className={`inline-flex min-h-[3rem] items-center justify-center rounded-[16px] px-4 text-[14px] font-bold ${
-                  companyProofName && companyProofDataUrl && companyDepositAmount.trim()
+                  canSubmitCompanyPayment
                     ? "bg-[#8E5EB5] text-white"
                     : "bg-[#efe7f8] text-[#b8a9cf]"
                 }`}
