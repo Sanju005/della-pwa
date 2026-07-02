@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import { parsePaymentAdjustmentNote } from "@/lib/payment-adjustment";
+import { calculateCommission } from "@/lib/payments";
 import { normalizeBookingWorkflowStatus } from "@/lib/booking-workflow";
 import {
   getSupabaseServiceKey,
@@ -486,116 +487,139 @@ export async function GET(request: Request) {
   );
 
   return NextResponse.json({
-    bookings: rows.map((row) => ({
-      id: row.id,
-      customerId: row.customer_id,
-      customerName: customerNames.get(row.customer_id) || "Customer",
-      serviceLabel: row.service_label,
-      serviceKey: row.service_key,
-      location: row.location_text,
-      bookingMode: row.booking_mode,
-      bookingStatus: normalizeBookingWorkflowStatus(row.booking_status),
-      statusLabel: providerStatusLabel(row.booking_status),
-      customerStatusLabel: customerStatusLabel(row.booking_status),
-      bucket: toBucket(row.booking_status),
-      scheduledDate: row.scheduled_date,
-      scheduledStartTime: row.scheduled_start_time,
-      scheduledEndTime: row.scheduled_end_time,
-      schedule: formatDateTimeLabel(
-        row.scheduled_date,
-        row.scheduled_start_time,
-        row.scheduled_end_time
-      ),
-      customerNote: row.customer_note ?? "",
-      providerResponseNote: row.provider_response_note ?? "",
-      declineReason: row.decline_reason ?? "",
-      quotedAmount:
+    bookings: rows.map((row) => {
+      const normalizedStatus = normalizeBookingWorkflowStatus(row.booking_status);
+      const parsedAdjustment = parsePaymentAdjustmentNote(row.provider_response_note);
+      const quotedAmount =
         typeof row.payment_records?.[0]?.amount === "number"
           ? Number(row.payment_records[0]?.amount ?? 0)
-          : Number(row.final_amount ?? 0) || (parsePaymentAdjustmentNote(row.provider_response_note)?.finalAmount ??
-            Number(row.quoted_amount ?? 0)),
-      baseAmount:
-        Number(row.booking_price ?? 0) || (parsePaymentAdjustmentNote(row.provider_response_note)?.baseAmount ??
-        Number(row.quoted_amount ?? 0)),
-      paymentStatus:
-        row.payment_records?.[0]?.status === "paid" ||
-        row.payment_records?.[0]?.status === "failed" ||
-        row.payment_records?.[0]?.status === "cancelled" ||
-        row.payment_records?.[0]?.status === "refunded"
-          ? row.payment_records[0].status
-          : "pending",
-      paymentOption: row.payment_records?.[0]?.payment_option === "online" ? "online" : "cash",
-      companyCommissionAmount:
+          : Number(row.final_amount ?? 0) ||
+            (parsedAdjustment?.finalAmount ?? Number(row.quoted_amount ?? 0));
+      const baseAmount =
+        Number(row.booking_price ?? 0) ||
+        (parsedAdjustment?.baseAmount ?? Number(row.quoted_amount ?? 0));
+      const paymentOption =
+        row.payment_records?.[0]?.payment_option === "online" ? "online" : "cash";
+      const derivedCommission = calculateCommission(quotedAmount);
+      const shouldCarryCompanyCommission =
+        paymentOption === "cash" &&
+        [
+          "final_payment_sent",
+          "cash_paid_by_user",
+          "payment_received_by_provider",
+          "completed",
+        ].includes(normalizedStatus);
+      const companyCommissionAmount =
         typeof row.payment_records?.[0]?.company_commission_amount === "number"
           ? Number(row.payment_records[0]?.company_commission_amount ?? 0)
-          : 0,
-      companyPaymentStatus:
-        row.payment_records?.[0]?.company_payment_status === "paid"
-          ? "paid"
-          : row.payment_records?.[0]?.company_payment_status === "payment_process"
-            ? "payment_process"
-            : "pending",
-      providerCompanyPaymentAmount:
-        typeof row.payment_records?.[0]?.provider_company_payment_amount === "number"
-          ? Number(row.payment_records[0]?.provider_company_payment_amount ?? 0)
-          : 0,
-      adminCompanyReceivedAmount:
-        typeof row.payment_records?.[0]?.admin_company_received_amount === "number"
-          ? Number(row.payment_records[0]?.admin_company_received_amount ?? 0)
-          : 0,
-      providerNetAmount:
+          : shouldCarryCompanyCommission
+            ? derivedCommission.companyCommissionAmount
+            : 0;
+      const providerNetAmount =
         typeof row.payment_records?.[0]?.provider_net_amount === "number"
           ? Number(row.payment_records[0]?.provider_net_amount ?? 0)
-          : Number(row.quoted_amount ?? 0),
-      customerPaymentProofDataUrl: row.payment_records?.[0]?.customer_payment_proof_data_url ?? "",
-      customerPaymentProofFileName: row.payment_records?.[0]?.customer_payment_proof_file_name ?? "",
-      customerPaymentProofMimeType: row.payment_records?.[0]?.customer_payment_proof_mime_type ?? "",
-      providerCompanyPaymentProofDataUrl: row.payment_records?.[0]?.provider_company_payment_proof_data_url ?? "",
-      providerCompanyPaymentProofFileName: row.payment_records?.[0]?.provider_company_payment_proof_file_name ?? "",
-      providerCompanyPaymentProofMimeType: row.payment_records?.[0]?.provider_company_payment_proof_mime_type ?? "",
-      additionalCharge:
-        Array.isArray(row.additional_charges)
-          ? row.additional_charges.reduce((sum, item) => sum + Number(item?.amount ?? 0), 0)
-          : parsePaymentAdjustmentNote(row.provider_response_note)?.additionalCharge ?? 0,
-      additionalChargeDescription:
-        parsePaymentAdjustmentNote(row.provider_response_note)?.chargeDescription ?? "",
-      paymentBreakdown:
-        Array.isArray(row.payment_breakdown)
-          ? row.payment_breakdown
-              .filter((item) => typeof item?.description === "string" && typeof item?.amount === "number")
-              .map((item) => ({ description: item.description ?? "", amount: Number(item.amount ?? 0) }))
-          : parsePaymentAdjustmentNote(row.provider_response_note)?.rows ?? [],
-      workFinishedImages: Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
-      cashPaymentProofImages: Array.isArray(row.cash_payment_proof_images) ? row.cash_payment_proof_images : [],
-      userReviewStatus:
-        row.user_review_status === "submitted" || row.user_review_status === "skipped"
-          ? row.user_review_status
-          : "pending",
-      providerReviewStatus:
-        row.provider_review_status === "submitted" || row.provider_review_status === "skipped"
-          ? row.provider_review_status
-          : "pending",
-      paymentNote:
-        row.payment_records?.[0]?.status === "paid"
-          ? `Customer paid via ${row.payment_records?.[0]?.payment_method ?? "Cash"}.`
-          : parsePaymentAdjustmentNote(row.provider_response_note)?.note ?? "",
-      createdAt: row.created_at,
-      acceptedAt: row.accepted_at ?? "",
-      onTheWayAt: row.on_the_way_at ?? "",
-      arrivedAt: row.arrived_at ?? "",
-      workFinishedAt: row.work_finished_at ?? "",
-      workConfirmedByUserAt: row.work_confirmed_by_user_at ?? "",
-      paymentSentAt: row.payment_sent_at ?? "",
-      cashPaidByUserAt: row.cash_paid_by_user_at ?? row.payment_records?.[0]?.paid_at ?? "",
-      paymentReceivedByProviderAt: row.payment_received_by_provider_at ?? "",
-      completedAt: row.completed_at ?? "",
-      paidAt: row.cash_paid_by_user_at ?? row.payment_records?.[0]?.paid_at ?? "",
-      providerReviewRating:
-        typeof row.provider_review_records?.[0]?.rating === "number"
-          ? Number(row.provider_review_records[0].rating ?? 0)
-          : undefined,
-      providerReviewComment: row.provider_review_records?.[0]?.comment ?? "",
-      providerReviewedAt: row.provider_review_records?.[0]?.created_at ?? "",
-    })),
+          : shouldCarryCompanyCommission
+            ? derivedCommission.providerNetAmount
+            : Number(row.quoted_amount ?? 0);
+
+      return {
+        id: row.id,
+        customerId: row.customer_id,
+        customerName: customerNames.get(row.customer_id) || "Customer",
+        serviceLabel: row.service_label,
+        serviceKey: row.service_key,
+        location: row.location_text,
+        bookingMode: row.booking_mode,
+        bookingStatus: normalizedStatus,
+        statusLabel: providerStatusLabel(row.booking_status),
+        customerStatusLabel: customerStatusLabel(row.booking_status),
+        bucket: toBucket(row.booking_status),
+        scheduledDate: row.scheduled_date,
+        scheduledStartTime: row.scheduled_start_time,
+        scheduledEndTime: row.scheduled_end_time,
+        schedule: formatDateTimeLabel(
+          row.scheduled_date,
+          row.scheduled_start_time,
+          row.scheduled_end_time
+        ),
+        customerNote: row.customer_note ?? "",
+        providerResponseNote: row.provider_response_note ?? "",
+        declineReason: row.decline_reason ?? "",
+        quotedAmount,
+        baseAmount,
+        paymentStatus:
+          row.payment_records?.[0]?.status === "paid" ||
+          row.payment_records?.[0]?.status === "failed" ||
+          row.payment_records?.[0]?.status === "cancelled" ||
+          row.payment_records?.[0]?.status === "refunded"
+            ? row.payment_records[0].status
+            : "pending",
+        paymentOption,
+        companyCommissionAmount,
+        companyPaymentStatus:
+          row.payment_records?.[0]?.company_payment_status === "paid"
+            ? "paid"
+            : row.payment_records?.[0]?.company_payment_status === "payment_process"
+              ? "payment_process"
+              : "pending",
+        providerCompanyPaymentAmount:
+          typeof row.payment_records?.[0]?.provider_company_payment_amount === "number"
+            ? Number(row.payment_records[0]?.provider_company_payment_amount ?? 0)
+            : 0,
+        adminCompanyReceivedAmount:
+          typeof row.payment_records?.[0]?.admin_company_received_amount === "number"
+            ? Number(row.payment_records[0]?.admin_company_received_amount ?? 0)
+            : 0,
+        providerNetAmount,
+        customerPaymentProofDataUrl: row.payment_records?.[0]?.customer_payment_proof_data_url ?? "",
+        customerPaymentProofFileName: row.payment_records?.[0]?.customer_payment_proof_file_name ?? "",
+        customerPaymentProofMimeType: row.payment_records?.[0]?.customer_payment_proof_mime_type ?? "",
+        providerCompanyPaymentProofDataUrl: row.payment_records?.[0]?.provider_company_payment_proof_data_url ?? "",
+        providerCompanyPaymentProofFileName: row.payment_records?.[0]?.provider_company_payment_proof_file_name ?? "",
+        providerCompanyPaymentProofMimeType: row.payment_records?.[0]?.provider_company_payment_proof_mime_type ?? "",
+        additionalCharge:
+          Array.isArray(row.additional_charges)
+            ? row.additional_charges.reduce((sum, item) => sum + Number(item?.amount ?? 0), 0)
+            : parsedAdjustment?.additionalCharge ?? 0,
+        additionalChargeDescription: parsedAdjustment?.chargeDescription ?? "",
+        paymentBreakdown:
+          Array.isArray(row.payment_breakdown)
+            ? row.payment_breakdown
+                .filter((item) => typeof item?.description === "string" && typeof item?.amount === "number")
+                .map((item) => ({ description: item.description ?? "", amount: Number(item.amount ?? 0) }))
+            : parsedAdjustment?.rows ?? [],
+        workFinishedImages: Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
+        cashPaymentProofImages: Array.isArray(row.cash_payment_proof_images) ? row.cash_payment_proof_images : [],
+        userReviewStatus:
+          row.user_review_status === "submitted" || row.user_review_status === "skipped"
+            ? row.user_review_status
+            : "pending",
+        providerReviewStatus:
+          row.provider_review_status === "submitted" || row.provider_review_status === "skipped"
+            ? row.provider_review_status
+            : "pending",
+        paymentNote:
+          row.payment_records?.[0]?.status === "paid"
+            ? `Customer paid via ${row.payment_records?.[0]?.payment_method ?? "Cash"}.`
+            : parsedAdjustment?.note ?? "",
+        createdAt: row.created_at,
+        acceptedAt: row.accepted_at ?? "",
+        onTheWayAt: row.on_the_way_at ?? "",
+        arrivedAt: row.arrived_at ?? "",
+        workFinishedAt: row.work_finished_at ?? "",
+        workConfirmedByUserAt: row.work_confirmed_by_user_at ?? "",
+        paymentSentAt: row.payment_sent_at ?? "",
+        cashPaidByUserAt: row.cash_paid_by_user_at ?? row.payment_records?.[0]?.paid_at ?? "",
+        paymentReceivedByProviderAt: row.payment_received_by_provider_at ?? "",
+        completedAt: row.completed_at ?? "",
+        paidAt: row.cash_paid_by_user_at ?? row.payment_records?.[0]?.paid_at ?? "",
+        providerReviewRating:
+          typeof row.provider_review_records?.[0]?.rating === "number"
+            ? Number(row.provider_review_records[0].rating ?? 0)
+            : undefined,
+        providerReviewComment: row.provider_review_records?.[0]?.comment ?? "",
+        providerReviewedAt: row.provider_review_records?.[0]?.created_at ?? "",
+      };
+    }),
   });
 }
