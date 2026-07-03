@@ -240,7 +240,11 @@ function TimelineCard({
         </span>
         <span className={`mt-2 h-full min-h-16 w-[2px] ${done || current ? "bg-[#8E5EB5]" : "bg-[#e5e7eb]"}`} />
       </div>
-      <div className={`flex-1 rounded-[24px] border p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)] ${current ? "border-[#dcc7f7] bg-[linear-gradient(180deg,#fcf7ff_0%,#fffefe_100%)]" : "border-[#eee5f7] bg-white"}`}>
+      <div
+        className={`flex-1 rounded-[24px] border bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)] ${
+          current ? "border-[#dcc7f7]" : "border-[#eee5f7]"
+        }`}
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-[0.95rem] font-black tracking-[-0.035em] text-[#0f172a]">
