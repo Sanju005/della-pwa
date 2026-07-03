@@ -1,3 +1,0 @@
-module.exports=[33290,a=>{"use strict";var b=a.i(7997);a.s(["default",0,function({children:a}){return(0,b.jsx)("html",{lang:"en",className:"h-full bg-[#f3fbf4] antialiased",children:(0,b.jsx)("body",{className:"min-h-full overflow-x-hidden bg-[#f3fbf4] text-[#0f172a]",children:a})})},"metadata",0,{title:"DELLA",description:"Book trusted home and lifestyle services in one DELLA app.",applicationName:"DELLA",appleWebApp:{capable:!0,statusBarStyle:"default",title:"DELLA"},formatDetection:{telephone:!1}},"viewport",0,{width:"device-width",initialScale:1,viewportFit:"cover",themeColor:"#16a34a"}])},70864,a=>{a.n(a.i(33290))}];
-
-//# sourceMappingURL=app_layout_tsx_13yf0ls._.js.map
