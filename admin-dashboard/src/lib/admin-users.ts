@@ -63,6 +63,18 @@ type LiveBookingRow = {
   scheduled_date?: string | null;
   scheduled_start_time?: string | null;
   total_amount?: number | null;
+  booking_price?: number | null;
+  final_amount?: number | null;
+  provider_response_note?: string | null;
+  work_finished_images?: string[] | null;
+  additional_charges?: Array<{
+    description?: string | null;
+    amount?: number | null;
+  }> | null;
+  payment_breakdown?: Array<{
+    description?: string | null;
+    amount?: number | null;
+  }> | null;
   customer_id?: string | null;
   provider_id?: string | null;
   provider_profiles?: ProfileRelation;
@@ -409,7 +421,7 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
 
   const column = role === "provider" ? "provider_id" : "customer_id";
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("bookings")
     .select(`
       id,
@@ -417,6 +429,12 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
       scheduled_date,
       scheduled_start_time,
       total_amount,
+      booking_price,
+      final_amount,
+      provider_response_note,
+      work_finished_images,
+      additional_charges,
+      payment_breakdown,
       customer_id,
       provider_id,
       provider_profiles (
@@ -430,6 +448,32 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
     .order("scheduled_date", { ascending: false })
     .limit(12);
 
+  if (error) {
+    const fallbackRead = await supabase
+      .from("bookings")
+      .select(`
+        id,
+        booking_status,
+        scheduled_date,
+        scheduled_start_time,
+        total_amount,
+        customer_id,
+        provider_id,
+        provider_profiles (
+          marketing_name
+        ),
+        provider_services (
+          service_type
+        )
+      `)
+      .eq(column, userId)
+      .order("scheduled_date", { ascending: false })
+      .limit(12);
+
+    data = fallbackRead.data;
+    error = fallbackRead.error;
+  }
+
   if (error || !data) {
     return null;
   }
@@ -439,6 +483,11 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
     const providerService = relationItem(row.provider_services);
     const customerName = profileNames.get(row.customer_id ?? "");
     const providerName = providerProfile?.marketing_name?.trim() || profileNames.get(row.provider_id ?? "");
+    const fixedAmount = Number(row.booking_price ?? row.total_amount ?? 0);
+    const additionalAmount = Array.isArray(row.additional_charges)
+      ? row.additional_charges.reduce((sum, item) => sum + Number(item?.amount ?? 0), 0)
+      : 0;
+    const totalAmount = Number(row.final_amount ?? row.total_amount ?? fixedAmount + additionalAmount);
 
     return {
       id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
@@ -446,8 +495,13 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
       provider: providerName || "DELLA Provider",
       customer: customerName || "Customer",
       status: mapBookingStatus(row.booking_status),
-      amount: formatCurrency(row.total_amount ?? 0),
+      amount: formatCurrency(totalAmount),
       schedule: formatSchedule(row.scheduled_date, row.scheduled_start_time),
+      fixedAmount: formatCurrency(fixedAmount),
+      additionalAmount: formatCurrency(additionalAmount),
+      totalAmount: formatCurrency(totalAmount),
+      description: row.provider_response_note?.trim() || "",
+      completionImages: Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
     } satisfies DashboardBooking;
   });
 }

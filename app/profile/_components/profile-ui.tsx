@@ -1830,7 +1830,7 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
           {booking.workFinishedImages && booking.workFinishedImages.length > 0 ? (
             <div className="mb-4">
               <p className="text-[14px] font-black text-[#24193a]">
-                Job Photos ({booking.workFinishedImages.length})
+                Completion Images ({booking.workFinishedImages.length})
               </p>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {booking.workFinishedImages.slice(0, 3).map((image, index) => (
@@ -1851,23 +1851,19 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
             <p className="text-[15px] font-black text-[#8E5EB5]">Payment Summary</p>
             <div className="mt-4 space-y-3 text-[14px] text-[#24193a]">
               <div className="flex items-center justify-between gap-3">
-                <span>Booking Price</span>
+                <span>Fixed Amount</span>
                 <span className="font-semibold">RM {booking.baseAmount ?? booking.paymentAmount ?? 0}</span>
               </div>
-              {typeof booking.additionalCharge === "number" && booking.additionalCharge > 0 ? (
-                <div className="space-y-2">
-                  <p className="font-semibold">Additional Charges</p>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p>{booking.additionalChargeDescription || "Additional charge"}</p>
-                      {booking.paymentNote ? (
-                        <p className="text-[12px] text-[#7f7692]">{booking.paymentNote}</p>
-                      ) : null}
-                    </div>
-                    <span className="font-semibold">RM {booking.additionalCharge}</span>
-                  </div>
-                </div>
-              ) : null}
+              <div className="flex items-center justify-between gap-3">
+                <span>Additional Amount</span>
+                <span className="font-semibold">RM {booking.additionalCharge ?? 0}</span>
+              </div>
+              <div className="rounded-[16px] bg-[#faf6ff] px-4 py-3">
+                <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#8E5EB5]">Description</p>
+                <p className="mt-2 text-[13px] leading-6 text-[#4c4561]">
+                  {booking.additionalChargeDescription || booking.paymentNote || "No additional description provided."}
+                </p>
+              </div>
               <div className="border-t border-dashed border-[#ddd4ea] pt-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-[1rem] font-black text-[#8E5EB5]">Total Amount</span>
@@ -2076,6 +2072,11 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
           icon={<CalendarIcon className="h-4 w-4" />}
           label="Date & Time"
           value={booking.schedule}
+        />
+        <ProfileInfoRow
+          icon={<WalletIcon className="h-4 w-4" />}
+          label="Rates"
+          value={`Base RM ${booking.baseAmount ?? booking.paymentAmount ?? 0} / Total RM ${booking.paymentAmount ?? 0}`}
         />
         <ProfileInfoRow
           icon={<PinIcon className="h-4 w-4" />}

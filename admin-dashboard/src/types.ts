@@ -59,6 +59,11 @@ export type DashboardBooking = {
   status: string;
   amount: string;
   schedule: string;
+  fixedAmount?: string;
+  additionalAmount?: string;
+  totalAmount?: string;
+  description?: string;
+  completionImages?: string[];
 };
 
 export type PaymentRow = {

@@ -566,6 +566,79 @@ export function UserProfilePage() {
     );
   }
 
+  function renderBookingDetails() {
+    return (
+      <div className="space-y-4">
+        {relatedBookings.map((booking) => (
+          <SurfaceCard key={booking.id} title={`${booking.id} • ${booking.service}`}>
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Provider</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">{booking.provider}</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Schedule</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">{booking.schedule}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Fixed Amount</p>
+                  <p className="mt-2 text-base font-bold text-slate-950">{booking.fixedAmount ?? booking.amount}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Additional Amount</p>
+                  <p className="mt-2 text-base font-bold text-slate-950">{booking.additionalAmount ?? "RM0.00"}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 sm:col-span-2">
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Total Amount</p>
+                  <p className="mt-2 text-base font-bold text-emerald-700">{booking.totalAmount ?? booking.amount}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 px-4 py-4">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Description</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  {booking.description || "No additional description provided."}
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-900">Completion Images</p>
+                  <MiniStatus status={booking.status} />
+                </div>
+                {booking.completionImages?.length ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    {booking.completionImages.slice(0, 3).map((image, index) => (
+                      <a
+                        key={`${booking.id}-admin-completion-${index}`}
+                        href={image}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                      >
+                        <img
+                          src={image}
+                          alt={`Completion image ${index + 1}`}
+                          className="aspect-[4/3] w-full object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-500">No completion images uploaded.</p>
+                )}
+              </div>
+            </div>
+          </SurfaceCard>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-[28px] border border-[#E7ECE7] bg-white px-5 py-5 shadow-[0_18px_50px_rgba(15,23,42,0.05)] sm:px-6">
@@ -725,20 +798,7 @@ export function UserProfilePage() {
 
       {activeTab === "Overview" ? renderOverview() : null}
 
-      {activeTab === "Bookings"
-        ? renderSimpleTable(
-            "All Bookings",
-            ["Booking ID", "Service", "Provider", "Date & Time", "Amount", "Status"],
-            relatedBookings.map((booking) => [
-              booking.id,
-              booking.service,
-              booking.provider,
-              booking.schedule,
-              booking.amount,
-              booking.status,
-            ])
-          )
-        : null}
+      {activeTab === "Bookings" ? renderBookingDetails() : null}
 
       {activeTab === "Payments"
         ? renderSimpleTable(

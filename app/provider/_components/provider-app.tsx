@@ -558,6 +558,10 @@ export function useProviderAppData() {
     actionDetails?: {
       finalAmount?: number;
       workFinishedImages?: string[];
+      paymentBreakdown?: Array<{
+        description: string;
+        amount: number;
+      }>;
     },
   ) {
     const client = getSupabaseClient();
@@ -594,6 +598,7 @@ export function useProviderAppData() {
           note,
           finalAmount: actionDetails?.finalAmount,
           workFinishedImages: actionDetails?.workFinishedImages,
+          paymentBreakdown: actionDetails?.paymentBreakdown,
         }),
       }).catch((error) => {
         console.error("[Provider app] Booking action request failed:", error);

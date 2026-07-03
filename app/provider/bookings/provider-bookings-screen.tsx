@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
+  Camera,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Image as ImageIcon,
   MapPin,
   MessageCircleMore,
+  Plus,
   Wallet,
 } from "lucide-react";
 
@@ -619,7 +622,13 @@ function BookingDetails({
   onDecline: (bookingId: string) => void;
   onOnTheWay: (bookingId: string) => void;
   onArrived: (bookingId: string) => void;
-  onWorkFinished: (bookingId: string, images: string[], finalAmount: number) => void;
+  onWorkFinished: (
+    bookingId: string,
+    images: string[],
+    finalAmount: number,
+    additionalAmount: number,
+    description: string,
+  ) => void;
   onSendPaymentRequest: (booking: ProviderBookingItem, finalAmount: number) => void;
   onConfirmPaymentReceived: (bookingId: string) => void;
   onCompleteProviderJob: (bookingId: string) => void;
@@ -627,12 +636,14 @@ function BookingDetails({
   onOpenReview: (booking: ProviderBookingItem) => void;
 }) {
   const workFinishedInputRef = useRef<HTMLInputElement>(null);
+  const workFinishedCameraInputRef = useRef<HTMLInputElement>(null);
   const [workFinishedImages, setWorkFinishedImages] = useState<string[]>(booking.workFinishedImages ?? []);
   const [workFinishedImageError, setWorkFinishedImageError] = useState("");
   const [workImageCropSource, setWorkImageCropSource] = useState("");
   const [workImageCropQueue, setWorkImageCropQueue] = useState<string[]>([]);
-  const [finalPaymentAmount, setFinalPaymentAmount] = useState(
-    String(booking.quotedAmount || booking.baseAmount || 0),
+  const [additionalAmount, setAdditionalAmount] = useState(String(booking.additionalCharge || 0));
+  const [completionDescription, setCompletionDescription] = useState(
+    booking.additionalChargeDescription || booking.paymentNote || "",
   );
   const stepState = {
     confirmed: ["accepted", "on_the_way", "arrived", "work_finished_by_provider", "work_confirmed_by_user", "final_payment_sent", "cash_paid_by_user", "payment_received_by_provider", "completed", "paid", "review_requested", "reviewed"].includes(booking.bookingStatus) ? "done" : booking.bookingStatus === "pending_provider_response" || booking.bookingStatus === "pending" ? "current" : "waiting",
@@ -655,8 +666,13 @@ function BookingDetails({
     setWorkFinishedImageError("");
     setWorkImageCropSource("");
     setWorkImageCropQueue([]);
-    setFinalPaymentAmount(String(booking.quotedAmount || booking.baseAmount || 0));
-  }, [booking.id, booking.workFinishedImages, booking.quotedAmount, booking.baseAmount]);
+    setAdditionalAmount(String(booking.additionalCharge || 0));
+    setCompletionDescription(booking.additionalChargeDescription || booking.paymentNote || "");
+  }, [booking.id, booking.workFinishedImages, booking.additionalCharge, booking.additionalChargeDescription, booking.paymentNote]);
+
+  const fixedAmount = Number(booking.baseAmount || booking.quotedAmount || 0);
+  const additionalAmountValue = Number(additionalAmount || 0);
+  const finalPaymentAmount = fixedAmount + (Number.isFinite(additionalAmountValue) ? additionalAmountValue : 0);
 
   const openNextWorkImageCrop = (queue: string[]) => {
     const [nextImage, ...remainingImages] = queue;
@@ -809,58 +825,125 @@ function BookingDetails({
               onChange={handleWorkFinishedImageChange}
               className="hidden"
             />
-            <div className="mb-3 rounded-[18px] border border-[#eee5f7] bg-white p-3">
-              <label className="mb-3 block">
-                <span className="text-[13px] font-extrabold text-[#1f1630]">Final Payment Amount (RM)</span>
+            <input
+              ref={workFinishedCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleWorkFinishedImageChange}
+              className="hidden"
+            />
+            <div className="rounded-[28px] border border-[#eee5f7] bg-white p-6 shadow-[0_16px_34px_rgba(86,38,135,0.06)]">
+              <label className="block">
+                <span className="text-[13px] font-extrabold text-[#1f1630]">Fixed Amount (RM)</span>
+                <input
+                  type="text"
+                  readOnly
+                  value={fixedAmount.toFixed(2)}
+                  className="mt-3 h-14 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 text-[18px] font-semibold text-[#1f1630] outline-none"
+                />
+              </label>
+              <label className="mt-5 block">
+                <span className="text-[13px] font-extrabold text-[#1f1630]">Additional Amount (RM)</span>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
-                  value={finalPaymentAmount}
-                  onChange={(event) => setFinalPaymentAmount(event.target.value)}
-                  className="mt-2 h-11 w-full rounded-[14px] border border-[#e7dff2] px-4 text-[14px] font-semibold text-[#1f1630] outline-none focus:border-[#8E5EB5]"
+                  value={additionalAmount}
+                  onChange={(event) => setAdditionalAmount(event.target.value)}
+                  className="mt-3 h-14 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 text-[18px] font-semibold text-[#1f1630] outline-none focus:border-[#8E5EB5]"
                 />
               </label>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[13px] font-extrabold text-[#1f1630]">Completion Images</p>
-                  <p className="mt-1 text-[12px] text-[#64748b]">
-                    Attach job proof before sending the payment request.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => workFinishedInputRef.current?.click()}
-                  className="shrink-0 rounded-[12px] border border-[#dcc7f7] bg-[#fbf8ff] px-3 py-2 text-[12px] font-extrabold text-[#8E5EB5]"
-                >
-                  Add Images
-                </button>
-              </div>
-              {workFinishedImages.length > 0 ? (
-                <div className="mt-3 grid grid-cols-4 gap-2">
-                  {workFinishedImages.map((image, index) => (
-                    <div key={`${booking.id}-work-image-${index}`} className="relative aspect-square overflow-hidden rounded-[12px] border border-[#eee5f7]">
-                      <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                        className="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-[12px] font-black text-white"
-                        aria-label={`Remove completion proof ${index + 1}`}
+              <label className="mt-5 block">
+                <span className="text-[13px] font-extrabold text-[#1f1630]">Description</span>
+                <textarea
+                  rows={4}
+                  value={completionDescription}
+                  onChange={(event) => setCompletionDescription(event.target.value)}
+                  placeholder="Extra work / additional materials"
+                  className="mt-3 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 py-4 text-[16px] text-[#1f1630] outline-none placeholder:text-[#7b728a] focus:border-[#8E5EB5]"
+                />
+              </label>
+              <div className="mt-6">
+                <p className="text-[13px] font-extrabold text-[#1f1630]">Completion Images</p>
+                <p className="mt-1 text-[12px] text-[#64748b]">Add up to 3 proof images</p>
+                <div className="mt-4 grid grid-cols-3 gap-3">
+                  {Array.from({ length: WORK_FINISHED_IMAGE_MAX_COUNT }).map((_, index) => {
+                    const image = workFinishedImages[index];
+                    return image ? (
+                      <div
+                        key={`${booking.id}-work-image-${index}`}
+                        className="relative aspect-square overflow-hidden rounded-[20px] border border-[#dcc7f7] bg-[#faf5ff]"
                       >
-                        x
+                        <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                          }
+                          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-[12px] font-black text-white"
+                          aria-label={`Remove completion proof ${index + 1}`}
+                        >
+                          x
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        key={`${booking.id}-work-image-slot-${index}`}
+                        type="button"
+                        onClick={() => workFinishedInputRef.current?.click()}
+                        className="flex aspect-square flex-col items-center justify-center rounded-[20px] border-2 border-dashed border-[#9b5de5] bg-[#fcf8ff] text-[#8E5EB5]"
+                      >
+                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-current">
+                          <Plus className="h-6 w-6" />
+                        </span>
+                        <ImageIcon className="mt-4 h-7 w-7" />
                       </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              ) : null}
-              {workFinishedImageError ? (
-                <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{workFinishedImageError}</p>
-              ) : null}
+                <div className="mt-4 flex items-center justify-center gap-4 text-[13px] font-medium text-[#7b728a]">
+                  <button
+                    type="button"
+                    onClick={() => workFinishedInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 text-[#7b728a]"
+                  >
+                    <ImageIcon className="h-5 w-5 text-[#8E5EB5]" />
+                    Choose from gallery
+                  </button>
+                  <span className="text-[#d2c2ea]">|</span>
+                  <button
+                    type="button"
+                    onClick={() => workFinishedCameraInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 text-[#7b728a]"
+                  >
+                    <Camera className="h-5 w-5 text-[#8E5EB5]" />
+                    Take a photo
+                  </button>
+                </div>
+                {workFinishedImageError ? (
+                  <p className="mt-3 text-[12px] font-semibold text-[#dc2626]">{workFinishedImageError}</p>
+                ) : null}
+              </div>
+              <div className="mt-5 rounded-[18px] border border-[#efe4fb] bg-[#faf6ff] px-4 py-3">
+                <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#8E5EB5]">Total Payment Request</p>
+                <p className="mt-2 text-[1.5rem] font-black tracking-[-0.04em] text-[#1f1630]">
+                  {formatCurrency(finalPaymentAmount)}
+                </p>
+              </div>
             </div>
             <AppButton
-              className="w-full"
+              className="w-full !min-h-[4.25rem] !rounded-[20px] !bg-[linear-gradient(135deg,#8E5EB5_0%,#7b42c3_100%)] !text-[18px] !shadow-[0_20px_36px_rgba(142,94,181,0.28)]"
               disabled={actionBookingId === booking.id}
-              onClick={() => onWorkFinished(booking.id, workFinishedImages, Number(finalPaymentAmount))}
+              onClick={() =>
+                onWorkFinished(
+                  booking.id,
+                  workFinishedImages,
+                  finalPaymentAmount,
+                  Number.isFinite(additionalAmountValue) ? additionalAmountValue : 0,
+                  completionDescription.trim(),
+                )
+              }
             >
               Mark Job Completed & Send Payment Request
             </AppButton>
@@ -882,7 +965,7 @@ function BookingDetails({
                     min="0"
                     step="0.01"
                     value={finalPaymentAmount}
-                    onChange={(event) => setFinalPaymentAmount(event.target.value)}
+                    readOnly
                     className="mt-2 h-11 w-full rounded-[14px] border border-[#e7dff2] px-4 text-[14px] font-semibold text-[#1f1630] outline-none focus:border-[#8E5EB5]"
                   />
                 </label>
@@ -1160,7 +1243,13 @@ export function ProviderBookingsScreen({
     state.handleBookingAction(bookingId, "arrived", "Provider arrived at customer location");
   }
 
-  function handleWorkFinished(bookingId: string, images: string[] = [], finalAmount = 0) {
+  function handleWorkFinished(
+    bookingId: string,
+    images: string[] = [],
+    finalAmount = 0,
+    additionalAmount = 0,
+    description = "",
+  ) {
     if (images.length < 1) {
       state.setError("Please attach at least 1 job image before sending the payment request.");
       return;
@@ -1174,10 +1263,21 @@ export function ProviderBookingsScreen({
     state.handleBookingAction(
       bookingId,
       "final_payment_sent",
-      "Provider marked work as finished and sent the final cash payment request.",
+      description || "Provider marked work as finished and sent the final cash payment request.",
       {
         finalAmount,
         workFinishedImages: images,
+        paymentBreakdown: [
+          { description: "Booking Price", amount: Math.max(0, finalAmount - Math.max(0, additionalAmount)) },
+          ...(additionalAmount > 0
+            ? [
+                {
+                  description: description || "Additional Charges",
+                  amount: additionalAmount,
+                },
+              ]
+            : []),
+        ],
       },
     );
   }
