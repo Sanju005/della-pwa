@@ -255,11 +255,7 @@ function TimelineCard({
         </span>
         <span className={`mt-2 h-full min-h-16 w-[2px] ${done || current ? "bg-[#8E5EB5]" : "bg-[#e5e7eb]"}`} />
       </div>
-      <div
-        className={`flex-1 rounded-[24px] border bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)] ${
-          current ? "border-[#dcc7f7]" : "border-[#eee5f7]"
-        }`}
-      >
+      <div className="flex-1 rounded-[24px] border border-[#eee5f7] bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-[0.95rem] font-black tracking-[-0.035em] text-[#0f172a]">
@@ -874,114 +870,112 @@ function BookingDetails({
               onChange={handleWorkFinishedProofChange("camera")}
               className="hidden"
             />
-            <div className="rounded-[28px] border border-[#eee5f7] bg-white p-6 shadow-[0_16px_34px_rgba(86,38,135,0.06)]">
-              <label className="block">
-                <span className="text-[13px] font-extrabold text-[#1f1630]">Fixed Amount (RM)</span>
-                <input
-                  type="text"
-                  readOnly
-                  value={fixedAmount.toFixed(2)}
-                  className="mt-3 h-14 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 text-[18px] font-semibold text-[#1f1630] outline-none"
-                />
-              </label>
-              <label className="mt-5 block">
-                <span className="text-[13px] font-extrabold text-[#1f1630]">Additional Amount (RM)</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={additionalAmount}
-                  onChange={(event) => setAdditionalAmount(event.target.value)}
-                  className="mt-3 h-14 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 text-[18px] font-semibold text-[#1f1630] outline-none focus:border-[#8E5EB5]"
-                />
-              </label>
-              <label className="mt-5 block">
-                <span className="text-[13px] font-extrabold text-[#1f1630]">Description</span>
-                <textarea
-                  rows={4}
-                  value={completionDescription}
-                  onChange={(event) => setCompletionDescription(event.target.value)}
-                  placeholder="Extra work / additional materials"
-                  className="mt-3 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 py-4 text-[16px] text-[#1f1630] outline-none placeholder:text-[#7b728a] focus:border-[#8E5EB5]"
-                />
-              </label>
-              <div className="mt-6">
-                <p className="text-[13px] font-extrabold text-[#1f1630]">Completion Images</p>
-                <p className="mt-1 text-[12px] text-[#64748b]">Add up to 3 proof files. Gallery: JPG, JPEG, PDF. Camera: image.</p>
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  {Array.from({ length: WORK_FINISHED_IMAGE_MAX_COUNT }).map((_, index) => {
-                    const image = workFinishedImages[index];
-                    return image ? (
-                      <div
-                        key={`${booking.id}-work-image-${index}`}
-                        className="relative aspect-square overflow-hidden rounded-[20px] border border-[#dcc7f7] bg-[#faf5ff]"
-                      >
-                        {isPdfWorkProof(image) ? (
-                          <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fcf8ff] px-3 text-center text-[#8E5EB5]">
-                            <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
-                            <span className="text-[12px] font-semibold leading-5">Proof file {index + 1}</span>
-                          </div>
-                        ) : (
-                          <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
-                          }
-                          className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-[12px] font-black text-white"
-                          aria-label={`Remove completion proof ${index + 1}`}
-                        >
-                          x
-                        </button>
-                      </div>
-                    ) : (
+            <label className="block">
+              <span className="text-[13px] font-extrabold text-[#1f1630]">Fixed Amount (RM)</span>
+              <input
+                type="text"
+                readOnly
+                value={fixedAmount.toFixed(2)}
+                className="mt-3 h-14 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 text-[18px] font-semibold text-[#1f1630] outline-none"
+              />
+            </label>
+            <label className="mt-5 block">
+              <span className="text-[13px] font-extrabold text-[#1f1630]">Additional Amount (RM)</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={additionalAmount}
+                onChange={(event) => setAdditionalAmount(event.target.value)}
+                className="mt-3 h-14 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 text-[18px] font-semibold text-[#1f1630] outline-none focus:border-[#8E5EB5]"
+              />
+            </label>
+            <label className="mt-5 block">
+              <span className="text-[13px] font-extrabold text-[#1f1630]">Description</span>
+              <textarea
+                rows={4}
+                value={completionDescription}
+                onChange={(event) => setCompletionDescription(event.target.value)}
+                placeholder="Extra work / additional materials"
+                className="mt-3 w-full rounded-[18px] border border-[#e7dff2] bg-white px-4 py-4 text-[16px] text-[#1f1630] outline-none placeholder:text-[#7b728a] focus:border-[#8E5EB5]"
+              />
+            </label>
+            <div className="mt-6">
+              <p className="text-[13px] font-extrabold text-[#1f1630]">Completion Images</p>
+              <p className="mt-1 text-[12px] text-[#64748b]">Add up to 3 proof files. Gallery: JPG, JPEG, PDF. Camera: image.</p>
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                {Array.from({ length: WORK_FINISHED_IMAGE_MAX_COUNT }).map((_, index) => {
+                  const image = workFinishedImages[index];
+                  return image ? (
+                    <div
+                      key={`${booking.id}-work-image-${index}`}
+                      className="relative aspect-square overflow-hidden rounded-[20px] border border-[#dcc7f7] bg-[#faf5ff]"
+                    >
+                      {isPdfWorkProof(image) ? (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fcf8ff] px-3 text-center text-[#8E5EB5]">
+                          <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                          <span className="text-[12px] font-semibold leading-5">Proof file {index + 1}</span>
+                        </div>
+                      ) : (
+                        <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
+                      )}
                       <button
-                        key={`${booking.id}-work-image-slot-${index}`}
                         type="button"
-                        onClick={() => workFinishedInputRef.current?.click()}
-                        className="flex aspect-square flex-col items-center justify-center rounded-[20px] border-2 border-dashed border-[#9b5de5] bg-[#fcf8ff] text-[#8E5EB5]"
+                        onClick={() =>
+                          setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                        }
+                        className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-[12px] font-black text-white"
+                        aria-label={`Remove completion proof ${index + 1}`}
                       >
-                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-current">
-                          <Plus className="h-6 w-6" />
-                        </span>
-                        <ImageIcon className="mt-4 h-7 w-7" />
+                        x
                       </button>
-                    );
-                  })}
-                </div>
-                <div className="mt-4 flex items-center justify-center gap-4 text-[13px] font-medium text-[#7b728a]">
-                  <button
-                    type="button"
-                    onClick={() => workFinishedInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 text-[#7b728a]"
-                  >
-                    <ImageIcon className="h-5 w-5 text-[#8E5EB5]" />
-                    Choose from gallery
-                  </button>
-                  <span className="text-[#d2c2ea]">|</span>
-                  <button
-                    type="button"
-                    onClick={() => workFinishedCameraInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 text-[#7b728a]"
-                  >
-                    <Camera className="h-5 w-5 text-[#8E5EB5]" />
-                    Take a photo
-                  </button>
-                </div>
-                {workFinishedImageError ? (
-                  <p className="mt-3 text-[12px] font-semibold text-[#dc2626]">{workFinishedImageError}</p>
-                ) : null}
+                    </div>
+                  ) : (
+                    <button
+                      key={`${booking.id}-work-image-slot-${index}`}
+                      type="button"
+                      onClick={() => workFinishedInputRef.current?.click()}
+                      className="flex aspect-square flex-col items-center justify-center rounded-[20px] border-2 border-dashed border-[#9b5de5] bg-[#fcf8ff] text-[#8E5EB5]"
+                    >
+                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-current">
+                        <Plus className="h-6 w-6" />
+                      </span>
+                      <ImageIcon className="mt-4 h-7 w-7" />
+                    </button>
+                  );
+                })}
               </div>
-              <div className="mt-5 rounded-[18px] border border-[#e7dff2] bg-white px-4 py-3">
-                <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#8E5EB5]">Total Payment Request</p>
-                <p className="mt-2 text-[1.5rem] font-black tracking-[-0.04em] text-[#1f1630]">
-                  {formatCurrency(finalPaymentAmount)}
-                </p>
+              <div className="mt-4 flex items-center justify-center gap-4 text-[13px] font-medium text-[#7b728a]">
+                <button
+                  type="button"
+                  onClick={() => workFinishedInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 text-[#7b728a]"
+                >
+                  <ImageIcon className="h-5 w-5 text-[#8E5EB5]" />
+                  Choose from gallery
+                </button>
+                <span className="text-[#d2c2ea]">|</span>
+                <button
+                  type="button"
+                  onClick={() => workFinishedCameraInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 text-[#7b728a]"
+                >
+                  <Camera className="h-5 w-5 text-[#8E5EB5]" />
+                  Take a photo
+                </button>
               </div>
+              {workFinishedImageError ? (
+                <p className="mt-3 text-[12px] font-semibold text-[#dc2626]">{workFinishedImageError}</p>
+              ) : null}
+            </div>
+            <div className="mt-5 rounded-[18px] border border-[#e7dff2] bg-white px-4 py-3">
+              <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#8E5EB5]">Total Payment Request</p>
+              <p className="mt-2 text-[1.5rem] font-black tracking-[-0.04em] text-[#1f1630]">
+                {formatCurrency(finalPaymentAmount)}
+              </p>
             </div>
             <AppButton
-              className="w-full !min-h-[4.25rem] !rounded-[20px] !bg-[linear-gradient(135deg,#8E5EB5_0%,#7b42c3_100%)] !text-[18px] !shadow-[0_20px_36px_rgba(142,94,181,0.28)]"
+              className="mt-5 w-full !min-h-[4.25rem] !rounded-[20px] !bg-[linear-gradient(135deg,#8E5EB5_0%,#7b42c3_100%)] !text-[18px] !shadow-[0_20px_36px_rgba(142,94,181,0.28)]"
               disabled={actionBookingId === booking.id}
               onClick={() =>
                 onWorkFinished(
