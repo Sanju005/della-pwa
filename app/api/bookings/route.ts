@@ -65,6 +65,12 @@ type ProviderProfileRow = {
   marketing_name: string | null;
 };
 
+type ProviderIdentityRow = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
 type BookingRow = {
   id: string;
   provider_id: string;
@@ -652,7 +658,8 @@ function buildUserActivitySteps(status: BookingRow["booking_status"]): Booking["
 
 function mapLiveBookingToUi(
   row: BookingRow,
-  providerName: string
+  providerName: string,
+  providerAvatarUrl?: string
 ): Booking {
   const scheduleParts = formatDateTimeLabel(
     row.scheduled_date,
@@ -685,6 +692,8 @@ function mapLiveBookingToUi(
     id: row.id,
     service: `${row.service_label} Service`,
     provider: providerName,
+    providerFullName: providerName,
+    providerAvatarUrl: providerAvatarUrl?.trim() || "",
     schedule: scheduleParts.schedule,
     location: row.location_text,
     status: toBookingTab(row.booking_status),
@@ -767,23 +776,42 @@ function mapLiveBookingToUi(
   };
 }
 
-async function loadProviderNames(
+async function loadProviderDirectory(
   adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
   providerIds: string[]
 ) {
   if (providerIds.length === 0) {
-    return new Map<string, string>();
+    return new Map<string, { name: string; avatarUrl: string }>();
   }
 
-  const { data } = await adminClient
-    .from("provider_profiles")
-    .select("id, marketing_name")
-    .in("id", providerIds);
+  const [{ data: providerProfiles }, { data: profiles }] = await Promise.all([
+    adminClient
+      .from("provider_profiles")
+      .select("id, marketing_name")
+      .in("id", providerIds),
+    adminClient
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", providerIds),
+  ]);
+
+  const marketingNameById = new Map(
+    ((providerProfiles ?? []) as ProviderProfileRow[]).map((row) => [
+      row.id,
+      row.marketing_name?.trim() || "",
+    ])
+  );
 
   return new Map(
-    ((data ?? []) as ProviderProfileRow[]).map((row) => [
+    ((profiles ?? []) as ProviderIdentityRow[]).map((row) => [
       row.id,
-      row.marketing_name?.trim() || "DELLA Provider",
+      {
+        name:
+          row.full_name?.trim() ||
+          marketingNameById.get(row.id) ||
+          "DELLA Provider",
+        avatarUrl: row.avatar_url?.trim() || "",
+      },
     ])
   );
 }
@@ -876,7 +904,7 @@ export async function GET(request: Request) {
   }
 
   const rows = (data ?? []) as BookingRow[];
-  const providerNames = await loadProviderNames(
+  const providerDirectory = await loadProviderDirectory(
     verified.adminClient,
     [...new Set(rows.map((row) => row.provider_id))]
   );
@@ -885,7 +913,8 @@ export async function GET(request: Request) {
     bookings: rows.map((row) =>
       mapLiveBookingToUi(
         row,
-        providerNames.get(row.provider_id) || "DELLA Provider"
+        providerDirectory.get(row.provider_id)?.name || "DELLA Provider",
+        providerDirectory.get(row.provider_id)?.avatarUrl || ""
       )
     ),
   });

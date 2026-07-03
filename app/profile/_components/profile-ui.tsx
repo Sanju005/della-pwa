@@ -1274,32 +1274,48 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
         {filtered.map((booking) => (
           <div
             key={booking.id}
-            className="rounded-[24px] border border-[#eee6f9] bg-white p-4 shadow-[0_14px_30px_rgba(106,69,160,0.08)]"
+            className="rounded-[26px] border border-[#eadff8] bg-[linear-gradient(180deg,#fffefe_0%,#fffafc_100%)] p-4 shadow-[0_18px_38px_rgba(106,69,160,0.1)]"
           >
-            <div className="flex gap-3">
-              <div className="rounded-[18px] border border-[#f1e7fb] bg-[#fffdfd] p-1 shadow-[0_8px_18px_rgba(106,69,160,0.06)]">
-                <BookingThumb kind={booking.thumbnail} imageSrc={booking.imageSrc} service={booking.service} />
+            <div className="flex items-start gap-3">
+              <div className="rounded-[18px] border border-[#f2e8fb] bg-[#fffaf0] p-1.5 shadow-[0_12px_24px_rgba(106,69,160,0.08)]">
+                <BookingThumb
+                  kind={booking.thumbnail}
+                  imageSrc={booking.imageSrc}
+                  avatarSrc={booking.providerAvatarUrl}
+                  service={booking.service}
+                  providerName={booking.providerFullName || booking.provider}
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[16px] font-black text-[#1f1630]">{booking.provider}</p>
-                    <p className="mt-1 text-[12px] font-semibold text-[#7b728a]">{booking.service}</p>
+                    <p className="text-[1.35rem] font-black leading-7 tracking-[-0.04em] text-[#1f1630]">
+                      {booking.providerFullName || booking.provider}
+                    </p>
+                    <p className="mt-1 text-[13px] font-semibold text-[#7b728a]">{booking.service}</p>
                   </div>
                   <SharedStatusBadge label={booking.statusLabel} tone={bookingTone(booking)} />
                 </div>
-                <div className="mt-3 space-y-2 text-[12px] text-[#544b66]">
-                  <div className="flex items-start gap-2">
-                    <CalendarIcon className="mt-0.5 h-4 w-4 text-[#8E5EB5]" />
-                    <span>{booking.schedule}</span>
+                <div className="mt-4 space-y-0 overflow-hidden rounded-[20px] border border-[#f0e7fb] bg-white/90">
+                  <div className="flex items-start gap-3 px-4 py-3 text-[13px] text-[#544b66]">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#f6effd] text-[#8E5EB5]">
+                      <CalendarIcon className="h-4.5 w-4.5" />
+                    </span>
+                    <span className="pt-1 font-semibold leading-6">{booking.schedule}</span>
                   </div>
-                  <div className="flex items-start gap-2">
-                    <PinIcon className="mt-0.5 h-4 w-4 text-[#8E5EB5]" />
-                    <span>{booking.location}</span>
+                  <div className="h-px bg-[#f3ebfb]" />
+                  <div className="flex items-start gap-3 px-4 py-3 text-[13px] text-[#544b66]">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#f6effd] text-[#8E5EB5]">
+                      <PinIcon className="h-4.5 w-4.5" />
+                    </span>
+                    <span className="pt-1 font-semibold leading-6">{booking.location}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <WalletIcon className="h-4 w-4 text-[#8E5EB5]" />
-                    <span className="font-bold text-[#1f1630]">RM{booking.paymentAmount ?? 0}</span>
+                  <div className="h-px bg-[#f3ebfb]" />
+                  <div className="flex items-center gap-3 px-4 py-3 text-[13px] text-[#544b66]">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#f6effd] text-[#8E5EB5]">
+                      <WalletIcon className="h-4.5 w-4.5" />
+                    </span>
+                    <span className="font-black text-[#1f1630]">{formatBookingAmount(booking.paymentAmount)}</span>
                   </div>
                 </div>
               </div>
@@ -1307,21 +1323,15 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
 
             <Link
               href={`/profile/bookings/${booking.id}`}
-              className="mt-4 flex h-11 w-full items-center justify-between rounded-[14px] border border-[#f0e2ff] bg-[#fbf7ff] px-4 text-[13px] font-extrabold text-[#8E5EB5]"
+              className="mt-4 flex h-12 w-full items-center justify-between rounded-[16px] bg-[linear-gradient(135deg,#7c3aed_0%,#5b21b6_100%)] px-4 text-[15px] font-extrabold text-white shadow-[0_16px_32px_rgba(91,33,182,0.25)]"
             >
               <span>Track Task</span>
               <ChevronRightIcon className="h-4 w-4" />
             </Link>
 
-            {booking.activitySteps?.length ? (
-              <div className="mt-4">
-                <CompactTaskPath steps={booking.activitySteps} />
-              </div>
-            ) : null}
-
-            <div className="mt-4 text-[11px] text-[#8e84a0]">
-              <p className="font-semibold">Booking ID</p>
-              <p className="mt-1 font-bold text-[#6d6480]">{booking.id}</p>
+            <div className="mt-4 rounded-[22px] border border-[#efe4fb] bg-white p-4 shadow-[0_12px_24px_rgba(106,69,160,0.05)]">
+              <p className="text-[1rem] font-black tracking-[-0.03em] text-[#1f1630]">Current Status</p>
+              <BookingStatusSummary booking={booking} />
             </div>
 
             {booking.status === "cancelled" ? (
@@ -1336,20 +1346,101 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
                 </p>
               </div>
             ) : null}
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <AppButton href={`/profile/bookings/${booking.id}#task-messages`} tone="secondary" className="w-full !rounded-[14px] !border-[#d9c5f1] !bg-white !text-[#8E5EB5] !shadow-none">
-                Message
-              </AppButton>
-              <AppButton href={`/profile/bookings/${booking.id}`} className="w-full !rounded-[14px] !bg-[#8E5EB5] !shadow-[0_12px_24px_rgba(142,94,181,0.22)]">
-                {booking.status === "completed" ? "See Details" : "Open Booking"}
-              </AppButton>
-            </div>
           </div>
         ))}
       </div>
     </ProfileShell>
   );
+}
+
+function BookingStatusSummary({ booking }: { booking: Booking }) {
+  const currentStep =
+    booking.activitySteps?.find((step) => step.status === "current") ??
+    booking.activitySteps?.find((step) => step.status === "done") ??
+    null;
+  const { title, description } = describeBookingStatus(booking);
+
+  return (
+    <div className="mt-4 rounded-[20px] border border-[#eee5fb] bg-[linear-gradient(180deg,#faf6ff_0%,#fffefe_100%)] p-4">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#dcc7f7] bg-[#f3e8ff] text-[#7c3aed] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+          <CheckCircleIcon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[15px] font-black text-[#7c3aed]">
+            {currentStep?.label || title}
+          </p>
+          <p className="mt-1 text-[13px] leading-5 text-[#6d6480]">{description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function describeBookingStatus(booking: Booking) {
+  switch (booking.workflowStatus) {
+    case "pending_provider_response":
+      return {
+        title: "Booking Sent",
+        description: "Waiting for provider response.",
+      };
+    case "accepted":
+      return {
+        title: "Provider Accepted",
+        description: "Your booking has been accepted by the provider.",
+      };
+    case "on_the_way":
+      return {
+        title: "Provider On The Way",
+        description: "The provider is on the way to your location.",
+      };
+    case "arrived":
+      return {
+        title: "Provider Arrived",
+        description: "The provider has arrived and is ready to start.",
+      };
+    case "work_finished_by_provider":
+      return {
+        title: "Confirm Work Completion",
+        description: "Review the task and confirm the provider has finished.",
+      };
+    case "work_confirmed_by_user":
+      return {
+        title: "Waiting Final Payment",
+        description: "Send the final payment so the task can be closed.",
+      };
+    case "final_payment_sent":
+    case "cash_paid_by_user":
+      return {
+        title: "Payment Sent",
+        description: "Payment was sent and is waiting for provider confirmation.",
+      };
+    case "payment_received_by_provider":
+    case "completed":
+    case "paid":
+    case "review_requested":
+    case "reviewed":
+      return {
+        title: "Task Completed",
+        description: "This booking has been completed successfully.",
+      };
+    case "declined":
+    case "declined_by_provider":
+      return {
+        title: "Booking Declined",
+        description: "The provider declined this booking request.",
+      };
+    case "cancelled":
+      return {
+        title: "Booking Cancelled",
+        description: "This booking was cancelled.",
+      };
+    default:
+      return {
+        title: booking.statusLabel,
+        description: "Track this booking to view the latest progress.",
+      };
+  }
 }
 
 function CompactTaskPath({
@@ -3568,11 +3659,15 @@ function NavItem({
 function BookingThumb({
   kind,
   imageSrc,
+  avatarSrc,
   service,
+  providerName,
 }: {
   kind: string;
   imageSrc?: string;
+  avatarSrc?: string;
   service: string;
+  providerName?: string;
 }) {
   const tones =
     kind === "food"
@@ -3581,9 +3676,23 @@ function BookingThumb({
         ? "from-sky-300 via-slate-200 to-cyan-600"
         : "from-slate-800 via-slate-600 to-stone-400";
 
+  if (avatarSrc) {
+    return (
+      <div className="relative h-[4.9rem] w-[4.9rem] shrink-0 overflow-hidden rounded-[16px] bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)]">
+        <Image
+          src={avatarSrc}
+          alt={providerName || service}
+          fill
+          unoptimized
+          className="object-cover"
+        />
+      </div>
+    );
+  }
+
   if (imageSrc) {
     return (
-      <div className="relative h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-[14px] shadow-[0_8px_18px_rgba(15,23,42,0.16)]">
+      <div className="relative h-[4.9rem] w-[4.9rem] shrink-0 overflow-hidden rounded-[16px] shadow-[0_8px_18px_rgba(15,23,42,0.16)]">
         <Image
           src={imageSrc}
           alt={service}
@@ -3596,7 +3705,7 @@ function BookingThumb({
   }
 
   return (
-    <div className={`h-[4.5rem] w-[4.5rem] shrink-0 rounded-[14px] bg-gradient-to-br ${tones} p-2 shadow-[0_8px_18px_rgba(15,23,42,0.16)]`}>
+    <div className={`h-[4.9rem] w-[4.9rem] shrink-0 rounded-[16px] bg-gradient-to-br ${tones} p-2 shadow-[0_8px_18px_rgba(15,23,42,0.16)]`}>
       <div className="flex h-full w-full items-end rounded-[10px] bg-black/20 p-2">
         {kind === "food" ? <ChefHatIcon className="h-5 w-5 text-white" /> : null}
         {kind === "cleaning" ? <SparklesCleanIcon className="h-5 w-5 text-white" /> : null}
@@ -3616,6 +3725,10 @@ function badgeToneClass(tone: Booking["badgeTone"]) {
   }
 
   return "bg-[#eef2f7] text-[#64748b]";
+}
+
+function formatBookingAmount(value?: number) {
+  return `RM${Number(value ?? 0).toFixed(2)}`;
 }
 
 function bookingTone(booking: Booking) {

@@ -72,6 +72,8 @@ export type Booking = {
   id: string;
   service: string;
   provider: string;
+  providerFullName?: string;
+  providerAvatarUrl?: string;
   schedule: string;
   location: string;
   status: BookingStatus;
