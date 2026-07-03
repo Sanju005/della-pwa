@@ -4072,44 +4072,48 @@ export function PaymentsScreen() {
           </section>
         ) : null}
 
-        {pendingCompanyAmount > 0 || processingCompanyAmount > 0 ? (
-          <section className="rounded-[28px] border border-[#ffd9d5] bg-[linear-gradient(180deg,#fffefe_0%,#fff8f8_100%)] px-5 py-5 shadow-[0_18px_36px_rgba(255,89,89,0.08)]">
-            <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#fff1f3_0%,#ffe6eb_100%)] text-[#d61f45]">
-                <Landmark className="h-7 w-7" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="max-w-[14rem] text-[1.05rem] font-black leading-6 tracking-[-0.04em] text-[#d62839] sm:max-w-none">
-                  {isCompanyPaymentProcessing ? "Company Payment In Process" : "Amount to Pay Company"}
-                </h2>
-                <p className="mt-1 max-w-[15rem] text-[14px] leading-6 text-[#5d6278] sm:max-w-none">
-                  {isCompanyPaymentProcessing
-                    ? "Your uploaded payment slip is under admin review."
-                    : "You have pending amount to pay as company commission."}
-                </p>
-              </div>
-              <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:block sm:text-right">
-                <p className="whitespace-nowrap text-[1.15rem] font-black tracking-[-0.04em] text-[#d62839]">
-                  {formatCurrency(isCompanyPaymentProcessing ? processingCompanyAmount : pendingCompanyAmount)}
-                </p>
-                {isCompanyPaymentProcessing ? (
-                  <span className="inline-flex min-h-[2.95rem] items-center rounded-[16px] bg-[#f8e9ea] px-4 py-2 text-[14px] font-extrabold text-[#d62839] sm:mt-3">
-                    Payment Process
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setModal("company")}
-                    className="inline-flex min-h-[2.95rem] items-center gap-2 rounded-[16px] bg-[linear-gradient(180deg,#ec3349_0%,#d81d35_100%)] px-4 py-2 text-[14px] font-extrabold text-white sm:mt-3"
-                  >
-                    Pay Now
-                    <ChevronRight className="h-4.5 w-4.5" />
-                  </button>
-                )}
-              </div>
+        <section className="rounded-[28px] border border-[#ffd9d5] bg-[linear-gradient(180deg,#fffefe_0%,#fff8f8_100%)] px-5 py-5 shadow-[0_18px_36px_rgba(255,89,89,0.08)]">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#fff1f3_0%,#ffe6eb_100%)] text-[#d61f45]">
+              <Landmark className="h-7 w-7" />
             </div>
-          </section>
-        ) : null}
+            <div className="min-w-0 flex-1">
+              <h2 className="max-w-[14rem] text-[1.05rem] font-black leading-6 tracking-[-0.04em] text-[#d62839] sm:max-w-none">
+                {isCompanyPaymentProcessing ? "Company Payment In Process" : "Amount to Pay Company"}
+              </h2>
+              <p className="mt-1 max-w-[15rem] text-[14px] leading-6 text-[#5d6278] sm:max-w-none">
+                {isCompanyPaymentProcessing
+                  ? "Your uploaded payment slip is under admin review."
+                  : pendingCompanyAmount > 0
+                    ? "You have pending amount to pay as company commission."
+                    : "No payable amount to company right now."}
+              </p>
+            </div>
+            <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:block sm:text-right">
+              <p className="whitespace-nowrap text-[1.15rem] font-black tracking-[-0.04em] text-[#d62839]">
+                {formatCurrency(isCompanyPaymentProcessing ? processingCompanyAmount : pendingCompanyAmount)}
+              </p>
+              {isCompanyPaymentProcessing ? (
+                <span className="inline-flex min-h-[2.95rem] items-center rounded-[16px] bg-[#f8e9ea] px-4 py-2 text-[14px] font-extrabold text-[#d62839] sm:mt-3">
+                  Payment Process
+                </span>
+              ) : pendingCompanyAmount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setModal("company")}
+                  className="inline-flex min-h-[2.95rem] items-center gap-2 rounded-[16px] bg-[linear-gradient(180deg,#ec3349_0%,#d81d35_100%)] px-4 py-2 text-[14px] font-extrabold text-white sm:mt-3"
+                >
+                  Pay Now
+                  <ChevronRight className="h-4.5 w-4.5" />
+                </button>
+              ) : (
+                <span className="inline-flex min-h-[2.95rem] items-center rounded-[16px] bg-[#f8e9ea] px-4 py-2 text-[14px] font-extrabold text-[#d62839] sm:mt-3">
+                  No Payable
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
 
         <section className="overflow-hidden rounded-[30px] bg-white shadow-[0_24px_54px_rgba(91,45,144,0.1)] ring-1 ring-[#efe7f8]">
           <div className="overflow-x-auto border-b border-[#efe7f8]">
