@@ -263,6 +263,15 @@ export async function POST(request: Request) {
     );
   }
 
+  if (depositedAmount !== toCurrency(summary?.payableAmount ?? 0)) {
+    return NextResponse.json(
+      {
+        error: `Deposited amount must be exactly RM ${toCurrency(summary?.payableAmount ?? 0).toFixed(2)}.`,
+      },
+      { status: 400 },
+    );
+  }
+
   let { data: pendingPaymentRows, error: pendingPaymentError } = await verified.adminClient
     .from("payments")
     .select("id")

@@ -3377,6 +3377,7 @@ export function PaymentsScreen() {
     processingAmount: 0,
     latestSubmission: null,
   });
+  const [companyPayableSummaryLoaded, setCompanyPayableSummaryLoaded] = useState(false);
   const [companyProofName, setCompanyProofName] = useState("");
   const [companyProofError, setCompanyProofError] = useState("");
   const [companyProofDataUrl, setCompanyProofDataUrl] = useState("");
@@ -3580,22 +3581,25 @@ export function PaymentsScreen() {
     )
     .reduce((sum, booking) => sum + Number(booking.companyCommissionAmount ?? 0), 0);
   const pendingCompanyAmount =
-    companyPayableSummary.payableAmount > 0
-      ? companyPayableSummary.payableAmount
-      : derivedPendingCompanyAmount;
+    companyPayableSummaryLoaded ? companyPayableSummary.payableAmount : derivedPendingCompanyAmount;
   const processingCompanyAmount =
-    companyPayableSummary.processingAmount > 0
+    companyPayableSummaryLoaded
       ? companyPayableSummary.processingAmount
       : derivedProcessingCompanyAmount;
   const isCompanyPaymentProcessing = processingCompanyAmount > 0;
   const isSubmittingCompanyPayment = state.actionBookingId === "provider-company-payment";
   const companyDepositAmountValue = Number(companyDepositAmount);
+  const companyDepositMatchesPending =
+    Number.isFinite(companyDepositAmountValue) &&
+    Math.round((companyDepositAmountValue + Number.EPSILON) * 100) / 100 ===
+      Math.round((pendingCompanyAmount + Number.EPSILON) * 100) / 100;
   const canSubmitCompanyPayment =
     Boolean(companyProofName) &&
     Boolean(companyProofDataUrl) &&
     companyDepositAmount.trim().length > 0 &&
     Number.isFinite(companyDepositAmountValue) &&
     companyDepositAmountValue > 0 &&
+    companyDepositMatchesPending &&
     pendingCompanyAmount > 0;
 
   function resetCompanyProofState() {
@@ -3715,6 +3719,7 @@ export function PaymentsScreen() {
         processingAmount: Number(result.processingAmount ?? 0),
         latestSubmission: result.latestSubmission ?? null,
       });
+      setCompanyPayableSummaryLoaded(true);
     }
 
     void loadCompanyPayableSummary();
@@ -4514,16 +4519,38 @@ export function PaymentsScreen() {
                 inputMode="decimal"
                 value={companyDepositAmount}
                 onChange={(event) => {
-                  const nextValue = event.target.value.replace(/[^\d.]/g, "");
-                  const [whole = "", decimal = ""] = nextValue.split(".");
+                  const rawValue = event.target.value.replace(/[^\d.]/g, "");
+                  const decimalIndex = rawValue.indexOf(".");
                   const normalizedValue =
-                    decimal.length > 0 ? `${whole}.${decimal.slice(0, 2)}` : whole;
+                    decimalIndex === -1
+                      ? rawValue
+                      : `${rawValue.slice(0, decimalIndex)}.${rawValue
+                          .slice(decimalIndex + 1)
+                          .replace(/\./g, "")
+                          .slice(0, 2)}`;
                   setCompanyDepositAmount(normalizedValue);
+                }}
+                onBlur={() => {
+                  if (!companyDepositAmount.trim().length) {
+                    return;
+                  }
+
+                  if (Number.isFinite(companyDepositAmountValue) && companyDepositAmountValue > 0) {
+                    setCompanyDepositAmount(companyDepositAmountValue.toFixed(2));
+                  }
                 }}
                 placeholder="Enter deposited amount"
                 className="mt-3 block w-full bg-transparent text-[15px] font-semibold text-[#1d1633] outline-none"
               />
             </label>
+            <p className="text-[12px] font-semibold text-[#7b748f]">
+              Enter the exact payable amount: {formatCurrency(pendingCompanyAmount)}
+            </p>
+            {companyDepositAmount.trim().length > 0 && !companyDepositMatchesPending ? (
+              <p className="text-[12px] font-semibold text-[#dc2626]">
+                Deposited amount must be exactly {formatCurrency(pendingCompanyAmount)}.
+              </p>
+            ) : null}
             <div className="grid grid-cols-1 gap-3">
               <button
                 type="button"
@@ -4531,6 +4558,13 @@ export function PaymentsScreen() {
                 onClick={async () => {
                   if (!Number.isFinite(companyDepositAmountValue) || companyDepositAmountValue <= 0) {
                     state.setError("Enter a valid deposited amount.");
+                    return;
+                  }
+
+                  if (!companyDepositMatchesPending) {
+                    state.setError(
+                      `Deposited amount must be exactly ${formatCurrency(pendingCompanyAmount)}.`,
+                    );
                     return;
                   }
 
