@@ -100,6 +100,10 @@ function isPdfProof(mimeType?: string, fileName?: string) {
   return mimeType === "application/pdf" || fileName?.toLowerCase().endsWith(".pdf");
 }
 
+function isPdfDataUrl(value?: string) {
+  return (value ?? "").startsWith("data:application/pdf");
+}
+
 function formatStepDate(value?: string) {
   if (!value) {
     return "";
@@ -1841,7 +1845,14 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
                     rel="noreferrer"
                     className="block aspect-[4/3] overflow-hidden rounded-[12px] border border-[#ebe2f8] bg-[#f8f5fc]"
                   >
-                    <img src={image} alt={`Job photo ${index + 1}`} className="h-full w-full object-cover" />
+                    {isPdfDataUrl(image) ? (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-center text-[#8E5EB5]">
+                        <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                        <span className="text-[12px] font-semibold">Proof file {index + 1}</span>
+                      </div>
+                    ) : (
+                      <img src={image} alt={`Job photo ${index + 1}`} className="h-full w-full object-cover" />
+                    )}
                   </a>
                 ))}
               </div>

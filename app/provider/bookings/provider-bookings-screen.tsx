@@ -57,6 +57,21 @@ async function readImageAsDataUrl(file: File) {
   });
 }
 
+function isPdfWorkProof(value?: string) {
+  return (value ?? "").startsWith("data:application/pdf");
+}
+
+function isGalleryWorkProofFile(file: File) {
+  const name = file.name.toLowerCase();
+  return (
+    file.type === "application/pdf" ||
+    file.type === "image/jpeg" ||
+    name.endsWith(".pdf") ||
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg")
+  );
+}
+
 function isCompletedStatus(status: ProviderBookingItem["bookingStatus"]) {
   return ["completed", "paid", "review_requested", "reviewed"].includes(status);
 }
@@ -692,7 +707,8 @@ function BookingDetails({
     setWorkImageCropSource(nextImage ?? "");
   };
 
-  const handleWorkFinishedImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWorkFinishedProofChange =
+    (source: "gallery" | "camera") => async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
     event.target.value = "";
 
@@ -709,14 +725,18 @@ function BookingDetails({
     }
 
     try {
-      const images = await Promise.all(
+      const proofs = await Promise.all(
         files.map(async (file) => {
-          if (!file.type.startsWith("image/")) {
-            throw new Error("Only image files are allowed.");
+          if (source === "gallery" && !isGalleryWorkProofFile(file)) {
+            throw new Error("Gallery upload accepts JPG, JPEG, or PDF only.");
+          }
+
+          if (source === "camera" && !file.type.startsWith("image/")) {
+            throw new Error("Camera upload must be an image.");
           }
 
           if (file.size > WORK_FINISHED_IMAGE_MAX_BYTES) {
-            throw new Error("Each image must be 5MB or smaller.");
+            throw new Error("Each proof file must be 5MB or smaller.");
           }
 
           return readImageAsDataUrl(file);
@@ -724,9 +744,18 @@ function BookingDetails({
       );
 
       setWorkFinishedImageError("");
-      openNextWorkImageCrop(images);
+      const pdfProofs = proofs.filter((proof) => isPdfWorkProof(proof));
+      const imageProofs = proofs.filter((proof) => !isPdfWorkProof(proof));
+
+      if (pdfProofs.length) {
+        setWorkFinishedImages((current) => [...current, ...pdfProofs].slice(0, WORK_FINISHED_IMAGE_MAX_COUNT));
+      }
+
+      if (imageProofs.length) {
+        openNextWorkImageCrop(imageProofs);
+      }
     } catch (error) {
-      setWorkFinishedImageError(error instanceof Error ? error.message : "Unable to attach image.");
+      setWorkFinishedImageError(error instanceof Error ? error.message : "Unable to attach proof.");
     }
   };
 
@@ -832,9 +861,9 @@ function BookingDetails({
             <input
               ref={workFinishedInputRef}
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf"
               multiple
-              onChange={handleWorkFinishedImageChange}
+              onChange={handleWorkFinishedProofChange("gallery")}
               className="hidden"
             />
             <input
@@ -842,7 +871,7 @@ function BookingDetails({
               type="file"
               accept="image/*"
               capture="environment"
-              onChange={handleWorkFinishedImageChange}
+              onChange={handleWorkFinishedProofChange("camera")}
               className="hidden"
             />
             <div className="rounded-[28px] border border-[#eee5f7] bg-white p-6 shadow-[0_16px_34px_rgba(86,38,135,0.06)]">
@@ -878,7 +907,7 @@ function BookingDetails({
               </label>
               <div className="mt-6">
                 <p className="text-[13px] font-extrabold text-[#1f1630]">Completion Images</p>
-                <p className="mt-1 text-[12px] text-[#64748b]">Add up to 3 proof images</p>
+                <p className="mt-1 text-[12px] text-[#64748b]">Add up to 3 proof files. Gallery: JPG, JPEG, PDF. Camera: image.</p>
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   {Array.from({ length: WORK_FINISHED_IMAGE_MAX_COUNT }).map((_, index) => {
                     const image = workFinishedImages[index];
@@ -887,7 +916,14 @@ function BookingDetails({
                         key={`${booking.id}-work-image-${index}`}
                         className="relative aspect-square overflow-hidden rounded-[20px] border border-[#dcc7f7] bg-[#faf5ff]"
                       >
-                        <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
+                        {isPdfWorkProof(image) ? (
+                          <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fcf8ff] px-3 text-center text-[#8E5EB5]">
+                            <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                            <span className="text-[12px] font-semibold leading-5">Proof file {index + 1}</span>
+                          </div>
+                        ) : (
+                          <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
+                        )}
                         <button
                           type="button"
                           onClick={() =>

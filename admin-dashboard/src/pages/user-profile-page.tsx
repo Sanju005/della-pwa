@@ -85,6 +85,10 @@ function avatarGradient(name: string) {
   return palette[index];
 }
 
+function isPdfDataUrl(value?: string) {
+  return (value ?? "").startsWith("data:application/pdf");
+}
+
 export function UserProfilePage() {
   const { userId = "" } = useParams();
   const navigate = useNavigate();
@@ -620,11 +624,18 @@ export function UserProfilePage() {
                         rel="noreferrer"
                         className="block overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
                       >
-                        <img
-                          src={image}
-                          alt={`Completion image ${index + 1}`}
-                          className="aspect-[4/3] w-full object-cover"
-                        />
+                        {isPdfDataUrl(image) ? (
+                          <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 px-3 text-center text-violet-700">
+                            <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                            <span className="text-[12px] font-semibold">Proof file {index + 1}</span>
+                          </div>
+                        ) : (
+                          <img
+                            src={image}
+                            alt={`Completion image ${index + 1}`}
+                            className="aspect-[4/3] w-full object-cover"
+                          />
+                        )}
                       </a>
                     ))}
                   </div>
