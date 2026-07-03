@@ -344,7 +344,7 @@ function ProviderBookingSummary({ booking }: { booking: ProviderBookingItem }) {
           label="Location"
           value={booking.location || "Location not provided"}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           <BookingInfoRow
             icon={<CalendarDays className="h-4.5 w-4.5" />}
             label="Date & Time"
@@ -440,7 +440,7 @@ function ProviderBookingSummaryWithActions({
           label="Location"
           value={booking.location || "Location not provided"}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           <BookingInfoRow
             icon={<CalendarDays className="h-4.5 w-4.5" />}
             label="Date & Time"
