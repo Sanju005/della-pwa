@@ -1223,6 +1223,20 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
   useEffect(() => {
     let active = true;
     const client = getSupabaseClient();
+    let bookingsChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
+    let paymentsChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = (callback: () => Promise<void>, delayMs = 400) => {
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+
+      refreshTimeout = setTimeout(() => {
+        refreshTimeout = null;
+        void callback();
+      }, delayMs);
+    };
 
     async function loadLiveBookings() {
       if (!client) {
@@ -1252,12 +1266,56 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
       }
 
       setItems(result.bookings);
+
+      if (!bookingsChannel) {
+        bookingsChannel = client
+          .channel(`customer-bookings-${session.user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "bookings",
+              filter: `customer_id=eq.${session.user.id}`,
+            },
+            () => {
+              scheduleRefresh(loadLiveBookings);
+            },
+          )
+          .subscribe();
+      }
+
+      if (!paymentsChannel) {
+        paymentsChannel = client
+          .channel(`customer-booking-payments-${session.user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "payments",
+            },
+            () => {
+              scheduleRefresh(loadLiveBookings);
+            },
+          )
+          .subscribe();
+      }
     }
 
     void loadLiveBookings();
 
     return () => {
       active = false;
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+      if (client && bookingsChannel) {
+        void client.removeChannel(bookingsChannel);
+      }
+      if (client && paymentsChannel) {
+        void client.removeChannel(paymentsChannel);
+      }
     };
   }, []);
 

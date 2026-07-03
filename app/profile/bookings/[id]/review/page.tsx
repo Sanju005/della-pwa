@@ -19,11 +19,24 @@ export default function ProfileBookingReviewPage({
 
   useEffect(() => {
     let active = true;
+    const client = getSupabaseClient();
+    let bookingsChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
+    let paymentsChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = (callback: () => Promise<void>, delayMs = 400) => {
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+
+      refreshTimeout = setTimeout(() => {
+        refreshTimeout = null;
+        void callback();
+      }, delayMs);
+    };
 
     async function loadBooking() {
       const { id } = await params;
-
-      const client = getSupabaseClient();
 
       if (!active || !client) {
         setMissing(true);
@@ -57,12 +70,57 @@ export default function ProfileBookingReviewPage({
       const match = result.bookings.find((item) => item.id === id) ?? null;
       setBooking(match);
       setMissing(!match);
+
+      if (!bookingsChannel) {
+        bookingsChannel = client
+          .channel(`customer-booking-review-${session.user.id}-${id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "bookings",
+              filter: `customer_id=eq.${session.user.id}`,
+            },
+            () => {
+              scheduleRefresh(loadBooking);
+            },
+          )
+          .subscribe();
+      }
+
+      if (!paymentsChannel) {
+        paymentsChannel = client
+          .channel(`customer-booking-review-payments-${session.user.id}-${id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "payments",
+              filter: `booking_id=eq.${id}`,
+            },
+            () => {
+              scheduleRefresh(loadBooking);
+            },
+          )
+          .subscribe();
+      }
     }
 
     void loadBooking();
 
     return () => {
       active = false;
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+      if (client && bookingsChannel) {
+        void client.removeChannel(bookingsChannel);
+      }
+      if (client && paymentsChannel) {
+        void client.removeChannel(paymentsChannel);
+      }
     };
   }, [params]);
 

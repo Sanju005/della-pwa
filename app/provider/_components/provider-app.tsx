@@ -385,6 +385,41 @@ export function useProviderAppData() {
     let active = true;
     const client = getSupabaseClient();
     let unsubscribeForegroundPush: (() => void) | undefined;
+    let bookingsChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
+    let notificationsChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
+    let messagesChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    let latestAccessToken = "";
+
+    const scheduleWorkspaceRefresh = (delayMs = 500) => {
+      if (!active || !latestAccessToken) {
+        return;
+      }
+
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+
+      refreshTimeout = setTimeout(() => {
+        refreshTimeout = null;
+
+        if (!active || !latestAccessToken) {
+          return;
+        }
+
+        void loadWorkspace(latestAccessToken);
+      }, delayMs);
+    };
+
+    const handleWindowFocus = () => {
+      scheduleWorkspaceRefresh(0);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        scheduleWorkspaceRefresh(0);
+      }
+    };
 
     async function load() {
       if (!client) {
@@ -412,10 +447,67 @@ export function useProviderAppData() {
         return;
       }
 
+      latestAccessToken = session.access_token;
+
       await loadWorkspace(session.access_token);
+
+      if (!active) {
+        return;
+      }
+
+      bookingsChannel = client
+        .channel(`provider-bookings-${session.user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "bookings",
+            filter: `provider_id=eq.${session.user.id}`,
+          },
+          () => {
+            scheduleWorkspaceRefresh();
+          },
+        )
+        .subscribe();
+
+      notificationsChannel = client
+        .channel(`provider-notifications-${session.user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          () => {
+            scheduleWorkspaceRefresh();
+          },
+        )
+        .subscribe();
+
+      messagesChannel = client
+        .channel(`provider-messages-${session.user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "booking_messages",
+          },
+          () => {
+            scheduleWorkspaceRefresh();
+          },
+        )
+        .subscribe();
+
+      window.addEventListener("focus", handleWindowFocus);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
 
       unsubscribeForegroundPush = await subscribeToForegroundPush((path) => {
         router.push(path);
+        scheduleWorkspaceRefresh(0);
       });
     }
 
@@ -423,7 +515,21 @@ export function useProviderAppData() {
 
     return () => {
       active = false;
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       unsubscribeForegroundPush?.();
+      if (client && bookingsChannel) {
+        void client.removeChannel(bookingsChannel);
+      }
+      if (client && notificationsChannel) {
+        void client.removeChannel(notificationsChannel);
+      }
+      if (client && messagesChannel) {
+        void client.removeChannel(messagesChannel);
+      }
     };
   }, [router]);
 
