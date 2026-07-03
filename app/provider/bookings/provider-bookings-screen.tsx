@@ -257,7 +257,15 @@ function TimelineCard({
               </div>
             ) : null}
           </div>
-          <span className={`inline-flex rounded-full px-4 py-2 text-[12px] font-bold ${done ? "bg-[#eef9f0] text-[#16a34a]" : current ? "bg-[#f3e8ff] text-[#8E5EB5]" : "bg-[#f3f4f6] text-[#6b7280]"}`}>
+          <span
+            className={`inline-flex rounded-full border px-4 py-2 text-[12px] font-bold ${
+              done
+                ? "border-[#bbf7d0] bg-white text-[#16a34a]"
+                : current
+                  ? "border-[#dcc7f7] bg-white text-[#8E5EB5]"
+                  : "border-[#e5e7eb] bg-white text-[#6b7280]"
+            }`}
+          >
             {done ? "Done" : current ? "Current Step" : "Waiting"}
           </span>
         </div>
@@ -929,7 +937,7 @@ function BookingDetails({
                   <p className="mt-3 text-[12px] font-semibold text-[#dc2626]">{workFinishedImageError}</p>
                 ) : null}
               </div>
-              <div className="mt-5 rounded-[18px] border border-[#efe4fb] bg-[#faf6ff] px-4 py-3">
+              <div className="mt-5 rounded-[18px] border border-[#e7dff2] bg-white px-4 py-3">
                 <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#8E5EB5]">Total Payment Request</p>
                 <p className="mt-2 text-[1.5rem] font-black tracking-[-0.04em] text-[#1f1630]">
                   {formatCurrency(finalPaymentAmount)}
