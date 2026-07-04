@@ -1098,83 +1098,93 @@ export function DashboardScreen() {
             </div>
           </div>
 
-            <Link
-              href={
-                pendingRequest
-                  ? `/provider/bookings?tab=pending&booking=${pendingRequest.id}`
-                  : "/provider/bookings?tab=pending"
-              }
-              className="relative mt-5 block overflow-hidden rounded-[22px] border border-[#eadcf7] bg-[linear-gradient(135deg,#ffffff_0%,#fcfaff_72%,#f3eafd_100%)] p-5 shadow-[0_12px_28px_rgba(142,94,181,0.08)]"
-            >
-            <div className="absolute -bottom-10 -right-6 h-28 w-36 rounded-full bg-[radial-gradient(circle,rgba(179,136,235,0.18)_0%,rgba(179,136,235,0)_72%)]" />
+          <Link
+            href={
+              pendingRequest
+                ? `/provider/bookings?tab=pending&booking=${pendingRequest.id}`
+                : "/provider/bookings?tab=pending"
+            }
+            className="relative mt-5 block overflow-hidden rounded-[22px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-4 shadow-[0_12px_28px_rgba(236,72,153,0.10)]"
+          >
+            <div className="absolute -bottom-10 -right-6 h-28 w-36 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.16)_0%,rgba(244,114,182,0)_72%)]" />
             <div className="relative flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <span className="inline-flex h-20 w-20 items-center justify-center rounded-[20px] bg-[#f5effd] text-[#7c3aed]">
-                  <BriefcaseBusiness className="h-9 w-9" />
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-white text-[#e6499a] shadow-[0_10px_24px_rgba(236,72,153,0.12)]">
+                  <BriefcaseBusiness className="h-7 w-7" />
                 </span>
-                <div>
-                  <p className="text-[2.2rem] font-black leading-none tracking-[-0.07em] text-[#6d28d9]">
-                    {newTasks.length}
-                  </p>
-                  <p className="mt-2 text-[14px] font-black text-[#1f1630]">New Task</p>
-                  <p className="mt-1 text-[13px] leading-6 text-[#7b728a]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[2rem] font-black leading-none tracking-[-0.07em] text-[#d63384]">
+                      {newTasks.length}
+                    </p>
+                    <p className="text-[14px] font-black text-[#1f1630]">New Task</p>
+                  </div>
+                  <p className="mt-1 text-[12px] leading-5 text-[#7b728a]">
                     Reviewing and accepting new requests
                   </p>
                 </div>
               </div>
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f5effd] text-[#7c3aed]">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
                 <ChevronRight className="h-5 w-5" />
               </span>
             </div>
           </Link>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
-              <Link
-                href="/provider/bookings?tab=ongoing"
-                className="relative overflow-hidden rounded-[20px] border border-[#eadcf7] bg-[linear-gradient(135deg,#ffffff_0%,#fcfaff_72%,#f3eafd_100%)] p-3.5 shadow-[0_10px_20px_rgba(142,94,181,0.05)]"
-              >
-              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(179,136,235,0.15)_0%,rgba(179,136,235,0)_72%)]" />
-              <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#f5effd] text-[#7c3aed]">
-                <Clock3 className="h-6 w-6" />
-              </span>
-              <p className="relative mt-4 text-[1.55rem] font-black leading-none tracking-[-0.06em] text-[#6d28d9]">{ongoingBookings.length}</p>
-              <p className="relative mt-2 text-[14px] font-black text-[#1f1630]">On Going</p>
+            <Link
+              href="/provider/bookings?tab=ongoing"
+              className="relative overflow-hidden rounded-[20px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-3.5 shadow-[0_10px_20px_rgba(236,72,153,0.07)]"
+            >
+              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14)_0%,rgba(244,114,182,0)_72%)]" />
+              <div className="relative flex items-center gap-2.5">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+                  <Clock3 className="h-5 w-5" />
+                </span>
+                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#d63384]">{ongoingBookings.length}</p>
+              </div>
+              <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">On Going</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Take live task actions</p>
             </Link>
-              <Link
-                href="/provider/bookings?tab=pending"
-                className="relative overflow-hidden rounded-[20px] border border-[#eadcf7] bg-[linear-gradient(135deg,#ffffff_0%,#fcfaff_72%,#f3eafd_100%)] p-3.5 shadow-[0_10px_20px_rgba(142,94,181,0.05)]"
-              >
-              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(179,136,235,0.15)_0%,rgba(179,136,235,0)_72%)]" />
-              <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#f5effd] text-[#7c3aed]">
-                <Bell className="h-6 w-6" />
-              </span>
-              <p className="relative mt-4 text-[1.55rem] font-black leading-none tracking-[-0.06em] text-[#6d28d9]">{pendingTodayTasks.length}</p>
-              <p className="relative mt-2 text-[14px] font-black text-[#1f1630]">Pending Task</p>
+            <Link
+              href="/provider/bookings?tab=pending"
+              className="relative overflow-hidden rounded-[20px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-3.5 shadow-[0_10px_20px_rgba(236,72,153,0.07)]"
+            >
+              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14)_0%,rgba(244,114,182,0)_72%)]" />
+              <div className="relative flex items-center gap-2.5">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+                  <Bell className="h-5 w-5" />
+                </span>
+                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#d63384]">{pendingTodayTasks.length}</p>
+              </div>
+              <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Pending Task</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Pending for today</p>
             </Link>
-              <Link
-                href="/provider/bookings?tab=completes"
-                className="relative overflow-hidden rounded-[20px] border border-[#eadcf7] bg-[linear-gradient(135deg,#ffffff_0%,#fcfaff_72%,#f3eafd_100%)] p-3.5 shadow-[0_10px_20px_rgba(142,94,181,0.05)]"
-              >
-              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(179,136,235,0.15)_0%,rgba(179,136,235,0)_72%)]" />
-              <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#f5effd] text-[#7c3aed]">
-                <CalendarDays className="h-6 w-6" />
-              </span>
-              <p className="relative mt-4 text-[1.55rem] font-black leading-none tracking-[-0.06em] text-[#6d28d9]">{completedBookings.length}</p>
-              <p className="relative mt-2 text-[14px] font-black text-[#1f1630]">Completed</p>
+            <Link
+              href="/provider/bookings?tab=completes"
+              className="relative overflow-hidden rounded-[20px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-3.5 shadow-[0_10px_20px_rgba(236,72,153,0.07)]"
+            >
+              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14)_0%,rgba(244,114,182,0)_72%)]" />
+              <div className="relative flex items-center gap-2.5">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+                  <CalendarDays className="h-5 w-5" />
+                </span>
+                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#d63384]">{completedBookings.length}</p>
+              </div>
+              <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Completed</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Open finished task details</p>
             </Link>
             <Link
               href="/provider/bookings?tab=canceled"
-              className="relative overflow-hidden rounded-[20px] border border-[#eadcf7] bg-[linear-gradient(135deg,#ffffff_0%,#fcfaff_72%,#f3eafd_100%)] p-3.5 shadow-[0_10px_20px_rgba(142,94,181,0.05)]"
+              className="relative overflow-hidden rounded-[20px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-3.5 shadow-[0_10px_20px_rgba(236,72,153,0.07)]"
             >
-              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(179,136,235,0.15)_0%,rgba(179,136,235,0)_72%)]" />
-              <span className="relative inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#f5effd] text-[#7c3aed]">
-                <Bell className="h-6 w-6" />
-              </span>
-              <p className="relative mt-4 text-[1.55rem] font-black leading-none tracking-[-0.06em] text-[#6d28d9]">{canceledBookings.length}</p>
-              <p className="relative mt-2 text-[14px] font-black text-[#1f1630]">Cancelled</p>
+              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14)_0%,rgba(244,114,182,0)_72%)]" />
+              <div className="relative flex items-center gap-2.5">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+                  <Bell className="h-5 w-5" />
+                </span>
+                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#d63384]">{canceledBookings.length}</p>
+              </div>
+              <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Cancelled</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">View cancelled tasks</p>
             </Link>
           </div>

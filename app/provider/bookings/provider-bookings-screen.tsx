@@ -909,15 +909,17 @@ function BookingDetails({
                   return image ? (
                     <div
                       key={`${booking.id}-work-image-${index}`}
-                      className="relative aspect-square overflow-hidden rounded-[20px] border border-[#dcc7f7] bg-[#faf5ff]"
+                      className="relative aspect-[0.88] overflow-hidden rounded-[18px] border border-[#d9b0d0] bg-[#fff7fc] p-2"
                     >
                       {isPdfWorkProof(image) ? (
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fcf8ff] px-3 text-center text-[#8E5EB5]">
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-[14px] border border-dashed border-[#d56ab1] bg-white px-3 text-center text-[#d63384]">
                           <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
                           <span className="text-[12px] font-semibold leading-5">Proof file {index + 1}</span>
                         </div>
                       ) : (
-                        <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
+                        <div className="h-full w-full overflow-hidden rounded-[14px] border border-dashed border-[#d56ab1] bg-white">
+                          <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
+                        </div>
                       )}
                       <button
                         type="button"
@@ -935,12 +937,14 @@ function BookingDetails({
                       key={`${booking.id}-work-image-slot-${index}`}
                       type="button"
                       onClick={() => workFinishedInputRef.current?.click()}
-                      className="flex aspect-square flex-col items-center justify-center rounded-[20px] border-2 border-dashed border-[#9b5de5] bg-[#fcf8ff] text-[#8E5EB5]"
+                      className="flex aspect-[0.88] flex-col items-center justify-center rounded-[18px] border border-[#e8bfd8] bg-[#fff7fc] p-2 text-[#d63384]"
                     >
-                      <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-current">
-                        <Plus className="h-6 w-6" />
+                      <span className="flex h-full w-full flex-col items-center justify-center rounded-[14px] border-2 border-dashed border-current bg-white">
+                        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-current">
+                          <Plus className="h-5 w-5" />
+                        </span>
+                        <ImageIcon className="mt-3 h-6 w-6" />
                       </span>
-                      <ImageIcon className="mt-4 h-7 w-7" />
                     </button>
                   );
                 })}
