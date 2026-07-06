@@ -9,7 +9,6 @@ import {
   BookOpen,
   BriefcaseBusiness,
   CreditCard,
-  ChevronRight,
   CircleUserRound,
   CookingPot,
   House,
@@ -25,13 +24,9 @@ import {
   CarFront,
   Bolt,
   Heart,
-  CalendarDays,
 } from "lucide-react";
 import {
   BottomNav,
-  EmptyState,
-  SectionTitle,
-  StatusBadge,
 } from "@/app/_components/della-ui";
 
 import { ProviderDistanceText } from "@/app/_components/provider-distance";
@@ -50,7 +45,6 @@ export function MarketplaceScreen({
   popularChefProviders,
   popularElectricianProviders,
   popularMaidProviders,
-  upcomingBooking,
   errorMessage,
 }: HomeFeedData) {
   const [displayName, setDisplayName] = useState(greetingName);
@@ -184,60 +178,6 @@ export function MarketplaceScreen({
             href="/providers?service=maid"
             providers={popularMaidProviders}
           />
-
-          <section className="mt-8">
-            <SectionTitle
-              title="Upcoming booking"
-              action={
-                <Link
-                  href="/profile/bookings"
-                  className="text-[14px] font-extrabold text-[#8E5EB5]"
-                >
-                  See all bookings
-                </Link>
-              }
-            />
-
-            <div className="rounded-[22px] border border-[#E5EBE6] bg-white p-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
-              {upcomingBooking ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex h-[5.4rem] w-[5.4rem] shrink-0 items-center justify-center rounded-[18px] bg-[#EEF9F1] text-[#0F172A]">
-                    <House className="h-10 w-10 stroke-[1.7]" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[18px] font-extrabold tracking-[-0.03em] text-[#0F172A]">
-                      {upcomingBooking.title}
-                    </h3>
-                    <p className="mt-1 truncate text-[15px] font-semibold text-[#344054]">
-                      {upcomingBooking.provider}
-                    </p>
-
-                    <div className="mt-3 flex items-center gap-2 text-[14px] text-[#475467]">
-                      <CalendarDays className="h-4 w-4 text-[#8E5EB5]" />
-                      <span className="truncate">{upcomingBooking.scheduleLabel}</span>
-                    </div>
-                    <div className="mt-3">
-                      <StatusBadge label={upcomingBooking.statusLabel} tone="pending" />
-                    </div>
-                  </div>
-
-                  <Link
-                    href="/profile/bookings"
-                    className="inline-flex h-12 shrink-0 items-center gap-2 rounded-[16px] border border-[#8E5EB5] px-5 text-[15px] font-extrabold text-[#8E5EB5]"
-                  >
-                    View Details
-                    <ChevronRight className="h-4.5 w-4.5" />
-                  </Link>
-                </div>
-              ) : (
-                <EmptyState
-                  title="No upcoming booking yet"
-                  description="Your next confirmed service will appear here for quick access."
-                />
-              )}
-            </div>
-          </section>
 
           <BottomNav
             items={[

@@ -332,7 +332,7 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
   const [favoriteProviders, setFavoriteProviders] = useState(initialData.favoriteProviders);
   const [bookingSummary, setBookingSummary] = useState(initialData.bookingSummary);
   const [paymentSummary, setPaymentSummary] = useState(initialData.paymentSummary);
-  const [walletPanel, setWalletPanel] = useState<"closed" | "withdraw" | "payable">("closed");
+  const [walletPanel, setWalletPanel] = useState<"closed" | "withdraw">("closed");
   const [selectedBank, setSelectedBank] = useState("Maybank");
   const [walletMessage, setWalletMessage] = useState("");
   const [logoutError, setLogoutError] = useState("");
@@ -340,6 +340,43 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
   const router = useRouter();
 
   const fullName = `${profile.firstName} ${profile.lastName}`.trim();
+  const referralCode = useMemo(
+    () => buildReferralCode(profile.firstName, profile.lastName, profile.phoneNumber),
+    [profile.firstName, profile.lastName, profile.phoneNumber],
+  );
+  const referralLink = useMemo(() => buildReferralLink(referralCode), [referralCode]);
+  const availablePoints = useMemo(
+    () =>
+      Math.max(
+        250,
+        bookingSummary.completed * 150 + favoriteProviders.length * 25 + Number(paymentSummary.totalPaid || 0),
+      ),
+    [bookingSummary.completed, favoriteProviders.length, paymentSummary.totalPaid],
+  );
+  const redeemableRewards = useMemo(
+    () => [
+      {
+        id: "voucher-10",
+        title: "RM 10 Voucher",
+        description: "Grab RM10 off on any service.",
+        points: 500,
+      },
+      {
+        id: "voucher-20",
+        title: "RM 20 Voucher",
+        description: "Save RM20 on selected bookings.",
+        points: 900,
+      },
+      {
+        id: "service-discount",
+        title: "Free Service Discount",
+        description: "Enjoy up to RM30 service discount.",
+        points: 1200,
+      },
+    ],
+    [],
+  );
+  const [referralMessage, setReferralMessage] = useState("");
 
   const handleLogout = () => {
     startLogoutTransition(async () => {
@@ -372,11 +409,6 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
     setWalletPanel("withdraw");
   };
 
-  const handlePayableClick = () => {
-    setWalletMessage("");
-    setWalletPanel("payable");
-  };
-
   const handleConnectBank = () => {
     if (paymentSummary.walletBalance <= 0) {
       setWalletMessage("No wallet balance available to withdraw yet.");
@@ -392,28 +424,6 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
     setWalletMessage(
       `${selectedBank} connected. Withdrawal request for ${formatRinggit(amount)} is being processed.`,
     );
-    setWalletPanel("closed");
-  };
-
-  const handlePayCompany = () => {
-    if (paymentSummary.companyPayable <= 0) {
-      setWalletMessage("No payable amount due to the company right now.");
-      setWalletPanel("closed");
-      return;
-    }
-
-    const amount = paymentSummary.companyPayable;
-    setPaymentSummary((current) => ({
-      ...current,
-      companyPayable: 0,
-      totalPaid: Number((current.totalPaid + amount).toFixed(2)),
-      lastPaymentLabel: `Company payment on ${new Intl.DateTimeFormat("en-MY", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }).format(new Date())}`,
-    }));
-    setWalletMessage(`${formatRinggit(amount)} paid to DELLA successfully.`);
     setWalletPanel("closed");
   };
 
@@ -492,15 +502,12 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
       <ProfileCompletion completion={profile.completion} />
       <WalletSummaryCard
         walletBalance={paymentSummary.walletBalance}
-        companyPayable={paymentSummary.companyPayable}
         walletPanel={walletPanel}
         selectedBank={selectedBank}
         walletMessage={walletMessage}
         onSelectedBankChange={setSelectedBank}
         onWithdrawClick={handleWithdrawClick}
-        onPayableClick={handlePayableClick}
         onConnectBank={handleConnectBank}
-        onPayCompany={handlePayCompany}
         onClosePanel={() => setWalletPanel("closed")}
       />
 
@@ -615,6 +622,15 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
           value={paymentSummary.lastPaymentLabel}
         />
       </SectionCard>
+
+      <ReferralRewardsCard
+        referralCode={referralCode}
+        referralLink={referralLink}
+        availablePoints={availablePoints}
+        rewards={redeemableRewards}
+        feedbackMessage={referralMessage}
+        onFeedbackChange={setReferralMessage}
+      />
 
       <section className="mt-4 rounded-[18px] border border-[#f3d2d2] bg-[#fff7f7] p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)]">
         <button
@@ -3367,170 +3383,304 @@ function ProfileCompletion({ completion }: { completion: number }) {
 
 function WalletSummaryCard({
   walletBalance,
-  companyPayable,
   walletPanel,
   selectedBank,
   walletMessage,
   onSelectedBankChange,
   onWithdrawClick,
-  onPayableClick,
   onConnectBank,
-  onPayCompany,
   onClosePanel,
 }: {
   walletBalance: number;
-  companyPayable: number;
-  walletPanel: "closed" | "withdraw" | "payable";
+  walletPanel: "closed" | "withdraw";
   selectedBank: string;
   walletMessage: string;
   onSelectedBankChange: (value: string) => void;
   onWithdrawClick: () => void;
-  onPayableClick: () => void;
   onConnectBank: () => void;
-  onPayCompany: () => void;
   onClosePanel: () => void;
 }) {
   const bankOptions = ["Maybank", "CIMB", "Public Bank", "RHB Bank"];
   const withdrawDisabled = walletBalance <= 0;
-  const payCompanyDisabled = companyPayable <= 0;
 
   return (
     <section className="mt-4 overflow-hidden rounded-[22px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_16px_36px_rgba(104,63,155,0.1)]">
-      <div className="space-y-4">
-        <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
-                Wallet Balance
-              </p>
-              <p className="mt-2 text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
-                {formatRinggit(walletBalance)}
-              </p>
-              <p className="mt-1 text-[12px] text-[#7c728f]">
-                Available for withdrawal to your bank account
-              </p>
-            </div>
-            <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#edf7ee] text-[#22c55e]">
-              <WalletIcon className="h-6 w-6" />
-            </span>
+      <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
+              Wallet Balance
+            </p>
+            <p className="mt-2 text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+              {formatRinggit(walletBalance)}
+            </p>
+            <p className="mt-1 text-[12px] text-[#7c728f]">
+              Available for withdrawal to your bank account
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={onWithdrawClick}
-            disabled={withdrawDisabled}
-            className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-extrabold transition ${
-              withdrawDisabled
-                ? "cursor-not-allowed bg-[#d8cde6] text-white shadow-none"
-                : "bg-[#8E5EB5] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
-            }`}
-          >
-            Withdraw
-          </button>
-          {walletPanel === "withdraw" ? (
-            <div className="mt-4 rounded-[18px] border border-[#e8def6] bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[14px] font-extrabold text-[#1f1630]">Connect bank account</p>
-                  <p className="mt-1 text-[12px] text-[#7c728f]">
-                    Choose the bank account to receive {formatRinggit(walletBalance)}.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onClosePanel}
-                  className="text-[12px] font-bold text-[#8E5EB5]"
-                >
-                  Close
-                </button>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {bankOptions.map((bank) => (
-                  <button
-                    key={bank}
-                    type="button"
-                    onClick={() => onSelectedBankChange(bank)}
-                    className={`rounded-[12px] border px-3 py-3 text-left text-[13px] font-bold ${
-                      selectedBank === bank
-                        ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
-                        : "border-[#e5e7eb] bg-white text-[#374151]"
-                    }`}
-                  >
-                    {bank}
-                  </button>
-                ))}
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#edf7ee] text-[#22c55e]">
+            <WalletIcon className="h-6 w-6" />
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onWithdrawClick}
+          disabled={withdrawDisabled}
+          className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-extrabold transition ${
+            withdrawDisabled
+              ? "cursor-not-allowed bg-[#d8cde6] text-white shadow-none"
+              : "bg-[#8E5EB5] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
+          }`}
+        >
+          Withdraw
+        </button>
+        {walletPanel === "withdraw" ? (
+          <div className="mt-4 rounded-[18px] border border-[#e8def6] bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[14px] font-extrabold text-[#1f1630]">Connect bank account</p>
+                <p className="mt-1 text-[12px] text-[#7c728f]">
+                  Choose the bank account to receive {formatRinggit(walletBalance)}.
+                </p>
               </div>
               <button
                 type="button"
-                onClick={onConnectBank}
-                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#22c55e] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(34,197,94,0.18)]"
+                onClick={onClosePanel}
+                className="text-[12px] font-bold text-[#8E5EB5]"
               >
-                Connect and Withdraw
+                Close
               </button>
             </div>
-          ) : null}
-        </div>
-
-        <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E5EB5]">
-                Payable to Company
-              </p>
-              <p className="mt-1 text-[1.6rem] font-black tracking-[-0.05em] text-[#1f1630]">
-                {formatRinggit(companyPayable)}
-              </p>
-              <p className="mt-1 text-[12px] text-[#7c728f]">
-                Amount due to DELLA from recent customer payments
-              </p>
-            </div>
-            <span className="rounded-full bg-[#f5f1fa] px-3 py-1 text-[11px] font-bold text-[#8E5EB5]">
-              DELLA
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onPayableClick}
-            disabled={payCompanyDisabled}
-            className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] border px-4 text-[14px] font-extrabold transition ${
-              payCompanyDisabled
-                ? "cursor-not-allowed border-[#e6def0] bg-[#f3eef8] text-[#b49bcf]"
-                : "border-[#d9c8ee] bg-white text-[#8E5EB5]"
-            }`}
-          >
-            Pay to Company
-          </button>
-          {walletPanel === "payable" ? (
-            <div className="mt-4 rounded-[18px] border border-[#e8def6] bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[14px] font-extrabold text-[#1f1630]">Pay company now</p>
-                  <p className="mt-1 text-[12px] text-[#7c728f]">
-                    Confirm payment of {formatRinggit(companyPayable)} to DELLA.
-                  </p>
-                </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {bankOptions.map((bank) => (
                 <button
+                  key={bank}
                   type="button"
-                  onClick={onClosePanel}
-                  className="text-[12px] font-bold text-[#8E5EB5]"
+                  onClick={() => onSelectedBankChange(bank)}
+                  className={`rounded-[12px] border px-3 py-3 text-left text-[13px] font-bold ${
+                    selectedBank === bank
+                      ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
+                      : "border-[#e5e7eb] bg-white text-[#374151]"
+                  }`}
                 >
-                  Close
+                  {bank}
                 </button>
-              </div>
-              <button
-                type="button"
-                onClick={onPayCompany}
-                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
-              >
-                Pay {formatRinggit(companyPayable)}
-              </button>
+              ))}
             </div>
-          ) : null}
-        </div>
+            <button
+              type="button"
+              onClick={onConnectBank}
+              className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#22c55e] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(34,197,94,0.18)]"
+            >
+              Connect and Withdraw
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {walletMessage ? (
         <p className="mt-4 rounded-[14px] border border-[#d7efdb] bg-[#effbf1] px-4 py-3 text-[12px] font-semibold text-[#1f6b37]">
           {walletMessage}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function ReferralRewardsCard({
+  referralCode,
+  referralLink,
+  availablePoints,
+  rewards,
+  feedbackMessage,
+  onFeedbackChange,
+}: {
+  referralCode: string;
+  referralLink: string;
+  availablePoints: number;
+  rewards: Array<{
+    id: string;
+    title: string;
+    description: string;
+    points: number;
+  }>;
+  feedbackMessage: string;
+  onFeedbackChange: (value: string) => void;
+}) {
+  async function handleCopyLink() {
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("Clipboard is not supported.");
+      }
+
+      await navigator.clipboard.writeText(referralLink);
+      onFeedbackChange("Referral link copied successfully.");
+    } catch {
+      onFeedbackChange("Unable to copy the referral link right now.");
+    }
+  }
+
+  async function handleShareLink() {
+    try {
+      if (typeof navigator === "undefined") {
+        throw new Error("Share is not supported.");
+      }
+
+      if (typeof navigator.share === "function") {
+        await navigator.share({
+          title: "Join DELLA",
+          text: `Use my referral code ${referralCode} when you join DELLA.`,
+          url: referralLink,
+        });
+        onFeedbackChange("Referral link shared successfully.");
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(referralLink);
+        onFeedbackChange("Share is not supported here, so the referral link was copied instead.");
+        return;
+      }
+
+      throw new Error("Share is not supported.");
+    } catch {
+      onFeedbackChange("Unable to share the referral link right now.");
+    }
+  }
+
+  return (
+    <section className="mt-4 rounded-[22px] border border-[#eadff7] bg-[linear-gradient(180deg,#fdfbff_0%,#ffffff_100%)] p-4 shadow-[0_16px_34px_rgba(104,63,155,0.08)]">
+      <div className="rounded-[20px] bg-[radial-gradient(circle_at_top_right,#f4e6ff_0%,#ffffff_52%,#fbf8ff_100%)] p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#8E5EB5_0%,#7A49A7_100%)] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]">
+              <GiftIcon className="h-6 w-6" />
+            </div>
+            <h3 className="mt-3 text-[1.25rem] font-black tracking-[-0.04em] text-[#1f1630]">
+              Refer & Earn
+            </h3>
+            <p className="mt-1 text-[13px] leading-6 text-[#746a88]">
+              Invite friends and earn reward points for future bookings.
+            </p>
+          </div>
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[22px] bg-[radial-gradient(circle_at_center,#fff3cf_0%,#f2e7ff_58%,#ffffff_100%)]">
+            <GiftBoxStackIcon className="h-14 w-14 text-[#8E5EB5]" />
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-[16px] border border-dashed border-[#d8c6ef] bg-white/90 p-4">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#9d83c4]">
+            Your Referral Code
+          </p>
+          <p className="mt-2 text-[1.5rem] font-black tracking-[-0.05em] text-[#7A49A7]">
+            {referralCode}
+          </p>
+        </div>
+
+        <div className="mt-4 rounded-[16px] border border-[#ece4f7] bg-white p-4">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#9d83c4]">
+            Your Referral Link
+          </p>
+          <p className="mt-2 break-all text-[13px] font-semibold text-[#3a3050]">
+            {referralLink}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => void handleCopyLink()}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
+            >
+              <CopyIcon className="h-4 w-4" />
+              Copy Link
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleShareLink()}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#d8c6ef] bg-white px-4 text-[14px] font-extrabold text-[#8E5EB5]"
+            >
+              <ShareArrowIcon className="h-4 w-4" />
+              Share
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-[18px] border border-[#e8def6] bg-[linear-gradient(180deg,#ffffff_0%,#faf6ff_100%)] p-4">
+          <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,#8E5EB5_0%,#7A49A7_100%)] text-white">
+            <CoinsIcon className="h-5 w-5" />
+          </div>
+          <p className="mt-3 text-[13px] font-bold text-[#64587c]">Available Points</p>
+          <p className="mt-1 text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+            {availablePoints.toLocaleString()}
+            <span className="ml-2 text-[1rem] font-bold text-[#8E5EB5]">pts</span>
+          </p>
+          <p className="mt-1 text-[12px] text-[#7c728f]">Keep referring and earn more rewards.</p>
+        </div>
+
+        <div className="rounded-[18px] border border-[#f1e7d6] bg-[linear-gradient(180deg,#fffaf2_0%,#ffffff_100%)] p-4">
+          <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,#f59e0b_0%,#f97316_100%)] text-white">
+            <SparkGiftIcon className="h-5 w-5" />
+          </div>
+          <p className="mt-3 text-[13px] font-bold text-[#7a5c2d]">Redeem Points</p>
+          <p className="mt-1 text-[14px] leading-6 text-[#7c728f]">
+            Use your points for vouchers and booking discounts.
+          </p>
+          <button
+            type="button"
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-[12px] bg-[#8E5EB5] px-4 text-[13px] font-extrabold text-white shadow-[0_12px_22px_rgba(142,94,181,0.18)]"
+          >
+            Redeem Now
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-[18px] border border-[#ece4f7] bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h4 className="text-[15px] font-extrabold text-[#1f1630]">Redeem Options</h4>
+          <span className="text-[12px] font-bold text-[#8E5EB5]">How it works</span>
+        </div>
+        <div className="mt-3 space-y-3">
+          {rewards.map((reward) => {
+            const disabled = availablePoints < reward.points;
+
+            return (
+              <div
+                key={reward.id}
+                className="flex items-center justify-between gap-3 rounded-[16px] border border-[#f1ebf8] bg-[#fcfbfe] px-3 py-3"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#f5f1fa] text-[#8E5EB5]">
+                    <VoucherIcon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[14px] font-bold text-[#1f1630]">{reward.title}</p>
+                    <p className="text-[12px] text-[#7c728f]">{reward.description}</p>
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[14px] font-black text-[#8E5EB5]">{reward.points} pts</p>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    className={`mt-2 inline-flex h-9 items-center justify-center rounded-[10px] px-4 text-[12px] font-extrabold ${
+                      disabled
+                        ? "cursor-not-allowed bg-[#ece6f5] text-[#b8a9cf]"
+                        : "bg-[#8E5EB5] text-white shadow-[0_10px_20px_rgba(142,94,181,0.16)]"
+                    }`}
+                  >
+                    Redeem
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {feedbackMessage ? (
+        <p className="mt-4 rounded-[14px] border border-[#d7efdb] bg-[#effbf1] px-4 py-3 text-[12px] font-semibold text-[#1f6b37]">
+          {feedbackMessage}
         </p>
       ) : null}
     </section>
@@ -3775,7 +3925,6 @@ function BottomNav() {
       <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#8A94A6]">
         <NavItem href="/home" label="Home" icon={<HomeIcon className="h-5 w-5" />} active={pathname === "/home"} />
         <NavItem href="/profile/bookings" label="Bookings" icon={<CalendarIcon className="h-5 w-5" />} active={pathname.startsWith("/profile/bookings")} />
-        <NavItem href="/profile/notifications" label="Alerts" icon={<BellIcon className="h-5 w-5" />} active={pathname.startsWith("/profile/notifications")} />
         <NavItem href="/profile/favourites" label="Favourite" icon={<UserIcon className="h-5 w-5" />} active={pathname.startsWith("/profile/favourites")} />
         <NavItem href="/profile" label="Profile" icon={<UserIcon className="h-5 w-5" />} active={pathname === "/profile" || pathname.startsWith("/profile/edit") || pathname.startsWith("/profile/addresses") || pathname.startsWith("/profile/settings")} />
       </div>
@@ -3930,6 +4079,18 @@ function customerInitials(profile: CustomerProfile) {
 
 function formatRinggit(amount: number) {
   return `RM ${amount.toFixed(2)}`;
+}
+
+function buildReferralCode(firstName: string, lastName: string, phoneNumber: string) {
+  const first = firstName.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 3) || "DEL";
+  const last = lastName.replace(/[^a-zA-Z]/g, "").toUpperCase().slice(0, 3) || "USR";
+  const digits = phoneNumber.replace(/\D/g, "").slice(-3) || "001";
+
+  return `${first}${last}${digits}`;
+}
+
+function buildReferralLink(referralCode: string) {
+  return `https://app.dellaapp.com/invite/${referralCode}`;
 }
 
 function SettingIcon({
@@ -4225,6 +4386,75 @@ function WalletIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass(className)}>
       <rect x="3" y="6" width="18" height="12" rx="2" />
       <path d="M16 12h3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GiftIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass(className)}>
+      <path d="M4 10h16v10H4z" />
+      <path d="M12 10v10M4 10h16M12 10H7.5a2.5 2.5 0 1 1 0-5c2 0 3.3 2 4.5 5Zm0 0h4.5a2.5 2.5 0 1 0 0-5c-2 0-3.3 2-4.5 5Z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function GiftBoxStackIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={iconClass(className)}>
+      <path d="M4 10h16v10H4z" />
+      <path d="M12 10v10M4 10h16M7 7.5h10" strokeLinecap="round" />
+      <path d="M7.2 7.5a2.2 2.2 0 1 1 0-4.4c1.8 0 3 1.8 4.8 4.4m4.8 0a2.2 2.2 0 1 0 0-4.4c-1.8 0-3 1.8-4.8 4.4" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="18.5" cy="18.5" r="2.3" fill="currentColor" stroke="none" opacity="0.18" />
+      <path d="M18.5 17.2v2.6M17.2 18.5h2.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CopyIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass(className)}>
+      <rect x="9" y="9" width="10" height="11" rx="2" />
+      <path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ShareArrowIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass(className)}>
+      <path d="M12 16V5" strokeLinecap="round" />
+      <path d="m8 9 4-4 4 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 13v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CoinsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass(className)}>
+      <ellipse cx="12" cy="6" rx="5.5" ry="2.5" />
+      <path d="M6.5 6v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5V6M6.5 10v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-4" />
+    </svg>
+  );
+}
+
+function SparkGiftIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass(className)}>
+      <path d="M4 10h16v10H4z" />
+      <path d="M12 10v10M4 10h16" strokeLinecap="round" />
+      <path d="M9 7.5a2 2 0 1 1 0-4c1.5 0 2.4 1.3 3 4m3 0a2 2 0 1 0 0-4c-1.5 0-2.4 1.3-3 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19 4v3M17.5 5.5h3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function VoucherIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass(className)}>
+      <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8Z" />
+      <path d="M12 7v10" strokeLinecap="round" strokeDasharray="2.5 2.5" />
     </svg>
   );
 }
