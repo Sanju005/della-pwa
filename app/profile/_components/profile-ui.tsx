@@ -1517,7 +1517,7 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
               Latest
             </span>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="-mx-1 mt-3 flex flex-nowrap items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {([
               { id: "all", label: "All" },
               { id: "today", label: "Today" },
@@ -1528,7 +1528,7 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
                 key={option.id}
                 type="button"
                 onClick={() => setDateFilter(option.id)}
-                className={`rounded-full px-4 py-2 text-[12px] font-extrabold transition ${
+                className={`shrink-0 rounded-full px-3.5 py-2 text-[11px] font-extrabold transition ${
                   dateFilter === option.id
                     ? "bg-[#8E5EB5] text-white shadow-[0_12px_22px_rgba(142,94,181,0.18)]"
                     : "border border-[#e8def6] bg-white text-[#6d6480]"
@@ -1630,11 +1630,6 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
               <span className="pl-1">Track Task</span>
               <ChevronRightIcon className="h-4.5 w-4.5" />
             </Link>
-
-            <div className="mt-4 rounded-[22px] border border-[#efe4fb] bg-white p-4 shadow-[0_12px_24px_rgba(106,69,160,0.05)]">
-              <p className="text-[1rem] font-black tracking-[-0.03em] text-[#1f1630]">Current Status</p>
-              <BookingStatusSummary booking={booking} />
-            </div>
 
             {booking.status === "cancelled" ? (
               <div className="mt-3 space-y-1.5 rounded-[14px] border border-[#f0e8f8] bg-[#fcfaff] px-3 py-2.5 text-[12px] leading-5 text-[#544b66]">
