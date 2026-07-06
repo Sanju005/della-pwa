@@ -350,7 +350,7 @@ export async function subscribeToForegroundPush(
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       const notification = new Notification(title, {
         body,
-        icon: "/icon.png",
+        icon: "/brand/app-icon.png",
       });
 
       notification.onclick = () => {
