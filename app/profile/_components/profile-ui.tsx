@@ -623,13 +623,8 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
         />
       </SectionCard>
 
-      <ReferralRewardsCard
-        referralCode={referralCode}
-        referralLink={referralLink}
+      <RewardsSummaryCard
         availablePoints={availablePoints}
-        rewards={redeemableRewards}
-        feedbackMessage={referralMessage}
-        onFeedbackChange={setReferralMessage}
       />
 
       <section className="mt-4 rounded-[18px] border border-[#f3d2d2] bg-[#fff7f7] p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)]">
@@ -645,6 +640,63 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
           <p className="mt-3 text-[13px] font-semibold text-[#dc2626]">{logoutError}</p>
         ) : null}
       </section>
+    </ProfileShell>
+  );
+}
+
+export function RewardsScreen({ initialData }: OverviewProps) {
+  const profile = initialData.profile;
+  const favoriteProviders = initialData.favoriteProviders;
+  const bookingSummary = initialData.bookingSummary;
+  const paymentSummary = initialData.paymentSummary;
+  const referralCode = useMemo(
+    () => buildReferralCode(profile.firstName, profile.lastName, profile.phoneNumber),
+    [profile.firstName, profile.lastName, profile.phoneNumber],
+  );
+  const referralLink = useMemo(() => buildReferralLink(referralCode), [referralCode]);
+  const availablePoints = useMemo(
+    () =>
+      Math.max(
+        250,
+        bookingSummary.completed * 150 + favoriteProviders.length * 25 + Number(paymentSummary.totalPaid || 0),
+      ),
+    [bookingSummary.completed, favoriteProviders.length, paymentSummary.totalPaid],
+  );
+  const redeemableRewards = useMemo(
+    () => [
+      {
+        id: "voucher-10",
+        title: "RM 10 Voucher",
+        description: "Grab RM10 off on any service.",
+        points: 500,
+      },
+      {
+        id: "voucher-20",
+        title: "RM 20 Voucher",
+        description: "Save RM20 on selected bookings.",
+        points: 900,
+      },
+      {
+        id: "service-discount",
+        title: "Free Service Discount",
+        description: "Enjoy up to RM30 service discount.",
+        points: 1200,
+      },
+    ],
+    [],
+  );
+  const [referralMessage, setReferralMessage] = useState("");
+
+  return (
+    <ProfileShell title="Rewards" showBack backHref="/profile" showBottomNav={false}>
+      <ReferralRewardsCard
+        referralCode={referralCode}
+        referralLink={referralLink}
+        availablePoints={availablePoints}
+        rewards={redeemableRewards}
+        feedbackMessage={referralMessage}
+        onFeedbackChange={setReferralMessage}
+      />
     </ProfileShell>
   );
 }
@@ -3484,6 +3536,39 @@ function WalletSummaryCard({
         </p>
       ) : null}
     </section>
+  );
+}
+
+function RewardsSummaryCard({
+  availablePoints,
+}: {
+  availablePoints: number;
+}) {
+  return (
+    <Link
+      href="/profile/rewards"
+      className="mt-4 block rounded-[18px] border border-[#e8def6] bg-[linear-gradient(180deg,#ffffff_0%,#faf6ff_100%)] p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)]"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#8E5EB5_0%,#7A49A7_100%)] text-white">
+            <CoinsIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[15px] font-extrabold text-[#1f1630]">Available Points</p>
+            <p className="mt-1 text-[12px] text-[#7c728f]">
+              Tap to view referral link, points and redeem options
+            </p>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[1.4rem] font-black tracking-[-0.05em] text-[#1f1630]">
+            {availablePoints.toLocaleString()}
+          </p>
+          <p className="text-[12px] font-bold text-[#8E5EB5]">pts</p>
+        </div>
+      </div>
+    </Link>
   );
 }
 
