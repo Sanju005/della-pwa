@@ -24,6 +24,7 @@ import {
   MessageCircleMore,
   Phone,
   PencilLine,
+  Upload,
   Send,
   Settings,
   Shield,
@@ -481,6 +482,200 @@ function OtpInputSlots({
         );
       })}
     </div>
+  );
+}
+
+type VerificationFlowScreenProps = {
+  backHref: string;
+  title: string;
+  description: string;
+  statusVerified: boolean;
+  fieldLabel: string;
+  fieldType: "email" | "phone";
+  fieldValue: string;
+  onFieldValueChange: (value: string) => void;
+  fieldPlaceholder: string;
+  leadingPrefix?: React.ReactNode;
+  sendLabel: string;
+  sentMessage: string;
+  idleMessage: string;
+  securityMessage: string;
+  verifyLabel: string;
+  successMessage: string;
+};
+
+function VerificationFlowScreen({
+  backHref,
+  title,
+  description,
+  statusVerified,
+  fieldLabel,
+  fieldType,
+  fieldValue,
+  onFieldValueChange,
+  fieldPlaceholder,
+  leadingPrefix,
+  sendLabel,
+  sentMessage,
+  idleMessage,
+  securityMessage,
+  verifyLabel,
+  successMessage,
+}: VerificationFlowScreenProps) {
+  const state = useProviderAppData();
+  const router = useRouter();
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+  const [screenNotice, setScreenNotice] = useState("");
+  const fallback = LoadingOrError(state);
+
+  useEffect(() => {
+    if (!otpSent || countdown <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCountdown((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [otpSent, countdown]);
+
+  if (fallback) {
+    return fallback;
+  }
+
+  const normalizedValue = fieldValue.trim();
+  const canSendOtp =
+    fieldType === "email"
+      ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedValue)
+      : normalizedValue.length >= 7;
+  const canVerify = canSendOtp && otp.length === 6;
+
+  return (
+    <MobilePage className="pb-40">
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href={backHref}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_10px_24px_rgba(86,38,135,0.06)]"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <VerificationStatusPill verified={statusVerified} />
+        </div>
+
+        <header className="pt-2">
+          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">{title}</h1>
+          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">{description}</p>
+        </header>
+
+        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+          <div>
+            <p className="text-[15px] font-black text-[#1f1630]">{fieldLabel}</p>
+            <div className="mt-4 overflow-hidden rounded-[16px] border border-[#e7def4]">
+              <div className="flex items-stretch">
+                {leadingPrefix ? (
+                  <div className="flex min-w-[96px] items-center gap-2 border-r border-[#e7def4] bg-white px-3">
+                    {leadingPrefix}
+                  </div>
+                ) : null}
+                <div className="flex flex-1 items-center gap-3 bg-white px-4">
+                  {!leadingPrefix ? (
+                    <Mail className="h-5 w-5 shrink-0 text-[#8E5EB5]" />
+                  ) : null}
+                  <input
+                    type={fieldType}
+                    inputMode={fieldType === "email" ? "email" : "numeric"}
+                    value={fieldValue}
+                    onChange={(event) => onFieldValueChange(event.target.value)}
+                    placeholder={fieldPlaceholder}
+                    className="h-[52px] flex-1 bg-white text-[15px] text-[#1f1630] outline-none placeholder:text-[#b3a9c7]"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!canSendOtp) {
+                return;
+              }
+
+              setOtp("");
+              setOtpSent(true);
+              setCountdown(30);
+              setScreenNotice(sentMessage);
+            }}
+            disabled={!canSendOtp}
+            className={`mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border text-[15px] font-black transition ${
+              canSendOtp
+                ? "border-[#cdb8f3] bg-white text-[#8E5EB5] shadow-[0_12px_28px_rgba(142,94,181,0.08)]"
+                : "cursor-not-allowed border-[#eadff8] bg-[#faf7fe] text-[#c2b2dc]"
+            }`}
+          >
+            <Send className="h-4.5 w-4.5" />
+            {sendLabel}
+          </button>
+
+          <div className="mt-6">
+            <p className="text-[15px] font-black text-[#1f1630]">Enter OTP</p>
+            <OtpInputSlots value={otp} onChange={setOtp} />
+
+            <div className="mt-4 space-y-2 text-[13px]">
+              <div className="flex items-center gap-2 text-[#6f6681]">
+                <MessageCircleMore className="h-4 w-4 text-[#8E5EB5]" />
+                <span>{screenNotice || idleMessage}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[#6f6681]">
+                <Clock3 className="h-4 w-4 text-[#8E5EB5]" />
+                <span>
+                  Resend code in{" "}
+                  <strong className="font-black text-[#8E5EB5]">
+                    00:{String(countdown).padStart(2, "0")}
+                  </strong>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f5efff_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#8E5EB5]">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[14px] font-black text-[#1f1630]">Your security matters</p>
+              <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">{securityMessage}</p>
+            </div>
+          </div>
+        </section>
+
+        <button
+          type="button"
+          disabled={!canVerify}
+          onClick={() => {
+            if (!canVerify) {
+              return;
+            }
+
+            state.setNotice(successMessage);
+            router.push(backHref);
+          }}
+          className={`mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+            canVerify
+              ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
+              : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
+          }`}
+        >
+          {verifyLabel}
+        </button>
+      </section>
+    </MobilePage>
   );
 }
 
@@ -5448,7 +5643,7 @@ export function ProfileScreen() {
 
         <div className="mt-5 space-y-3">
           <VerificationStatusCard
-            href="/provider/more"
+            href="/provider/profile/email-verification"
             icon={<Mail className="h-6 w-6" />}
             title="Email"
             subtitle="Email status"
@@ -5462,18 +5657,11 @@ export function ProfileScreen() {
             verified={data.phoneVerified}
           />
           <VerificationStatusCard
-            href="/provider/more"
+            href="/provider/profile/identity-verification"
             icon={<IdCard className="h-6 w-6" />}
             title="Identity"
             subtitle="ID check"
             verified={data.identityVerified}
-          />
-          <VerificationStatusCard
-            href="/provider/more"
-            icon={<Shield className="h-6 w-6" />}
-            title="KYC / Background"
-            subtitle="Trust checks"
-            verified={data.backgroundCheckVerified || data.kycVerified}
           />
         </div>
 
@@ -5760,6 +5948,237 @@ export function PhoneVerificationScreen() {
           }`}
         >
           Verify Number
+        </button>
+      </section>
+    </MobilePage>
+  );
+}
+
+export function EmailVerificationScreen() {
+  const state = useProviderAppData();
+  const fallback = LoadingOrError(state);
+  const [draftEmail, setDraftEmail] = useState<string | null>(null);
+  const emailValue = draftEmail ?? state.data?.email ?? "";
+
+  if (fallback) {
+    return fallback;
+  }
+
+  const data = state.data!;
+
+  return (
+    <VerificationFlowScreen
+      backHref="/provider/profile"
+      title="Email Verification"
+      description="Add your email address and verify it with a one-time code."
+      statusVerified={data.emailVerified}
+      fieldLabel="Email Address"
+      fieldType="email"
+      fieldValue={emailValue}
+      onFieldValueChange={(value) => setDraftEmail(value.trimStart())}
+      fieldPlaceholder="Enter email address"
+      sendLabel="Send Code"
+      sentMessage="We sent a 6-digit code to your email."
+      idleMessage="We sent a 6-digit code to your email"
+      securityMessage="Your email address will be used for account verification and important updates."
+      verifyLabel="Verify Email"
+      successMessage="Email verification submitted successfully."
+    />
+  );
+}
+
+export function IdentityVerificationScreen() {
+  const state = useProviderAppData();
+  const router = useRouter();
+  const [frontFileName, setFrontFileName] = useState("");
+  const [backFileName, setBackFileName] = useState("");
+  const [frontPreview, setFrontPreview] = useState<string | null>(null);
+  const [backPreview, setBackPreview] = useState<string | null>(null);
+  const frontInputRef = useRef<HTMLInputElement | null>(null);
+  const backInputRef = useRef<HTMLInputElement | null>(null);
+  const fallback = LoadingOrError(state);
+
+  if (fallback) {
+    return fallback;
+  }
+
+  const data = state.data!;
+  const canSubmit = Boolean(frontPreview && backPreview);
+
+  const handleFileChange = (side: "front" | "back") =>
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      const dataUrl = await readFileAsDataUrl(file);
+      if (side === "front") {
+        setFrontFileName(file.name);
+        setFrontPreview(dataUrl);
+        return;
+      }
+
+      setBackFileName(file.name);
+      setBackPreview(dataUrl);
+    };
+
+  return (
+    <MobilePage className="pb-40">
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/provider/profile"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_10px_24px_rgba(86,38,135,0.06)]"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <VerificationStatusPill verified={data.identityVerified} />
+        </div>
+
+        <header className="pt-2">
+          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+            Identity Verification
+          </h1>
+          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
+            Upload your IC front and back for identity verification.
+          </p>
+        </header>
+
+        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+          <div className="space-y-5">
+            <div>
+              <p className="text-[15px] font-black text-[#1f1630]">IC Front</p>
+              <div className="mt-3 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-24 w-32 overflow-hidden rounded-[14px] border border-[#ece3f8] bg-[linear-gradient(135deg,#f8f4ff_0%,#eef2ff_100%)]">
+                    {frontPreview ? (
+                      <Image src={frontPreview} alt={frontFileName || "IC front"} fill unoptimized className="object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[#8E5EB5]">
+                        <IdCard className="h-10 w-10" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] leading-5 text-[#6f6681]">
+                      Upload clear image of front side
+                    </p>
+                    {frontFileName ? (
+                      <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{frontFileName}</p>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => frontInputRef.current?.click()}
+                      className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload Front
+                    </button>
+                    <input
+                      ref={frontInputRef}
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleFileChange("front")}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-[15px] font-black text-[#1f1630]">IC Back</p>
+              <div className="mt-3 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-24 w-32 overflow-hidden rounded-[14px] border border-[#ece3f8] bg-[linear-gradient(135deg,#f8f4ff_0%,#eef2ff_100%)]">
+                    {backPreview ? (
+                      <Image src={backPreview} alt={backFileName || "IC back"} fill unoptimized className="object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[#8E5EB5]">
+                        <IdCard className="h-10 w-10" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] leading-5 text-[#6f6681]">
+                      Upload clear image of back side
+                    </p>
+                    {backFileName ? (
+                      <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{backFileName}</p>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => backInputRef.current?.click()}
+                      className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Upload Back
+                    </button>
+                    <input
+                      ref={backInputRef}
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleFileChange("back")}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f5efff_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#8E5EB5]">
+              <IdCard className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[14px] font-black text-[#1f1630]">Image Requirements</p>
+              <ul className="mt-2 space-y-1 text-[13px] leading-5 text-[#6f6681]">
+                <li>Ensure the full IC is visible within the frame</li>
+                <li>All text must be clear and readable</li>
+                <li>Image must be in focus and not blurry</li>
+                <li>No glare or reflections on the card</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f5efff_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#8E5EB5]">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[14px] font-black text-[#1f1630]">Your information is safe</p>
+              <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+                Your IC images are encrypted and used only for identity verification. We do not store your documents beyond the verification process.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <button
+          type="button"
+          disabled={!canSubmit}
+          onClick={() => {
+            if (!canSubmit) {
+              return;
+            }
+
+            state.setNotice("Identity verification submitted successfully.");
+            router.push("/provider/profile");
+          }}
+          className={`mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+            canSubmit
+              ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
+              : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
+          }`}
+        >
+          Submit for Verification
         </button>
       </section>
     </MobilePage>
