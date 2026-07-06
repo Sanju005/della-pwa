@@ -259,7 +259,7 @@ function TimelineCard({
       <div className="min-w-0 flex-1 rounded-[24px] border border-[#eee5f7] bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h3 className="text-[0.95rem] font-black tracking-[-0.035em] text-[#0f172a]">
+            <h3 className="text-[0.95rem] font-bold tracking-[-0.035em] text-[#0f172a]">
               {number}. {title}
             </h3>
             {(dateLabel || timeLabel) ? (

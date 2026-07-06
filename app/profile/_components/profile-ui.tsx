@@ -190,7 +190,7 @@ function StepTimelineCard({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-[1.1rem] font-black tracking-[-0.04em] text-[#1f1630]">
+            <h3 className="text-[1.1rem] font-bold tracking-[-0.04em] text-[#1f1630]">
               {number}. {title}
             </h3>
             {(dateLabel || timeLabel) ? (
@@ -1517,7 +1517,7 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
               Latest
             </span>
           </div>
-          <div className="-mx-1 mt-3 flex flex-nowrap items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mt-3 flex flex-nowrap items-center gap-1.5 overflow-hidden">
             {([
               { id: "all", label: "All" },
               { id: "today", label: "Today" },
@@ -1528,7 +1528,7 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
                 key={option.id}
                 type="button"
                 onClick={() => setDateFilter(option.id)}
-                className={`shrink-0 rounded-full px-3.5 py-2 text-[11px] font-extrabold transition ${
+                className={`min-w-0 flex-1 truncate rounded-full px-2.5 py-1.5 text-[10px] font-extrabold transition ${
                   dateFilter === option.id
                     ? "bg-[#8E5EB5] text-white shadow-[0_12px_22px_rgba(142,94,181,0.18)]"
                     : "border border-[#e8def6] bg-white text-[#6d6480]"
