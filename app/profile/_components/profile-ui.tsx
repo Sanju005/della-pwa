@@ -346,15 +346,19 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
         return;
       }
 
-      const { error } = await client.auth.signOut();
+      try {
+        const { error } = await client.auth.signOut({ scope: "local" });
 
-      if (error) {
-        setLogoutError(error.message || "Unable to log out right now.");
-        return;
+        if (error) {
+          setLogoutError(error.message || "Unable to log out right now.");
+          return;
+        }
+
+        router.replace("/login");
+        router.refresh();
+      } catch (error) {
+        setLogoutError(error instanceof Error ? error.message : "Failed to fetch");
       }
-
-      router.replace("/login");
-      router.refresh();
     });
   };
 
@@ -426,39 +430,47 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
         return;
       }
 
-      const response = await fetch("/api/profile/me", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      try {
+        const response = await fetch("/api/profile/me", {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
 
-      const favoritesResponse = await fetch("/api/profile/favorites", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+        const result = (await response.json()) as
+          | {
+              profile: CustomerProfile;
+              bookingSummary: ProfileOverviewData["bookingSummary"];
+              paymentSummary: ProfileOverviewData["paymentSummary"];
+            }
+          | { error?: string };
 
-      const result = (await response.json()) as
-        | {
-            profile: CustomerProfile;
-            bookingSummary: ProfileOverviewData["bookingSummary"];
-            paymentSummary: ProfileOverviewData["paymentSummary"];
-          }
-        | { error?: string };
-      const favoritesResult = (await favoritesResponse.json()) as
-        | { favoriteProviders: FavoriteProvider[] }
-        | { error?: string };
+        if (!active || !response.ok || !("profile" in result)) {
+          return;
+        }
 
-      if (!active || !response.ok || !("profile" in result)) {
+        setProfile(result.profile);
+        setBookingSummary(result.bookingSummary);
+        setPaymentSummary(result.paymentSummary);
+      } catch {
         return;
       }
 
-      setProfile(result.profile);
-      setBookingSummary(result.bookingSummary);
-      setPaymentSummary(result.paymentSummary);
+      try {
+        const favoritesResponse = await fetch("/api/profile/favorites", {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        const favoritesResult = (await favoritesResponse.json()) as
+          | { favoriteProviders: FavoriteProvider[] }
+          | { error?: string };
 
-      if (favoritesResponse.ok && "favoriteProviders" in favoritesResult) {
-        setFavoriteProviders(favoritesResult.favoriteProviders);
+        if (active && favoritesResponse.ok && "favoriteProviders" in favoritesResult) {
+          setFavoriteProviders(favoritesResult.favoriteProviders);
+        }
+      } catch {
+        // Keep the main profile visible even if favourites fail to load.
       }
     }
 
@@ -1592,15 +1604,19 @@ export function SettingsScreen({ groups }: SettingsProps) {
         return;
       }
 
-      const { error } = await client.auth.signOut();
+      try {
+        const { error } = await client.auth.signOut({ scope: "local" });
 
-      if (error) {
-        setLogoutError(error.message || "Unable to log out right now.");
-        return;
+        if (error) {
+          setLogoutError(error.message || "Unable to log out right now.");
+          return;
+        }
+
+        router.replace("/login");
+        router.refresh();
+      } catch (error) {
+        setLogoutError(error instanceof Error ? error.message : "Failed to fetch");
       }
-
-      router.replace("/login");
-      router.refresh();
     });
   };
 

@@ -40,6 +40,12 @@ type CustomerProfileRow = {
   completion: number | null;
 };
 
+const customerProfileSelectWithOptionalColumns =
+  "id, first_name, last_name, date_of_birth, sex, phone_number, country_code, city, region, state, country, emergency_contact_number, verified, completion";
+
+const customerProfileSelectBase =
+  "id, first_name, last_name, date_of_birth, sex, city, state, country";
+
 type BookingAggregateRow = {
   booking_status: string | null;
 };
@@ -84,6 +90,64 @@ function splitFullName(fullName: string | null | undefined) {
     firstName: parts[0] ?? "",
     lastName: parts.slice(1).join(" "),
   };
+}
+
+function isMissingCustomerProfileColumnError(message?: string) {
+  const normalized = message?.trim().toLowerCase() ?? "";
+
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("phone_number") ||
+      normalized.includes("country_code") ||
+      normalized.includes("region") ||
+      normalized.includes("emergency_contact_number") ||
+      normalized.includes("verified") ||
+      normalized.includes("completion") ||
+      normalized.includes("updated_at"))
+  );
+}
+
+function stripUnsupportedCustomerProfileFields(payload: Record<string, unknown>) {
+  const nextPayload = { ...payload };
+  delete nextPayload.phone_number;
+  delete nextPayload.country_code;
+  delete nextPayload.emergency_contact_number;
+  delete nextPayload.region;
+  delete nextPayload.verified;
+  delete nextPayload.completion;
+  delete nextPayload.updated_at;
+  return nextPayload;
+}
+
+async function fetchCustomerProfileRow(
+  adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
+  customerId: string,
+) {
+  const primary = await adminClient
+    .from("customer_profiles")
+    .select(customerProfileSelectWithOptionalColumns)
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (!primary.error) {
+    return primary.data as CustomerProfileRow | null;
+  }
+
+  if (!isMissingCustomerProfileColumnError(primary.error.message)) {
+    throw primary.error;
+  }
+
+  const fallback = await adminClient
+    .from("customer_profiles")
+    .select(customerProfileSelectBase)
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (fallback.error) {
+    throw fallback.error;
+  }
+
+  return fallback.data as CustomerProfileRow | null;
 }
 
 function pickNameFallback(options: Array<string | null | undefined>) {
@@ -310,54 +374,55 @@ export async function GET(request: Request) {
     return verified.error;
   }
 
-  const [customerProfileResult, bookingsResult, paymentsResult] = await Promise.all([
-    verified.adminClient
-      .from("customer_profiles")
-      .select("id, first_name, last_name, date_of_birth, sex, phone_number, country_code, city, region, state, country, emergency_contact_number, verified, completion")
-      .eq("id", verified.profile.id)
-      .maybeSingle(),
-    verified.adminClient
-      .from("bookings")
-      .select("booking_status")
-      .eq("customer_id", verified.profile.id)
-      .limit(200),
-    verified.adminClient
-      .from("payments")
-      .select("amount, status, paid_at, created_at, service_title")
-      .eq("customer_id", verified.profile.id)
-      .order("paid_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false, nullsFirst: false })
-      .limit(200),
-  ]);
+  try {
+    const [customerProfile, bookingsResult, paymentsResult] = await Promise.all([
+      fetchCustomerProfileRow(verified.adminClient, verified.profile.id),
+      verified.adminClient
+        .from("bookings")
+        .select("booking_status")
+        .eq("customer_id", verified.profile.id)
+        .limit(200),
+      verified.adminClient
+        .from("payments")
+        .select("amount, status, paid_at, created_at, service_title")
+        .eq("customer_id", verified.profile.id)
+        .order("paid_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(200),
+    ]);
+    const bookingRows = (bookingsResult.data ?? []) as BookingAggregateRow[];
+    const paymentRows = (paymentsResult.data ?? []) as PaymentAggregateRow[];
 
-  const customerProfile = customerProfileResult.data as CustomerProfileRow | null;
-  const bookingRows = (bookingsResult.data ?? []) as BookingAggregateRow[];
-  const paymentRows = (paymentsResult.data ?? []) as PaymentAggregateRow[];
-
-  return NextResponse.json({
-    profile: buildCustomerProfile(
-      verified.profile,
-      customerProfile,
-      verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
-        ? (verified.authUser.user_metadata as Record<string, unknown>)
-        : undefined,
-      typeof verified.authUser.user_metadata?.first_name === "string"
-        ? verified.authUser.user_metadata.first_name
-        : typeof verified.authUser.user_metadata?.full_name === "string"
-          ? splitFullName(verified.authUser.user_metadata.full_name).firstName
+    return NextResponse.json({
+      profile: buildCustomerProfile(
+        verified.profile,
+        customerProfile,
+        verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
+          ? (verified.authUser.user_metadata as Record<string, unknown>)
+          : undefined,
+        typeof verified.authUser.user_metadata?.first_name === "string"
+          ? verified.authUser.user_metadata.first_name
+          : typeof verified.authUser.user_metadata?.full_name === "string"
+            ? splitFullName(verified.authUser.user_metadata.full_name).firstName
+            : "",
+        typeof verified.authUser.user_metadata?.last_name === "string"
+          ? verified.authUser.user_metadata.last_name
+          : typeof verified.authUser.user_metadata?.full_name === "string"
+            ? splitFullName(verified.authUser.user_metadata.full_name).lastName
+            : "",
+        typeof verified.authUser.user_metadata?.sex === "string"
+          ? verified.authUser.user_metadata.sex
           : "",
-      typeof verified.authUser.user_metadata?.last_name === "string"
-        ? verified.authUser.user_metadata.last_name
-        : typeof verified.authUser.user_metadata?.full_name === "string"
-          ? splitFullName(verified.authUser.user_metadata.full_name).lastName
-          : "",
-      typeof verified.authUser.user_metadata?.sex === "string"
-        ? verified.authUser.user_metadata.sex
-        : "",
-    ),
-    bookingSummary: mapBookingSummary(bookingRows),
-    paymentSummary: buildPaymentSummary(paymentRows),
-  });
+      ),
+      bookingSummary: mapBookingSummary(bookingRows),
+      paymentSummary: buildPaymentSummary(paymentRows),
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to load customer profile." },
+      { status: 500 },
+    );
+  }
 }
 
 type UpdatePayload = {
@@ -461,9 +526,17 @@ export async function PATCH(request: Request) {
     updated_at: new Date().toISOString(),
   };
 
-  const { error: customerProfileError } = await verified.adminClient
+  let customerProfileWrite = await verified.adminClient
     .from("customer_profiles")
     .upsert(customerProfilePayload, { onConflict: "id" });
+
+  if (customerProfileWrite.error && isMissingCustomerProfileColumnError(customerProfileWrite.error.message)) {
+    customerProfileWrite = await verified.adminClient
+      .from("customer_profiles")
+      .upsert(stripUnsupportedCustomerProfileFields(customerProfilePayload), { onConflict: "id" });
+  }
+
+  const customerProfileError = customerProfileWrite.error;
 
   if (customerProfileError) {
     return NextResponse.json(
@@ -478,11 +551,13 @@ export async function PATCH(request: Request) {
     .eq("id", verified.profile.id)
     .maybeSingle();
 
-  const refreshedCustomerProfileResult = await verified.adminClient
-    .from("customer_profiles")
-    .select("id, first_name, last_name, date_of_birth, sex, phone_number, country_code, city, region, state, country, emergency_contact_number, verified, completion")
-    .eq("id", verified.profile.id)
-    .maybeSingle();
+  let refreshedCustomerProfile: CustomerProfileRow | null = null;
+
+  try {
+    refreshedCustomerProfile = await fetchCustomerProfileRow(verified.adminClient, verified.profile.id);
+  } catch {
+    refreshedCustomerProfile = null;
+  }
 
   if (refreshedProfileResult.error || !refreshedProfileResult.data) {
     return NextResponse.json({ error: "Unable to load updated profile." }, { status: 500 });
@@ -492,7 +567,7 @@ export async function PATCH(request: Request) {
     profile: {
       ...buildCustomerProfile(
         refreshedProfileResult.data as ProfileRow,
-        (refreshedCustomerProfileResult.data as CustomerProfileRow | null) ?? null,
+        refreshedCustomerProfile,
         verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
           ? ({
               ...verified.authUser.user_metadata,
