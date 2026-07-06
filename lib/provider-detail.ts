@@ -10,6 +10,7 @@ import {
   type ProviderListing,
 } from "./provider-catalog";
 import { getProviderRegistration } from "./provider-registration-storage";
+import type { ProviderRegistrationRecord, ProviderService } from "./provider-registration-types";
 import { getSupabaseServiceKey, getSupabaseUrl } from "./supabase-env";
 
 type ProviderGalleryImage = {
@@ -223,6 +224,46 @@ function registrationServiceLabel(serviceKey: ProviderCategoryKey) {
     case "electrician":
       return "Electrician";
   }
+}
+
+function collectRegistrationGallery(
+  registration: ProviderRegistrationRecord | null,
+  preferredService?: ProviderService | null,
+) {
+  if (!registration) {
+    return [] satisfies ProviderGalleryImage[];
+  }
+
+  const orderedServices = [
+    preferredService ?? null,
+    ...registration.data.selectedServices.filter((service) => service !== preferredService),
+  ].filter(Boolean) as ProviderService[];
+
+  const gallery: ProviderGalleryImage[] = [];
+
+  for (const service of orderedServices) {
+    const details = registration.data.serviceDetails[service];
+
+    if (!details) {
+      continue;
+    }
+
+    details.imageDataUrls.forEach((src, index) => {
+      const normalized = src.trim();
+
+      if (!normalized) {
+        return;
+      }
+
+      gallery.push({
+        src: normalized,
+        alt: `${service} work image ${index + 1}`,
+        caption: details.imageCaptions[index]?.trim() || `${service} work ${index + 1}`,
+      });
+    });
+  }
+
+  return gallery;
 }
 
 function addDays(date: Date, days: number) {
@@ -706,17 +747,10 @@ export const getProviderDetail = cache(
       const availabilityLabel = availabilityWithConflicts.some((slot) => slot.state === "available")
         ? "Available"
         : "Unavailable";
-      const registrationService = registration?.data.serviceDetails[
-        registrationServiceLabel(scopedMatch.serviceKey)
-      ];
-      const registrationGallery =
-        registrationService?.imageDataUrls
-          .map((src, index) => ({
-            src: src.trim(),
-            alt: `${scopedMatch.name} work image ${index + 1}`,
-            caption: registrationService.imageCaptions[index]?.trim() || `Work ${index + 1}`,
-          }))
-          .filter((image) => Boolean(image.src)) ?? [];
+      const registrationGallery = collectRegistrationGallery(
+        registration,
+        registrationServiceLabel(scopedMatch.serviceKey),
+      );
 
       return buildDetailFromListing(scopedMatch, {
         profileImage: registration?.data.basicProfile.avatarDataUrl || null,
@@ -767,17 +801,10 @@ export const getProviderDetail = cache(
     const availabilityLabel = availabilityWithConflicts.some((slot) => slot.state === "available")
       ? "Available"
       : "Unavailable";
-    const registrationService = registration?.data.serviceDetails[
-      registrationServiceLabel(fallbackMatch.serviceKey)
-    ];
-    const registrationGallery =
-      registrationService?.imageDataUrls
-        .map((src, index) => ({
-          src: src.trim(),
-          alt: `${fallbackMatch.name} work image ${index + 1}`,
-          caption: registrationService.imageCaptions[index]?.trim() || `Work ${index + 1}`,
-        }))
-        .filter((image) => Boolean(image.src)) ?? [];
+    const registrationGallery = collectRegistrationGallery(
+      registration,
+      registrationServiceLabel(fallbackMatch.serviceKey),
+    );
 
     return buildDetailFromListing(fallbackMatch, {
       profileImage: registration?.data.basicProfile.avatarDataUrl || null,
