@@ -177,6 +177,12 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
     locationDetails?.formattedAddress ||
     locationDetails?.label ||
     "Bandar Puteri Puchong, Subang Jaya City Council";
+  const availabilitySummaryLabel =
+    sortBy === "nearest"
+      ? `${serviceLower} available nearby`
+      : sortBy === "price-low"
+        ? `${serviceLower} with lower hourly rates`
+        : `popular ${serviceLower} based on rating`;
 
   return (
     <main className="min-h-[100dvh] bg-[#fbf8ff]">
@@ -350,7 +356,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
                   <span className="h-2.5 w-2.5 rounded-full bg-[#8E5EB5]" />
                   <span>
                     <span className="font-semibold text-[#344054]">{filteredListings.length}</span>{" "}
-                    {serviceLower} available near you
+                    {availabilitySummaryLabel}
                   </span>
                 </p>
               </div>
@@ -383,6 +389,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
                   key={listing.id}
                   listing={listing}
                   distanceKm={getListingDistanceKm(listing)}
+                  sortBy={sortBy}
                 />
               ))}
             </div>
@@ -482,9 +489,11 @@ function TabButton({
 function ProviderCard({
   listing,
   distanceKm,
+  sortBy,
 }: {
   listing: CatalogScreenListing;
   distanceKm: number;
+  sortBy: SortKey;
 }) {
   const fullName = buildProviderFullName(listing);
   const jobsCompleted = Math.max(listing.reviews * 2 + 68, 120);
@@ -495,6 +504,14 @@ function ProviderCard({
     listing.specialties[3] ?? "Wiring",
     listing.specialties[4] ?? "Switch Board Repair",
   ];
+  const rankingBadge =
+    sortBy === "nearest"
+      ? `Nearby • ${formatDistanceKm(distanceKm)}`
+      : sortBy === "price-low"
+        ? `Low Rate • RM${listing.hourlyRate}/hr`
+        : listing.rating >= 4.8
+          ? "Top Rated Provider"
+          : "Popular Provider";
 
   return (
     <article className="w-full max-w-[380px] rounded-[28px] border border-[#e7ece8] bg-white p-[18px] shadow-[0_18px_38px_rgba(15,23,42,0.07)]">
@@ -523,7 +540,7 @@ function ProviderCard({
               </p>
               <span className="mt-3 inline-flex max-w-full items-center gap-1.5 rounded-full bg-[#f3ebfc] px-3 py-1.5 text-[10px] font-semibold text-[#8E5EB5]">
                 <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-                <span className="break-words">Top Rated Provider</span>
+                <span className="break-words">{rankingBadge}</span>
               </span>
             </div>
 
