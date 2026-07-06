@@ -5796,9 +5796,6 @@ export function ReviewsScreen() {
 
 export function ProfileScreen() {
   const state = useProviderAppData();
-  const [draftEmergencyContactNumber, setDraftEmergencyContactNumber] = useState<string | null>(null);
-  const [draftCountry, setDraftCountry] = useState<string | null>(null);
-  const [isSavingContact, startSavingContact] = useTransition();
   const fallback = LoadingOrError(state);
 
   if (fallback) {
@@ -5806,8 +5803,6 @@ export function ProfileScreen() {
   }
 
   const data = state.data!;
-  const emergencyContactNumber = draftEmergencyContactNumber ?? data.emergencyContactNumber ?? "";
-  const country = draftCountry ?? data.country ?? "Malaysia";
   const displayName = data.marketingName || data.fullName || "Provider";
   const verificationCount = [
     data.emailVerified,
@@ -5863,96 +5858,10 @@ export function ProfileScreen() {
           <InfoRow icon={<MessageCircleMore className="h-4.5 w-4.5 text-[#16a34a]" />} label="Email" value={data.email} />
           <InfoRow icon={<CreditCard className="h-4.5 w-4.5 text-[#16a34a]" />} label="Phone" value={data.phone || "Not set"} />
           <InfoRow icon={<Phone className="h-4.5 w-4.5 text-[#16a34a]" />} label="Emergency Contact" value={data.emergencyContactNumber || "Not set"} />
-          <InfoRow icon={<Globe className="h-4.5 w-4.5 text-[#16a34a]" />} label="Country" value={data.country || "Malaysia"} />
+          <InfoRow icon={<Globe className="h-4.5 w-4.5 text-[#16a34a]" />} label="Nationality" value={data.country || "Malaysia"} />
           <InfoRow icon={<MapPin className="h-4.5 w-4.5 text-[#16a34a]" />} label="Service Radius" value={`${data.serviceRadiusKm} KM`} />
           <InfoRow icon={<Globe className="h-4.5 w-4.5 text-[#16a34a]" />} label="Location" value={data.serviceLocation || "Not set"} />
           <InfoRow icon={<Star className="h-4.5 w-4.5 text-[#16a34a]" />} label="Rating" value={`${data.averageRating.toFixed(1)} (${data.totalReviews})`} />
-        </div>
-        <div className="mt-5 rounded-[18px] border border-[#e7eee8] bg-[#fbfffc] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[15px] font-black text-[#0f172a]">Emergency Contact</p>
-              <p className="mt-1 text-[12px] text-[#64748b]">
-                Update the number we should use if we cannot reach you directly.
-              </p>
-            </div>
-            <span className="rounded-full bg-[#eef9f1] px-3 py-1 text-[11px] font-bold text-[#16a34a]">
-              Editable
-            </span>
-          </div>
-          <div className="mt-4 grid gap-3">
-            <label className="block">
-              <span className="mb-2 block text-[13px] font-semibold text-[#0f172a]">Country</span>
-              <input
-                value={country}
-                onChange={(event) => setDraftCountry(event.target.value)}
-                className="h-11 w-full rounded-[12px] border border-[#d8ebdf] bg-white px-4 text-[14px] text-[#0f172a] outline-none"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-[13px] font-semibold text-[#0f172a]">Emergency Contact Number</span>
-              <input
-                type="tel"
-                value={emergencyContactNumber}
-                onChange={(event) => setDraftEmergencyContactNumber(event.target.value)}
-                placeholder="Enter emergency contact number"
-                className="h-11 w-full rounded-[12px] border border-[#d8ebdf] bg-white px-4 text-[14px] text-[#0f172a] outline-none placeholder:text-[#94a3b8]"
-              />
-            </label>
-          </div>
-          <button
-            type="button"
-            disabled={isSavingContact || !emergencyContactNumber.trim()}
-            onClick={() => {
-              startSavingContact(async () => {
-                state.setError("");
-                state.setNotice("");
-
-                const client = getSupabaseClient();
-
-                if (!client) {
-                  state.setError("Supabase is not configured yet.");
-                  return;
-                }
-
-                const {
-                  data: { session },
-                } = await client.auth.getSession();
-
-                if (!session) {
-                  state.setError("Your session expired. Please log in again.");
-                  return;
-                }
-
-                const response = await fetch("/api/provider/me", {
-                  method: "PATCH",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${session.access_token}`,
-                  },
-                  body: JSON.stringify({
-                    country,
-                    emergencyContactNumber,
-                  }),
-                });
-
-                const result = (await response.json().catch(() => ({}))) as { error?: string };
-
-                if (!response.ok) {
-                  state.setError(result.error || "Unable to update emergency contact.");
-                  return;
-                }
-
-                await state.reloadWorkspace();
-                setDraftCountry(null);
-                setDraftEmergencyContactNumber(null);
-                state.setNotice("Emergency contact updated.");
-              });
-            }}
-            className="mt-4 inline-flex h-11 items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[13px] font-extrabold text-white disabled:opacity-60"
-          >
-            {isSavingContact ? "Saving..." : "Save Emergency Contact"}
-          </button>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <Link
