@@ -59,6 +59,7 @@ import {
 import { getSupabaseClient } from "@/lib/supabase";
 import { serviceSpecialties } from "@/lib/provider-registration-config";
 import { isPaymentProofMimeType, PAYMENT_PROOF_MAX_BYTES, readFileAsDataUrl } from "@/lib/upload-proof";
+import swipperLogo from "@/Logo/Swipper Logo New.png";
 
 import {
   formatCompactCurrency,
@@ -1267,8 +1268,15 @@ export function DashboardScreen() {
           >
             <Menu className="h-5 w-5" />
           </Link>
-          <div className="text-[2rem] font-black tracking-[-0.08em] text-[#16a34a]">
-            della
+          <div className="flex h-11 items-center justify-center">
+            <Image
+              src={swipperLogo}
+              alt="Swipper"
+              width={132}
+              height={40}
+              className="h-9 w-auto object-contain"
+              priority
+            />
           </div>
           <Link
             href="/provider/messages"
