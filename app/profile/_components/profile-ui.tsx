@@ -1563,11 +1563,11 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
         {filtered.map((booking) => (
           <div
             key={booking.id}
-            className="rounded-[28px] border border-[#eadff8] bg-white px-5 py-5 shadow-[0_18px_38px_rgba(106,69,160,0.1)]"
+            className="rounded-[28px] border border-[#eadff8] bg-white px-4 py-4 shadow-[0_18px_38px_rgba(106,69,160,0.1)]"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 flex-1 items-start gap-4">
-                <div className="relative h-[5.8rem] w-[5.8rem] shrink-0 overflow-hidden rounded-full border-4 border-white bg-[#f5eefc] shadow-[0_16px_28px_rgba(106,69,160,0.16)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <div className="relative h-[4.9rem] w-[4.9rem] shrink-0 overflow-hidden rounded-full border-4 border-white bg-[#f5eefc] shadow-[0_14px_24px_rgba(106,69,160,0.14)]">
                   {booking.providerAvatarUrl || booking.imageSrc ? (
                     <Image
                       src={booking.providerAvatarUrl || booking.imageSrc || ""}
@@ -1582,11 +1582,11 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
                     </div>
                   )}
                 </div>
-                <div className="min-w-0 flex-1 pt-1">
-                  <p className="text-[1.95rem] font-black leading-[1.05] tracking-[-0.05em] text-[#181538]">
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <p className="text-[1.15rem] font-black leading-[1.08] tracking-[-0.04em] text-[#181538]">
                     {booking.providerFullName || booking.provider}
                   </p>
-                  <p className="mt-2 text-[13px] font-medium leading-6 text-[#7b728a]">
+                  <p className="mt-1 text-[12px] font-medium leading-5 text-[#7b728a]">
                     {booking.service}
                   </p>
                 </div>
@@ -1594,30 +1594,30 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
               <BookingStatusPill label={booking.statusLabel} tone={bookingTone(booking)} />
             </div>
 
-            <div className="mt-5 w-full overflow-hidden rounded-[24px] border border-[#efe5fb] bg-white shadow-[0_10px_22px_rgba(106,69,160,0.04)]">
-              <div className="flex items-start gap-4 px-4 py-4 text-[#2d274f]">
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#f6effd] text-[#8E5EB5]">
-                  <CalendarIcon className="h-5 w-5" />
+            <div className="mt-4 w-full overflow-hidden rounded-[22px] border border-[#efe5fb] bg-white shadow-[0_8px_18px_rgba(106,69,160,0.04)]">
+              <div className="flex items-start gap-3 px-4 py-3 text-[#2d274f]">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#f6effd] text-[#8E5EB5]">
+                  <CalendarIcon className="h-4.5 w-4.5" />
                 </span>
-                <span className="min-w-0 pt-1 text-left text-[13px] font-semibold leading-7">
+                <span className="min-w-0 pt-0.5 text-left text-[12px] font-semibold leading-6">
                   {booking.schedule}
                 </span>
               </div>
               <div className="h-px bg-[#f1e8fb]" />
-              <div className="flex items-start gap-4 px-4 py-4 text-[#2d274f]">
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#f6effd] text-[#8E5EB5]">
-                  <PinIcon className="h-5 w-5" />
+              <div className="flex items-start gap-3 px-4 py-3 text-[#2d274f]">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#f6effd] text-[#8E5EB5]">
+                  <PinIcon className="h-4.5 w-4.5" />
                 </span>
-                <span className="min-w-0 pt-1 text-left text-[13px] font-semibold leading-8">
+                <span className="min-w-0 pt-0.5 text-left text-[12px] font-semibold leading-7">
                   {booking.location}
                 </span>
               </div>
               <div className="h-px bg-[#f1e8fb]" />
-              <div className="flex items-center gap-4 px-4 py-4 text-[#2d274f]">
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#f6effd] text-[#8E5EB5]">
-                  <WalletIcon className="h-5 w-5" />
+              <div className="flex items-center gap-3 px-4 py-3 text-[#2d274f]">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#f6effd] text-[#8E5EB5]">
+                  <WalletIcon className="h-4.5 w-4.5" />
                 </span>
-                <span className="text-[1.1rem] font-black tracking-[-0.03em] text-[#161233]">
+                <span className="text-[1rem] font-black tracking-[-0.03em] text-[#161233]">
                   {formatBookingAmount(booking.paymentAmount)}
                 </span>
               </div>
@@ -1625,10 +1625,10 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
 
             <Link
               href={`/profile/bookings/${booking.id}`}
-              className="mt-5 flex h-[3.8rem] w-full items-center justify-between rounded-[20px] bg-[linear-gradient(135deg,#8f40ff_0%,#702cf0_55%,#5a20c9_100%)] px-5 text-[1rem] font-extrabold text-white shadow-[0_18px_34px_rgba(91,33,182,0.28)]"
+              className="mt-4 flex h-[3.45rem] w-full items-center justify-between rounded-[19px] bg-[linear-gradient(135deg,#8f40ff_0%,#702cf0_55%,#5a20c9_100%)] px-5 text-[0.95rem] font-extrabold text-white shadow-[0_16px_30px_rgba(91,33,182,0.26)]"
             >
               <span className="pl-1">Track Task</span>
-              <ChevronRightIcon className="h-5 w-5" />
+              <ChevronRightIcon className="h-4.5 w-4.5" />
             </Link>
 
             <div className="mt-4 rounded-[22px] border border-[#efe4fb] bg-white p-4 shadow-[0_12px_24px_rgba(106,69,160,0.05)]">
@@ -1699,9 +1699,9 @@ function BookingStatusPill({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[12px] font-bold ${toneClass}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-bold ${toneClass}`}
     >
-      {tone === "completed" ? <CheckCircleIcon className="h-4 w-4" /> : null}
+      {tone === "completed" ? <CheckCircleIcon className="h-3.5 w-3.5" /> : null}
       <span>{label}</span>
     </span>
   );
@@ -3499,7 +3499,10 @@ function ProfileSummaryCard({
   fullName: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[#e4ece7] bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)]">
+    <Link
+      href="/profile/edit"
+      className="block rounded-[18px] border border-[#e4ece7] bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)] transition hover:border-[#d9c8ee] hover:shadow-[0_14px_30px_rgba(106,69,160,0.08)]"
+    >
       <div className="flex items-center gap-4">
         {profile.avatarUrl ? (
           <div className="relative h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-full shadow-[0_12px_24px_rgba(15,23,42,0.18)]">
@@ -3540,7 +3543,7 @@ function ProfileSummaryCard({
           ) : null}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
