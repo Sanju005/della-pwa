@@ -35,6 +35,7 @@ export type ProviderDashboardData = {
   emailVerified: boolean;
   phoneVerified: boolean;
   identityVerified: boolean;
+  identityVerificationStatus: "pending" | "processing" | "verified" | "rejected";
   kycVerified: boolean;
   backgroundCheckVerified: boolean;
   services: Array<{

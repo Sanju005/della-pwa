@@ -46,6 +46,11 @@ type ProviderProfileRow = {
         identity_verified: boolean | null;
         kyc_verified: boolean | null;
         background_check_verified: boolean | null;
+        identity_document_type?: string | null;
+        identity_front_image_url?: string | null;
+        identity_back_image_url?: string | null;
+        updated_at?: string | null;
+        created_at?: string | null;
       }
     | Array<{
         phone_verified: boolean | null;
@@ -53,6 +58,11 @@ type ProviderProfileRow = {
         identity_verified: boolean | null;
         kyc_verified: boolean | null;
         background_check_verified: boolean | null;
+        identity_document_type?: string | null;
+        identity_front_image_url?: string | null;
+        identity_back_image_url?: string | null;
+        updated_at?: string | null;
+        created_at?: string | null;
       }>
     | null;
 };
@@ -104,6 +114,27 @@ function toTitleCase(value: string | null | undefined) {
     .join(" ");
 }
 
+function normalizeIdentityVerificationStatus(
+  value: unknown,
+  verified: boolean,
+): "pending" | "processing" | "verified" | "rejected" {
+  if (verified) {
+    return "verified";
+  }
+
+  if (typeof value !== "string") {
+    return "pending";
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "processing" || normalized === "rejected" || normalized === "verified") {
+    return normalized;
+  }
+
+  return "pending";
+}
+
 function isMissingProviderProfileColumnError(message?: string) {
   const normalized = message?.trim().toLowerCase() ?? "";
 
@@ -126,6 +157,25 @@ function isMissingProviderServiceMediaColumnError(message?: string) {
       normalized.includes("certificate_data_urls") ||
       normalized.includes("certificate_captions"))
   );
+}
+
+function isMissingVerificationDocumentColumnError(message?: string) {
+  const normalized = message?.trim().toLowerCase() ?? "";
+
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("identity_document_type") ||
+      normalized.includes("identity_front_image_url") ||
+      normalized.includes("identity_back_image_url"))
+  );
+}
+
+function stripVerificationDocumentFields(payload: Record<string, unknown>) {
+  const nextPayload = { ...payload };
+  delete nextPayload.identity_document_type;
+  delete nextPayload.identity_front_image_url;
+  delete nextPayload.identity_back_image_url;
+  return nextPayload;
 }
 
 async function upsertProviderProfile(
@@ -305,7 +355,12 @@ async function fetchProviderSnapshot(
       email_verified,
       identity_verified,
       kyc_verified,
-      background_check_verified
+      background_check_verified,
+      identity_document_type,
+      identity_front_image_url,
+      identity_back_image_url,
+      created_at,
+      updated_at
     `)
     .or(`provider_id.eq.${providerId},id.eq.${providerId}`)
     .limit(1);
@@ -335,7 +390,23 @@ async function fetchProviderSnapshot(
     services = (fallback.data as ProviderServiceRow[] | null) ?? null;
   }
 
-  const verifications = verificationWrite.data;
+  let verifications = verificationWrite.data as ProviderProfileRow["provider_verifications"];
+
+  if (verificationWrite.error && isMissingVerificationDocumentColumnError(verificationWrite.error.message)) {
+    const fallbackVerification = await adminClient
+      .from("provider_verifications")
+      .select(`
+        phone_verified,
+        email_verified,
+        identity_verified,
+        kyc_verified,
+        background_check_verified
+      `)
+      .or(`provider_id.eq.${providerId},id.eq.${providerId}`)
+      .limit(1);
+
+    verifications = fallbackVerification.data as ProviderProfileRow["provider_verifications"];
+  }
 
   return {
     ...(providerProfile as ProviderProfileRow),
@@ -387,6 +458,11 @@ function buildResponse(
       ? (authUser.user_metadata as Record<string, unknown>)
       : {};
   const verification = relationItem(providerProfile.provider_verifications);
+  const identityVerified = Boolean(verification?.identity_verified);
+  const identityVerificationStatus = normalizeIdentityVerificationStatus(
+    metadata.identity_verification_status,
+    identityVerified,
+  );
 
   return {
     providerId: profile.id,
@@ -413,7 +489,8 @@ function buildResponse(
     isVisible: Boolean(providerProfile.is_visible),
     emailVerified: Boolean(authUser.email_confirmed_at) || Boolean(verification?.email_verified),
     phoneVerified: Boolean(verification?.phone_verified),
-    identityVerified: Boolean(verification?.identity_verified),
+    identityVerified,
+    identityVerificationStatus,
     kycVerified: Boolean(verification?.kyc_verified),
     backgroundCheckVerified: Boolean(verification?.background_check_verified),
     services:
@@ -468,6 +545,10 @@ type UpdatePayload = {
   emergencyContactNumber?: string;
   phoneVerified?: boolean;
   identityVerified?: boolean;
+  identityVerificationStatus?: "pending" | "processing" | "verified" | "rejected";
+  identityDocumentType?: "ic" | "passport";
+  identityFrontImageUrl?: string;
+  identityBackImageUrl?: string;
 };
 
 export async function PATCH(request: Request) {
@@ -497,7 +578,9 @@ export async function PATCH(request: Request) {
   if (
     typeof payload.fullName === "string" ||
     typeof payload.country === "string" ||
-    typeof payload.emergencyContactNumber === "string"
+    typeof payload.emergencyContactNumber === "string" ||
+    typeof payload.identityVerificationStatus === "string" ||
+    typeof payload.identityVerified === "boolean"
   ) {
     const fullName =
       typeof payload.fullName === "string" && payload.fullName.trim()
@@ -526,6 +609,34 @@ export async function PATCH(request: Request) {
               ? payload.emergencyContactNumber.trim()
               : typeof currentMetadata.emergency_contact_number === "string"
                 ? currentMetadata.emergency_contact_number
+                : "",
+          identity_verification_status:
+            typeof payload.identityVerificationStatus === "string"
+              ? payload.identityVerificationStatus
+              : typeof payload.identityVerified === "boolean"
+                ? payload.identityVerified
+                  ? "verified"
+                  : "pending"
+                : typeof currentMetadata.identity_verification_status === "string"
+                  ? currentMetadata.identity_verification_status
+                  : "pending",
+          identity_document_type:
+            payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
+              ? payload.identityDocumentType
+              : typeof currentMetadata.identity_document_type === "string"
+                ? currentMetadata.identity_document_type
+                : "",
+          identity_front_image_url:
+            typeof payload.identityFrontImageUrl === "string"
+              ? payload.identityFrontImageUrl
+              : typeof currentMetadata.identity_front_image_url === "string"
+                ? currentMetadata.identity_front_image_url
+                : "",
+          identity_back_image_url:
+            typeof payload.identityBackImageUrl === "string"
+              ? payload.identityBackImageUrl
+              : typeof currentMetadata.identity_back_image_url === "string"
+                ? currentMetadata.identity_back_image_url
                 : "",
         },
       },
@@ -563,14 +674,22 @@ export async function PATCH(request: Request) {
 
   if (
     typeof payload.phoneVerified === "boolean" ||
-    typeof payload.identityVerified === "boolean"
+    typeof payload.identityVerified === "boolean" ||
+    payload.identityDocumentType === "ic" ||
+    payload.identityDocumentType === "passport" ||
+    typeof payload.identityFrontImageUrl === "string" ||
+    typeof payload.identityBackImageUrl === "string"
   ) {
     const verificationPayload = {
       phone_verified: payload.phoneVerified,
       email_verified: Boolean(verified.authUser.email_confirmed_at),
       identity_verified: payload.identityVerified,
       kyc_verified: payload.identityVerified,
+      identity_document_type: payload.identityDocumentType,
+      identity_front_image_url: payload.identityFrontImageUrl?.trim(),
+      identity_back_image_url: payload.identityBackImageUrl?.trim(),
     };
+    const verificationPayloadWithoutDocuments = stripVerificationDocumentFields(verificationPayload);
 
     const byProviderId = await verified.adminClient
       .from("provider_verifications")
@@ -582,7 +701,70 @@ export async function PATCH(request: Request) {
         { onConflict: "provider_id" },
       );
 
-    if (byProviderId.error && isMissingConflictTargetError(byProviderId.error.message)) {
+    if (byProviderId.error && isMissingVerificationDocumentColumnError(byProviderId.error.message)) {
+      const fallbackByProviderId = await verified.adminClient
+        .from("provider_verifications")
+        .upsert(
+          {
+            provider_id: verified.profile.id,
+            ...verificationPayloadWithoutDocuments,
+          },
+          { onConflict: "provider_id" },
+        );
+
+      if (fallbackByProviderId.error && isMissingConflictTargetError(fallbackByProviderId.error.message)) {
+        const existingVerification = await verified.adminClient
+          .from("provider_verifications")
+          .select("id")
+          .eq("provider_id", verified.profile.id)
+          .maybeSingle();
+
+        if (existingVerification.data?.id) {
+          const { error } = await verified.adminClient
+            .from("provider_verifications")
+            .update(verificationPayloadWithoutDocuments)
+            .eq("id", existingVerification.data.id);
+
+          if (error) {
+            return NextResponse.json(
+              { error: error.message || "Unable to update provider verification." },
+              { status: 500 },
+            );
+          }
+        } else {
+          const { error } = await verified.adminClient
+            .from("provider_verifications")
+            .insert({
+              provider_id: verified.profile.id,
+              ...verificationPayloadWithoutDocuments,
+            });
+
+          if (error) {
+            return NextResponse.json(
+              { error: error.message || "Unable to update provider verification." },
+              { status: 500 },
+            );
+          }
+        }
+      } else if (fallbackByProviderId.error) {
+        const byId = await verified.adminClient
+          .from("provider_verifications")
+          .upsert(
+            {
+              id: verified.profile.id,
+              ...verificationPayloadWithoutDocuments,
+            },
+            { onConflict: "id" },
+          );
+
+        if (byId.error) {
+          return NextResponse.json(
+            { error: byId.error.message || "Unable to update provider verification." },
+            { status: 500 },
+          );
+        }
+      }
+    } else if (byProviderId.error && isMissingConflictTargetError(byProviderId.error.message)) {
       const existingVerification = await verified.adminClient
         .from("provider_verifications")
         .select("id")
@@ -633,6 +815,36 @@ export async function PATCH(request: Request) {
           { status: 500 },
         );
       }
+    }
+  }
+
+  if (payload.identityVerificationStatus === "processing") {
+    const providerMessage =
+      "Your IC / Passport successfully submitted for verification. It will take up to 24 hours to activate.";
+
+    await verified.adminClient.from("notifications").insert({
+      user_id: verified.profile.id,
+      booking_id: null,
+      notification_type: "identity_verification_submitted",
+      title: "Identity verification submitted",
+      body: providerMessage,
+    });
+
+    const { data: adminProfiles } = await verified.adminClient
+      .from("profiles")
+      .select("id")
+      .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+
+    if (adminProfiles?.length) {
+      await verified.adminClient.from("notifications").insert(
+        adminProfiles.map((admin) => ({
+          user_id: admin.id,
+          booking_id: null,
+          notification_type: "identity_verification_submitted",
+          title: "Provider identity verification submitted",
+          body: `${verified.profile.full_name?.trim() || "A provider"} submitted IC / Passport for verification review.`,
+        })),
+      );
     }
   }
 

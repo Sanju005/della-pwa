@@ -139,6 +139,11 @@ async function upsertProviderVerification(
   phoneVerified: boolean,
   emailVerified: boolean,
   identityVerified: boolean,
+  identityDocument?: {
+    documentType?: string;
+    frontImageUrl?: string;
+    backImageUrl?: string;
+  },
 ) {
   if (!adminClient) {
     return { error: { message: "Supabase is not configured yet." } };
@@ -150,7 +155,16 @@ async function upsertProviderVerification(
     identity_verified: identityVerified,
     kyc_verified: identityVerified,
     background_check_verified: false,
+    identity_document_type: identityDocument?.documentType?.trim() || null,
+    identity_front_image_url: identityDocument?.frontImageUrl?.trim() || null,
+    identity_back_image_url: identityDocument?.backImageUrl?.trim() || null,
   };
+  const {
+    identity_document_type: _identityDocumentType,
+    identity_front_image_url: _identityFrontImageUrl,
+    identity_back_image_url: _identityBackImageUrl,
+    ...fallbackPayload
+  } = payload;
 
   const byProviderId = await adminClient
     .from("provider_verifications")
@@ -166,6 +180,59 @@ async function upsertProviderVerification(
     return byProviderId;
   }
 
+  if (
+    (byProviderId.error.message ?? "").toLowerCase().includes("column") &&
+    ((byProviderId.error.message ?? "").toLowerCase().includes("identity_document_type") ||
+      (byProviderId.error.message ?? "").toLowerCase().includes("identity_front_image_url") ||
+      (byProviderId.error.message ?? "").toLowerCase().includes("identity_back_image_url"))
+  ) {
+    const fallbackByProviderId = await adminClient
+      .from("provider_verifications")
+      .upsert(
+        {
+          provider_id: providerId,
+          ...fallbackPayload,
+        },
+        { onConflict: "provider_id" },
+      );
+
+    if (!fallbackByProviderId.error) {
+      return fallbackByProviderId;
+    }
+
+    if (isMissingConflictTargetError(fallbackByProviderId.error.message)) {
+      const existingVerification = await adminClient
+        .from("provider_verifications")
+        .select("id")
+        .eq("provider_id", providerId)
+        .maybeSingle();
+
+      if (existingVerification.data?.id) {
+        return adminClient
+          .from("provider_verifications")
+          .update(fallbackPayload)
+          .eq("id", existingVerification.data.id);
+      }
+
+      return adminClient
+        .from("provider_verifications")
+        .insert({
+          provider_id: providerId,
+          ...fallbackPayload,
+        });
+    }
+
+    return adminClient
+      .from("provider_verifications")
+      .upsert(
+        {
+          id: providerId,
+          ...fallbackPayload,
+        },
+        { onConflict: "id" },
+      );
+  }
+
   if (isMissingConflictTargetError(byProviderId.error.message)) {
     const existingVerification = await adminClient
       .from("provider_verifications")
@@ -176,7 +243,7 @@ async function upsertProviderVerification(
     if (existingVerification.data?.id) {
       return adminClient
         .from("provider_verifications")
-        .update(payload)
+        .update(fallbackPayload)
         .eq("id", existingVerification.data.id);
     }
 
@@ -184,7 +251,7 @@ async function upsertProviderVerification(
       .from("provider_verifications")
       .insert({
         provider_id: providerId,
-        ...payload,
+        ...fallbackPayload,
       });
   }
 
@@ -193,7 +260,7 @@ async function upsertProviderVerification(
     .upsert(
       {
         id: providerId,
-        ...payload,
+        ...fallbackPayload,
       },
       { onConflict: "id" },
     );
@@ -480,6 +547,11 @@ export async function POST(request: Request) {
       phoneVerified,
       true,
       identityVerified,
+      {
+        documentType: payload.verification.documentType,
+        frontImageUrl: payload.verification.frontImageDataUrl,
+        backImageUrl: payload.verification.backImageDataUrl,
+      },
     );
 
     const verificationSetupFailed = Boolean(verificationResult.error);

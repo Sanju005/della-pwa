@@ -531,7 +531,12 @@ export function ProviderProfilePage() {
                     <div key={document.id} className="flex items-center justify-between gap-3 text-sm">
                       <div className="flex items-center gap-3 text-slate-700">
                         <FileText className="size-4 text-slate-400" />
-                        <span>{document.label}</span>
+                        <div>
+                          <span>{document.label}</span>
+                          {document.note ? (
+                            <p className="mt-1 text-[11px] text-slate-400">{document.note}</p>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 text-emerald-700">
                         <CheckCircle2 className="size-4" />
@@ -937,13 +942,50 @@ export function ProviderProfilePage() {
                 <div key={document.id} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4">
                   <div className="flex items-center gap-3 text-sm text-slate-700">
                     <FileText className="size-4 text-slate-400" />
-                    <span>{document.label}</span>
+                    <div>
+                      <span>{document.label}</span>
+                      {document.note ? (
+                        <p className="mt-1 text-[11px] text-slate-400">{document.note}</p>
+                      ) : null}
+                    </div>
                   </div>
                   <MiniStatus status={document.status} />
                 </div>
               ))}
             </div>
           </div>
+          {detail.identityDocuments?.length ? (
+            <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-950">Identity Review</h3>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    {detail.identityDocumentType} submitted {detail.identitySubmittedAt ? `on ${detail.identitySubmittedAt}` : "for review"}.
+                  </p>
+                </div>
+                <MiniStatus status={detail.identityVerificationStatus ?? "Pending"} />
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {detail.identityDocuments.map((document) => (
+                  <a
+                    key={document.id}
+                    href={document.previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                      <img src={document.previewUrl} alt={document.label} className="h-full w-full object-cover" />
+                    </div>
+                    <div className="mt-3">
+                      <p className="text-sm font-semibold text-slate-900">{document.label}</p>
+                      <p className="mt-1 text-[12px] text-slate-500">{document.fileName}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </SurfaceCard>
       ) : null}
       {activeTab === "Service Areas" ? (

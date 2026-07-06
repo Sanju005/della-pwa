@@ -29,6 +29,7 @@ import {
   cropImageFromSelection,
   type CropSelection,
 } from "@/app/_components/image-crop-modal";
+import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
 import {
   formatCurrency,
   formatDateLabel,
@@ -65,7 +66,7 @@ function isGalleryWorkProofFile(file: File) {
   const name = file.name.toLowerCase();
   return (
     file.type === "application/pdf" ||
-    file.type === "image/jpeg" ||
+    isAcceptedImageFile(file) ||
     name.endsWith(".pdf") ||
     name.endsWith(".jpg") ||
     name.endsWith(".jpeg")
@@ -597,7 +598,7 @@ function ProviderReviewModal({
         <div className="mt-5">
           <label className="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-[14px] border border-dashed border-[#cdb3eb] bg-[#fcfaff] text-[13px] font-extrabold text-[#8E5EB5]">
             Add Review Photos
-            <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => void handleReviewPhotoChange(event)} />
+            <input type="file" accept={IMAGE_UPLOAD_ACCEPT} multiple className="hidden" onChange={(event) => void handleReviewPhotoChange(event)} />
           </label>
           {photos.length > 0 ? (
             <div className="mt-3 grid grid-cols-4 gap-2">
@@ -857,7 +858,7 @@ function BookingDetails({
             <input
               ref={workFinishedInputRef}
               type="file"
-              accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf"
+              accept={`${IMAGE_UPLOAD_ACCEPT},.pdf,application/pdf`}
               multiple
               onChange={handleWorkFinishedProofChange("gallery")}
               className="hidden"
@@ -865,7 +866,7 @@ function BookingDetails({
             <input
               ref={workFinishedCameraInputRef}
               type="file"
-              accept="image/*"
+              accept={IMAGE_UPLOAD_ACCEPT}
               capture="environment"
               onChange={handleWorkFinishedProofChange("camera")}
               className="hidden"

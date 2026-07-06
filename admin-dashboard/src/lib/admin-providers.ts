@@ -5,6 +5,7 @@ import type {
   ProviderCommissionRow,
   ProviderDetailRecord,
   ProviderDocumentItem,
+  ProviderIdentityDocument,
   ProviderPayoutRow,
   ProviderRow,
   ProviderTaskRow,
@@ -50,12 +51,22 @@ type ProviderProfileRow = {
         identity_verified?: boolean | null;
         kyc_verified?: boolean | null;
         background_check_verified?: boolean | null;
+        identity_document_type?: string | null;
+        identity_front_image_url?: string | null;
+        identity_back_image_url?: string | null;
+        updated_at?: string | null;
+        created_at?: string | null;
       }
     | Array<{
         phone_verified?: boolean | null;
         identity_verified?: boolean | null;
         kyc_verified?: boolean | null;
         background_check_verified?: boolean | null;
+        identity_document_type?: string | null;
+        identity_front_image_url?: string | null;
+        identity_back_image_url?: string | null;
+        updated_at?: string | null;
+        created_at?: string | null;
       }>
     | null;
 };
@@ -200,7 +211,12 @@ const providerProfileSelectBase = `
     phone_verified,
     identity_verified,
     kyc_verified,
-    background_check_verified
+    background_check_verified,
+    identity_document_type,
+    identity_front_image_url,
+    identity_back_image_url,
+    created_at,
+    updated_at
   )
 `;
 
@@ -849,6 +865,40 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     liveProfile.average_rating,
     liveProfile.total_reviews
   );
+  const identityDocuments = [
+    verification?.identity_front_image_url
+      ? {
+          id: "identity-front",
+          label:
+            verification?.identity_document_type === "passport"
+              ? "Passport Main Page"
+              : "IC Front",
+          fileName:
+            verification?.identity_document_type === "passport"
+              ? "passport-main.jpg"
+              : "ic-front.jpg",
+          previewUrl: verification.identity_front_image_url,
+        }
+      : null,
+    verification?.identity_back_image_url
+      ? {
+          id: "identity-back",
+          label:
+            verification?.identity_document_type === "passport"
+              ? "Passport Supporting Page"
+              : "IC Back",
+          fileName:
+            verification?.identity_document_type === "passport"
+              ? "passport-supporting.jpg"
+              : "ic-back.jpg",
+          previewUrl: verification.identity_back_image_url,
+        }
+      : null,
+  ].filter((item): item is ProviderIdentityDocument => Boolean(item));
+  const identitySubmittedAt =
+    verification?.updated_at || verification?.created_at
+      ? formatDateTime(verification.updated_at ?? verification.created_at)
+      : "";
 
   const status = formatStatus(liveAccount?.status ?? (liveProfile.is_visible === false ? "paused" : "active"));
 
@@ -896,6 +946,14 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
         ? formatCurrency(livePayments.reduce((sum, row) => sum + (row.amount ?? 0), 0))
         : fallback.totalEarnings,
     reviewsCount: String(liveProfile.total_reviews ?? (Number(fallback.reviewsCount) || 0)),
+    identityVerificationStatus: verification?.identity_verified
+      ? "Verified"
+      : identityDocuments.length > 0
+        ? "Processing"
+        : "Pending",
+    identityDocumentType:
+      verification?.identity_document_type === "passport" ? "Passport" : "IC / Passport",
+    identitySubmittedAt,
     metrics,
     serviceAreas,
     documents: [
@@ -907,10 +965,12 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
       {
         id: "live-doc-2",
         label: "Identity Verification",
-        status: verification?.identity_verified ? "Verified" : "Pending",
+        status: verification?.identity_verified ? "Verified" : identityDocuments.length > 0 ? "Processing" : "Pending",
+        note: identityDocuments.length > 0 ? `${identityDocuments.length} document image${identityDocuments.length > 1 ? "s" : ""} submitted` : undefined,
       },
       ...fallback.documents.slice(2),
     ] satisfies ProviderDocumentItem[],
+    identityDocuments,
     completedTaskRows: taskRows?.completedTaskRows.length ? taskRows.completedTaskRows : fallback.completedTaskRows,
     upcomingTaskRows: taskRows?.upcomingTaskRows.length ? taskRows.upcomingTaskRows : fallback.upcomingTaskRows,
     payoutRows,

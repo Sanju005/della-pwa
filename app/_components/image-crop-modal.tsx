@@ -81,14 +81,20 @@ export function ImageCropModal({
     startSelection: CropSelection;
   } | null>(null);
 
+  const getFrameRatio = () => {
+    const rect = imageFrameRef.current?.getBoundingClientRect();
+    return rect && rect.height > 0 ? rect.width / rect.height : 1;
+  };
+
+  const getAspectHeightFromWidth = (width: number) =>
+    aspectRatio ? (width * getFrameRatio()) / aspectRatio : width;
+
   const clampSelection = (nextSelection: CropSelection) => {
     const minSize = 18;
     const next = { ...nextSelection };
 
     if (aspectRatio) {
-      const rect = imageFrameRef.current?.getBoundingClientRect();
-      const frameRatio = rect && rect.height > 0 ? rect.width / rect.height : 1;
-      next.height = (next.width * frameRatio) / aspectRatio;
+      next.height = getAspectHeightFromWidth(next.width);
     }
 
     next.width = Math.max(minSize, Math.min(next.width, 100));
@@ -104,10 +110,8 @@ export function ImageCropModal({
       return;
     }
 
-    const rect = imageFrameRef.current.getBoundingClientRect();
-    const frameRatio = rect.height > 0 ? rect.width / rect.height : 1;
     const width = 76;
-    const height = (width * frameRatio) / aspectRatio;
+    const height = getAspectHeightFromWidth(width);
     setSelection(clampSelection({
       x: (100 - width) / 2,
       y: (100 - height) / 2,
@@ -135,41 +139,79 @@ export function ImageCropModal({
       return;
     }
 
-    if (dragState.mode === "se") {
-      setSelection(clampSelection({
-        ...original,
-        width: original.width + deltaX,
-        height: original.height + deltaY,
-      }));
-      return;
-    }
+    if (!aspectRatio) {
+      if (dragState.mode === "se") {
+        setSelection(clampSelection({
+          ...original,
+          width: original.width + deltaX,
+          height: original.height + deltaY,
+        }));
+        return;
+      }
 
-    if (dragState.mode === "sw") {
+      if (dragState.mode === "sw") {
+        setSelection(clampSelection({
+          x: original.x + deltaX,
+          y: original.y,
+          width: original.width - deltaX,
+          height: original.height + deltaY,
+        }));
+        return;
+      }
+
+      if (dragState.mode === "ne") {
+        setSelection(clampSelection({
+          x: original.x,
+          y: original.y + deltaY,
+          width: original.width + deltaX,
+          height: original.height - deltaY,
+        }));
+        return;
+      }
+
       setSelection(clampSelection({
         x: original.x + deltaX,
-        y: original.y,
-        width: original.width - deltaX,
-        height: original.height + deltaY,
-      }));
-      return;
-    }
-
-    if (dragState.mode === "ne") {
-      setSelection(clampSelection({
-        x: original.x,
         y: original.y + deltaY,
-        width: original.width + deltaX,
+        width: original.width - deltaX,
         height: original.height - deltaY,
       }));
       return;
     }
 
-    setSelection(clampSelection({
-      x: original.x + deltaX,
-      y: original.y + deltaY,
-      width: original.width - deltaX,
-      height: original.height - deltaY,
-    }));
+    const aspectWidthRatio = aspectRatio / getFrameRatio();
+    const minWidth = Math.max(18, 18 * aspectWidthRatio);
+    const anchor =
+      dragState.mode === "se"
+        ? { x: original.x, y: original.y, horizontal: "right", vertical: "down" }
+        : dragState.mode === "sw"
+          ? { x: original.x + original.width, y: original.y, horizontal: "left", vertical: "down" }
+          : dragState.mode === "ne"
+            ? { x: original.x, y: original.y + original.height, horizontal: "right", vertical: "up" }
+            : { x: original.x + original.width, y: original.y + original.height, horizontal: "left", vertical: "up" };
+    const widthFromHorizontal =
+      dragState.mode === "se" || dragState.mode === "ne"
+        ? original.width + deltaX
+        : original.width - deltaX;
+    const widthFromVertical =
+      dragState.mode === "se" || dragState.mode === "sw"
+        ? original.width + deltaY * aspectWidthRatio
+        : original.width - deltaY * aspectWidthRatio;
+    const requestedWidth =
+      Math.abs(widthFromVertical - original.width) > Math.abs(widthFromHorizontal - original.width)
+        ? widthFromVertical
+        : widthFromHorizontal;
+    const maxWidthByX = anchor.horizontal === "right" ? 100 - anchor.x : anchor.x;
+    const maxHeightByY = anchor.vertical === "down" ? 100 - anchor.y : anchor.y;
+    const maxWidthByY = maxHeightByY * aspectWidthRatio;
+    const width = Math.max(minWidth, Math.min(requestedWidth, maxWidthByX, maxWidthByY));
+    const height = getAspectHeightFromWidth(width);
+
+    setSelection({
+      x: anchor.horizontal === "right" ? anchor.x : anchor.x - width,
+      y: anchor.vertical === "down" ? anchor.y : anchor.y - height,
+      width,
+      height,
+    });
   };
 
   const startDrag = (

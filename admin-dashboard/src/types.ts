@@ -230,6 +230,15 @@ export type ProviderDocumentItem = {
   id: string;
   label: string;
   status: string;
+  note?: string;
+  previewUrl?: string;
+};
+
+export type ProviderIdentityDocument = {
+  id: string;
+  label: string;
+  fileName: string;
+  previewUrl: string;
 };
 
 export type ProviderTaskRow = {
@@ -310,10 +319,14 @@ export type ProviderDetailRecord = {
   totalEarnings: string;
   withdrawn: string;
   reviewsCount: string;
+  identityVerificationStatus?: string;
+  identityDocumentType?: string;
+  identitySubmittedAt?: string;
   metrics: UserMetric[];
   serviceAreas: ProviderServiceArea[];
   skills: ProviderSkill[];
   documents: ProviderDocumentItem[];
+  identityDocuments?: ProviderIdentityDocument[];
   completedTaskRows: ProviderTaskRow[];
   upcomingTaskRows: ProviderUpcomingTaskRow[];
   payoutRows: ProviderPayoutRow[];

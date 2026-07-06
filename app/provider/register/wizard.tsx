@@ -11,6 +11,7 @@ import {
   type CropSelection,
   type CropTone,
 } from "@/app/_components/image-crop-modal";
+import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
 import {
   availabilityDays,
   createDefaultProviderRegistration,
@@ -59,8 +60,8 @@ const DynamicLocationPickerMap = dynamic(
 const TODAY_ISO = new Date().toISOString().split("T")[0];
 const IMAGE_UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
 const CERTIFICATE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
-const PROFILE_AND_MEDIA_ACCEPT = "image/jpeg,image/jpg,image/png,image/gif";
-const CERTIFICATE_ACCEPT = "image/jpeg,image/jpg,image/png,image/gif,application/pdf";
+const PROFILE_AND_MEDIA_ACCEPT = IMAGE_UPLOAD_ACCEPT;
+const CERTIFICATE_ACCEPT = `${IMAGE_UPLOAD_ACCEPT},.pdf,application/pdf`;
 const AVAILABILITY_TIME_OPTIONS = [
   "12:00 AM",
   "01:00 AM",
@@ -98,8 +99,8 @@ async function readFileAsDataUrl(file: File) {
 }
 
 async function prepareCertificateUpload(file: File) {
-  if (!["image/jpeg", "image/jpg", "image/png", "image/gif", "application/pdf"].includes(file.type)) {
-    throw new Error("Certificates must be JPG, JPEG, PNG, GIF, or PDF.");
+  if (file.type !== "application/pdf" && !isAcceptedImageFile(file)) {
+    throw new Error("Certificates must be JPG, JPEG, PNG, GIF, TIFF, JFIF, or PDF.");
   }
 
   if (file.size > CERTIFICATE_UPLOAD_MAX_BYTES) {
@@ -332,11 +333,14 @@ export function ProviderRegistrationWizard() {
           },
           body: JSON.stringify({
             phoneVerified: data.verification.phoneOtp.join("") === "123456",
-            identityVerified: Boolean(
+            identityVerified: false,
+            identityVerificationStatus: Boolean(
               data.verification.documentType &&
                 data.verification.frontImageName &&
                 data.verification.backImageName
-            ),
+            )
+              ? "processing"
+              : "pending",
           }),
         });
 
@@ -459,8 +463,8 @@ export function ProviderRegistrationWizard() {
     aspectRatio?: number;
     onApply: (dataUrl: string, fileName: string) => void;
   }) => {
-    if (!["image/jpeg", "image/jpg", "image/png", "image/gif"].includes(file.type)) {
-      throw new Error("Only JPG, JPEG, PNG, or GIF images are allowed.");
+    if (!isAcceptedImageFile(file)) {
+      throw new Error("Only JPG, JPEG, PNG, GIF, TIFF, or JFIF images are allowed.");
     }
 
     if (file.size > maxSizeBytes) {
@@ -2301,14 +2305,14 @@ function UploadCard({
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/jpg"
+        accept={IMAGE_UPLOAD_ACCEPT}
         onChange={handleChange}
         className="hidden"
       />
       <input
         ref={cameraInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/jpg"
+        accept={IMAGE_UPLOAD_ACCEPT}
         capture="environment"
         onChange={handleChange}
         className="hidden"

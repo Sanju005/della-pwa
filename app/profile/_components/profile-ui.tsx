@@ -11,8 +11,10 @@ import {
   StatusBadge as SharedStatusBadge,
 } from "@/app/_components/della-ui";
 import { BookingMessagesPanel } from "@/app/_components/booking-messages-panel";
+import { ImageCropModal, cropImageFromSelection } from "@/app/_components/image-crop-modal";
 
 import { LiveLocationChip } from "@/app/_components/live-location-chip";
+import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
 import {
   disablePushNotifications,
   getLastPushError,
@@ -799,6 +801,10 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
   const [savedMessage, setSavedMessage] = useState("");
   const [form, setForm] = useState(initialProfile);
   const [verificationBusy, startVerificationTransition] = useTransition();
+  const [avatarCropState, setAvatarCropState] = useState<{
+    fileName: string;
+    sourceDataUrl: string;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -852,17 +858,28 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
 
     if (!file) {
       return;
     }
 
     void (async () => {
-      const cropped = await cropImageToSquareDataUrl(file);
-      setForm((current) => ({
-        ...current,
-        avatarUrl: cropped,
-      }));
+      if (!isAcceptedImageFile(file)) {
+        setSavedMessage("Please choose a JPG, PNG, GIF, TIFF, or JFIF image.");
+        return;
+      }
+
+      if (file.size > 2 * 1024 * 1024) {
+        setSavedMessage("Profile photo must be 2MB or smaller.");
+        return;
+      }
+
+      setSavedMessage("");
+      setAvatarCropState({
+        fileName: file.name,
+        sourceDataUrl: await readFileAsDataUrl(file),
+      });
     })();
   };
 
@@ -909,7 +926,7 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
             </span>
             <input
               type="file"
-              accept="image/png,image/jpeg,image/jpg"
+              accept={IMAGE_UPLOAD_ACCEPT}
               onChange={handleAvatarChange}
               className="sr-only"
             />
@@ -1003,6 +1020,23 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
         >
           {isPending ? "Saving..." : "Save Changes"}
         </button>
+        {avatarCropState ? (
+          <ImageCropModal
+            imageDataUrl={avatarCropState.sourceDataUrl}
+            tone="profile"
+            aspectRatio={1}
+            onClose={() => setAvatarCropState(null)}
+            onApply={async (selection) => {
+              const cropped = await cropImageFromSelection(avatarCropState.sourceDataUrl, selection);
+              setForm((current) => ({
+                ...current,
+                avatarUrl: cropped,
+              }));
+              setSavedMessage("");
+              setAvatarCropState(null);
+            }}
+          />
+        ) : null}
       </form>
     </ProfileShell>
   );
@@ -3976,33 +4010,6 @@ async function readFileAsDataUrl(file: File) {
     reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
     reader.onerror = () => reject(new Error("Unable to read the selected image."));
     reader.readAsDataURL(file);
-  });
-}
-
-async function cropImageToSquareDataUrl(file: File) {
-  const sourceDataUrl = await readFileAsDataUrl(file);
-
-  return new Promise<string>((resolve, reject) => {
-    const image = new window.Image();
-    image.onload = () => {
-      const size = Math.min(image.width, image.height);
-      const offsetX = Math.max(0, (image.width - size) / 2);
-      const offsetY = Math.max(0, (image.height - size) / 2);
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        reject(new Error("Unable to process this image."));
-        return;
-      }
-
-      context.drawImage(image, offsetX, offsetY, size, size, 0, 0, size, size);
-      resolve(canvas.toDataURL("image/jpeg", 0.92));
-    };
-    image.onerror = () => reject(new Error("Unable to process this image."));
-    image.src = sourceDataUrl;
   });
 }
 

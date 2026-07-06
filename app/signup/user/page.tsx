@@ -5,6 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  ImageCropModal,
+  cropImageFromSelection,
+  type CropTone,
+} from "@/app/_components/image-crop-modal";
 
 import {
   Icons,
@@ -12,6 +17,7 @@ import {
   RegisterShell,
   RegisterTitle,
 } from "../../register/_components/register-ui";
+import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
 import { getSupabaseClient } from "@/lib/supabase";
 import { malaysianStates } from "@/lib/provider-registration-config";
 
@@ -44,6 +50,12 @@ export default function SignupUserPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState("");
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const [cropState, setCropState] = useState<{
+    fileName: string;
+    sourceDataUrl: string;
+    tone: CropTone;
+    aspectRatio?: number;
+  } | null>(null);
 
   useEffect(() => {
     const query = [addressLine1, addressLine2, postcode, city, stateName]
@@ -92,8 +104,8 @@ export default function SignupUserPage() {
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please choose a JPG or PNG image for the profile photo.");
+    if (!isAcceptedImageFile(file)) {
+      setError("Please choose a JPG, PNG, GIF, TIFF, or JFIF image for the profile photo.");
       return;
     }
 
@@ -104,9 +116,13 @@ export default function SignupUserPage() {
 
     void (async () => {
       try {
-        const cropped = await cropImageToSquareDataUrl(file);
         setError("");
-        setAvatarDataUrl(cropped);
+        setCropState({
+          fileName: file.name,
+          sourceDataUrl: await readFileAsDataUrl(file),
+          tone: "profile",
+          aspectRatio: 1,
+        });
       } catch {
         setError("Unable to process the selected profile image.");
       }
@@ -514,6 +530,23 @@ export default function SignupUserPage() {
           Log in
         </Link>
       </p>
+      {cropState ? (
+        <ImageCropModal
+          imageDataUrl={cropState.sourceDataUrl}
+          tone={cropState.tone}
+          aspectRatio={cropState.aspectRatio}
+          onClose={() => setCropState(null)}
+          onApply={async (selection) => {
+            try {
+              const cropped = await cropImageFromSelection(cropState.sourceDataUrl, selection);
+              setAvatarDataUrl(cropped);
+              setCropState(null);
+            } catch {
+              setError("Unable to process the selected profile image.");
+            }
+          }}
+        />
+      ) : null}
     </RegisterShell>
   );
 }
@@ -542,11 +575,11 @@ function ProfileImageField({
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-semibold text-[#111827]">Add a profile photo</p>
             <p className="mt-1 text-[12px] text-[#6b7280]">
-              JPG or PNG, up to 2MB. Saved as cropped square image.
+              JPG, PNG, GIF, TIFF, or JFIF, up to 2MB. Crop before saving.
             </p>
             <input
               type="file"
-              accept="image/png,image/jpeg,image/jpg"
+              accept={IMAGE_UPLOAD_ACCEPT}
               onChange={onChange}
               className="mt-3 block w-full text-[13px] text-[#4b5563] file:mr-3 file:rounded-[10px] file:border-0 file:bg-[#8E5EB5] file:px-3 file:py-2 file:font-bold file:text-white"
             />
@@ -832,32 +865,5 @@ async function readFileAsDataUrl(file: File) {
     reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
     reader.onerror = () => reject(new Error("Unable to read the selected image."));
     reader.readAsDataURL(file);
-  });
-}
-
-async function cropImageToSquareDataUrl(file: File) {
-  const sourceDataUrl = await readFileAsDataUrl(file);
-
-  return new Promise<string>((resolve, reject) => {
-    const image = new window.Image();
-    image.onload = () => {
-      const size = Math.min(image.width, image.height);
-      const offsetX = Math.max(0, (image.width - size) / 2);
-      const offsetY = Math.max(0, (image.height - size) / 2);
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        reject(new Error("Unable to process this image."));
-        return;
-      }
-
-      context.drawImage(image, offsetX, offsetY, size, size, 0, 0, size, size);
-      resolve(canvas.toDataURL("image/jpeg", 0.92));
-    };
-    image.onerror = () => reject(new Error("Unable to process this image."));
-    image.src = sourceDataUrl;
   });
 }

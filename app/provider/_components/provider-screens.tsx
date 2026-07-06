@@ -46,6 +46,7 @@ import {
 import { BookingMessagesPanel } from "@/app/_components/booking-messages-panel";
 import { ImageCropModal, cropImageFromSelection, type CropTone } from "@/app/_components/image-crop-modal";
 import { getFirebaseClientConfig } from "@/lib/firebase";
+import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
 import {
   disablePushNotifications,
   getLastPushError,
@@ -381,19 +382,37 @@ function MetricCard({
 
 function VerificationStatusPill({
   verified,
+  status = "pending",
 }: {
   verified: boolean;
+  status?: "pending" | "processing" | "verified" | "rejected";
 }) {
+  const tone = verified ? "verified" : status;
+
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold ${
-        verified
+        tone === "verified"
           ? "bg-[#ecf9f0] text-[#16a34a]"
-          : "bg-[#fff5e8] text-[#f59e0b]"
+          : tone === "processing"
+            ? "bg-[#eef2ff] text-[#4f46e5]"
+            : tone === "rejected"
+              ? "bg-[#fff1f2] text-[#e11d48]"
+              : "bg-[#fff5e8] text-[#f59e0b]"
       }`}
     >
-      {verified ? <ShieldCheck className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
-      {verified ? "Verified" : "Pending"}
+      {tone === "verified" ? (
+        <ShieldCheck className="h-3.5 w-3.5" />
+      ) : (
+        <Clock3 className="h-3.5 w-3.5" />
+      )}
+      {tone === "verified"
+        ? "Verified"
+        : tone === "processing"
+          ? "Processing"
+          : tone === "rejected"
+            ? "Rejected"
+            : "Pending"}
     </span>
   );
 }
@@ -404,19 +423,28 @@ function VerificationStatusCard({
   title,
   subtitle,
   verified,
+  status = "pending",
 }: {
   href?: string;
   icon: React.ReactNode;
   title: string;
   subtitle: string;
   verified: boolean;
+  status?: "pending" | "processing" | "verified" | "rejected";
 }) {
+  const tone = verified ? "verified" : status;
   const content = (
     <div className="group rounded-[24px] border border-[#eee7f8] bg-white px-4 py-4 shadow-[0_12px_30px_rgba(86,38,135,0.06)] transition hover:border-[#d8c8f0] hover:shadow-[0_18px_36px_rgba(86,38,135,0.09)]">
       <div className="flex items-center gap-4">
         <span
           className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] ${
-            verified ? "bg-[#ecf9f0] text-[#16a34a]" : "bg-[#fff3e8] text-[#f59e0b]"
+            tone === "verified"
+              ? "bg-[#ecf9f0] text-[#16a34a]"
+              : tone === "processing"
+                ? "bg-[#eef2ff] text-[#4f46e5]"
+                : tone === "rejected"
+                  ? "bg-[#fff1f2] text-[#e11d48]"
+                  : "bg-[#fff3e8] text-[#f59e0b]"
           }`}
         >
           {icon}
@@ -426,7 +454,7 @@ function VerificationStatusCard({
           <p className="mt-1 text-[13px] text-[#7b728a]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-3">
-          <VerificationStatusPill verified={verified} />
+          <VerificationStatusPill verified={verified} status={status} />
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#fbf8ff] text-[#8E5EB5] transition group-hover:bg-[#f4eefc]">
             <ChevronRight className="h-5 w-5" />
           </span>
@@ -5108,7 +5136,7 @@ export function ServicesScreen() {
         return;
       }
 
-      if (!file.type.startsWith("image/")) {
+      if (!isAcceptedImageFile(file)) {
         setMessage(source === "camera" ? "Camera upload must be an image." : "Gallery upload must be an image.");
         return;
       }
@@ -6014,6 +6042,7 @@ export function ProfileScreen() {
             title="Identity"
             subtitle="ID check"
             verified={data.identityVerified}
+            status={data.identityVerificationStatus}
           />
         </div>
 
@@ -6365,6 +6394,8 @@ export function IdentityVerificationScreen() {
   }
 
   const data = state.data!;
+  const identityStatus = data.identityVerificationStatus;
+  const isIdentityLocked = data.identityVerified || identityStatus === "processing";
   const canSubmit = Boolean(frontPreview && backPreview);
 
   const handleFileChange = (side: "front" | "back", source: "gallery" | "camera") =>
@@ -6376,12 +6407,17 @@ export function IdentityVerificationScreen() {
         return;
       }
 
-      if (source === "camera" && !file.type.startsWith("image/")) {
+      if (isIdentityLocked) {
+        state.setError("Your identity verification is under review right now.");
+        return;
+      }
+
+      if (source === "camera" && !isAcceptedImageFile(file)) {
         state.setError("Camera upload must be an image.");
         return;
       }
 
-      if (source === "gallery" && !file.type.startsWith("image/")) {
+      if (source === "gallery" && !isAcceptedImageFile(file)) {
         state.setError("Gallery upload must be an image for document cropping.");
         return;
       }
@@ -6424,6 +6460,11 @@ export function IdentityVerificationScreen() {
   };
 
   const openSourcePicker = (side: "front" | "back") => {
+    if (isIdentityLocked) {
+      state.setError("Your identity verification is under review right now.");
+      return;
+    }
+
     setIdentityUploadTarget(side);
     state.setError("");
   };
@@ -6443,7 +6484,7 @@ export function IdentityVerificationScreen() {
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
-          <VerificationStatusPill verified={data.identityVerified} />
+          <VerificationStatusPill verified={data.identityVerified} status={identityStatus} />
         </div>
 
         <header className="pt-2">
@@ -6451,9 +6492,23 @@ export function IdentityVerificationScreen() {
             Identity Verification
           </h1>
           <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
-            Upload your IC or passport images for identity verification.
+            {identityStatus === "processing"
+              ? "Your IC / passport is under review. Verification usually takes up to 24 hours."
+              : "Upload your IC or passport images for identity verification."}
           </p>
         </header>
+
+        {identityStatus === "processing" ? (
+          <section className="rounded-[18px] border border-[#c7d2fe] bg-[#eef2ff] px-4 py-3 text-[13px] font-semibold text-[#4338ca]">
+            Your IC / Passport successfully submitted for verification. It will take up to 24 hours to activate.
+          </section>
+        ) : null}
+
+        {identityStatus === "rejected" ? (
+          <section className="rounded-[18px] border border-[#fecdd3] bg-[#fff1f2] px-4 py-3 text-[13px] font-semibold text-[#be123c]">
+            Your previous identity verification was rejected. Please upload your IC / Passport again.
+          </section>
+        ) : null}
 
         <section className="rounded-[22px] border border-[#eadff8] bg-white p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
           <p className="text-[14px] font-black text-[#1f1630]">Document Type</p>
@@ -6461,22 +6516,24 @@ export function IdentityVerificationScreen() {
             <button
               type="button"
               onClick={() => setSelectedDocumentType("ic")}
+              disabled={isIdentityLocked}
               className={`rounded-[14px] border px-4 py-3 text-[14px] font-bold transition ${
                 selectedDocumentType === "ic"
                   ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
                   : "border-[#e7def4] bg-white text-[#6f6681]"
-              }`}
+              } ${isIdentityLocked ? "cursor-not-allowed opacity-60" : ""}`}
             >
               IC
             </button>
             <button
               type="button"
               onClick={() => setSelectedDocumentType("passport")}
+              disabled={isIdentityLocked}
               className={`rounded-[14px] border px-4 py-3 text-[14px] font-bold transition ${
                 selectedDocumentType === "passport"
                   ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
                   : "border-[#e7def4] bg-white text-[#6f6681]"
-              }`}
+              } ${isIdentityLocked ? "cursor-not-allowed opacity-60" : ""}`}
             >
               Passport
             </button>
@@ -6510,6 +6567,7 @@ export function IdentityVerificationScreen() {
                     <button
                       type="button"
                       onClick={() => openSourcePicker("front")}
+                      disabled={isIdentityLocked}
                       className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
                     >
                       <Upload className="h-4 w-4" />
@@ -6518,14 +6576,14 @@ export function IdentityVerificationScreen() {
                     <input
                       ref={frontGalleryInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_UPLOAD_ACCEPT}
                       onChange={handleFileChange("front", "gallery")}
                       className="hidden"
                     />
                     <input
                       ref={frontCameraInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_UPLOAD_ACCEPT}
                       capture="environment"
                       onChange={handleFileChange("front", "camera")}
                       className="hidden"
@@ -6560,6 +6618,7 @@ export function IdentityVerificationScreen() {
                     <button
                       type="button"
                       onClick={() => openSourcePicker("back")}
+                      disabled={isIdentityLocked}
                       className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
                     >
                       <Upload className="h-4 w-4" />
@@ -6568,14 +6627,14 @@ export function IdentityVerificationScreen() {
                     <input
                       ref={backGalleryInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_UPLOAD_ACCEPT}
                       onChange={handleFileChange("back", "gallery")}
                       className="hidden"
                     />
                     <input
                       ref={backCameraInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_UPLOAD_ACCEPT}
                       capture="environment"
                       onChange={handleFileChange("back", "camera")}
                       className="hidden"
@@ -6627,22 +6686,65 @@ export function IdentityVerificationScreen() {
 
         <button
           type="button"
-          disabled={!canSubmit}
-          onClick={() => {
-            if (!canSubmit) {
+          disabled={!canSubmit || isIdentityLocked}
+          onClick={async () => {
+            if (!canSubmit || isIdentityLocked) {
               return;
             }
 
-            state.setNotice("Identity verification submitted successfully.");
+            const client = getSupabaseClient();
+
+            if (!client) {
+              state.setError("Supabase is not configured yet.");
+              return;
+            }
+
+            const {
+              data: { session },
+            } = await client.auth.getSession();
+
+            if (!session) {
+              state.setError("Your provider session expired. Please log in again.");
+              return;
+            }
+
+            const response = await fetch("/api/provider/me", {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                identityVerified: false,
+                identityVerificationStatus: "processing",
+                identityDocumentType: selectedDocumentType,
+                identityFrontImageUrl: frontPreview,
+                identityBackImageUrl: backPreview,
+              }),
+            });
+
+            const result = (await response.json().catch(() => ({}))) as { error?: string };
+
+            if (!response.ok) {
+              state.setError(result.error || "Unable to submit identity verification.");
+              return;
+            }
+
+            const successMessage =
+              `Your ${selectedDocumentType === "passport" ? "Passport" : "IC / Passport"} successfully submitted for verification. It will take 24 hrs to activate.`;
+
+            state.setNotice(successMessage);
+            window.alert(successMessage);
+            await state.reloadWorkspace();
             router.push("/provider/profile");
           }}
           className={`mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
-            canSubmit
+            canSubmit && !isIdentityLocked
               ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
               : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
           }`}
         >
-          Submit for Verification
+          {isIdentityLocked ? "Submitted for Review" : "Submit for Verification"}
         </button>
 
         {identityUploadTarget ? (
