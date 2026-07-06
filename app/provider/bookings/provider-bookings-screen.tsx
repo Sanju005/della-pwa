@@ -256,9 +256,9 @@ function TimelineCard({
         </span>
         <span className={`mt-2 h-full min-h-16 w-[2px] ${done || current ? "bg-[#8E5EB5]" : "bg-[#e5e7eb]"}`} />
       </div>
-      <div className="flex-1 rounded-[24px] border border-[#eee5f7] bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
+      <div className="min-w-0 flex-1 rounded-[24px] border border-[#eee5f7] bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="text-[0.95rem] font-black tracking-[-0.035em] text-[#0f172a]">
               {number}. {title}
             </h3>
@@ -281,7 +281,7 @@ function TimelineCard({
             {done ? "Done" : current ? "Current Step" : "Waiting"}
           </span>
         </div>
-        {expanded ? <div className="mt-4">{children}</div> : null}
+        {expanded ? <div className="mt-4 min-w-0">{children}</div> : null}
       </div>
     </div>
   );
@@ -725,10 +725,10 @@ function BookingDetails({
       const proofs = await Promise.all(
         files.map(async (file) => {
           if (source === "gallery" && !isGalleryWorkProofFile(file)) {
-            throw new Error("Gallery upload accepts JPG, JPEG, or PDF only.");
+            throw new Error("Gallery upload accepts JPG, JPEG, PNG, GIF, WEBP, TIFF, JFIF, or PDF.");
           }
 
-          if (source === "camera" && !file.type.startsWith("image/")) {
+          if (source === "camera" && !isAcceptedImageFile(file)) {
             throw new Error("Camera upload must be an image.");
           }
 
@@ -749,7 +749,11 @@ function BookingDetails({
       }
 
       if (imageProofs.length) {
-        openNextWorkImageCrop(imageProofs);
+        if (workImageCropSource) {
+          setWorkImageCropQueue((current) => [...current, ...imageProofs]);
+        } else {
+          openNextWorkImageCrop(imageProofs);
+        }
       }
     } catch (error) {
       setWorkFinishedImageError(error instanceof Error ? error.message : "Unable to attach proof.");
@@ -902,22 +906,22 @@ function BookingDetails({
               />
             </label>
             <div className="mt-6">
-              <div className="overflow-hidden rounded-[28px] border border-[#f2e8fb] bg-[radial-gradient(circle_at_top_left,rgba(255,230,242,0.9),transparent_18%),radial-gradient(circle_at_top_right,rgba(241,234,255,0.8),transparent_20%),linear-gradient(180deg,#ffffff_0%,#fffdfd_100%)] p-5 shadow-[0_18px_44px_rgba(86,38,135,0.07)]">
-                <div className="flex items-start gap-4">
+              <div className="w-full max-w-full overflow-hidden rounded-[28px] border border-[#f2e8fb] bg-[radial-gradient(circle_at_top_left,rgba(255,230,242,0.9),transparent_18%),radial-gradient(circle_at_top_right,rgba(241,234,255,0.8),transparent_20%),linear-gradient(180deg,#ffffff_0%,#fffdfd_100%)] p-4 shadow-[0_18px_44px_rgba(86,38,135,0.07)] sm:p-5">
+                <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                   <span className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95),rgba(248,214,233,0.95))] text-[#e83e9a] shadow-[0_12px_26px_rgba(232,62,154,0.12)]">
                     <ImageIcon className="h-8 w-8" />
                   </span>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[14px] font-black tracking-[-0.03em] text-[#1f1630] sm:text-[15px]">
                       Completion Images
                     </p>
                     <p className="mt-1 text-[12px] leading-6 text-[#7d84a0] sm:text-[13px]">
-                      Add up to 3 proof files. Gallery: JPG, JPEG, PDF. Camera: image only.
+                      Add up to 3 proof files. Gallery: JPG, JPEG, PNG, GIF, WEBP, TIFF, JFIF, PDF. Camera: image only.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-5 grid grid-cols-3 gap-3">
+                <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
                   {Array.from({ length: WORK_FINISHED_IMAGE_MAX_COUNT }).map((_, index) => {
                     const image = workFinishedImages[index];
 
@@ -974,27 +978,26 @@ function BookingDetails({
                   })}
                 </div>
 
-                <div className="mt-5 flex items-center justify-center gap-3 text-[#1f1630]">
+                <div className="mt-5 grid grid-cols-2 gap-3 text-[#1f1630]">
                   <button
                     type="button"
                     onClick={() => workFinishedInputRef.current?.click()}
-                    className="inline-flex flex-1 items-center justify-center gap-3 rounded-[18px] px-2 py-2.5 text-center"
+                    className="inline-flex min-w-0 items-center justify-center gap-2 rounded-[18px] px-2 py-2.5 text-center"
                   >
                     <span className="inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#f4edff_0%,#f8f1ff_100%)] text-[#8E5EB5] shadow-[0_10px_24px_rgba(142,94,181,0.08)]">
                       <ImageIcon className="h-6 w-6" />
                     </span>
-                    <span className="text-[12px] font-bold leading-5 sm:text-[13px]">Choose from gallery</span>
+                    <span className="min-w-0 text-[12px] font-bold leading-5 sm:text-[13px]">Choose from gallery</span>
                   </button>
-                  <span className="h-12 w-px bg-[#eadcf8]" />
                   <button
                     type="button"
                     onClick={() => workFinishedCameraInputRef.current?.click()}
-                    className="inline-flex flex-1 items-center justify-center gap-3 rounded-[18px] px-2 py-2.5 text-center"
+                    className="inline-flex min-w-0 items-center justify-center gap-2 rounded-[18px] px-2 py-2.5 text-center"
                   >
                     <span className="inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#f4edff_0%,#f8f1ff_100%)] text-[#8E5EB5] shadow-[0_10px_24px_rgba(142,94,181,0.08)]">
                       <Camera className="h-6 w-6" />
                     </span>
-                    <span className="text-[12px] font-bold leading-5 sm:text-[13px]">Take a photo</span>
+                    <span className="min-w-0 text-[12px] font-bold leading-5 sm:text-[13px]">Take a photo</span>
                   </button>
                 </div>
               </div>
