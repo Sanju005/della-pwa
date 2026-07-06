@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import swiperLogo from "../../../Logo/Swiper.png";
 import {
-  Bell,
   BookOpen,
   BriefcaseBusiness,
   ChevronRight,
@@ -14,7 +13,6 @@ import {
   CookingPot,
   House,
   MapPin,
-  MessageCircleMore,
   Smartphone,
   Star,
   SprayCan,
@@ -138,14 +136,13 @@ export function MarketplaceScreen({
                 </div>
               </div>
 
-              <button
-                type="button"
-                aria-label="Notifications"
-                className="relative mt-1 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#0F172A]"
+              <Link
+                href="/profile"
+                aria-label="Profile"
+                className="relative mt-1 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
               >
-                <Bell className="h-7 w-7 stroke-[2.2]" />
-                <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-[#8E5EB5]" />
-              </button>
+                <CircleUserRound className="h-7 w-7 stroke-[2.1]" />
+              </Link>
             </div>
           </header>
 
@@ -216,13 +213,8 @@ export function MarketplaceScreen({
               },
               {
                 href: "/profile/bookings",
-                label: "Bookings",
+                label: "Task",
                 icon: <BookOpen className="h-5 w-5 stroke-[1.9]" />,
-              },
-              {
-                href: "/profile/messages",
-                label: "Messages",
-                icon: <MessageCircleMore className="h-5 w-5 stroke-[1.9]" />,
               },
               {
                 href: "/profile/favourites",
@@ -230,9 +222,9 @@ export function MarketplaceScreen({
                 icon: <Heart className="h-5 w-5 stroke-[1.9]" />,
               },
               {
-                href: "/profile",
-                label: "Profile",
-                icon: <CircleUserRound className="h-5 w-5 stroke-[1.9]" />,
+                href: "/profile/bookings?tab=ongoing",
+                label: "On Going",
+                icon: <BriefcaseBusiness className="h-5 w-5 stroke-[1.9]" />,
               },
             ]}
           />

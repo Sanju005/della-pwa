@@ -4262,14 +4262,32 @@ function AvatarCircle({
 
 function BottomNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab");
+  const isBookingsRoute = pathname.startsWith("/profile/bookings");
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] border-t border-[#E8ECE8] bg-white/97 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
       <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#8A94A6]">
         <NavItem href="/home" label="Home" icon={<HomeIcon className="h-5 w-5" />} active={pathname === "/home"} />
-        <NavItem href="/profile/bookings" label="Bookings" icon={<CalendarIcon className="h-5 w-5" />} active={pathname.startsWith("/profile/bookings")} />
-        <NavItem href="/profile/favourites" label="Favourite" icon={<UserIcon className="h-5 w-5" />} active={pathname.startsWith("/profile/favourites")} />
-        <NavItem href="/profile" label="Profile" icon={<UserIcon className="h-5 w-5" />} active={pathname === "/profile" || pathname.startsWith("/profile/edit") || pathname.startsWith("/profile/addresses") || pathname.startsWith("/profile/settings")} />
+        <NavItem
+          href="/profile/bookings"
+          label="Task"
+          icon={<CalendarIcon className="h-5 w-5" />}
+          active={isBookingsRoute && activeTab !== "ongoing"}
+        />
+        <NavItem
+          href="/profile/favourites"
+          label="Favourite"
+          icon={<FavoriteHeartIcon className="h-5 w-5" />}
+          active={pathname.startsWith("/profile/favourites")}
+        />
+        <NavItem
+          href="/profile/bookings?tab=ongoing"
+          label="On Going"
+          icon={<CheckCircleIcon className="h-5 w-5" />}
+          active={isBookingsRoute && activeTab === "ongoing"}
+        />
       </div>
     </nav>
   );
