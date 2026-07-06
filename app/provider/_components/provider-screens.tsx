@@ -43,6 +43,7 @@ import {
   StatusBadge,
 } from "@/app/_components/della-ui";
 import { BookingMessagesPanel } from "@/app/_components/booking-messages-panel";
+import { ImageCropModal, cropImageFromSelection, type CropTone } from "@/app/_components/image-crop-modal";
 import { getFirebaseClientConfig } from "@/lib/firebase";
 import {
   disablePushNotifications,
@@ -1324,52 +1325,66 @@ export function DashboardScreen() {
           </div>
 
           <div className="mt-5 overflow-hidden rounded-[22px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_16px_36px_rgba(104,63,155,0.1)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
-                  Wallet Balance
-                </p>
-                <p className="mt-2 text-[1.85rem] font-black tracking-[-0.06em] text-[#1f1630]">
-                  {formatCurrency(walletBalance)}
-                </p>
-                <p className="mt-1 text-[12px] text-[#7c728f]">
-                  Full amount collected from customers
-                </p>
-              </div>
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#edf7ee] text-[#22c55e]">
-                <Wallet className="h-5 w-5" />
-              </span>
-            </div>
-
-            <div className="mt-4 rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E5EB5]">
-                    Payable to Company
-                  </p>
-                  <p className="mt-1 text-[1.3rem] font-black tracking-[-0.05em] text-[#1f1630]">
-                    {formatCurrency(companyPayable)}
-                  </p>
+            <div className="space-y-4">
+              <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
+                      Wallet Balance
+                    </p>
+                    <p className="mt-2 text-[1.85rem] font-black tracking-[-0.06em] text-[#1f1630]">
+                      {formatCurrency(walletBalance)}
+                    </p>
+                    <p className="mt-1 text-[12px] text-[#7c728f]">
+                      Full amount collected from customers
+                    </p>
+                  </div>
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#edf7ee] text-[#22c55e]">
+                    <Wallet className="h-5 w-5" />
+                  </span>
                 </div>
-                <span className="rounded-full bg-[#f5f1fa] px-3 py-1 text-[11px] font-bold text-[#8E5EB5]">
-                  DELLA
-                </span>
+                <Link
+                  href="/provider/payments"
+                  aria-disabled={walletBalance <= 0}
+                  className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-extrabold transition ${
+                    walletBalance <= 0
+                      ? "pointer-events-none bg-[#d8cde6] text-white shadow-none"
+                      : "bg-[#8E5EB5] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
+                  }`}
+                >
+                  Withdraw
+                </Link>
               </div>
-            </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <Link
-                href="/provider/payments"
-                className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
-              >
-                Withdraw
-              </Link>
-              <Link
-                href="/provider/payments"
-                className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[#d9c8ee] bg-white px-4 text-[14px] font-extrabold text-[#8E5EB5]"
-              >
-                Pay to Company
-              </Link>
+              <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E5EB5]">
+                      Payable to Company
+                    </p>
+                    <p className="mt-1 text-[1.3rem] font-black tracking-[-0.05em] text-[#1f1630]">
+                      {formatCurrency(companyPayable)}
+                    </p>
+                    <p className="mt-1 text-[12px] text-[#7c728f]">
+                      Amount due to DELLA from recent customer payments
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-[#f5f1fa] px-3 py-1 text-[11px] font-bold text-[#8E5EB5]">
+                    DELLA
+                  </span>
+                </div>
+                <Link
+                  href="/provider/payments"
+                  aria-disabled={companyPayable <= 0}
+                  className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] border px-4 text-[14px] font-extrabold transition ${
+                    companyPayable <= 0
+                      ? "pointer-events-none border-[#e6def0] bg-[#f3eef8] text-[#b49bcf]"
+                      : "border-[#d9c8ee] bg-white text-[#8E5EB5]"
+                  }`}
+                >
+                  Pay to Company
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -4936,6 +4951,16 @@ export function ServicesScreen() {
     dailyRate: "",
     specialties: "",
   });
+  const [serviceImageDataUrls, setServiceImageDataUrls] = useState<string[]>([]);
+  const [serviceImageCaptions, setServiceImageCaptions] = useState<string[]>([]);
+  const [serviceImageFileName, setServiceImageFileName] = useState("");
+  const [serviceImageSourceTarget, setServiceImageSourceTarget] = useState<"service" | null>(null);
+  const [serviceImageCropState, setServiceImageCropState] = useState<{
+    fileName: string;
+    sourceDataUrl: string;
+  } | null>(null);
+  const serviceGalleryInputRef = useRef<HTMLInputElement | null>(null);
+  const serviceCameraInputRef = useRef<HTMLInputElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const fallback = LoadingOrError(state);
@@ -4982,6 +5007,8 @@ export function ServicesScreen() {
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
+        imageDataUrls: serviceImageDataUrls,
+        imageCaptions: serviceImageCaptions,
       }),
     });
 
@@ -5003,8 +5030,64 @@ export function ServicesScreen() {
       dailyRate: "",
       specialties: "",
     });
+    setServiceImageDataUrls([]);
+    setServiceImageCaptions([]);
+    setServiceImageFileName("");
     setMessage(editingServiceId ? "Service updated." : "New service added.");
   }
+
+  const handleServiceImageChange =
+    (source: "gallery" | "camera") => async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+
+      if (!file) {
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        setMessage(source === "camera" ? "Camera upload must be an image." : "Gallery upload must be an image.");
+        return;
+      }
+
+      if (file.size > PAYMENT_PROOF_MAX_BYTES) {
+        setMessage("Service image must be 5MB or smaller.");
+        return;
+      }
+
+      const dataUrl = await readFileAsDataUrl(file);
+      setServiceImageSourceTarget(null);
+      setServiceImageCropState({
+        fileName: file.name,
+        sourceDataUrl: dataUrl,
+      });
+      setMessage("");
+    };
+
+  const handleServiceImageCropApply = async (selection: { x: number; y: number; width: number; height: number }) => {
+    if (!serviceImageCropState) {
+      return;
+    }
+
+    try {
+      const croppedImage = await cropImageFromSelection(serviceImageCropState.sourceDataUrl, selection);
+      const nextImages = serviceImageDataUrls.length > 0 ? [...serviceImageDataUrls] : [""];
+      nextImages[0] = croppedImage;
+      setServiceImageDataUrls(nextImages.filter(Boolean));
+
+      const nextCaptions =
+        serviceImageCaptions.length > 0
+          ? [...serviceImageCaptions]
+          : new Array(Math.max(nextImages.filter(Boolean).length, 1)).fill("");
+      nextCaptions[0] = nextCaptions[0] || "Cover image";
+      setServiceImageCaptions(nextCaptions.slice(0, nextImages.filter(Boolean).length));
+      setServiceImageFileName(serviceImageCropState.fileName);
+      setServiceImageCropState(null);
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to crop service image.");
+    }
+  };
 
   return (
     <PageShell title="My Services" subtitle="Manage the services and pricing visible to customers.">
@@ -5056,6 +5139,9 @@ export function ServicesScreen() {
                         dailyRate: String(service.dailyRate),
                         specialties: service.specialties.join(", "),
                       });
+                      setServiceImageDataUrls(service.imageDataUrls);
+                      setServiceImageCaptions(service.imageCaptions);
+                      setServiceImageFileName("");
                       setMessage("");
                     }}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#eef9f1] text-[#16a34a]"
@@ -5097,6 +5183,11 @@ export function ServicesScreen() {
                     dailyRate: "",
                     specialties: "",
                   });
+                  setServiceImageDataUrls([]);
+                  setServiceImageCaptions([]);
+                  setServiceImageFileName("");
+                  setServiceImageSourceTarget(null);
+                  setServiceImageCropState(null);
                   setMessage("");
                 }}
                 className="text-[12px] font-bold text-[#16a34a]"
@@ -5172,6 +5263,69 @@ export function ServicesScreen() {
                 placeholder="Malay, Arabic, Event catering"
               />
             </label>
+            {editingServiceId ? (
+              <div className="rounded-[18px] border border-[#e7eee8] bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-[12px] font-bold text-[#64748b]">Current Service Image</span>
+                    <p className="mt-1 text-[12px] text-[#94a3b8]">
+                      Update the main image using gallery or camera, then crop before saving.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-4 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
+                  <div className="relative h-24 w-28 overflow-hidden rounded-[14px] border border-[#ece3f8] bg-[linear-gradient(135deg,#f8f4ff_0%,#eef2ff_100%)]">
+                    {serviceImageDataUrls[0] ? (
+                      <Image
+                        src={serviceImageDataUrls[0]}
+                        alt={serviceImageFileName || `${formatServiceLabel(form.serviceType)} service image`}
+                        fill
+                        unoptimized
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[#8E5EB5]">
+                        <BriefcaseBusiness className="h-9 w-9" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] leading-5 text-[#6f6681]">
+                      Replace the current service cover image.
+                    </p>
+                    {serviceImageFileName ? (
+                      <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{serviceImageFileName}</p>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setServiceImageSourceTarget("service");
+                        setMessage("");
+                      }}
+                      className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Change Service Image
+                    </button>
+                    <input
+                      ref={serviceGalleryInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleServiceImageChange("gallery")}
+                      className="hidden"
+                    />
+                    <input
+                      ref={serviceCameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleServiceImageChange("camera")}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
           {message ? (
             <p className="mt-4 rounded-[16px] border border-[#dbeee2] bg-[#f6fff8] px-4 py-3 text-[13px] font-semibold text-[#15803d]">
@@ -5185,6 +5339,51 @@ export function ServicesScreen() {
           </div>
         </div>
       </section>
+
+      {serviceImageSourceTarget ? (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-[#111827]/45 px-4 pb-6">
+          <div className="w-full max-w-[430px] rounded-[24px] bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)]">
+            <p className="text-[16px] font-black text-[#1f1630]">Update service image</p>
+            <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+              Choose a source, then crop the image before saving.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => serviceGalleryInputRef.current?.click()}
+                className="inline-flex h-12 items-center justify-center rounded-[14px] border border-[#d9c8ee] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+              >
+                Choose from Gallery
+              </button>
+              <button
+                type="button"
+                onClick={() => serviceCameraInputRef.current?.click()}
+                className="inline-flex h-12 items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-bold text-white"
+              >
+                Open Camera
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setServiceImageSourceTarget(null)}
+              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-[14px] border border-[#eee5f7] bg-[#faf7fe] text-[14px] font-bold text-[#6f6681]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {serviceImageCropState ? (
+        <ImageCropModal
+          imageDataUrl={serviceImageCropState.sourceDataUrl}
+          tone="service"
+          onClose={() => setServiceImageCropState(null)}
+          onApply={(selection) => {
+            void handleServiceImageCropApply(selection);
+          }}
+        />
+      ) : null}
     </PageShell>
   );
 }
@@ -5570,9 +5769,6 @@ export function ProfileScreen() {
           <InfoRow icon={<MapPin className="h-4.5 w-4.5 text-[#16a34a]" />} label="Service Radius" value={`${data.serviceRadiusKm} KM`} />
           <InfoRow icon={<Globe className="h-4.5 w-4.5 text-[#16a34a]" />} label="Location" value={data.serviceLocation || "Not set"} />
           <InfoRow icon={<Star className="h-4.5 w-4.5 text-[#16a34a]" />} label="Rating" value={`${data.averageRating.toFixed(1)} (${data.totalReviews})`} />
-          <InfoRow icon={<ShieldCheck className="h-4.5 w-4.5 text-[#16a34a]" />} label="Email Verified" value={data.emailVerified ? "Yes" : "No"} />
-          <InfoRow icon={<ShieldCheck className="h-4.5 w-4.5 text-[#16a34a]" />} label="Phone Verified" value={data.phoneVerified ? "Yes" : "No"} />
-          <InfoRow icon={<ShieldCheck className="h-4.5 w-4.5 text-[#16a34a]" />} label="Identity Verified" value={data.identityVerified ? "Yes" : "No"} />
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <Link
@@ -5994,8 +6190,18 @@ export function IdentityVerificationScreen() {
   const [backFileName, setBackFileName] = useState("");
   const [frontPreview, setFrontPreview] = useState<string | null>(null);
   const [backPreview, setBackPreview] = useState<string | null>(null);
-  const frontInputRef = useRef<HTMLInputElement | null>(null);
-  const backInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState<"ic" | "passport">("ic");
+  const [identityUploadTarget, setIdentityUploadTarget] = useState<"front" | "back" | null>(null);
+  const [identityCropState, setIdentityCropState] = useState<{
+    side: "front" | "back";
+    fileName: string;
+    sourceDataUrl: string;
+    tone: CropTone;
+  } | null>(null);
+  const frontGalleryInputRef = useRef<HTMLInputElement | null>(null);
+  const backGalleryInputRef = useRef<HTMLInputElement | null>(null);
+  const frontCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const backCameraInputRef = useRef<HTMLInputElement | null>(null);
   const fallback = LoadingOrError(state);
 
   if (fallback) {
@@ -6005,24 +6211,71 @@ export function IdentityVerificationScreen() {
   const data = state.data!;
   const canSubmit = Boolean(frontPreview && backPreview);
 
-  const handleFileChange = (side: "front" | "back") =>
+  const handleFileChange = (side: "front" | "back", source: "gallery" | "camera") =>
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
+      event.target.value = "";
 
       if (!file) {
         return;
       }
 
-      const dataUrl = await readFileAsDataUrl(file);
-      if (side === "front") {
-        setFrontFileName(file.name);
-        setFrontPreview(dataUrl);
+      if (source === "camera" && !file.type.startsWith("image/")) {
+        state.setError("Camera upload must be an image.");
         return;
       }
 
-      setBackFileName(file.name);
-      setBackPreview(dataUrl);
+      if (source === "gallery" && !file.type.startsWith("image/")) {
+        state.setError("Gallery upload must be an image for document cropping.");
+        return;
+      }
+
+      if (file.size > PAYMENT_PROOF_MAX_BYTES) {
+        state.setError("Each document image must be 5MB or smaller.");
+        return;
+      }
+
+      const dataUrl = await readFileAsDataUrl(file);
+      setIdentityUploadTarget(null);
+      setIdentityCropState({
+        side,
+        fileName: file.name,
+        sourceDataUrl: dataUrl,
+        tone: "document",
+      });
+      state.setError("");
     };
+
+  const handleIdentityCropApply = async (selection: { x: number; y: number; width: number; height: number }) => {
+    if (!identityCropState) {
+      return;
+    }
+
+    try {
+      const croppedImage = await cropImageFromSelection(identityCropState.sourceDataUrl, selection);
+      if (identityCropState.side === "front") {
+        setFrontFileName(identityCropState.fileName);
+        setFrontPreview(croppedImage);
+      } else {
+        setBackFileName(identityCropState.fileName);
+        setBackPreview(croppedImage);
+      }
+      setIdentityCropState(null);
+      state.setError("");
+    } catch (error) {
+      state.setError(error instanceof Error ? error.message : "Unable to crop this document image.");
+    }
+  };
+
+  const openSourcePicker = (side: "front" | "back") => {
+    setIdentityUploadTarget(side);
+    state.setError("");
+  };
+
+  const activeInputs =
+    identityUploadTarget === "front"
+      ? { gallery: frontGalleryInputRef, camera: frontCameraInputRef }
+      : { gallery: backGalleryInputRef, camera: backCameraInputRef };
 
   return (
     <MobilePage className="pb-40">
@@ -6042,14 +6295,44 @@ export function IdentityVerificationScreen() {
             Identity Verification
           </h1>
           <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
-            Upload your IC front and back for identity verification.
+            Upload your IC or passport images for identity verification.
           </p>
         </header>
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-white p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <p className="text-[14px] font-black text-[#1f1630]">Document Type</p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setSelectedDocumentType("ic")}
+              className={`rounded-[14px] border px-4 py-3 text-[14px] font-bold transition ${
+                selectedDocumentType === "ic"
+                  ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
+                  : "border-[#e7def4] bg-white text-[#6f6681]"
+              }`}
+            >
+              IC
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDocumentType("passport")}
+              className={`rounded-[14px] border px-4 py-3 text-[14px] font-bold transition ${
+                selectedDocumentType === "passport"
+                  ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
+                  : "border-[#e7def4] bg-white text-[#6f6681]"
+              }`}
+            >
+              Passport
+            </button>
+          </div>
+        </section>
 
         <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
           <div className="space-y-5">
             <div>
-              <p className="text-[15px] font-black text-[#1f1630]">IC Front</p>
+              <p className="text-[15px] font-black text-[#1f1630]">
+                {selectedDocumentType === "passport" ? "Passport Main Page" : "IC Front"}
+              </p>
               <div className="mt-3 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
                 <div className="flex items-center gap-4">
                   <div className="relative h-24 w-32 overflow-hidden rounded-[14px] border border-[#ece3f8] bg-[linear-gradient(135deg,#f8f4ff_0%,#eef2ff_100%)]">
@@ -6063,24 +6346,32 @@ export function IdentityVerificationScreen() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] leading-5 text-[#6f6681]">
-                      Upload clear image of front side
+                      Upload clear image of {selectedDocumentType === "passport" ? "passport page" : "front side"}
                     </p>
                     {frontFileName ? (
                       <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{frontFileName}</p>
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => frontInputRef.current?.click()}
+                      onClick={() => openSourcePicker("front")}
                       className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
                     >
                       <Upload className="h-4 w-4" />
-                      Upload Front
+                      {selectedDocumentType === "passport" ? "Upload Passport" : "Upload Front"}
                     </button>
                     <input
-                      ref={frontInputRef}
+                      ref={frontGalleryInputRef}
                       type="file"
-                      accept="image/*,.pdf"
-                      onChange={handleFileChange("front")}
+                      accept="image/*"
+                      onChange={handleFileChange("front", "gallery")}
+                      className="hidden"
+                    />
+                    <input
+                      ref={frontCameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileChange("front", "camera")}
                       className="hidden"
                     />
                   </div>
@@ -6089,7 +6380,9 @@ export function IdentityVerificationScreen() {
             </div>
 
             <div>
-              <p className="text-[15px] font-black text-[#1f1630]">IC Back</p>
+              <p className="text-[15px] font-black text-[#1f1630]">
+                {selectedDocumentType === "passport" ? "Passport Supporting Page" : "IC Back"}
+              </p>
               <div className="mt-3 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
                 <div className="flex items-center gap-4">
                   <div className="relative h-24 w-32 overflow-hidden rounded-[14px] border border-[#ece3f8] bg-[linear-gradient(135deg,#f8f4ff_0%,#eef2ff_100%)]">
@@ -6103,24 +6396,32 @@ export function IdentityVerificationScreen() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] leading-5 text-[#6f6681]">
-                      Upload clear image of back side
+                      Upload clear image of {selectedDocumentType === "passport" ? "supporting page" : "back side"}
                     </p>
                     {backFileName ? (
                       <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{backFileName}</p>
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => backInputRef.current?.click()}
+                      onClick={() => openSourcePicker("back")}
                       className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
                     >
                       <Upload className="h-4 w-4" />
-                      Upload Back
+                      {selectedDocumentType === "passport" ? "Upload Page" : "Upload Back"}
                     </button>
                     <input
-                      ref={backInputRef}
+                      ref={backGalleryInputRef}
                       type="file"
-                      accept="image/*,.pdf"
-                      onChange={handleFileChange("back")}
+                      accept="image/*"
+                      onChange={handleFileChange("back", "gallery")}
+                      className="hidden"
+                    />
+                    <input
+                      ref={backCameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileChange("back", "camera")}
                       className="hidden"
                     />
                   </div>
@@ -6138,10 +6439,11 @@ export function IdentityVerificationScreen() {
             <div>
               <p className="text-[14px] font-black text-[#1f1630]">Image Requirements</p>
               <ul className="mt-2 space-y-1 text-[13px] leading-5 text-[#6f6681]">
-                <li>Ensure the full IC is visible within the frame</li>
+                <li>Ensure the full IC or passport page is visible within the frame</li>
                 <li>All text must be clear and readable</li>
                 <li>Image must be in focus and not blurry</li>
                 <li>No glare or reflections on the card</li>
+                <li>Crop the image before saving to keep only the document area</li>
               </ul>
             </div>
           </div>
@@ -6155,11 +6457,17 @@ export function IdentityVerificationScreen() {
             <div>
               <p className="text-[14px] font-black text-[#1f1630]">Your information is safe</p>
               <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
-                Your IC images are encrypted and used only for identity verification. We do not store your documents beyond the verification process.
+                Your IC or passport images are encrypted and used only for identity verification. We do not store your documents beyond the verification process.
               </p>
             </div>
           </div>
         </section>
+
+        {state.error ? (
+          <p className="rounded-[16px] border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-[13px] font-semibold text-[#dc2626]">
+            {state.error}
+          </p>
+        ) : null}
 
         <button
           type="button"
@@ -6180,7 +6488,54 @@ export function IdentityVerificationScreen() {
         >
           Submit for Verification
         </button>
+
+        {identityUploadTarget ? (
+          <div className="fixed inset-0 z-40 flex items-end justify-center bg-[#111827]/45 px-4 pb-6">
+            <div className="w-full max-w-[430px] rounded-[24px] bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)]">
+              <p className="text-[16px] font-black text-[#1f1630]">
+                {identityUploadTarget === "front" ? "Front document image" : "Back document image"}
+              </p>
+              <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+                Choose a source, then crop the document before saving.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => activeInputs.gallery.current?.click()}
+                  className="inline-flex h-12 items-center justify-center rounded-[14px] border border-[#d9c8ee] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                >
+                  Choose from Gallery
+                </button>
+                <button
+                  type="button"
+                  onClick={() => activeInputs.camera.current?.click()}
+                  className="inline-flex h-12 items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-bold text-white"
+                >
+                  Open Camera
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIdentityUploadTarget(null)}
+                className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-[14px] border border-[#eee5f7] bg-[#faf7fe] text-[14px] font-bold text-[#6f6681]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
+
+      {identityCropState ? (
+        <ImageCropModal
+          imageDataUrl={identityCropState.sourceDataUrl}
+          tone={identityCropState.tone}
+          onClose={() => setIdentityCropState(null)}
+          onApply={(selection) => {
+            void handleIdentityCropApply(selection);
+          }}
+        />
+      ) : null}
     </MobilePage>
   );
 }

@@ -19,6 +19,8 @@ type ServicePayload = {
   hourlyRate?: number;
   dailyRate?: number;
   specialties?: string[];
+  imageDataUrls?: string[];
+  imageCaptions?: string[];
 };
 
 function isProviderRole(role: string | null | undefined) {
@@ -96,6 +98,23 @@ function normalizeSpecialties(items: string[] | undefined) {
     .filter(Boolean);
 }
 
+function normalizeMedia(items: string[] | undefined) {
+  return (items ?? []).map((item) => item.trim()).filter(Boolean);
+}
+
+function normalizeCaptions(items: string[] | undefined, media: string[]) {
+  return media.map((_, index) => items?.[index]?.trim() ?? "");
+}
+
+function isMissingProviderServiceMediaColumnError(message?: string) {
+  const normalized = message?.trim().toLowerCase() ?? "";
+
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("image_data_urls") || normalized.includes("image_captions"))
+  );
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -111,7 +130,7 @@ export async function PATCH(
 
   const serviceLookup = await verified.adminClient
     .from("provider_services")
-    .select("id")
+    .select("id, image_data_urls, image_captions")
     .eq("id", params.id)
     .eq("provider_id", verified.profile.id)
     .maybeSingle();
@@ -120,21 +139,45 @@ export async function PATCH(
     return NextResponse.json({ error: "Service was not found." }, { status: 404 });
   }
 
+  const imageDataUrls = normalizeMedia(payload.imageDataUrls);
+  const imageCaptions = normalizeCaptions(payload.imageCaptions, imageDataUrls);
+
   const updateService = await verified.adminClient
     .from("provider_services")
     .update({
       years_experience: payload.yearsExperience?.trim() || "",
       hourly_rate: Number(payload.hourlyRate ?? 0),
       daily_rate: Number(payload.dailyRate ?? 0),
+      image_data_urls: imageDataUrls,
+      image_captions: imageCaptions,
     })
     .eq("id", params.id)
     .eq("provider_id", verified.profile.id);
 
-  if (updateService.error) {
+  if (updateService.error && !isMissingProviderServiceMediaColumnError(updateService.error.message)) {
     return NextResponse.json(
       { error: updateService.error.message || "Unable to update service." },
       { status: 500 },
     );
+  }
+
+  if (updateService.error && isMissingProviderServiceMediaColumnError(updateService.error.message)) {
+    const fallbackUpdate = await verified.adminClient
+      .from("provider_services")
+      .update({
+        years_experience: payload.yearsExperience?.trim() || "",
+        hourly_rate: Number(payload.hourlyRate ?? 0),
+        daily_rate: Number(payload.dailyRate ?? 0),
+      })
+      .eq("id", params.id)
+      .eq("provider_id", verified.profile.id);
+
+    if (fallbackUpdate.error) {
+      return NextResponse.json(
+        { error: fallbackUpdate.error.message || "Unable to update service." },
+        { status: 500 },
+      );
+    }
   }
 
   const deleteSpecialties = await verified.adminClient
