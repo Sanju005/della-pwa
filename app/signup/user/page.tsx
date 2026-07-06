@@ -105,7 +105,7 @@ export default function SignupUserPage() {
     }
 
     if (!isAcceptedImageFile(file)) {
-      setError("Please choose a JPG, PNG, GIF, TIFF, or JFIF image for the profile photo.");
+      setError("Please choose a JPG, PNG, GIF, WEBP, TIFF, or JFIF image for the profile photo.");
       return;
     }
 
@@ -575,7 +575,7 @@ function ProfileImageField({
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-semibold text-[#111827]">Add a profile photo</p>
             <p className="mt-1 text-[12px] text-[#6b7280]">
-              JPG, PNG, GIF, TIFF, or JFIF, up to 2MB. Crop before saving.
+              JPG, PNG, GIF, WEBP, TIFF, or JFIF, up to 2MB. Crop before saving.
             </p>
             <input
               type="file"

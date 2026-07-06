@@ -3,6 +3,7 @@ export const ACCEPTED_IMAGE_MIME_TYPES = [
   "image/jpg",
   "image/png",
   "image/gif",
+  "image/webp",
   "image/tiff",
   "image/x-tiff",
 ] as const;
@@ -12,6 +13,7 @@ export const ACCEPTED_IMAGE_EXTENSIONS = [
   ".jpeg",
   ".png",
   ".gif",
+  ".webp",
   ".tif",
   ".tiff",
   ".jfif",

@@ -464,7 +464,7 @@ export function ProviderRegistrationWizard() {
     onApply: (dataUrl: string, fileName: string) => void;
   }) => {
     if (!isAcceptedImageFile(file)) {
-      throw new Error("Only JPG, JPEG, PNG, GIF, TIFF, or JFIF images are allowed.");
+      throw new Error("Only JPG, JPEG, PNG, GIF, WEBP, TIFF, or JFIF images are allowed.");
     }
 
     if (file.size > maxSizeBytes) {
@@ -736,7 +736,7 @@ function BasicProfileStep({
                 Add a profile photo
               </p>
               <p className="mt-1 text-[12px] text-[#6b7280]">
-                JPG, JPEG, PNG, or GIF. Max 2MB. Crop before upload.
+                JPG, JPEG, PNG, GIF, or WEBP. Max 2MB. Crop before upload.
               </p>
               <input
                 ref={fileInputRef}

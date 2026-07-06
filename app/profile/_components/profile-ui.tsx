@@ -866,7 +866,7 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
 
     void (async () => {
       if (!isAcceptedImageFile(file)) {
-        setSavedMessage("Please choose a JPG, PNG, GIF, TIFF, or JFIF image.");
+        setSavedMessage("Please choose a JPG, PNG, GIF, WEBP, TIFF, or JFIF image.");
         return;
       }
 
