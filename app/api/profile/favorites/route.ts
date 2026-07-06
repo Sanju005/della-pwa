@@ -79,7 +79,7 @@ function mapFavoriteSchemaError(message: string | null | undefined) {
     normalized.includes("customer_favorite_providers") &&
     (normalized.includes("does not exist") || normalized.includes("schema cache"))
   ) {
-    return "Favorites database schema is missing. Apply `supabase/migrations/20260630_create_customer_favorite_providers.sql` and refresh the Supabase schema cache.";
+    return "Favorites database schema is not ready yet. Favourite providers will stay saved on this device for now.";
   }
 
   return message || null;

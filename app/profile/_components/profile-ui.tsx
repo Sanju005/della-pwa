@@ -13,6 +13,11 @@ import {
 import { BookingMessagesPanel } from "@/app/_components/booking-messages-panel";
 import { ImageCropModal, cropImageFromSelection } from "@/app/_components/image-crop-modal";
 
+import {
+  isFavoriteSchemaUnavailable,
+  loadStoredFavoriteProviderIds,
+  saveStoredFavoriteProviderIds,
+} from "@/lib/customer-favorites-browser";
 import { LiveLocationChip } from "@/app/_components/live-location-chip";
 import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
 import {
@@ -665,10 +670,18 @@ export function FavoritesScreen({ providers }: FavoritesProps) {
       }
 
       if (!response.ok || !("favoriteProviders" in result)) {
+        if ("error" in result && isFavoriteSchemaUnavailable(result.error)) {
+          const localIds = loadStoredFavoriteProviderIds();
+          setItems(providers.filter((provider) => localIds.has(provider.id)));
+          setError("");
+          return;
+        }
+
         setError(("error" in result ? result.error : "") || "Unable to load favourite providers right now.");
         return;
       }
 
+      saveStoredFavoriteProviderIds(new Set(result.favoriteProviders.map((provider) => provider.id)));
       setItems(result.favoriteProviders);
     }
 
@@ -699,6 +712,7 @@ export function FavoritesScreen({ providers }: FavoritesProps) {
     const previousItems = items;
     const nextItems = previousItems.filter((item) => item.id !== providerId);
     setItems(nextItems);
+    saveStoredFavoriteProviderIds(new Set(nextItems.map((item) => item.id)));
     setError("");
 
     const response = await fetch("/api/profile/favorites", {
@@ -712,8 +726,14 @@ export function FavoritesScreen({ providers }: FavoritesProps) {
 
     if (!response.ok) {
       const result = (await response.json().catch(() => ({}))) as { error?: string };
+      if (isFavoriteSchemaUnavailable(result.error)) {
+        setError("");
+        return;
+      }
+
       setError(result.error || "Unable to remove favourite provider right now.");
       setItems(previousItems);
+      saveStoredFavoriteProviderIds(new Set(previousItems.map((item) => item.id)));
     }
   }
 

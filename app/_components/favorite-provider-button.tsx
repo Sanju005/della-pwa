@@ -4,6 +4,11 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 
+import {
+  isFavoriteSchemaUnavailable,
+  loadStoredFavoriteProviderIds,
+  saveStoredFavoriteProviderIds,
+} from "@/lib/customer-favorites-browser";
 import { getSupabaseClient } from "@/lib/supabase";
 
 const FAVORITES_UPDATED_EVENT = "della:favorites-updated";
@@ -25,7 +30,9 @@ async function loadFavoriteIds() {
       const client = getSupabaseClient();
 
       if (!client) {
-        return new Set<string>();
+        const storedIds = loadStoredFavoriteProviderIds();
+        favoriteIdsCache = storedIds;
+        return cloneFavoriteIds(storedIds);
       }
 
       const {
@@ -33,23 +40,34 @@ async function loadFavoriteIds() {
       } = await client.auth.getSession();
 
       if (!session) {
-        return new Set<string>();
+        const storedIds = loadStoredFavoriteProviderIds();
+        favoriteIdsCache = storedIds;
+        return cloneFavoriteIds(storedIds);
       }
 
       const response = await fetch("/api/profile/favorites", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
-      });
+      }).catch(() => null);
+
+      if (!response) {
+        const storedIds = loadStoredFavoriteProviderIds();
+        favoriteIdsCache = storedIds;
+        return cloneFavoriteIds(storedIds);
+      }
 
       const result = (await response.json().catch(() => ({}))) as {
         favoriteProviders?: Array<{ id: string }>;
+        error?: string;
       };
 
-      const ids = new Set(
-        (result.favoriteProviders ?? []).map((provider) => provider.id),
-      );
+      const ids =
+        response.ok && "favoriteProviders" in result
+          ? new Set((result.favoriteProviders ?? []).map((provider) => provider.id))
+          : loadStoredFavoriteProviderIds();
       favoriteIdsCache = ids;
+      saveStoredFavoriteProviderIds(ids);
       return cloneFavoriteIds(ids);
     })().finally(() => {
       favoriteIdsPromise = null;
@@ -61,6 +79,7 @@ async function loadFavoriteIds() {
 
 function broadcastFavoriteIds(ids: Set<string>) {
   favoriteIdsCache = cloneFavoriteIds(ids);
+  saveStoredFavoriteProviderIds(ids);
   window.dispatchEvent(
     new CustomEvent(FAVORITES_UPDATED_EVENT, {
       detail: {
@@ -158,7 +177,9 @@ export function FavoriteProviderButton({
         }),
       }).catch(() => null);
 
-      if (!response?.ok) {
+      const result = (await response?.json().catch(() => ({}))) as { error?: string } | undefined;
+
+      if (!response?.ok && !isFavoriteSchemaUnavailable(result?.error)) {
         const revertedIds = cloneFavoriteIds(nextIds);
         if (nextFavoriteState) {
           revertedIds.delete(providerId);
