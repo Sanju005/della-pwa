@@ -626,18 +626,6 @@ export async function PATCH(request: Request) {
               : typeof currentMetadata.identity_document_type === "string"
                 ? currentMetadata.identity_document_type
                 : "",
-          identity_front_image_url:
-            typeof payload.identityFrontImageUrl === "string"
-              ? payload.identityFrontImageUrl
-              : typeof currentMetadata.identity_front_image_url === "string"
-                ? currentMetadata.identity_front_image_url
-                : "",
-          identity_back_image_url:
-            typeof payload.identityBackImageUrl === "string"
-              ? payload.identityBackImageUrl
-              : typeof currentMetadata.identity_back_image_url === "string"
-                ? currentMetadata.identity_back_image_url
-                : "",
         },
       },
     );
