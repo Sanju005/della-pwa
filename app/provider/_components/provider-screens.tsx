@@ -15,13 +15,18 @@ import {
   CreditCard,
   Globe,
   HelpCircle,
+  IdCard,
   Landmark,
   LogOut,
+  Mail,
   MapPin,
   Menu,
   MessageCircleMore,
+  Phone,
   PencilLine,
+  Send,
   Settings,
+  Shield,
   ShieldCheck,
   Star,
   UserRound,
@@ -366,6 +371,115 @@ function MetricCard({
       <p className={`text-[1.2rem] font-black tracking-[-0.05em] ${accent}`}>{value}</p>
       <p className="mt-1 text-[12px] font-semibold text-[#544b66]">{label}</p>
       <p className="mt-1 text-[11px] text-[#9a90ac]">{meta}</p>
+    </div>
+  );
+}
+
+function VerificationStatusPill({
+  verified,
+}: {
+  verified: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold ${
+        verified
+          ? "bg-[#ecf9f0] text-[#16a34a]"
+          : "bg-[#fff5e8] text-[#f59e0b]"
+      }`}
+    >
+      {verified ? <ShieldCheck className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
+      {verified ? "Verified" : "Pending"}
+    </span>
+  );
+}
+
+function VerificationStatusCard({
+  href,
+  icon,
+  title,
+  subtitle,
+  verified,
+}: {
+  href?: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  verified: boolean;
+}) {
+  const content = (
+    <div className="group rounded-[24px] border border-[#eee7f8] bg-white px-4 py-4 shadow-[0_12px_30px_rgba(86,38,135,0.06)] transition hover:border-[#d8c8f0] hover:shadow-[0_18px_36px_rgba(86,38,135,0.09)]">
+      <div className="flex items-center gap-4">
+        <span
+          className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] ${
+            verified ? "bg-[#ecf9f0] text-[#16a34a]" : "bg-[#fff3e8] text-[#f59e0b]"
+          }`}
+        >
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[1.05rem] font-black tracking-[-0.04em] text-[#1f1630]">{title}</p>
+          <p className="mt-1 text-[13px] text-[#7b728a]">{subtitle}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <VerificationStatusPill verified={verified} />
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#fbf8ff] text-[#8E5EB5] transition group-hover:bg-[#f4eefc]">
+            <ChevronRight className="h-5 w-5" />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!href) {
+    return content;
+  }
+
+  return <Link href={href}>{content}</Link>;
+}
+
+function OtpInputSlots({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (nextValue: string) => void;
+}) {
+  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+
+  return (
+    <div className="mt-4 flex items-center gap-3">
+      {Array.from({ length: 6 }, (_, index) => {
+        const char = value[index] ?? "";
+
+        return (
+          <input
+            key={index}
+            ref={(node) => {
+              inputsRef.current[index] = node;
+            }}
+            inputMode="numeric"
+            maxLength={1}
+            value={char}
+            onChange={(event) => {
+              const nextChar = event.target.value.replace(/\D/g, "").slice(-1);
+              const next = value.split("");
+              next[index] = nextChar;
+              onChange(next.join("").slice(0, 6));
+
+              if (nextChar && index < 5) {
+                inputsRef.current[index + 1]?.focus();
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Backspace" && !char && index > 0) {
+                inputsRef.current[index - 1]?.focus();
+              }
+            }}
+            className="h-14 w-12 rounded-[14px] border border-[#e5def3] bg-white text-center text-[1.25rem] font-black text-[#1f1630] outline-none transition focus:border-[#8E5EB5] focus:ring-2 focus:ring-[#efe6fb]"
+          />
+        );
+      })}
     </div>
   );
 }
@@ -1089,7 +1203,7 @@ export function DashboardScreen() {
 
         <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
           <div className="flex items-center gap-3">
-            <span className="h-7 w-1.5 rounded-full bg-[#8E5EB5]" />
+            <span className="h-7 w-1.5 rounded-full bg-[#645394]" />
             <div>
               <h2 className="text-[17px] font-black tracking-[-0.04em] text-[#0f172a]">
                 Today&apos;s Task
@@ -1104,17 +1218,17 @@ export function DashboardScreen() {
                 ? `/provider/bookings?tab=pending&booking=${pendingRequest.id}`
                 : "/provider/bookings?tab=pending"
             }
-            className="relative mt-5 block overflow-hidden rounded-[22px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-4 shadow-[0_12px_28px_rgba(236,72,153,0.10)]"
+            className="relative mt-5 block overflow-hidden rounded-[22px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-4 shadow-[0_12px_28px_rgba(100,83,148,0.12)]"
           >
-            <div className="absolute -bottom-10 -right-6 h-28 w-36 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.16)_0%,rgba(244,114,182,0)_72%)]" />
+            <div className="absolute -bottom-10 -right-6 h-28 w-36 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.16)_0%,rgba(100,83,148,0)_72%)]" />
             <div className="relative flex items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-white text-[#e6499a] shadow-[0_10px_24px_rgba(236,72,153,0.12)]">
+                <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-white text-[#645394] shadow-[0_10px_24px_rgba(100,83,148,0.14)]">
                   <BriefcaseBusiness className="h-7 w-7" />
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-[2rem] font-black leading-none tracking-[-0.07em] text-[#d63384]">
+                    <p className="text-[2rem] font-black leading-none tracking-[-0.07em] text-[#645394]">
                       {newTasks.length}
                     </p>
                     <p className="text-[14px] font-black text-[#1f1630]">New Task</p>
@@ -1124,7 +1238,7 @@ export function DashboardScreen() {
                   </p>
                 </div>
               </div>
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                 <ChevronRight className="h-5 w-5" />
               </span>
             </div>
@@ -1133,56 +1247,56 @@ export function DashboardScreen() {
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Link
               href="/provider/bookings?tab=ongoing"
-              className="relative overflow-hidden rounded-[20px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-3.5 shadow-[0_10px_20px_rgba(236,72,153,0.07)]"
+              className="relative overflow-hidden rounded-[20px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_10px_20px_rgba(100,83,148,0.08)]"
             >
-              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14)_0%,rgba(244,114,182,0)_72%)]" />
+              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.14)_0%,rgba(100,83,148,0)_72%)]" />
               <div className="relative flex items-center gap-2.5">
-                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Clock3 className="h-5 w-5" />
                 </span>
-                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#d63384]">{ongoingBookings.length}</p>
+                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#645394]">{ongoingBookings.length}</p>
               </div>
               <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">On Going</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Take live task actions</p>
             </Link>
             <Link
               href="/provider/bookings?tab=pending"
-              className="relative overflow-hidden rounded-[20px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-3.5 shadow-[0_10px_20px_rgba(236,72,153,0.07)]"
+              className="relative overflow-hidden rounded-[20px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_10px_20px_rgba(100,83,148,0.08)]"
             >
-              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14)_0%,rgba(244,114,182,0)_72%)]" />
+              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.14)_0%,rgba(100,83,148,0)_72%)]" />
               <div className="relative flex items-center gap-2.5">
-                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Bell className="h-5 w-5" />
                 </span>
-                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#d63384]">{pendingTodayTasks.length}</p>
+                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#645394]">{pendingTodayTasks.length}</p>
               </div>
               <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Pending Task</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Pending for today</p>
             </Link>
             <Link
               href="/provider/bookings?tab=completes"
-              className="relative overflow-hidden rounded-[20px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-3.5 shadow-[0_10px_20px_rgba(236,72,153,0.07)]"
+              className="relative overflow-hidden rounded-[20px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_10px_20px_rgba(100,83,148,0.08)]"
             >
-              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14)_0%,rgba(244,114,182,0)_72%)]" />
+              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.14)_0%,rgba(100,83,148,0)_72%)]" />
               <div className="relative flex items-center gap-2.5">
-                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <CalendarDays className="h-5 w-5" />
                 </span>
-                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#d63384]">{completedBookings.length}</p>
+                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#645394]">{completedBookings.length}</p>
               </div>
               <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Completed</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Open finished task details</p>
             </Link>
             <Link
               href="/provider/bookings?tab=canceled"
-              className="relative overflow-hidden rounded-[20px] border border-[#f1c8e6] bg-[linear-gradient(135deg,#fff7fc_0%,#fef1f8_70%,#fde7f3_100%)] p-3.5 shadow-[0_10px_20px_rgba(236,72,153,0.07)]"
+              className="relative overflow-hidden rounded-[20px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_10px_20px_rgba(100,83,148,0.08)]"
             >
-              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14)_0%,rgba(244,114,182,0)_72%)]" />
+              <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.14)_0%,rgba(100,83,148,0)_72%)]" />
               <div className="relative flex items-center gap-2.5">
-                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#e6499a] shadow-[0_8px_18px_rgba(236,72,153,0.10)]">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Bell className="h-5 w-5" />
                 </span>
-                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#d63384]">{canceledBookings.length}</p>
+                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#645394]">{canceledBookings.length}</p>
               </div>
               <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Cancelled</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">View cancelled tasks</p>
@@ -5311,13 +5425,18 @@ export function ProfileScreen() {
 
       <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-[1.1rem] font-black tracking-[-0.04em] text-[#0f172a]">
-              Verification
-            </h3>
-            <p className="mt-1 text-[12px] text-[#64748b]">
-              Verification status for your provider account.
-            </p>
+          <div className="flex items-center gap-4">
+            <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
+              <ShieldCheck className="h-7 w-7" />
+            </span>
+            <div>
+              <h3 className="text-[1.5rem] font-black tracking-[-0.05em] text-[#1f1630]">
+                Verification
+              </h3>
+              <p className="mt-1 text-[13px] text-[#7b728a]">
+                Verification status for your provider account
+              </p>
+            </div>
           </div>
           <Link
             href="/provider/more"
@@ -5327,11 +5446,55 @@ export function ProfileScreen() {
           </Link>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <MetricCard label="Email" value={data.emailVerified ? "Verified" : "Pending"} meta="Email status" accent={data.emailVerified ? "text-[#16a34a]" : "text-[#f59e0b]"} />
-          <MetricCard label="Phone" value={data.phoneVerified ? "Verified" : "Pending"} meta="Phone status" accent={data.phoneVerified ? "text-[#16a34a]" : "text-[#f59e0b]"} />
-          <MetricCard label="Identity" value={data.identityVerified ? "Verified" : "Pending"} meta="ID check" accent={data.identityVerified ? "text-[#16a34a]" : "text-[#f59e0b]"} />
-          <MetricCard label="KYC / Background" value={data.backgroundCheckVerified || data.kycVerified ? "Verified" : "Pending"} meta="Trust checks" accent={data.backgroundCheckVerified || data.kycVerified ? "text-[#16a34a]" : "text-[#f59e0b]"} />
+        <div className="mt-5 space-y-3">
+          <VerificationStatusCard
+            href="/provider/more"
+            icon={<Mail className="h-6 w-6" />}
+            title="Email"
+            subtitle="Email status"
+            verified={data.emailVerified}
+          />
+          <VerificationStatusCard
+            href="/provider/profile/phone-verification"
+            icon={<Phone className="h-6 w-6" />}
+            title="Phone"
+            subtitle="Phone status"
+            verified={data.phoneVerified}
+          />
+          <VerificationStatusCard
+            href="/provider/more"
+            icon={<IdCard className="h-6 w-6" />}
+            title="Identity"
+            subtitle="ID check"
+            verified={data.identityVerified}
+          />
+          <VerificationStatusCard
+            href="/provider/more"
+            icon={<Shield className="h-6 w-6" />}
+            title="KYC / Background"
+            subtitle="Trust checks"
+            verified={data.backgroundCheckVerified || data.kycVerified}
+          />
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-4 rounded-[22px] border border-[#e7dcf8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f4edff_100%)] p-4">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#7c3aed] shadow-[0_10px_24px_rgba(124,58,237,0.12)]">
+              <HelpCircle className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[14px] font-black text-[#1f1630]">Need help?</p>
+              <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+                Learn more about verification or contact support for assistance.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/provider/more"
+            className="shrink-0 rounded-[14px] border border-[#decdf7] bg-white px-4 py-3 text-[13px] font-bold text-[#8E5EB5]"
+          >
+            Verify / Help
+          </Link>
         </div>
       </section>
 
@@ -5440,6 +5603,166 @@ export function ProfileScreen() {
         ))}
       </section>
     </PageShell>
+  );
+}
+
+export function PhoneVerificationScreen() {
+  const state = useProviderAppData();
+  const router = useRouter();
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+  const [screenNotice, setScreenNotice] = useState("");
+  const [draftPhoneNumber, setDraftPhoneNumber] = useState<string | null>(null);
+  const fallback = LoadingOrError(state);
+  const derivedPhoneNumber = state.data?.phone.replace(/^\+?60\s?/, "").trim() ?? "";
+  const phoneNumber = draftPhoneNumber ?? derivedPhoneNumber;
+
+  useEffect(() => {
+    if (!otpSent || countdown <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCountdown((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [otpSent, countdown]);
+
+  if (fallback) {
+    return fallback;
+  }
+
+  const data = state.data!;
+
+  const phoneValue = phoneNumber.trim();
+  const canSendOtp = phoneValue.length >= 7;
+  const canVerify = phoneValue.length >= 7 && otp.length === 6;
+
+  return (
+    <MobilePage className="pb-40">
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/provider/profile"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_10px_24px_rgba(86,38,135,0.06)]"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <VerificationStatusPill verified={data.phoneVerified} />
+        </div>
+
+        <header className="pt-2">
+          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+            Phone Verification
+          </h1>
+          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
+            Add your phone number and verify it with a one-time code.
+          </p>
+        </header>
+
+        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+          <div>
+            <p className="text-[15px] font-black text-[#1f1630]">Phone Number</p>
+            <div className="mt-4 overflow-hidden rounded-[16px] border border-[#e7def4]">
+              <div className="flex items-stretch">
+                <div className="flex w-[96px] items-center gap-2 border-r border-[#e7def4] bg-white px-3">
+                  <span className="text-[1.35rem]">🇲🇾</span>
+                  <span className="text-[16px] font-semibold text-[#1f1630]">+60</span>
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={phoneNumber}
+                  onChange={(event) => setDraftPhoneNumber(event.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="Enter phone number"
+                  className="h-[52px] flex-1 bg-white px-4 text-[15px] text-[#1f1630] outline-none placeholder:text-[#b3a9c7]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!canSendOtp) {
+                return;
+              }
+
+              setOtp("");
+              setOtpSent(true);
+              setCountdown(30);
+              setScreenNotice("We sent a 6-digit code by SMS to your phone.");
+            }}
+            disabled={!canSendOtp}
+            className={`mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border text-[15px] font-black transition ${
+              canSendOtp
+                ? "border-[#cdb8f3] bg-white text-[#8E5EB5] shadow-[0_12px_28px_rgba(142,94,181,0.08)]"
+                : "cursor-not-allowed border-[#eadff8] bg-[#faf7fe] text-[#c2b2dc]"
+            }`}
+          >
+            <Send className="h-4.5 w-4.5" />
+            Send OTP
+          </button>
+
+          <div className="mt-6">
+            <p className="text-[15px] font-black text-[#1f1630]">Enter OTP</p>
+            <OtpInputSlots value={otp} onChange={setOtp} />
+
+            <div className="mt-4 space-y-2 text-[13px]">
+              <div className="flex items-center gap-2 text-[#6f6681]">
+                <MessageCircleMore className="h-4 w-4 text-[#8E5EB5]" />
+                <span>{screenNotice || "We sent a 6-digit code by SMS"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[#6f6681]">
+                <Clock3 className="h-4 w-4 text-[#8E5EB5]" />
+                <span>
+                  Resend code in{" "}
+                  <strong className="font-black text-[#8E5EB5]">
+                    00:{String(countdown).padStart(2, "0")}
+                  </strong>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f5efff_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#8E5EB5]">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[14px] font-black text-[#1f1630]">Your security matters</p>
+              <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+                Your phone number will be used for account verification and important security alerts.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <button
+          type="button"
+          disabled={!canVerify}
+          onClick={() => {
+            if (!canVerify) {
+              return;
+            }
+
+            state.setNotice("Phone verification submitted successfully.");
+            router.push("/provider/profile");
+          }}
+          className={`mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+            canVerify
+              ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
+              : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
+          }`}
+        >
+          Verify Number
+        </button>
+      </section>
+    </MobilePage>
   );
 }
 

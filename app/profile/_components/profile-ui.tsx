@@ -3317,128 +3317,142 @@ function WalletSummaryCard({
   onClosePanel: () => void;
 }) {
   const bankOptions = ["Maybank", "CIMB", "Public Bank", "RHB Bank"];
+  const withdrawDisabled = walletBalance <= 0;
+  const payCompanyDisabled = companyPayable <= 0;
 
   return (
     <section className="mt-4 overflow-hidden rounded-[22px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_16px_36px_rgba(104,63,155,0.1)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
-            Wallet Balance
-          </p>
-          <p className="mt-2 text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
-            {formatRinggit(walletBalance)}
-          </p>
-          <p className="mt-1 text-[12px] text-[#7c728f]">
-            Available for withdrawal to your bank account
-          </p>
-        </div>
-        <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#edf7ee] text-[#22c55e]">
-          <WalletIcon className="h-6 w-6" />
-        </span>
-      </div>
-
-      <div className="mt-4 rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E5EB5]">
-              Payable to Company
-            </p>
-            <p className="mt-1 text-[1.4rem] font-black tracking-[-0.05em] text-[#1f1630]">
-              {formatRinggit(companyPayable)}
-            </p>
-          </div>
-          <span className="rounded-full bg-[#f5f1fa] px-3 py-1 text-[11px] font-bold text-[#8E5EB5]">
-            DELLA
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={onWithdrawClick}
-          className="inline-flex h-11 items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
-        >
-          Withdraw
-        </button>
-        <button
-          type="button"
-          onClick={onPayableClick}
-          className="inline-flex h-11 items-center justify-center rounded-[14px] border border-[#d9c8ee] bg-white px-4 text-[14px] font-extrabold text-[#8E5EB5]"
-        >
-          Pay to Company
-        </button>
-      </div>
-
-      {walletPanel === "withdraw" ? (
-        <div className="mt-4 rounded-[18px] border border-[#e8def6] bg-white p-4">
+      <div className="space-y-4">
+        <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[14px] font-extrabold text-[#1f1630]">Connect bank account</p>
+              <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
+                Wallet Balance
+              </p>
+              <p className="mt-2 text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+                {formatRinggit(walletBalance)}
+              </p>
               <p className="mt-1 text-[12px] text-[#7c728f]">
-                Choose the bank account to receive {formatRinggit(walletBalance)}.
+                Available for withdrawal to your bank account
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onClosePanel}
-              className="text-[12px] font-bold text-[#8E5EB5]"
-            >
-              Close
-            </button>
+            <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#edf7ee] text-[#22c55e]">
+              <WalletIcon className="h-6 w-6" />
+            </span>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {bankOptions.map((bank) => (
+          <button
+            type="button"
+            onClick={onWithdrawClick}
+            disabled={withdrawDisabled}
+            className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-extrabold transition ${
+              withdrawDisabled
+                ? "cursor-not-allowed bg-[#d8cde6] text-white shadow-none"
+                : "bg-[#8E5EB5] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
+            }`}
+          >
+            Withdraw
+          </button>
+          {walletPanel === "withdraw" ? (
+            <div className="mt-4 rounded-[18px] border border-[#e8def6] bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[14px] font-extrabold text-[#1f1630]">Connect bank account</p>
+                  <p className="mt-1 text-[12px] text-[#7c728f]">
+                    Choose the bank account to receive {formatRinggit(walletBalance)}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClosePanel}
+                  className="text-[12px] font-bold text-[#8E5EB5]"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {bankOptions.map((bank) => (
+                  <button
+                    key={bank}
+                    type="button"
+                    onClick={() => onSelectedBankChange(bank)}
+                    className={`rounded-[12px] border px-3 py-3 text-left text-[13px] font-bold ${
+                      selectedBank === bank
+                        ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
+                        : "border-[#e5e7eb] bg-white text-[#374151]"
+                    }`}
+                  >
+                    {bank}
+                  </button>
+                ))}
+              </div>
               <button
-                key={bank}
                 type="button"
-                onClick={() => onSelectedBankChange(bank)}
-                className={`rounded-[12px] border px-3 py-3 text-left text-[13px] font-bold ${
-                  selectedBank === bank
-                    ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
-                    : "border-[#e5e7eb] bg-white text-[#374151]"
-                }`}
+                onClick={onConnectBank}
+                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#22c55e] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(34,197,94,0.18)]"
               >
-                {bank}
+                Connect and Withdraw
               </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={onConnectBank}
-            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#22c55e] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(34,197,94,0.18)]"
-          >
-            Connect and Withdraw
-          </button>
+            </div>
+          ) : null}
         </div>
-      ) : null}
 
-      {walletPanel === "payable" ? (
-        <div className="mt-4 rounded-[18px] border border-[#e8def6] bg-white p-4">
-          <div className="flex items-start justify-between gap-3">
+        <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[14px] font-extrabold text-[#1f1630]">Pay company now</p>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E5EB5]">
+                Payable to Company
+              </p>
+              <p className="mt-1 text-[1.6rem] font-black tracking-[-0.05em] text-[#1f1630]">
+                {formatRinggit(companyPayable)}
+              </p>
               <p className="mt-1 text-[12px] text-[#7c728f]">
-                Confirm payment of {formatRinggit(companyPayable)} to DELLA.
+                Amount due to DELLA from recent customer payments
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onClosePanel}
-              className="text-[12px] font-bold text-[#8E5EB5]"
-            >
-              Close
-            </button>
+            <span className="rounded-full bg-[#f5f1fa] px-3 py-1 text-[11px] font-bold text-[#8E5EB5]">
+              DELLA
+            </span>
           </div>
           <button
             type="button"
-            onClick={onPayCompany}
-            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
+            onClick={onPayableClick}
+            disabled={payCompanyDisabled}
+            className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] border px-4 text-[14px] font-extrabold transition ${
+              payCompanyDisabled
+                ? "cursor-not-allowed border-[#e6def0] bg-[#f3eef8] text-[#b49bcf]"
+                : "border-[#d9c8ee] bg-white text-[#8E5EB5]"
+            }`}
           >
-            Pay {formatRinggit(companyPayable)}
+            Pay to Company
           </button>
+          {walletPanel === "payable" ? (
+            <div className="mt-4 rounded-[18px] border border-[#e8def6] bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[14px] font-extrabold text-[#1f1630]">Pay company now</p>
+                  <p className="mt-1 text-[12px] text-[#7c728f]">
+                    Confirm payment of {formatRinggit(companyPayable)} to DELLA.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClosePanel}
+                  className="text-[12px] font-bold text-[#8E5EB5]"
+                >
+                  Close
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={onPayCompany}
+                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
+              >
+                Pay {formatRinggit(companyPayable)}
+              </button>
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
 
       {walletMessage ? (
         <p className="mt-4 rounded-[14px] border border-[#d7efdb] bg-[#effbf1] px-4 py-3 text-[12px] font-semibold text-[#1f6b37]">
