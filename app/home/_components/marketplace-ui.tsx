@@ -118,7 +118,7 @@ export function MarketplaceScreen({
 
           <header className="relative z-10">
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0 flex-1">
                 <Image
                   src={swiperLogo}
                   alt="Swiper"
@@ -139,7 +139,7 @@ export function MarketplaceScreen({
               <Link
                 href="/profile"
                 aria-label="Profile"
-                className="relative mt-1 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+                className="relative mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
               >
                 <CircleUserRound className="h-7 w-7 stroke-[2.1]" />
               </Link>
