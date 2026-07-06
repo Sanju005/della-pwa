@@ -179,8 +179,10 @@ export function createDefaultProviderRegistration(): ProviderRegistrationData {
       postcode: "",
       city: "",
       state: "",
+      country: "Malaysia",
       serviceLocation: "",
       serviceRadius: 15,
+      emergencyContactNumber: "",
     },
     account: {
       email: "",

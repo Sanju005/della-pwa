@@ -94,6 +94,7 @@ function buildResidentialAddress(payload: ProviderRegistrationData) {
     payload.basicProfile.postcode,
     payload.basicProfile.city,
     payload.basicProfile.state,
+    payload.basicProfile.country,
   ]
     .map((value) => value.trim())
     .filter(Boolean)
@@ -274,6 +275,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!payload.basicProfile.country.trim() || !payload.basicProfile.emergencyContactNumber.trim()) {
+      return NextResponse.json(
+        { error: "Country and emergency contact number are required." },
+        { status: 400 }
+      );
+    }
+
     if (payload.selectedServices.length === 0) {
       return NextResponse.json(
         { error: "Select at least one service." },
@@ -327,6 +335,8 @@ export async function POST(request: Request) {
         sex,
         role: PROVIDER_ROLE,
         marketing_name: payload.basicProfile.marketingName.trim(),
+        country: payload.basicProfile.country.trim(),
+        emergency_contact_number: payload.basicProfile.emergencyContactNumber.trim(),
       },
     });
 

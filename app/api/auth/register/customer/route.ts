@@ -18,6 +18,7 @@ type CustomerSignupPayload = {
   phoneNumber?: string;
   password?: string;
   confirmPassword?: string;
+  emergencyContactNumber?: string;
   addressLabel?: string;
   unitNumber?: string;
   addressLine1?: string;
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
   const phoneNumber = payload.phoneNumber?.trim() ?? "";
   const password = payload.password ?? "";
   const confirmPassword = payload.confirmPassword ?? "";
+  const emergencyContactNumber = payload.emergencyContactNumber?.trim() ?? "";
   const addressLabel = payload.addressLabel?.trim() || "Address 1";
   const unitNumber = payload.unitNumber?.trim() ?? "";
   const addressLine1 = payload.addressLine1?.trim() ?? "";
@@ -105,6 +107,7 @@ export async function POST(request: Request) {
     !sex ||
     !email ||
     !phoneNumber ||
+    !emergencyContactNumber ||
     !password ||
     !confirmPassword ||
     !addressLine1 ||
@@ -151,6 +154,8 @@ export async function POST(request: Request) {
       last_name: lastName,
       sex,
       role: "customer",
+      country,
+      emergency_contact_number: emergencyContactNumber,
     },
   });
 

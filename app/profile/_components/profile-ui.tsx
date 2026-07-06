@@ -496,6 +496,8 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
         <ProfileInfoRow icon={<CalendarIcon className="h-4 w-4" />} label="Date of Birth" value={profile.dateOfBirth} />
         <ProfileInfoRow icon={<MailIcon className="h-4 w-4" />} label="Email" value={profile.email} />
         <ProfileInfoRow icon={<PhoneIcon className="h-4 w-4" />} label="Phone Number" value={`${profile.countryCode} ${profile.phoneNumber}`} />
+        <ProfileInfoRow icon={<PhoneIcon className="h-4 w-4" />} label="Emergency Contact" value={profile.emergencyContactNumber || "Not set"} />
+        <ProfileInfoRow icon={<PinIcon className="h-4 w-4" />} label="Country" value={profile.country || "Malaysia"} />
       </SectionCard>
 
       <SectionCard
@@ -950,6 +952,8 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
               </div>
             </div>
           </div>
+          <LabeledInput label="Emergency Contact Number" value={form.emergencyContactNumber} onChange={updateField("emergencyContactNumber")} icon={<PhoneIcon className="h-5 w-5" />} />
+          <LabeledInput label="Country" value={form.country} onChange={updateField("country")} icon={<PinIcon className="h-5 w-5" />} />
         </div>
 
         <div className="mt-5 rounded-[18px] border border-[#e4ece7] bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)]">

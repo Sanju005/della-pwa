@@ -35,6 +35,7 @@ type CustomerProfileRow = {
   region: string | null;
   state: string | null;
   country: string | null;
+  emergency_contact_number?: string | null;
   verified: boolean | null;
   completion: number | null;
 };
@@ -183,6 +184,7 @@ async function verifyCustomerRequest(request: Request) {
 function buildCustomerProfile(
   profile: ProfileRow,
   customerProfile: CustomerProfileRow | null,
+  metadata?: Record<string, unknown>,
   fallbackFirstName?: string,
   fallbackLastName?: string,
   fallbackSex?: string,
@@ -216,11 +218,20 @@ function buildCustomerProfile(
     email: profile.email?.trim() || "",
     phoneNumber: phoneParts.phoneNumber,
     countryCode: phoneParts.countryCode,
+    emergencyContactNumber:
+      customerProfile?.emergency_contact_number?.trim() ||
+      (typeof metadata?.emergency_contact_number === "string"
+        ? metadata.emergency_contact_number.trim()
+        : ""),
     city: customerProfile?.city?.trim() || "",
     region:
       customerProfile?.region?.trim() ||
       customerProfile?.state?.trim() ||
       customerProfile?.country?.trim() ||
+      "Malaysia",
+    country:
+      customerProfile?.country?.trim() ||
+      (typeof metadata?.country === "string" ? metadata.country.trim() : "") ||
       "Malaysia",
     verified: Boolean(customerProfile?.verified) || profile.status?.toLowerCase() === "active",
     completion: customerProfile?.completion ?? 80,
@@ -302,7 +313,7 @@ export async function GET(request: Request) {
   const [customerProfileResult, bookingsResult, paymentsResult] = await Promise.all([
     verified.adminClient
       .from("customer_profiles")
-      .select("id, first_name, last_name, date_of_birth, sex, phone_number, country_code, city, region, state, country, verified, completion")
+      .select("id, first_name, last_name, date_of_birth, sex, phone_number, country_code, city, region, state, country, emergency_contact_number, verified, completion")
       .eq("id", verified.profile.id)
       .maybeSingle(),
     verified.adminClient
@@ -327,6 +338,9 @@ export async function GET(request: Request) {
     profile: buildCustomerProfile(
       verified.profile,
       customerProfile,
+      verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
+        ? (verified.authUser.user_metadata as Record<string, unknown>)
+        : undefined,
       typeof verified.authUser.user_metadata?.first_name === "string"
         ? verified.authUser.user_metadata.first_name
         : typeof verified.authUser.user_metadata?.full_name === "string"
@@ -355,8 +369,10 @@ type UpdatePayload = {
   email?: string;
   phoneNumber?: string;
   countryCode?: string;
+  emergencyContactNumber?: string;
   city?: string;
   region?: string;
+  country?: string;
   verified?: boolean;
   completion?: number;
 };
@@ -376,6 +392,7 @@ export async function PATCH(request: Request) {
   const email = payload.email?.trim().toLowerCase() ?? "";
   const countryCode = payload.countryCode?.trim() || "+60";
   const phoneNumber = payload.phoneNumber?.trim() ?? "";
+  const emergencyContactNumber = payload.emergencyContactNumber?.trim() ?? "";
   const normalizedPhone = phoneNumber
     ? `${countryCode}${phoneNumber}`.replace(/\s+/g, "")
     : null;
@@ -414,6 +431,8 @@ export async function PATCH(request: Request) {
         first_name: firstName,
         last_name: lastName,
         sex,
+        country: payload.country?.trim() || "Malaysia",
+        emergency_contact_number: emergencyContactNumber,
       },
     },
   );
@@ -430,8 +449,10 @@ export async function PATCH(request: Request) {
     sex: sex || null,
     phone_number: phoneNumber || null,
     country_code: countryCode,
+    emergency_contact_number: emergencyContactNumber || null,
     city: payload.city?.trim() || null,
     region: payload.region?.trim() || null,
+    country: payload.country?.trim() || "Malaysia",
     verified: payload.verified ?? false,
     completion:
       typeof payload.completion === "number" && Number.isFinite(payload.completion)
@@ -459,7 +480,7 @@ export async function PATCH(request: Request) {
 
   const refreshedCustomerProfileResult = await verified.adminClient
     .from("customer_profiles")
-    .select("id, first_name, last_name, date_of_birth, sex, phone_number, country_code, city, region, state, country, verified, completion")
+    .select("id, first_name, last_name, date_of_birth, sex, phone_number, country_code, city, region, state, country, emergency_contact_number, verified, completion")
     .eq("id", verified.profile.id)
     .maybeSingle();
 
@@ -472,6 +493,16 @@ export async function PATCH(request: Request) {
       ...buildCustomerProfile(
         refreshedProfileResult.data as ProfileRow,
         (refreshedCustomerProfileResult.data as CustomerProfileRow | null) ?? null,
+        verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
+          ? ({
+              ...verified.authUser.user_metadata,
+              country: payload.country?.trim() || "Malaysia",
+              emergency_contact_number: emergencyContactNumber,
+            } as Record<string, unknown>)
+          : {
+              country: payload.country?.trim() || "Malaysia",
+              emergency_contact_number: emergencyContactNumber,
+            },
         firstName,
         lastName,
         sex,

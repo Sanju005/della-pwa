@@ -38,8 +38,10 @@ export type ProviderRegistrationData = {
     postcode: string;
     city: string;
     state: string;
+    country: string;
     serviceLocation: string;
     serviceRadius: number;
+    emergencyContactNumber: string;
   };
   account: {
     email: string;

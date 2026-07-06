@@ -377,7 +377,15 @@ async function ensureProviderProfile(
   return fetchProviderSnapshot(adminClient, profile.id);
 }
 
-function buildResponse(profile: ProfileRow, providerProfile: ProviderProfileRow, authUser: { email_confirmed_at?: string | null }) {
+function buildResponse(
+  profile: ProfileRow,
+  providerProfile: ProviderProfileRow,
+  authUser: { email_confirmed_at?: string | null; user_metadata?: unknown },
+) {
+  const metadata =
+    "user_metadata" in authUser && authUser.user_metadata && typeof authUser.user_metadata === "object"
+      ? (authUser.user_metadata as Record<string, unknown>)
+      : {};
   const verification = relationItem(providerProfile.provider_verifications);
 
   return {
@@ -385,11 +393,19 @@ function buildResponse(profile: ProfileRow, providerProfile: ProviderProfileRow,
     fullName: profile.full_name ?? "",
     email: profile.email ?? "",
     phone: profile.phone ?? "",
+    emergencyContactNumber:
+      typeof metadata.emergency_contact_number === "string"
+        ? metadata.emergency_contact_number
+        : "",
     avatarUrl: profile.avatar_url ?? "",
     accountStatus: toTitleCase(profile.status),
     marketingName: providerProfile.marketing_name ?? "",
     serviceLocation: providerProfile.service_location ?? "",
     serviceRadiusKm: providerProfile.service_radius_km ?? 0,
+    country:
+      typeof metadata.country === "string" && metadata.country.trim()
+        ? metadata.country
+        : "Malaysia",
     bio: providerProfile.bio ?? "",
     averageRating: Number(providerProfile.average_rating ?? 0),
     totalReviews: Number(providerProfile.total_reviews ?? 0),
@@ -448,6 +464,8 @@ type UpdatePayload = {
   serviceLocation?: string;
   serviceRadiusKm?: number;
   bio?: string;
+  country?: string;
+  emergencyContactNumber?: string;
   phoneVerified?: boolean;
   identityVerified?: boolean;
 };
@@ -460,6 +478,10 @@ export async function PATCH(request: Request) {
   }
 
   const payload = (await request.json()) as UpdatePayload;
+  const currentMetadata =
+    verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
+      ? verified.authUser.user_metadata
+      : {};
 
   if (typeof payload.fullName === "string" && payload.fullName.trim()) {
     const { error } = await verified.adminClient
@@ -469,6 +491,48 @@ export async function PATCH(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message || "Unable to update profile." }, { status: 500 });
+    }
+  }
+
+  if (
+    typeof payload.fullName === "string" ||
+    typeof payload.country === "string" ||
+    typeof payload.emergencyContactNumber === "string"
+  ) {
+    const fullName =
+      typeof payload.fullName === "string" && payload.fullName.trim()
+        ? payload.fullName.trim()
+        : verified.profile.full_name ?? "";
+
+    const [firstName = "", ...restName] = fullName.split(/\s+/).filter(Boolean);
+    const lastName = restName.join(" ");
+
+    const { error: authUpdateError } = await verified.adminClient.auth.admin.updateUserById(
+      verified.profile.id,
+      {
+        user_metadata: {
+          ...currentMetadata,
+          full_name: fullName,
+          first_name: firstName,
+          last_name: lastName,
+          country:
+            typeof payload.country === "string" && payload.country.trim()
+              ? payload.country.trim()
+              : typeof currentMetadata.country === "string"
+                ? currentMetadata.country
+                : "Malaysia",
+          emergency_contact_number:
+            typeof payload.emergencyContactNumber === "string"
+              ? payload.emergencyContactNumber.trim()
+              : typeof currentMetadata.emergency_contact_number === "string"
+                ? currentMetadata.emergency_contact_number
+                : "",
+        },
+      },
+    );
+
+    if (authUpdateError) {
+      return NextResponse.json({ error: authUpdateError.message || "Unable to update provider profile." }, { status: 500 });
     }
   }
 

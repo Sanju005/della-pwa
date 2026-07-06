@@ -7,8 +7,10 @@ export type CustomerProfile = {
   email: string;
   phoneNumber: string;
   countryCode: string;
+  emergencyContactNumber: string;
   city: string;
   region: string;
+  country: string;
   verified: boolean;
   completion: number;
 };

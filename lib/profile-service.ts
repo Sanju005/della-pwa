@@ -18,8 +18,10 @@ const emptyProfile: CustomerProfile = {
   email: "",
   phoneNumber: "",
   countryCode: "+60",
+  emergencyContactNumber: "",
   city: "",
   region: "Malaysia",
+  country: "Malaysia",
   verified: false,
   completion: 0,
 };

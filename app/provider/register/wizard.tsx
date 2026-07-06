@@ -238,8 +238,10 @@ export function ProviderRegistrationWizard() {
         !data.basicProfile.postcode.trim() ? "postcode" : null,
         !data.basicProfile.city.trim() ? "city" : null,
         !data.basicProfile.state.trim() ? "state" : null,
+        !data.basicProfile.country.trim() ? "country" : null,
         !data.account.email.trim() ? "email" : null,
         !data.account.phoneNumber.trim() ? "phoneNumber" : null,
+        !data.basicProfile.emergencyContactNumber.trim() ? "emergencyContactNumber" : null,
         !data.account.password ? "password" : null,
         !data.account.confirmPassword ? "confirmPassword" : null,
       ].filter((value): value is string => Boolean(value));
@@ -845,6 +847,15 @@ function BasicProfileStep({
         }}
         options={malaysianStates}
       />
+      <InputField
+        label="Country"
+        value={data.basicProfile.country}
+        invalid={invalidFields.includes("country")}
+        onChange={(value) => {
+          clearInvalidField("country");
+          updateBasic("country", value);
+        }}
+      />
 
       <InputField
         label="Email"
@@ -875,6 +886,15 @@ function BasicProfileStep({
           </div>
         </div>
       </div>
+      <InputField
+        label="Emergency Contact Number"
+        value={data.basicProfile.emergencyContactNumber}
+        invalid={invalidFields.includes("emergencyContactNumber")}
+        onChange={(value) => {
+          clearInvalidField("emergencyContactNumber");
+          updateBasic("emergencyContactNumber", value);
+        }}
+      />
       <InputField
         label="Password"
         value={data.account.password}

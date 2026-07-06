@@ -27,6 +27,7 @@ export default function SignupUserPage() {
   const [avatarDataUrl, setAvatarDataUrl] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [emergencyContactNumber, setEmergencyContactNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [addressLabel, setAddressLabel] = useState("Address 1");
@@ -155,6 +156,7 @@ export default function SignupUserPage() {
       !dateOfBirth ? "dateOfBirth" : null,
       !email ? "email" : null,
       !phoneNumber ? "phoneNumber" : null,
+      !emergencyContactNumber ? "emergencyContactNumber" : null,
       !addressLine1 ? "addressLine1" : null,
       !postcode ? "postcode" : null,
       !city ? "city" : null,
@@ -194,6 +196,7 @@ export default function SignupUserPage() {
           avatarDataUrl,
           email,
           phoneNumber,
+          emergencyContactNumber,
           password,
           confirmPassword,
           addressLabel,
@@ -321,6 +324,15 @@ export default function SignupUserPage() {
             setPhoneNumber(value);
           }}
           invalid={invalidFields.includes("phoneNumber")}
+        />
+        <ControlledPhoneField
+          label="Emergency Contact Number"
+          value={emergencyContactNumber}
+          onChange={(value) => {
+            clearInvalidField("emergencyContactNumber");
+            setEmergencyContactNumber(value);
+          }}
+          invalid={invalidFields.includes("emergencyContactNumber")}
         />
         <div className="rounded-[22px] border border-[#e7ece8] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.03)]">
           <h2 className="text-[15px] font-extrabold text-[#111827]">Saved Address</h2>
@@ -712,10 +724,12 @@ function ControlledField({
 }
 
 function ControlledPhoneField({
+  label = "Phone Number",
   value,
   onChange,
   invalid = false,
 }: {
+  label?: string;
   value: string;
   onChange: (value: string) => void;
   invalid?: boolean;
@@ -723,7 +737,7 @@ function ControlledPhoneField({
   return (
     <label className="block">
       <span className="mb-2 block text-[15px] font-semibold text-[#111827]">
-        Phone Number
+        {label}
       </span>
       <div className="flex gap-2.5">
         <div className="flex h-13 w-[8.25rem] items-center rounded-[14px] border border-[#d9e2dd] bg-white px-3 shadow-[0_8px_20px_rgba(15,23,42,0.03)]">

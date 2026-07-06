@@ -20,11 +20,13 @@ export type ProviderDashboardData = {
   fullName: string;
   email: string;
   phone: string;
+  emergencyContactNumber: string;
   avatarUrl: string;
   accountStatus: string;
   marketingName: string;
   serviceLocation: string;
   serviceRadiusKm: number;
+  country: string;
   bio: string;
   averageRating: number;
   totalReviews: number;
