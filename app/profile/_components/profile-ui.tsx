@@ -1360,7 +1360,50 @@ export function AddressesScreen({ addresses }: AddressesProps) {
 
 export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsProps) {
   const [items, setItems] = useState(bookings);
-  const filtered = items;
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "custom">("all");
+  const [customDate, setCustomDate] = useState("");
+  const filtered = useMemo(() => {
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const weekEnd = new Date(todayStart);
+    weekEnd.setDate(todayStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const matchesFilter = (booking: Booking) => {
+      const bookingDate = getBookingFilterDate(booking);
+
+      if (!bookingDate) {
+        return dateFilter === "all";
+      }
+
+      if (dateFilter === "today") {
+        return isSameCalendarDate(bookingDate, todayStart);
+      }
+
+      if (dateFilter === "week") {
+        return bookingDate >= todayStart && bookingDate <= weekEnd;
+      }
+
+      if (dateFilter === "custom") {
+        if (!customDate) {
+          return true;
+        }
+
+        const selectedDate = new Date(`${customDate}T00:00:00`);
+        if (Number.isNaN(selectedDate.getTime())) {
+          return true;
+        }
+
+        return isSameCalendarDate(bookingDate, selectedDate);
+      }
+
+      return true;
+    };
+
+    return [...items]
+      .filter(matchesFilter)
+      .sort((left, right) => getBookingSortTimestamp(right) - getBookingSortTimestamp(left));
+  }, [customDate, dateFilter, items]);
 
   useEffect(() => {
     let active = true;
@@ -1464,69 +1507,128 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
   return (
     <ProfileShell title="My Bookings" showBack backHref="/profile">
       <div className="mt-4 space-y-4">
+        <div className="rounded-[22px] border border-[#eadff8] bg-white p-4 shadow-[0_12px_28px_rgba(106,69,160,0.08)]">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[15px] font-extrabold text-[#1f1630]">Filter by Date</p>
+              <p className="mt-1 text-[12px] text-[#7b728a]">Sorted by latest booking first</p>
+            </div>
+            <span className="rounded-full bg-[#f5f1fa] px-3 py-1 text-[11px] font-bold text-[#8E5EB5]">
+              Latest
+            </span>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {([
+              { id: "all", label: "All" },
+              { id: "today", label: "Today" },
+              { id: "week", label: "This Week" },
+              { id: "custom", label: "Custom Date" },
+            ] as const).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setDateFilter(option.id)}
+                className={`rounded-full px-4 py-2 text-[12px] font-extrabold transition ${
+                  dateFilter === option.id
+                    ? "bg-[#8E5EB5] text-white shadow-[0_12px_22px_rgba(142,94,181,0.18)]"
+                    : "border border-[#e8def6] bg-white text-[#6d6480]"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          {dateFilter === "custom" ? (
+            <div className="mt-4">
+              <label className="block">
+                <span className="mb-2 block text-[12px] font-bold text-[#6d6480]">Choose date</span>
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(event) => setCustomDate(event.target.value)}
+                  className="h-11 w-full rounded-[14px] border border-[#e8def6] bg-[#fcfbfe] px-4 text-[14px] font-semibold text-[#1f1630] outline-none"
+                />
+              </label>
+            </div>
+          ) : null}
+        </div>
+
         {filtered.length === 0 ? (
           <SharedEmptyState
             title="No bookings yet"
-            description="When you create or finish bookings, they will appear here with live status updates."
+            description="No bookings match this date filter yet. Try another filter or book a new service."
             action={<AppButton href="/providers">Find Providers</AppButton>}
           />
         ) : null}
         {filtered.map((booking) => (
           <div
             key={booking.id}
-            className="rounded-[26px] border border-[#eadff8] bg-[linear-gradient(180deg,#fffefe_0%,#fffafc_100%)] p-4 shadow-[0_18px_38px_rgba(106,69,160,0.1)]"
+            className="rounded-[28px] border border-[#eadff8] bg-white px-5 py-5 shadow-[0_18px_38px_rgba(106,69,160,0.1)]"
           >
-            <div className="flex items-start gap-3">
-              <div className="rounded-[18px] border border-[#f2e8fb] bg-[#fffaf0] p-1.5 shadow-[0_12px_24px_rgba(106,69,160,0.08)]">
-                <BookingThumb
-                  kind={booking.thumbnail}
-                  imageSrc={booking.imageSrc}
-                  avatarSrc={booking.providerAvatarUrl}
-                  service={booking.service}
-                  providerName={booking.providerFullName || booking.provider}
-                />
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 flex-1 items-start gap-4">
+                <div className="relative h-[5.8rem] w-[5.8rem] shrink-0 overflow-hidden rounded-full border-4 border-white bg-[#f5eefc] shadow-[0_16px_28px_rgba(106,69,160,0.16)]">
+                  {booking.providerAvatarUrl || booking.imageSrc ? (
+                    <Image
+                      src={booking.providerAvatarUrl || booking.imageSrc || ""}
+                      alt={booking.providerFullName || booking.provider}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#8E5EB5_0%,#6b39c5_100%)] text-[1.2rem] font-black text-white">
+                      {providerNameInitials(booking.providerFullName || booking.provider)}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 pt-1">
+                  <p className="text-[1.95rem] font-black leading-[1.05] tracking-[-0.05em] text-[#181538]">
+                    {booking.providerFullName || booking.provider}
+                  </p>
+                  <p className="mt-2 text-[13px] font-medium leading-6 text-[#7b728a]">
+                    {booking.service}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[1.35rem] font-black leading-7 tracking-[-0.04em] text-[#1f1630]">
-                      {booking.providerFullName || booking.provider}
-                    </p>
-                    <p className="mt-1 text-[13px] font-semibold text-[#7b728a]">{booking.service}</p>
-                  </div>
-                  <SharedStatusBadge label={booking.statusLabel} tone={bookingTone(booking)} />
-                </div>
-                <div className="mt-4 space-y-0 overflow-hidden rounded-[20px] border border-[#f0e7fb] bg-white/90">
-                  <div className="flex items-start gap-3 px-4 py-3 text-[13px] text-[#544b66]">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#f6effd] text-[#8E5EB5]">
-                      <CalendarIcon className="h-4.5 w-4.5" />
-                    </span>
-                    <span className="pt-1 font-semibold leading-6">{booking.schedule}</span>
-                  </div>
-                  <div className="h-px bg-[#f3ebfb]" />
-                  <div className="flex items-start gap-3 px-4 py-3 text-[13px] text-[#544b66]">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#f6effd] text-[#8E5EB5]">
-                      <PinIcon className="h-4.5 w-4.5" />
-                    </span>
-                    <span className="pt-1 font-semibold leading-6">{booking.location}</span>
-                  </div>
-                  <div className="h-px bg-[#f3ebfb]" />
-                  <div className="flex items-center gap-3 px-4 py-3 text-[13px] text-[#544b66]">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#f6effd] text-[#8E5EB5]">
-                      <WalletIcon className="h-4.5 w-4.5" />
-                    </span>
-                    <span className="font-black text-[#1f1630]">{formatBookingAmount(booking.paymentAmount)}</span>
-                  </div>
-                </div>
+              <BookingStatusPill label={booking.statusLabel} tone={bookingTone(booking)} />
+            </div>
+
+            <div className="mt-5 w-full overflow-hidden rounded-[24px] border border-[#efe5fb] bg-white shadow-[0_10px_22px_rgba(106,69,160,0.04)]">
+              <div className="flex items-start gap-4 px-4 py-4 text-[#2d274f]">
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#f6effd] text-[#8E5EB5]">
+                  <CalendarIcon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 pt-1 text-left text-[13px] font-semibold leading-7">
+                  {booking.schedule}
+                </span>
+              </div>
+              <div className="h-px bg-[#f1e8fb]" />
+              <div className="flex items-start gap-4 px-4 py-4 text-[#2d274f]">
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#f6effd] text-[#8E5EB5]">
+                  <PinIcon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 pt-1 text-left text-[13px] font-semibold leading-8">
+                  {booking.location}
+                </span>
+              </div>
+              <div className="h-px bg-[#f1e8fb]" />
+              <div className="flex items-center gap-4 px-4 py-4 text-[#2d274f]">
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#f6effd] text-[#8E5EB5]">
+                  <WalletIcon className="h-5 w-5" />
+                </span>
+                <span className="text-[1.1rem] font-black tracking-[-0.03em] text-[#161233]">
+                  {formatBookingAmount(booking.paymentAmount)}
+                </span>
               </div>
             </div>
 
             <Link
               href={`/profile/bookings/${booking.id}`}
-              className="mt-4 flex h-12 w-full items-center justify-between rounded-[16px] bg-[linear-gradient(135deg,#7c3aed_0%,#5b21b6_100%)] px-4 text-[15px] font-extrabold text-white shadow-[0_16px_32px_rgba(91,33,182,0.25)]"
+              className="mt-5 flex h-[3.8rem] w-full items-center justify-between rounded-[20px] bg-[linear-gradient(135deg,#8f40ff_0%,#702cf0_55%,#5a20c9_100%)] px-5 text-[1rem] font-extrabold text-white shadow-[0_18px_34px_rgba(91,33,182,0.28)]"
             >
-              <span>Track Task</span>
-              <ChevronRightIcon className="h-4 w-4" />
+              <span className="pl-1">Track Task</span>
+              <ChevronRightIcon className="h-5 w-5" />
             </Link>
 
             <div className="mt-4 rounded-[22px] border border-[#efe4fb] bg-white p-4 shadow-[0_12px_24px_rgba(106,69,160,0.05)]">
@@ -1574,6 +1676,34 @@ function BookingStatusSummary({ booking }: { booking: Booking }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function BookingStatusPill({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: ReturnType<typeof bookingTone>;
+}) {
+  const toneClass =
+    tone === "completed"
+      ? "border-[#b9efe0] bg-[#e8fbf4] text-[#118c69]"
+      : tone === "accepted"
+        ? "border-[#d9c7ef] bg-[#f6effd] text-[#7c3aed]"
+        : tone === "pending"
+          ? "border-[#fde2b8] bg-[#fff4df] text-[#d97706]"
+          : tone === "declined" || tone === "cancelled"
+            ? "border-[#f6caca] bg-[#fff1f1] text-[#dc2626]"
+            : "border-[#d8e1f1] bg-[#f4f7fb] text-[#64748b]";
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[12px] font-bold ${toneClass}`}
+    >
+      {tone === "completed" ? <CheckCircleIcon className="h-4 w-4" /> : null}
+      <span>{label}</span>
+    </span>
   );
 }
 
@@ -4164,6 +4294,43 @@ function customerInitials(profile: CustomerProfile) {
 
 function formatRinggit(amount: number) {
   return `RM ${amount.toFixed(2)}`;
+}
+
+function getBookingFilterDate(booking: Booking) {
+  const source =
+    booking.scheduledStartAt ||
+    booking.completedAt ||
+    booking.acceptedAt ||
+    booking.createdAt ||
+    "";
+
+  if (!source) {
+    return null;
+  }
+
+  const parsed = new Date(source);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getBookingSortTimestamp(booking: Booking) {
+  return getBookingFilterDate(booking)?.getTime() ?? 0;
+}
+
+function isSameCalendarDate(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function providerNameInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "DE";
 }
 
 function buildReferralCode(firstName: string, lastName: string, phoneNumber: string) {

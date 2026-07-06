@@ -761,6 +761,8 @@ function mapLiveBookingToUi(
     notes: row.customer_note ?? "",
     cancelledBy: workflowStatus === "declined_by_provider" ? "Service provider" : "User",
     cancellationReason: row.decline_reason ?? "",
+    scheduledStartAt: row.scheduled_start_time,
+    scheduledEndAt: row.scheduled_end_time,
     createdAt: row.created_at,
     acceptedAt: row.accepted_at ?? "",
     onTheWayAt: row.on_the_way_at ?? "",

@@ -129,6 +129,8 @@ export type Booking = {
   notes?: string;
   cancelledBy?: string;
   cancellationReason?: string;
+  scheduledStartAt?: string;
+  scheduledEndAt?: string;
   createdAt?: string;
   acceptedAt?: string;
   onTheWayAt?: string;
