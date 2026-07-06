@@ -684,6 +684,7 @@ function BookingDetails({
           ? "current"
           : "waiting",
   } as const;
+  const workFinishedImageCount = booking.workFinishedImages?.length ?? 0;
 
   useEffect(() => {
     setWorkFinishedImages(booking.workFinishedImages ?? []);
@@ -692,7 +693,14 @@ function BookingDetails({
     setWorkImageCropQueue([]);
     setAdditionalAmount(String(booking.additionalCharge || 0));
     setCompletionDescription(booking.additionalChargeDescription || booking.paymentNote || "");
-  }, [booking.id, booking.workFinishedImages, booking.additionalCharge, booking.additionalChargeDescription, booking.paymentNote]);
+  }, [
+    booking.id,
+    booking.bookingStatus,
+    workFinishedImageCount,
+    booking.additionalCharge,
+    booking.additionalChargeDescription,
+    booking.paymentNote,
+  ]);
 
   const fixedAmount = Number(booking.baseAmount || booking.quotedAmount || 0);
   const additionalAmountValue = Number(additionalAmount || 0);
