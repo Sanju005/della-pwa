@@ -27,6 +27,7 @@ import {
   Upload,
   Send,
   Settings,
+  Share2,
   Shield,
   ShieldCheck,
   Star,
@@ -1888,6 +1889,50 @@ export function BookingsScreen({
     }
   }
 
+  async function handleShareBooking(booking: ProviderBookingItem) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const shareLink = `${window.location.origin}/provider/bookings/${booking.id}`;
+    const shareText = [
+      `Task: ${booking.serviceLabel}`,
+      `Date: ${formatDateLabel(booking.scheduledDate)}`,
+      `Time: ${formatTimeLabel(booking.scheduledDate, booking.scheduledStartTime)} - ${formatTimeLabel(booking.scheduledDate, booking.scheduledEndTime)}`,
+      `Address: ${booking.location}`,
+      `Current Status: ${booking.statusLabel}`,
+      `Share Link: ${shareLink}`,
+    ].join("\n");
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${booking.serviceLabel} Task`,
+          text: shareText,
+          url: shareLink,
+        });
+        state.setNotice("Task details shared.");
+        state.setError("");
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareText);
+        state.setNotice("Task details copied to clipboard.");
+        state.setError("");
+        return;
+      }
+
+      state.setError("Sharing is not supported on this device.");
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+
+      state.setError("Unable to share task details right now.");
+    }
+  }
+
   const todayKey = getTodayKey();
   const calendarMonthLabel = new Intl.DateTimeFormat("en-MY", {
     month: "long",
@@ -2066,14 +2111,24 @@ export function BookingsScreen({
                   : "See full task details, path, payment proofs, images, review, and completion status."}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={closeBookingDetails}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f7f6] text-[#64748b]"
-              aria-label="Close booking details"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleShareBooking(selectedBooking)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#e5d5fa] bg-[#fbf8ff] text-[#8E5EB5]"
+                aria-label="Share task details"
+              >
+                <Share2 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={closeBookingDetails}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f7f6] text-[#64748b]"
+                aria-label="Close booking details"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           <div className="mt-4 rounded-[20px] border border-[#eee5f7] bg-[#fcfaff] p-4">
