@@ -50,6 +50,7 @@ export function MarketplaceScreen({
 }: HomeFeedData) {
   const [displayName, setDisplayName] = useState(greetingName);
   const [displayLocation, setDisplayLocation] = useState(locationLabel);
+  const availablePointsLabel = "1,250 pts";
 
   useEffect(() => {
     let active = true;
@@ -155,6 +156,31 @@ export function MarketplaceScreen({
               ))}
             </div>
           </section>
+
+          <Link
+            href="/profile/rewards"
+            className="mt-6 block rounded-[24px] border border-[#eadff8] bg-[linear-gradient(135deg,#ffffff_0%,#f8f1ff_100%)] p-4 shadow-[0_14px_32px_rgba(106,69,160,0.08)]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#8E5EB5]">
+                  Finance
+                </p>
+                <h2 className="mt-2 text-[1.05rem] font-bold tracking-[-0.03em] text-[#0F172A]">
+                  Available Points
+                </h2>
+                <p className="mt-2 text-[1.7rem] font-black tracking-[-0.05em] text-[#8E5EB5]">
+                  {availablePointsLabel}
+                </p>
+                <p className="mt-1 text-[12px] text-[#6b7280]">
+                  Tap to view rewards and redeem options.
+                </p>
+              </div>
+              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#8E5EB5_0%,#7247ac_100%)] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]">
+                <CreditCard className="h-6 w-6 stroke-[2]" />
+              </span>
+            </div>
+          </Link>
 
           {errorMessage ? (
             <div className="mt-6 rounded-[18px] border border-[#F3C7C7] bg-[#FFF4F4] px-4 py-3 text-[13px] font-semibold text-[#B42318]">
