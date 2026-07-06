@@ -414,16 +414,16 @@ function ShowAllProvidersCard({
   return (
     <Link
       href={href}
-      className="flex h-full min-h-[25.5rem] w-full flex-col justify-between rounded-[22px] border border-dashed border-[#dcccf0] bg-[linear-gradient(180deg,#fcf8ff_0%,#f7efff_100%)] p-4 text-left shadow-[0_14px_32px_rgba(15,23,42,0.06)]"
+      className="flex h-full min-h-[25.5rem] w-full flex-col justify-between rounded-[22px] border border-dashed border-[#dcccf0] bg-[linear-gradient(180deg,#fcf8ff_0%,#f7efff_100%)] p-4 text-center shadow-[0_14px_32px_rgba(15,23,42,0.06)]"
     >
-      <div>
+      <div className="flex flex-col items-center">
         <div className="inline-flex h-14 w-14 items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#8E5EB5_0%,#7247ac_100%)] text-white shadow-[0_14px_28px_rgba(142,94,181,0.18)]">
           <ChevronRight className="h-7 w-7" />
         </div>
         <h3 className="mt-5 text-[1.25rem] font-bold leading-tight tracking-[-0.04em] text-[#162544]">
           Show All
         </h3>
-        <p className="mt-2 text-[0.9rem] leading-6 text-[#667085]">
+        <p className="mt-2 max-w-[15rem] text-[0.9rem] leading-6 text-[#667085]">
           See all {label} nearby and explore more provider options.
         </p>
       </div>

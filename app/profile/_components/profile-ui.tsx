@@ -1891,6 +1891,11 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
   const [paymentProofDataUrl, setPaymentProofDataUrl] = useState("");
   const [paymentProofFileName, setPaymentProofFileName] = useState("");
   const [paymentProofMimeType, setPaymentProofMimeType] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportMessage, setReportMessage] = useState("");
+  const [reportError, setReportError] = useState("");
+  const [reportNotice, setReportNotice] = useState("");
+  const [reportSubmitting, startReportTransition] = useTransition();
   const paymentMarkedPaid =
     booking.paymentStatus === "paid" ||
     ["cash_paid_by_user", "payment_received_by_provider", "completed"].includes(booking.workflowStatus);
@@ -1899,7 +1904,9 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
     ["cash_paid_by_user", "payment_received_by_provider", "completed"].includes(booking.workflowStatus) &&
     booking.userReviewStatus !== "submitted";
   const paidDateLabel =
-    canPayNow
+    paymentMarkedPaid
+      ? "Payment Done"
+      : canPayNow
       ? "Awaiting Customer Payment"
       : booking.status === "ongoing"
         ? "Payment Pending"
@@ -2067,6 +2074,71 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
     } catch {
       setPaymentError("Unable to read the payment proof file.");
     }
+  }
+
+  function handleReportIssue() {
+    setReportOpen(true);
+    setReportError("");
+    setReportNotice("");
+  }
+
+  function submitIssueReport() {
+    const client = getSupabaseClient();
+
+    startReportTransition(async () => {
+      setReportError("");
+      setReportNotice("");
+
+      if (!client) {
+        setReportError("Supabase is not configured yet.");
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+
+      if (!session) {
+        setReportError("Your session expired. Please log in again.");
+        return;
+      }
+
+      if (!reportMessage.trim()) {
+        setReportError("Please describe the issue before sending.");
+        return;
+      }
+
+      const response = await fetch("/api/reports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          bookingId: booking.id,
+          bookingTitle: `${booking.service} - ${booking.providerFullName || booking.provider}`,
+          providerName: booking.providerFullName || booking.provider,
+          schedule: booking.schedule,
+          location: booking.location,
+          paymentAmount: booking.paymentAmount ?? 0,
+          paymentMethod: booking.paymentMethod ?? "Cash",
+          message: reportMessage,
+        }),
+      }).catch(() => null);
+
+      const result = response
+        ? ((await response.json().catch(() => ({}))) as { success?: boolean; error?: string })
+        : null;
+
+      if (!response || !response.ok || !result?.success) {
+        setReportError(result?.error || "Unable to send the report right now.");
+        return;
+      }
+
+      setReportOpen(false);
+      setReportMessage("");
+      setReportNotice("Issue report sent successfully. Admin will receive it in reports.");
+    });
   }
 
   return (
@@ -2295,37 +2367,21 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
         ) : null}
       </section>
 
-      <section className="mt-4 rounded-[24px] border border-[#ebe2f8] bg-white p-4 shadow-[0_14px_30px_rgba(106,69,160,0.07)]">
-        <p className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#8E5EB5]">
-          Payment Method
-        </p>
-        <div className="mt-4">
-          <div className="rounded-[18px] border-2 border-[#8E5EB5] bg-white px-4 py-4 shadow-[0_10px_22px_rgba(142,94,181,0.08)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[15px] font-black text-[#1f1630]">Cash</p>
-                <p className="mt-1 text-[12px] text-[#6d6480]">Pay directly to provider</p>
-              </div>
-              <span className="rounded-full bg-[#8E5EB5] px-2 py-1 text-[11px] font-bold text-white">
-                Active
-              </span>
-            </div>
-          </div>
-          <p className="mt-3 text-[12px] text-[#8f86a2]">
-            Cash is the only customer payment option available for now. More payment methods can be added later.
-          </p>
-        </div>
-      </section>
-
       {paymentError ? (
         <p className="mt-4 rounded-[16px] border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-[13px] font-semibold text-[#dc2626]">
           {paymentError}
         </p>
       ) : null}
 
-      {paymentNotice || searchParams.get("payment") === "success" ? (
+      {reportError ? (
+        <p className="mt-4 rounded-[16px] border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-[13px] font-semibold text-[#dc2626]">
+          {reportError}
+        </p>
+      ) : null}
+
+      {paymentNotice || reportNotice || searchParams.get("payment") === "success" ? (
         <p className="mt-4 rounded-[16px] border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-[13px] font-semibold text-[#15803d]">
-          {paymentNotice || "Cash payment confirmed successfully."}
+          {paymentNotice || reportNotice || "Cash payment confirmed successfully."}
         </p>
       ) : null}
 
@@ -2368,11 +2424,85 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
         />
       </SectionCard>
 
-      <SectionCard title="Notes">
-        <p className="text-[14px] leading-6 text-[#374151]">
-          {booking.notes || "No additional note added for this booking."}
-        </p>
-      </SectionCard>
+      <section className="mt-4 rounded-[24px] border border-[#ebe2f8] bg-white p-4 shadow-[0_14px_30px_rgba(106,69,160,0.07)]">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[15px] font-bold text-[#24193a]">Report an Issue</p>
+            <p className="mt-1 text-[13px] leading-6 text-[#6d6480]">
+              Send this task details to admin and describe the issue you are facing.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleReportIssue}
+            className="inline-flex shrink-0 items-center justify-center rounded-[14px] bg-[#fff1f2] px-4 py-2 text-[13px] font-bold text-[#dc2626]"
+          >
+            Report
+          </button>
+        </div>
+      </section>
+
+      {reportOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1f1630]/45 px-4 py-6 sm:items-center">
+          <div className="w-full max-w-[430px] rounded-[28px] bg-white p-5 shadow-[0_24px_48px_rgba(31,22,48,0.24)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[18px] font-black tracking-[-0.03em] text-[#24193a]">
+                  Report an Issue
+                </p>
+                <p className="mt-1 text-[13px] text-[#6d6480]">
+                  Task details are included below for admin.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReportOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f5f1fa] text-[#8E5EB5]"
+              >
+                <CloseCircleIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-[18px] border border-[#ebe2f8] bg-[#fcf9ff] p-4 text-[13px] text-[#374151]">
+              <p><span className="font-bold text-[#24193a]">Task:</span> {booking.service}</p>
+              <p className="mt-2"><span className="font-bold text-[#24193a]">Provider:</span> {booking.providerFullName || booking.provider}</p>
+              <p className="mt-2"><span className="font-bold text-[#24193a]">Booking ID:</span> {booking.id}</p>
+              <p className="mt-2"><span className="font-bold text-[#24193a]">Schedule:</span> {booking.schedule}</p>
+              <p className="mt-2"><span className="font-bold text-[#24193a]">Location:</span> {booking.location}</p>
+              <p className="mt-2"><span className="font-bold text-[#24193a]">Payment:</span> RM{booking.paymentAmount ?? 0} • {booking.paymentMethod ?? "Cash"}</p>
+            </div>
+
+            <label className="mt-4 block">
+              <span className="mb-2 block text-[13px] font-bold text-[#24193a]">Describe the issue</span>
+              <textarea
+                value={reportMessage}
+                onChange={(event) => setReportMessage(event.target.value)}
+                rows={5}
+                className="w-full rounded-[18px] border border-[#d9c7ef] bg-white px-4 py-3 text-[14px] leading-6 text-[#24193a] outline-none"
+                placeholder="Explain what happened with this task..."
+              />
+            </label>
+
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setReportOpen(false)}
+                className="inline-flex h-12 flex-1 items-center justify-center rounded-[16px] border border-[#d9c7ef] bg-white text-[14px] font-bold text-[#8E5EB5]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitIssueReport}
+                disabled={reportSubmitting}
+                className="inline-flex h-12 flex-1 items-center justify-center rounded-[16px] bg-[#8E5EB5] text-[14px] font-bold text-white shadow-[0_16px_30px_rgba(142,94,181,0.24)] disabled:opacity-70"
+              >
+                {reportSubmitting ? "Sending..." : "Send to Admin"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
     </ProfileShell>
   );
