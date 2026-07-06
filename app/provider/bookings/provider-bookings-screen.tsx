@@ -901,72 +901,101 @@ function BookingDetails({
               />
             </label>
             <div className="mt-6">
-              <p className="text-[13px] font-extrabold text-[#1f1630]">Completion Images</p>
-              <p className="mt-1 text-[12px] text-[#64748b]">Add up to 3 proof files. Gallery: JPG, JPEG, PDF. Camera: image.</p>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {Array.from({ length: WORK_FINISHED_IMAGE_MAX_COUNT }).map((_, index) => {
-                  const image = workFinishedImages[index];
-                  return image ? (
-                    <div
-                      key={`${booking.id}-work-image-${index}`}
-                      className="relative aspect-[0.88] overflow-hidden rounded-[18px] border border-[#d9b0d0] bg-[#fff7fc] p-2"
-                    >
-                      {isPdfWorkProof(image) ? (
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-[14px] border border-dashed border-[#d56ab1] bg-white px-3 text-center text-[#d63384]">
-                          <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
-                          <span className="text-[12px] font-semibold leading-5">Proof file {index + 1}</span>
+              <div className="overflow-hidden rounded-[28px] border border-[#f2e8fb] bg-[radial-gradient(circle_at_top_left,rgba(255,230,242,0.9),transparent_18%),radial-gradient(circle_at_top_right,rgba(241,234,255,0.8),transparent_20%),linear-gradient(180deg,#ffffff_0%,#fffdfd_100%)] p-5 shadow-[0_18px_44px_rgba(86,38,135,0.07)]">
+                <div className="flex items-start gap-4">
+                  <span className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95),rgba(248,214,233,0.95))] text-[#e83e9a] shadow-[0_12px_26px_rgba(232,62,154,0.12)]">
+                    <ImageIcon className="h-8 w-8" />
+                  </span>
+                  <div>
+                    <p className="text-[14px] font-black tracking-[-0.03em] text-[#1f1630] sm:text-[15px]">
+                      Completion Images
+                    </p>
+                    <p className="mt-1 text-[12px] leading-6 text-[#7d84a0] sm:text-[13px]">
+                      Add up to 3 proof files. Gallery: JPG, JPEG, PDF. Camera: image only.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-3 gap-3">
+                  {Array.from({ length: WORK_FINISHED_IMAGE_MAX_COUNT }).map((_, index) => {
+                    const image = workFinishedImages[index];
+
+                    if (image) {
+                      return (
+                        <div
+                          key={`${booking.id}-work-image-${index}`}
+                          className="relative aspect-[0.88] overflow-hidden rounded-[22px] bg-white p-3 shadow-[0_16px_34px_rgba(86,38,135,0.08)]"
+                        >
+                          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[18px] border-2 border-dashed border-[#ff5ab8] bg-[#fffdfd]">
+                            {isPdfWorkProof(image) ? (
+                              <div className="flex flex-col items-center justify-center gap-3 px-3 text-center text-[#e83e9a]">
+                                <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                                <ImageIcon className="h-8 w-8" />
+                                <span className="text-[11px] font-semibold leading-4">Proof file {index + 1}</span>
+                              </div>
+                            ) : (
+                              <img
+                                src={image}
+                                alt={`Completion proof ${index + 1}`}
+                                className="h-full w-full object-cover"
+                              />
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                            }
+                            className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#1f1630]/70 text-[12px] font-black text-white"
+                            aria-label={`Remove completion proof ${index + 1}`}
+                          >
+                            x
+                          </button>
                         </div>
-                      ) : (
-                        <div className="h-full w-full overflow-hidden rounded-[14px] border border-dashed border-[#d56ab1] bg-white">
-                          <img src={image} alt={`Completion proof ${index + 1}`} className="h-full w-full object-cover" />
-                        </div>
-                      )}
+                      );
+                    }
+
+                    return (
                       <button
+                        key={`${booking.id}-work-image-slot-${index}`}
                         type="button"
-                        onClick={() =>
-                          setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
-                        }
-                        className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-[12px] font-black text-white"
-                        aria-label={`Remove completion proof ${index + 1}`}
+                        onClick={() => workFinishedInputRef.current?.click()}
+                        className="aspect-[0.88] rounded-[22px] bg-white p-3 shadow-[0_16px_34px_rgba(86,38,135,0.08)]"
                       >
-                        x
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      key={`${booking.id}-work-image-slot-${index}`}
-                      type="button"
-                      onClick={() => workFinishedInputRef.current?.click()}
-                      className="flex aspect-[0.88] flex-col items-center justify-center rounded-[18px] border border-[#e8bfd8] bg-[#fff7fc] p-2 text-[#d63384]"
-                    >
-                      <span className="flex h-full w-full flex-col items-center justify-center rounded-[14px] border-2 border-dashed border-current bg-white">
-                        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border-2 border-current">
-                          <Plus className="h-5 w-5" />
+                        <span className="flex h-full w-full flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-[#ff5ab8] bg-[#fffdfd] text-[#e83e9a]">
+                          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95),rgba(248,214,233,0.95))] shadow-[0_10px_22px_rgba(232,62,154,0.12)]">
+                            <Plus className="h-6 w-6" />
+                          </span>
+                          <ImageIcon className="mt-4 h-9 w-9" />
                         </span>
-                        <ImageIcon className="mt-3 h-6 w-6" />
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-4 flex items-center justify-center gap-4 text-[13px] font-medium text-[#7b728a]">
-                <button
-                  type="button"
-                  onClick={() => workFinishedInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 text-[#7b728a]"
-                >
-                  <ImageIcon className="h-5 w-5 text-[#8E5EB5]" />
-                  Choose from gallery
-                </button>
-                <span className="text-[#d2c2ea]">|</span>
-                <button
-                  type="button"
-                  onClick={() => workFinishedCameraInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 text-[#7b728a]"
-                >
-                  <Camera className="h-5 w-5 text-[#8E5EB5]" />
-                  Take a photo
-                </button>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-5 flex items-center justify-center gap-3 text-[#1f1630]">
+                  <button
+                    type="button"
+                    onClick={() => workFinishedInputRef.current?.click()}
+                    className="inline-flex flex-1 items-center justify-center gap-3 rounded-[18px] px-2 py-2.5 text-center"
+                  >
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#f4edff_0%,#f8f1ff_100%)] text-[#8E5EB5] shadow-[0_10px_24px_rgba(142,94,181,0.08)]">
+                      <ImageIcon className="h-6 w-6" />
+                    </span>
+                    <span className="text-[12px] font-bold leading-5 sm:text-[13px]">Choose from gallery</span>
+                  </button>
+                  <span className="h-12 w-px bg-[#eadcf8]" />
+                  <button
+                    type="button"
+                    onClick={() => workFinishedCameraInputRef.current?.click()}
+                    className="inline-flex flex-1 items-center justify-center gap-3 rounded-[18px] px-2 py-2.5 text-center"
+                  >
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#f4edff_0%,#f8f1ff_100%)] text-[#8E5EB5] shadow-[0_10px_24px_rgba(142,94,181,0.08)]">
+                      <Camera className="h-6 w-6" />
+                    </span>
+                    <span className="text-[12px] font-bold leading-5 sm:text-[13px]">Take a photo</span>
+                  </button>
+                </div>
               </div>
               {workFinishedImageError ? (
                 <p className="mt-3 text-[12px] font-semibold text-[#dc2626]">{workFinishedImageError}</p>
