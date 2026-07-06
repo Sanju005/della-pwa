@@ -125,9 +125,9 @@ export function MarketplaceScreen({
                   priority
                   className="h-auto w-[148px]"
                 />
-                <h1 className="mt-7 text-[28px] font-extrabold leading-[1.12] tracking-[-0.05em] text-[#0F172A]">
-                  {timePrefix()}{" "}
-                  <span className="inline-flex items-center gap-1">
+                <h1 className="mt-7 text-[26px] font-normal leading-[1.2] tracking-[-0.03em] text-[#0F172A]">
+                  <span className="block">{timePrefix()}</span>
+                  <span className="mt-1 inline-flex items-center gap-1">
                     {displayName} <span aria-hidden>👋</span>
                   </span>
                 </h1>

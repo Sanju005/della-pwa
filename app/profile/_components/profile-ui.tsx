@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   AppButton,
   BookingCard as SharedBookingCard,
@@ -1884,7 +1884,7 @@ export function SettingsScreen({ groups }: SettingsProps) {
 
 export function BookingDetailScreen({ booking }: BookingDetailProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const paymentQuery = useClientSearchParam("payment");
   const [paymentError, setPaymentError] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
   const [paymentLoading, startPaymentTransition] = useTransition();
@@ -1993,10 +1993,10 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
   } as const;
 
   useEffect(() => {
-    if (searchParams.get("payment") === "success") {
+    if (paymentQuery === "success") {
       setPaymentNotice("Cash payment confirmed successfully.");
     }
-  }, [searchParams]);
+  }, [paymentQuery]);
 
   function handleCashPaid() {
     const client = getSupabaseClient();
@@ -2379,7 +2379,7 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
         </p>
       ) : null}
 
-      {paymentNotice || reportNotice || searchParams.get("payment") === "success" ? (
+      {paymentNotice || reportNotice || paymentQuery === "success" ? (
         <p className="mt-4 rounded-[16px] border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 text-[13px] font-semibold text-[#15803d]">
           {paymentNotice || reportNotice || "Cash payment confirmed successfully."}
         </p>
@@ -4262,8 +4262,7 @@ function AvatarCircle({
 
 function BottomNav() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const activeTab = searchParams.get("tab");
+  const activeTab = useClientSearchParam("tab");
   const isBookingsRoute = pathname.startsWith("/profile/bookings");
 
   return (
@@ -4468,6 +4467,51 @@ function isSameCalendarDate(left: Date, right: Date) {
     left.getMonth() === right.getMonth() &&
     left.getDate() === right.getDate()
   );
+}
+
+function useClientSearchParam(name: string) {
+  const [value, setValue] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const readValue = () => {
+      setValue(new URLSearchParams(window.location.search).get(name));
+    };
+
+    readValue();
+
+    const handleLocationChange = () => {
+      readValue();
+    };
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function pushStateWrapper(...args) {
+      const result = originalPushState.apply(this, args);
+      handleLocationChange();
+      return result;
+    };
+
+    window.history.replaceState = function replaceStateWrapper(...args) {
+      const result = originalReplaceState.apply(this, args);
+      handleLocationChange();
+      return result;
+    };
+
+    window.addEventListener("popstate", handleLocationChange);
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+      window.removeEventListener("popstate", handleLocationChange);
+    };
+  }, [name]);
+
+  return value;
 }
 
 function providerNameInitials(name: string) {
