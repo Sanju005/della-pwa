@@ -8,6 +8,7 @@ import {
   Bell,
   BookOpen,
   BriefcaseBusiness,
+  ChevronRight,
   CreditCard,
   CircleUserRound,
   CookingPot,
@@ -263,6 +264,9 @@ function ProviderSliderSection({
               />
             </div>
           ))}
+          <div className="w-[calc(100vw-5.5rem)] max-w-[17rem] shrink-0">
+            <ShowAllProvidersCard href={href} title={title} />
+          </div>
         </div>
       </div>
     </section>
@@ -366,6 +370,49 @@ function PopularProviderCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function ShowAllProvidersCard({
+  href,
+  title,
+}: {
+  href: string;
+  title: string;
+}) {
+  const label = title
+    .replace(/^Popular\s+/i, "")
+    .replace(/\s+nearby you$/i, "")
+    .trim();
+
+  return (
+    <Link
+      href={href}
+      className="flex h-full min-h-[25.5rem] w-full flex-col justify-between rounded-[22px] border border-dashed border-[#dcccf0] bg-[linear-gradient(180deg,#fcf8ff_0%,#f7efff_100%)] p-4 text-left shadow-[0_14px_32px_rgba(15,23,42,0.06)]"
+    >
+      <div>
+        <div className="inline-flex h-14 w-14 items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#8E5EB5_0%,#7247ac_100%)] text-white shadow-[0_14px_28px_rgba(142,94,181,0.18)]">
+          <ChevronRight className="h-7 w-7" />
+        </div>
+        <h3 className="mt-5 text-[1.25rem] font-bold leading-tight tracking-[-0.04em] text-[#162544]">
+          Show All
+        </h3>
+        <p className="mt-2 text-[0.9rem] leading-6 text-[#667085]">
+          See all {label} nearby and explore more provider options.
+        </p>
+      </div>
+
+      <div className="rounded-[16px] border border-[#e4d7f5] bg-white/80 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[0.82rem] font-semibold text-[#8E5EB5]">
+            Open full list
+          </span>
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f4ebfc] text-[#8E5EB5]">
+            <ChevronRight className="h-4 w-4" />
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }
 
