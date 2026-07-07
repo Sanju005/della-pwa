@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import swiperLogo from "../../../Logo/Swiper.png";
-import chefCategoryIcon from "../../../Icon/Services/chef-01.png";
+import chefCategoryIcon from "../../../Icon/Services/chef new.png";
 import cleanerCategoryIcon from "../../../Icon/Services/cleaner.png";
 import {
   BookOpen,
