@@ -4,26 +4,26 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import swiperLogo from "../../../Logo/Swiper.png";
+import babysitterCategoryIcon from "../../../Icon/Services/baby-01.png";
 import chefCategoryIcon from "../../../Icon/Services/chef new.png";
-import cleanerCategoryIcon from "../../../Icon/Services/cleaner.png";
+import cleanerCategoryIcon from "../../../Icon/Services/cleaner-01.png";
+import driverCategoryIcon from "../../../Icon/Services/driver-01.png";
+import electricianCategoryIcon from "../../../Icon/Services/Electrician-01.png";
+import maidCategoryIcon from "../../../Icon/Services/maid-01.png";
+import plumberCategoryIcon from "../../../Icon/Services/Plumber-01.png";
+import tutorCategoryIcon from "../../../Icon/Services/Tutor-01.png";
 import {
   BookOpen,
   BriefcaseBusiness,
   ChevronRight,
   CreditCard,
   CircleUserRound,
-  CookingPot,
   House,
   MapPin,
   Smartphone,
   Star,
-  SprayCan,
   UserRound,
   User,
-  Wrench,
-  Baby,
-  CarFront,
-  Bolt,
   Heart,
 } from "lucide-react";
 import {
@@ -466,18 +466,12 @@ function ProviderBadge({
 }
 
 function CategoryItem({ category }: { category: HomeServiceCategory }) {
-  const usesUploadedIcon = category.key === "chef" || category.key === "cleaner";
-
   return (
     <Link
       href={`/providers?service=${category.key}`}
       className="flex flex-col items-center text-center"
     >
-      <div
-        className={`flex items-center justify-center text-[#8E5EB5] ${
-          usesUploadedIcon ? "h-[4.5rem] w-[4.5rem]" : "h-[3.7rem] w-[3.7rem] rounded-[18px] bg-[#f3ebfc]"
-        }`}
-      >
+      <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center text-[#8E5EB5]">
         <CategoryIcon kind={category.key} />
       </div>
       <p className="mt-3 text-[13px] font-semibold tracking-[-0.02em] text-[#0F172A]">
@@ -498,11 +492,29 @@ function CategoryIcon({ kind }: { kind: string }) {
         />
       );
     case "maid":
-      return <BriefcaseBusiness className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return (
+        <Image
+          src={maidCategoryIcon}
+          alt="Maid"
+          className="h-[4.1rem] w-[4.1rem] object-contain"
+        />
+      );
     case "babysitter":
-      return <Baby className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return (
+        <Image
+          src={babysitterCategoryIcon}
+          alt="Babysitter"
+          className="h-[4.1rem] w-[4.1rem] object-contain"
+        />
+      );
     case "driver":
-      return <CarFront className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return (
+        <Image
+          src={driverCategoryIcon}
+          alt="Driver"
+          className="h-[4.1rem] w-[4.1rem] object-contain"
+        />
+      );
     case "cleaner":
       return (
         <Image
@@ -512,11 +524,29 @@ function CategoryIcon({ kind }: { kind: string }) {
         />
       );
     case "tutor":
-      return <BookOpen className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return (
+        <Image
+          src={tutorCategoryIcon}
+          alt="Tutor"
+          className="h-[4.1rem] w-[4.1rem] object-contain"
+        />
+      );
     case "plumber":
-      return <Wrench className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return (
+        <Image
+          src={plumberCategoryIcon}
+          alt="Plumber"
+          className="h-[4.1rem] w-[4.1rem] object-contain"
+        />
+      );
     case "electrician":
-      return <Bolt className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return (
+        <Image
+          src={electricianCategoryIcon}
+          alt="Electrician"
+          className="h-[4.1rem] w-[4.1rem] object-contain"
+        />
+      );
     default:
       return <UserRound className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
   }
