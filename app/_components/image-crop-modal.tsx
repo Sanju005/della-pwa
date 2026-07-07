@@ -76,7 +76,7 @@ export function ImageCropModal({
       : { x: 7, y: 24, width: 86, height: 52 },
   );
   const [dragState, setDragState] = useState<{
-    mode: "move" | "nw" | "ne" | "sw" | "se";
+    mode: "move" | "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se";
     startX: number;
     startY: number;
     startSelection: CropSelection;
@@ -141,6 +141,42 @@ export function ImageCropModal({
     }
 
     if (!lockedAspectRatio) {
+      if (dragState.mode === "e") {
+        setSelection(clampSelection({
+          ...original,
+          width: original.width + deltaX,
+        }));
+        return;
+      }
+
+      if (dragState.mode === "w") {
+        setSelection(clampSelection({
+          x: original.x + deltaX,
+          y: original.y,
+          width: original.width - deltaX,
+          height: original.height,
+        }));
+        return;
+      }
+
+      if (dragState.mode === "s") {
+        setSelection(clampSelection({
+          ...original,
+          height: original.height + deltaY,
+        }));
+        return;
+      }
+
+      if (dragState.mode === "n") {
+        setSelection(clampSelection({
+          x: original.x,
+          y: original.y + deltaY,
+          width: original.width,
+          height: original.height - deltaY,
+        }));
+        return;
+      }
+
       if (dragState.mode === "se") {
         setSelection(clampSelection({
           ...original,
@@ -217,7 +253,7 @@ export function ImageCropModal({
 
   const startDrag = (
     event: React.PointerEvent<HTMLElement>,
-    mode: "move" | "nw" | "ne" | "sw" | "se",
+    mode: "move" | "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se",
   ) => {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -245,7 +281,7 @@ export function ImageCropModal({
                   : "document image"}.
           </p>
           {tone === "document" || tone === "work" ? (
-            <p className="mt-1 text-[11px] text-white/50">Free crop: drag each corner to any size you need.</p>
+            <p className="mt-1 text-[11px] text-white/50">Free crop: drag any side or corner to resize without a locked ratio.</p>
           ) : null}
         </div>
 
@@ -280,6 +316,30 @@ export function ImageCropModal({
               <span className="pointer-events-none absolute left-2/3 top-0 h-full border-l border-white/40" />
               <span className="pointer-events-none absolute left-0 top-1/3 w-full border-t border-white/40" />
               <span className="pointer-events-none absolute left-0 top-2/3 w-full border-t border-white/40" />
+              {!lockedAspectRatio ? (
+                <>
+                  <span
+                    role="presentation"
+                    onPointerDown={(event) => startDrag(event, "n")}
+                    className="absolute left-1/2 top-0 h-5 w-10 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize rounded-full border-2 border-white bg-[#8E5EB5]"
+                  />
+                  <span
+                    role="presentation"
+                    onPointerDown={(event) => startDrag(event, "s")}
+                    className="absolute bottom-0 left-1/2 h-5 w-10 -translate-x-1/2 translate-y-1/2 cursor-ns-resize rounded-full border-2 border-white bg-[#8E5EB5]"
+                  />
+                  <span
+                    role="presentation"
+                    onPointerDown={(event) => startDrag(event, "w")}
+                    className="absolute left-0 top-1/2 h-10 w-5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-white bg-[#8E5EB5]"
+                  />
+                  <span
+                    role="presentation"
+                    onPointerDown={(event) => startDrag(event, "e")}
+                    className="absolute right-0 top-1/2 h-10 w-5 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-white bg-[#8E5EB5]"
+                  />
+                </>
+              ) : null}
               {(["nw", "ne", "sw", "se"] as const).map((handle) => (
                 <span
                   key={handle}
