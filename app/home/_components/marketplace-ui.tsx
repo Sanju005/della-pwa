@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import swiperLogo from "../../../Logo/Swiper.png";
 import chefCategoryIcon from "../../../Icon/Services/chef-01.png";
+import cleanerCategoryIcon from "../../../Icon/Services/cleaner.png";
 import {
   BookOpen,
   BriefcaseBusiness,
@@ -465,7 +466,7 @@ function ProviderBadge({
 }
 
 function CategoryItem({ category }: { category: HomeServiceCategory }) {
-  const isChef = category.key === "chef";
+  const usesUploadedIcon = category.key === "chef" || category.key === "cleaner";
 
   return (
     <Link
@@ -474,7 +475,7 @@ function CategoryItem({ category }: { category: HomeServiceCategory }) {
     >
       <div
         className={`flex items-center justify-center text-[#8E5EB5] ${
-          isChef ? "h-[4.5rem] w-[4.5rem]" : "h-[3.7rem] w-[3.7rem] rounded-[18px] bg-[#f3ebfc]"
+          usesUploadedIcon ? "h-[4.5rem] w-[4.5rem]" : "h-[3.7rem] w-[3.7rem] rounded-[18px] bg-[#f3ebfc]"
         }`}
       >
         <CategoryIcon kind={category.key} />
@@ -503,7 +504,13 @@ function CategoryIcon({ kind }: { kind: string }) {
     case "driver":
       return <CarFront className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
     case "cleaner":
-      return <SprayCan className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return (
+        <Image
+          src={cleanerCategoryIcon}
+          alt="Cleaner"
+          className="h-[4.1rem] w-[4.1rem] object-contain"
+        />
+      );
     case "tutor":
       return <BookOpen className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
     case "plumber":
