@@ -500,7 +500,7 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
     <ProfileShell title="My Profile" showBottomNav>
       <ProfileSummaryCard profile={profile} fullName={fullName} />
       <ProfileCompletion completion={profile.completion} />
-      <CustomerVerificationSection verified={profile.verified} />
+      <CustomerVerificationSection profile={profile} />
       <WalletSummaryCard
         walletBalance={paymentSummary.walletBalance}
         walletPanel={walletPanel}
@@ -631,88 +631,196 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
 }
 
 function CustomerVerificationSection({
-  verified,
+  profile,
 }: {
-  verified: boolean;
+  profile: CustomerProfile;
 }) {
   return (
-    <section className="mt-4 rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-4">
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
-            <CheckShieldIcon className="h-7 w-7" />
-          </span>
-          <div>
-            <h3 className="text-[1.5rem] font-black tracking-[-0.05em] text-[#1f1630]">
-              Verification
-            </h3>
-            <p className="mt-1 text-[13px] text-[#7b728a]">
-              Verification status for your account
-            </p>
-          </div>
+    <Link
+      href="/profile/verification"
+      className="mt-4 flex items-center justify-between gap-3 rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]"
+    >
+      <div className="flex min-w-0 items-center gap-4">
+        <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
+          <CheckShieldIcon className="h-7 w-7" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-[1.25rem] font-black tracking-[-0.05em] text-[#1f1630]">
+            Verification
+          </h3>
+          <p className="mt-1 text-[13px] leading-5 text-[#7b728a]">
+            Open phone, email, and IC / passport verification
+          </p>
         </div>
-        <Link
-          href="/profile/edit"
-          className="rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-bold text-[#8E5EB5]"
-        >
-          Verify / Edit
-        </Link>
       </div>
-
-      <div className="mt-5 space-y-3">
-        <Link
-          href="/profile/edit"
-          className="flex items-center justify-between gap-3 rounded-[22px] border border-[#ece4fa] bg-white px-4 py-4 shadow-[0_8px_18px_rgba(106,69,160,0.04)]"
+      <div className="flex shrink-0 items-center gap-3">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${
+            profile.verified
+              ? "bg-[#eef9f0] text-[#16a34a]"
+              : "bg-[#fff7ed] text-[#f59e0b]"
+          }`}
         >
-          <div className="flex min-w-0 items-center gap-4">
-            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#f6effd] text-[#8E5EB5]">
-              <UserIcon className="h-6 w-6" />
+          {profile.verified ? <CheckCircleIcon className="h-4 w-4" /> : null}
+          {profile.verified ? "Verified" : "Pending"}
+        </span>
+        <ChevronRightIcon className="h-5 w-5 text-[#98a2b3]" />
+      </div>
+    </Link>
+  );
+}
+
+export function CustomerVerificationHubScreen({ initialProfile }: EditProps) {
+  const [profile, setProfile] = useState(initialProfile);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadLiveProfile() {
+      const client = getSupabaseClient();
+
+      if (!client) {
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+
+      if (!active || !session) {
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/profile/me", {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        const result = (await response.json()) as
+          | {
+              profile: CustomerProfile;
+            }
+          | { error?: string };
+
+        if (active && response.ok && "profile" in result) {
+          setProfile(result.profile);
+        }
+      } catch {
+        return;
+      }
+    }
+
+    void loadLiveProfile();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const emailVerified = Boolean(profile.email.trim());
+  const phoneVerified = Boolean(profile.phoneNumber.trim());
+  const identityVerified = profile.verified;
+
+  return (
+    <ProfileShell title="Verification" showBack backHref="/profile" showBottomNav={false}>
+      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-4">
+            <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
+              <CheckShieldIcon className="h-7 w-7" />
             </span>
-            <div className="min-w-0">
-              <p className="text-[1.05rem] font-bold tracking-[-0.03em] text-[#1f1630]">
-                Personal Account
-              </p>
+            <div>
+              <h3 className="text-[1.5rem] font-black tracking-[-0.05em] text-[#1f1630]">
+                Verification
+              </h3>
               <p className="mt-1 text-[13px] text-[#7b728a]">
-                Profile verification status
+                Verification status for your account
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${
-                verified
-                  ? "bg-[#eef9f0] text-[#16a34a]"
-                  : "bg-[#fff7ed] text-[#f59e0b]"
-              }`}
-            >
-              {verified ? <CheckCircleIcon className="h-4 w-4" /> : null}
-              {verified ? "Verified" : "Pending"}
-            </span>
-            <ChevronRightIcon className="h-5 w-5 text-[#98a2b3]" />
-          </div>
-        </Link>
-      </div>
-
-      <div className="mt-5 flex items-center justify-between gap-4 rounded-[22px] border border-[#e7dcf8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f4edff_100%)] p-4">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#7c3aed] shadow-[0_10px_24px_rgba(124,58,237,0.12)]">
-            <HelpIcon className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-[14px] font-black text-[#1f1630]">Need help?</p>
-            <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
-              Update your profile details and contact information to keep your account ready for bookings.
-            </p>
-          </div>
+          <Link
+            href="/profile/edit"
+            className="rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-bold text-[#8E5EB5]"
+          >
+            Verify / Edit
+          </Link>
         </div>
-        <Link
-          href="/profile/edit"
-          className="shrink-0 rounded-[14px] border border-[#decdf7] bg-white px-4 py-3 text-[13px] font-bold text-[#8E5EB5]"
-        >
-          Open Profile
-        </Link>
+
+        <div className="mt-5 space-y-3">
+          <CustomerVerificationStatusCard
+            href="/profile/edit"
+            icon={<MailIcon className="h-6 w-6" />}
+            title="Email"
+            subtitle="Email status"
+            verified={emailVerified}
+          />
+          <CustomerVerificationStatusCard
+            href="/profile/edit"
+            icon={<PhoneIcon className="h-6 w-6" />}
+            title="Phone"
+            subtitle="Phone status"
+            verified={phoneVerified}
+          />
+          <CustomerVerificationStatusCard
+            href="/profile/edit"
+            icon={<DocumentIcon className="h-6 w-6" />}
+            title="IC / Passport"
+            subtitle="Identity check"
+            verified={identityVerified}
+          />
+        </div>
+      </section>
+    </ProfileShell>
+  );
+}
+
+function CustomerVerificationStatusCard({
+  href,
+  icon,
+  title,
+  subtitle,
+  verified,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  verified: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between gap-3 rounded-[22px] border border-[#ece4fa] bg-white px-4 py-4 shadow-[0_8px_18px_rgba(106,69,160,0.04)]"
+    >
+      <div className="flex min-w-0 items-center gap-4">
+        <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#f6effd] text-[#8E5EB5]">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[1.05rem] font-bold tracking-[-0.03em] text-[#1f1630]">
+            {title}
+          </p>
+          <p className="mt-1 text-[13px] text-[#7b728a]">
+            {subtitle}
+          </p>
+        </div>
       </div>
-    </section>
+      <div className="flex shrink-0 items-center gap-3">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${
+            verified
+              ? "bg-[#eef9f0] text-[#16a34a]"
+              : "bg-[#fff7ed] text-[#f59e0b]"
+          }`}
+        >
+          {verified ? <CheckCircleIcon className="h-4 w-4" /> : null}
+          {verified ? "Verified" : "Pending"}
+        </span>
+        <ChevronRightIcon className="h-5 w-5 text-[#98a2b3]" />
+      </div>
+    </Link>
   );
 }
 
