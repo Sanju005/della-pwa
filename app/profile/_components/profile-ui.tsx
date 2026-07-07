@@ -1400,10 +1400,27 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
       return true;
     };
 
+    const matchesTab = (booking: Booking) => {
+      if (initialTab === "ongoing") {
+        return booking.status === "ongoing";
+      }
+
+      if (initialTab === "completed") {
+        return booking.status === "completed";
+      }
+
+      if (initialTab === "cancelled") {
+        return booking.status === "cancelled";
+      }
+
+      return booking.status === "pending";
+    };
+
     return [...items]
+      .filter(matchesTab)
       .filter(matchesFilter)
       .sort((left, right) => getBookingSortTimestamp(right) - getBookingSortTimestamp(left));
-  }, [customDate, dateFilter, items]);
+  }, [customDate, dateFilter, initialTab, items]);
 
   useEffect(() => {
     let active = true;
@@ -1555,8 +1572,20 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
 
         {filtered.length === 0 ? (
           <SharedEmptyState
-            title="No bookings yet"
-            description="No bookings match this date filter yet. Try another filter or book a new service."
+            title={
+              initialTab === "ongoing"
+                ? "No ongoing bookings"
+                : initialTab === "completed"
+                  ? "No completed bookings"
+                  : initialTab === "cancelled"
+                    ? "No cancelled bookings"
+                    : "No pending bookings"
+            }
+            description={
+              initialTab === "ongoing"
+                ? "Accepted and in-progress tasks will appear here until they are completed."
+                : "No bookings match this filter yet. Try another filter or book a new service."
+            }
             action={<AppButton href="/providers">Find Providers</AppButton>}
           />
         ) : null}
