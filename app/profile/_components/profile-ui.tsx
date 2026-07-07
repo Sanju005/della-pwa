@@ -2888,6 +2888,11 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
   const [paymentError, setPaymentError] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
   const [paymentLoading, startPaymentTransition] = useTransition();
+  const [paymentProofCropState, setPaymentProofCropState] = useState<{
+    sourceDataUrl: string;
+    fileName: string;
+    mimeType: string;
+  } | null>(null);
   const [paymentProofDataUrl, setPaymentProofDataUrl] = useState("");
   const [paymentProofFileName, setPaymentProofFileName] = useState("");
   const [paymentProofMimeType, setPaymentProofMimeType] = useState("");
@@ -3067,9 +3072,17 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
 
     try {
       const dataUrl = await readPaymentProofAsDataUrl(file);
-      setPaymentProofDataUrl(dataUrl);
-      setPaymentProofFileName(file.name);
-      setPaymentProofMimeType(file.type);
+      if (file.type === "application/pdf") {
+        setPaymentProofDataUrl(dataUrl);
+        setPaymentProofFileName(file.name);
+        setPaymentProofMimeType(file.type);
+      } else {
+        setPaymentProofCropState({
+          sourceDataUrl: dataUrl,
+          fileName: file.name,
+          mimeType: file.type,
+        });
+      }
       setPaymentError("");
     } catch {
       setPaymentError("Unable to read the payment proof file.");
@@ -3502,6 +3515,33 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {paymentProofCropState ? (
+        <ImageCropModal
+          imageDataUrl={paymentProofCropState.sourceDataUrl}
+          tone="work"
+          onClose={() => setPaymentProofCropState(null)}
+          onApply={async (selection) => {
+            try {
+              const croppedImage = await cropImageFromSelection(
+                paymentProofCropState.sourceDataUrl,
+                selection,
+              );
+              setPaymentProofDataUrl(croppedImage);
+              setPaymentProofFileName(paymentProofCropState.fileName);
+              setPaymentProofMimeType(paymentProofCropState.mimeType);
+              setPaymentProofCropState(null);
+              setPaymentError("");
+            } catch (cropError) {
+              setPaymentError(
+                cropError instanceof Error
+                  ? cropError.message
+                  : "Unable to crop the payment proof image.",
+              );
+            }
+          }}
+        />
       ) : null}
 
     </ProfileShell>

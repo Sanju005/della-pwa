@@ -69,7 +69,7 @@ export function ImageCropModal({
   onApply: (selection: CropSelection) => void;
 }) {
   const imageFrameRef = useRef<HTMLDivElement>(null);
-  const lockedAspectRatio = tone === "document" ? undefined : aspectRatio;
+  const lockedAspectRatio = tone === "document" || tone === "work" ? undefined : aspectRatio;
   const [selection, setSelection] = useState<CropSelection>(
     lockedAspectRatio
       ? { x: 12, y: 12, width: 76, height: 76 }
@@ -244,7 +244,7 @@ export function ImageCropModal({
                   ? "job completion image"
                   : "document image"}.
           </p>
-          {tone === "document" ? (
+          {tone === "document" || tone === "work" ? (
             <p className="mt-1 text-[11px] text-white/50">Free crop: drag each corner to any size you need.</p>
           ) : null}
         </div>
