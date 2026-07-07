@@ -488,7 +488,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={chefCategoryIcon}
           alt="Chef"
-          className="h-[4.5rem] w-[4.5rem] object-contain"
+          className="h-[4.95rem] w-[4.95rem] object-contain"
         />
       );
     case "maid":
@@ -496,7 +496,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={maidCategoryIcon}
           alt="Maid"
-          className="h-[4.1rem] w-[4.1rem] object-contain"
+          className="h-[4.9rem] w-[4.9rem] object-contain"
         />
       );
     case "babysitter":
@@ -504,7 +504,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={babysitterCategoryIcon}
           alt="Babysitter"
-          className="h-[4.1rem] w-[4.1rem] object-contain"
+          className="h-[4.9rem] w-[4.9rem] object-contain"
         />
       );
     case "driver":
@@ -512,7 +512,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={driverCategoryIcon}
           alt="Driver"
-          className="h-[4.1rem] w-[4.1rem] object-contain"
+          className="h-[4.9rem] w-[4.9rem] object-contain"
         />
       );
     case "cleaner":
@@ -520,7 +520,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={cleanerCategoryIcon}
           alt="Cleaner"
-          className="h-[4.1rem] w-[4.1rem] object-contain"
+          className="h-[4.9rem] w-[4.9rem] object-contain"
         />
       );
     case "tutor":
@@ -528,7 +528,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={tutorCategoryIcon}
           alt="Tutor"
-          className="h-[4.1rem] w-[4.1rem] object-contain"
+          className="h-[4.9rem] w-[4.9rem] object-contain"
         />
       );
     case "plumber":
@@ -536,7 +536,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={plumberCategoryIcon}
           alt="Plumber"
-          className="h-[4.1rem] w-[4.1rem] object-contain"
+          className="h-[4.9rem] w-[4.9rem] object-contain"
         />
       );
     case "electrician":
@@ -544,7 +544,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={electricianCategoryIcon}
           alt="Electrician"
-          className="h-[4.1rem] w-[4.1rem] object-contain"
+          className="h-[4.9rem] w-[4.9rem] object-contain"
         />
       );
     default:
