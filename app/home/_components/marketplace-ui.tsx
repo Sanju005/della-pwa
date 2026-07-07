@@ -22,6 +22,7 @@ import {
   Baby,
   CarFront,
   Bolt,
+  Shield,
   Heart,
 } from "lucide-react";
 import {
@@ -151,8 +152,8 @@ export function MarketplaceScreen({
             </div>
           </header>
 
-          <section className="mt-8 rounded-[26px] border border-[#E8EEE9] bg-white px-4 py-5 shadow-[0_14px_32px_rgba(15,23,42,0.05)]">
-            <div className="grid grid-cols-4 gap-y-6">
+          <section className="mt-8 rounded-[24px] border border-[#eef0f6] bg-white px-5 py-5 shadow-[0_18px_38px_rgba(15,23,42,0.06)]">
+            <div className="grid grid-cols-4 gap-x-3 gap-y-6 min-[390px]:gap-x-4">
               {categories.map((category) => (
                 <CategoryItem key={category.key} category={category} />
               ))}
@@ -464,15 +465,22 @@ function ProviderBadge({
 }
 
 function CategoryItem({ category }: { category: HomeServiceCategory }) {
+  const theme = getCategoryTheme(category.key);
+
   return (
     <Link
       href={`/providers?service=${category.key}`}
-      className="flex flex-col items-center text-center"
+      className="group flex flex-col items-center text-center"
     >
-      <div className="flex h-[3.7rem] w-[3.7rem] items-center justify-center rounded-[18px] bg-[#f3ebfc] text-[#8E5EB5]">
+      <div
+        className={`relative flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-[22px] border border-white/70 shadow-[0_12px_26px_rgba(31,41,55,0.10)] transition-transform duration-200 group-hover:scale-[1.03] min-[390px]:h-[4.75rem] min-[390px]:w-[4.75rem] ${theme.tileClass}`}
+      >
+        <span className="absolute inset-x-3 top-2 h-5 rounded-full bg-white/45 blur-md" />
+        <span className={`absolute -right-2 -top-2 h-8 w-8 rounded-full blur-sm ${theme.accentGlowClass}`} />
+        <span className="absolute inset-[1px] rounded-[21px] border border-white/40" />
         <CategoryIcon kind={category.key} />
       </div>
-      <p className="mt-3 text-[13px] font-semibold tracking-[-0.02em] text-[#0F172A]">
+      <p className="mt-3 text-[12px] font-semibold tracking-[-0.01em] text-[#162033] min-[390px]:text-[13px]">
         {category.label}
       </p>
     </Link>
@@ -480,25 +488,110 @@ function CategoryItem({ category }: { category: HomeServiceCategory }) {
 }
 
 function CategoryIcon({ kind }: { kind: string }) {
+  const theme = getCategoryTheme(kind);
+  const iconClass = `relative z-10 h-[1.9rem] w-[1.9rem] stroke-[2] drop-shadow-[0_6px_10px_rgba(255,255,255,0.35)] min-[390px]:h-[2.05rem] min-[390px]:w-[2.05rem] ${theme.iconClass}`;
+
   switch (kind) {
     case "chef":
-      return <CookingPot className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return <CookingPot className={iconClass} />;
     case "maid":
-      return <BriefcaseBusiness className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return <BriefcaseBusiness className={iconClass} />;
     case "babysitter":
-      return <Baby className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return <Baby className={iconClass} />;
     case "driver":
-      return <CarFront className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return <CarFront className={iconClass} />;
     case "cleaner":
-      return <SprayCan className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return <SprayCan className={iconClass} />;
     case "tutor":
-      return <BookOpen className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return <BookOpen className={iconClass} />;
     case "plumber":
-      return <Wrench className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return <Wrench className={iconClass} />;
     case "electrician":
-      return <Bolt className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return (
+        <span className="relative z-10 flex items-center justify-center">
+          <Shield className={`absolute h-[2.15rem] w-[2.15rem] stroke-[1.9] ${theme.iconClass}`} />
+          <Bolt className={`h-[1rem] w-[1rem] stroke-[2.4] ${theme.boltClass}`} />
+        </span>
+      );
     default:
-      return <UserRound className="h-[1.55rem] w-[1.55rem] stroke-[1.8]" />;
+      return <UserRound className={iconClass} />;
+  }
+}
+
+function getCategoryTheme(kind: string) {
+  switch (kind) {
+    case "chef":
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.9),_rgba(255,245,235,0.98)_42%,_rgba(255,225,205,0.95)_100%)]",
+        accentGlowClass: "bg-[#ff9c63]/50",
+        iconClass: "text-[#f26722]",
+        boltClass: "text-[#ffffff]",
+      };
+    case "maid":
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(237,245,255,0.98)_45%,_rgba(214,229,255,0.98)_100%)]",
+        accentGlowClass: "bg-[#69a8ff]/45",
+        iconClass: "text-[#2563eb]",
+        boltClass: "text-[#ffffff]",
+      };
+    case "babysitter":
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.94),_rgba(255,239,246,0.98)_44%,_rgba(255,220,231,0.96)_100%)]",
+        accentGlowClass: "bg-[#ff8cb1]/45",
+        iconClass: "text-[#f2779f]",
+        boltClass: "text-[#ffffff]",
+      };
+    case "driver":
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.94),_rgba(233,255,241,0.98)_43%,_rgba(206,245,221,0.98)_100%)]",
+        accentGlowClass: "bg-[#54d18d]/45",
+        iconClass: "text-[#16a34a]",
+        boltClass: "text-[#ffffff]",
+      };
+    case "cleaner":
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(247,236,255,0.98)_46%,_rgba(232,214,255,0.98)_100%)]",
+        accentGlowClass: "bg-[#b478ff]/45",
+        iconClass: "text-[#8b5cf6]",
+        boltClass: "text-[#ffffff]",
+      };
+    case "tutor":
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.96),_rgba(255,248,221,0.98)_46%,_rgba(255,236,177,0.98)_100%)]",
+        accentGlowClass: "bg-[#f6be2c]/42",
+        iconClass: "text-[#e59a0b]",
+        boltClass: "text-[#ffffff]",
+      };
+    case "plumber":
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(236,244,255,0.98)_44%,_rgba(214,228,252,0.98)_100%)]",
+        accentGlowClass: "bg-[#7ea6ff]/42",
+        iconClass: "text-[#3b82f6]",
+        boltClass: "text-[#ffffff]",
+      };
+    case "electrician":
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(243,238,255,0.98)_43%,_rgba(227,216,255,0.98)_100%)]",
+        accentGlowClass: "bg-[#9b7cff]/44",
+        iconClass: "text-[#7c3aed]",
+        boltClass: "text-[#7c3aed]",
+      };
+    default:
+      return {
+        tileClass:
+          "bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(243,244,246,0.98)_45%,_rgba(229,231,235,0.98)_100%)]",
+        accentGlowClass: "bg-[#94a3b8]/35",
+        iconClass: "text-[#475569]",
+        boltClass: "text-[#ffffff]",
+      };
   }
 }
 
