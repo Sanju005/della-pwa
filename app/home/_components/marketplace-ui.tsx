@@ -163,25 +163,32 @@ export function MarketplaceScreen({
 
           <Link
             href="/profile/rewards"
-            className="mt-6 block rounded-[24px] border border-[#eadff8] bg-[linear-gradient(135deg,#ffffff_0%,#f8f1ff_100%)] p-4 shadow-[0_14px_32px_rgba(106,69,160,0.08)]"
+            className="relative mt-6 block overflow-hidden rounded-[30px] border border-[#efe5ff] bg-[radial-gradient(circle_at_top_right,_rgba(176,108,255,0.28),_transparent_30%),linear-gradient(135deg,#ffffff_0%,#f8f2ff_42%,#eedfff_100%)] px-5 py-5 shadow-[0_18px_38px_rgba(124,58,237,0.10)]"
           >
-            <div className="flex items-start justify-between gap-3">
+            <span className="pointer-events-none absolute -right-14 -top-12 h-44 w-44 rounded-full bg-[radial-gradient(circle,_rgba(196,153,255,0.36),_transparent_68%)]" />
+            <span className="pointer-events-none absolute -bottom-10 right-0 h-28 w-44 rounded-full bg-[radial-gradient(circle,_rgba(206,178,255,0.32),_transparent_70%)]" />
+            <span className="pointer-events-none absolute bottom-5 right-6 h-14 w-24 opacity-40 [background-image:radial-gradient(#ffffff_1px,transparent_1px)] [background-size:8px_8px]" />
+            <div className="relative flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#8E5EB5]">
+                <p className="inline-flex rounded-full bg-[#ede3ff] px-4 py-1.5 text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#6d3fe0]">
                   Finance
                 </p>
-                <h2 className="mt-2 text-[1.05rem] font-bold tracking-[-0.03em] text-[#0F172A]">
+                <h2 className="mt-5 text-[1.05rem] font-bold tracking-[-0.04em] text-[#141b5f]">
                   Available Points
                 </h2>
-                <p className="mt-2 text-[1.7rem] font-black tracking-[-0.05em] text-[#8E5EB5]">
-                  {availablePointsLabel}
+                <p className="mt-4 flex items-end gap-2 tracking-[-0.06em] text-[#7c3aed]">
+                  <span className="text-[3.65rem] font-black leading-none">1,250</span>
+                  <span className="pb-2 text-[2rem] font-extrabold leading-none">pts</span>
                 </p>
-                <p className="mt-1 text-[12px] text-[#6b7280]">
-                  Tap to view rewards and redeem options.
+                <p className="mt-5 flex items-center gap-3 text-[12px] text-[#4b5563] min-[390px]:text-[13px]">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#efe7ff] text-[#7c3aed]">
+                    <Star className="h-4 w-4 stroke-[1.9]" />
+                  </span>
+                  <span>Tap to view rewards and redeem options.</span>
                 </p>
               </div>
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#8E5EB5_0%,#7247ac_100%)] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]">
-                <CreditCard className="h-6 w-6 stroke-[2]" />
+              <span className="inline-flex h-28 w-28 shrink-0 items-center justify-center rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,#8b5cf6_0%,#4f1fd3_100%)] text-white shadow-[0_18px_30px_rgba(109,63,224,0.28)]">
+                <CreditCard className="h-12 w-12 stroke-[1.9]" />
               </span>
             </div>
           </Link>
