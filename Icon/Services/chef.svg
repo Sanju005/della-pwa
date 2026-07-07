@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 188.43 219.5">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: none;
+        stroke-width: 0px;
+      }
+
+      .cls-2 {
+        clip-path: url(#clippath);
+      }
+    </style>
+    <clipPath id="clippath">
+      <rect class="cls-1" y="0" width="188.43" height="219.5" rx="23.41" ry="23.41"/>
+    </clipPath>
+  </defs>
+  <g class="cls-2">
+    <image width="1448" height="1086" transform="translate(-96.3 -112.68) scale(.73)" xlink:href="ChatGPT Image Jul 7, 2026, 09_27_13 PM.png"/>
+  </g>
+</svg>
