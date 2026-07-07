@@ -69,8 +69,9 @@ export function ImageCropModal({
   onApply: (selection: CropSelection) => void;
 }) {
   const imageFrameRef = useRef<HTMLDivElement>(null);
+  const lockedAspectRatio = tone === "document" ? undefined : aspectRatio;
   const [selection, setSelection] = useState<CropSelection>(
-    aspectRatio
+    lockedAspectRatio
       ? { x: 12, y: 12, width: 76, height: 76 }
       : { x: 7, y: 24, width: 86, height: 52 },
   );
@@ -87,13 +88,13 @@ export function ImageCropModal({
   };
 
   const getAspectHeightFromWidth = (width: number) =>
-    aspectRatio ? (width * getFrameRatio()) / aspectRatio : width;
+    lockedAspectRatio ? (width * getFrameRatio()) / lockedAspectRatio : width;
 
   const clampSelection = (nextSelection: CropSelection) => {
     const minSize = 18;
     const next = { ...nextSelection };
 
-    if (aspectRatio) {
+    if (lockedAspectRatio) {
       next.height = getAspectHeightFromWidth(next.width);
     }
 
@@ -106,7 +107,7 @@ export function ImageCropModal({
   };
 
   const resetInitialSelection = () => {
-    if (!aspectRatio || !imageFrameRef.current) {
+    if (!lockedAspectRatio || !imageFrameRef.current) {
       return;
     }
 
@@ -139,7 +140,7 @@ export function ImageCropModal({
       return;
     }
 
-    if (!aspectRatio) {
+    if (!lockedAspectRatio) {
       if (dragState.mode === "se") {
         setSelection(clampSelection({
           ...original,
@@ -178,7 +179,7 @@ export function ImageCropModal({
       return;
     }
 
-    const aspectWidthRatio = aspectRatio / getFrameRatio();
+    const aspectWidthRatio = lockedAspectRatio / getFrameRatio();
     const minWidth = Math.max(18, 18 * aspectWidthRatio);
     const anchor =
       dragState.mode === "se"
@@ -243,6 +244,9 @@ export function ImageCropModal({
                   ? "job completion image"
                   : "document image"}.
           </p>
+          {tone === "document" ? (
+            <p className="mt-1 text-[11px] text-white/50">Free crop: drag each corner to any size you need.</p>
+          ) : null}
         </div>
 
         <div className="mt-4 flex min-h-[25rem] items-center justify-center bg-[#111] px-3 py-6">
