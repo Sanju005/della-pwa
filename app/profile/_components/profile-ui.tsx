@@ -512,21 +512,6 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
       />
 
       <SectionCard
-        title="Personal Information"
-        actionHref="/profile/edit"
-        actionLabel="View All"
-      >
-        <ProfileInfoRow icon={<UserIcon className="h-4 w-4" />} label="First Name" value={profile.firstName} />
-        <ProfileInfoRow icon={<UserIcon className="h-4 w-4" />} label="Last Name" value={profile.lastName} />
-        <ProfileInfoRow icon={<UserIcon className="h-4 w-4" />} label="Gender" value={profile.sex || "Male"} />
-        <ProfileInfoRow icon={<CalendarIcon className="h-4 w-4" />} label="Date of Birth" value={profile.dateOfBirth} />
-        <ProfileInfoRow icon={<MailIcon className="h-4 w-4" />} label="Email" value={profile.email} />
-        <ProfileInfoRow icon={<PhoneIcon className="h-4 w-4" />} label="Phone Number" value={`${profile.countryCode} ${profile.phoneNumber}`} />
-        <ProfileInfoRow icon={<PhoneIcon className="h-4 w-4" />} label="Emergency Contact" value={profile.emergencyContactNumber || "Not set"} />
-        <ProfileInfoRow icon={<PinIcon className="h-4 w-4" />} label="Country" value={profile.country || "Malaysia"} />
-      </SectionCard>
-
-      <SectionCard
         title="My Bookings"
         actionHref="/profile/bookings"
         actionLabel="View All"

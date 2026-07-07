@@ -40,6 +40,7 @@ type SearchResponse = {
 type LiveLocationChipProps = {
   fallbackLabel: string;
   className?: string;
+  titleLabel?: string;
   onLocationChange?: (location: StoredLiveLocation) => void;
   onLocationClear?: () => void;
   displayLabel?: string;
@@ -66,6 +67,7 @@ const DynamicLocationPickerMap = dynamic(
 export function LiveLocationChip({
   fallbackLabel,
   className = "",
+  titleLabel,
   onLocationChange,
   onLocationClear,
   displayLabel,
@@ -193,24 +195,31 @@ export function LiveLocationChip({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setIsPickerOpen(true)}
-        className={`flex min-h-[3.25rem] items-center gap-2.5 rounded-[18px] border border-[#e3ebe6] bg-white px-4 text-[15px] font-semibold text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${className}`.trim()}
-        title={locationTitle}
-      >
-        {leadingIcon === "search" ? (
-          <Search className="h-5.5 w-5.5 shrink-0 text-[#667085]" />
-        ) : (
-          <MapPin className="h-5.5 w-5.5 shrink-0 fill-[#16A34A] text-[#16A34A]" />
-        )}
-        <span className="truncate">{visibleLabel}</span>
-        {isLoading ? (
-          <LoaderCircle className="h-4.5 w-4.5 shrink-0 animate-spin text-[#16A34A]" />
-        ) : showChevron ? (
-          <ChevronDown className="h-4.5 w-4.5 shrink-0 text-[#667085]" />
+      <div className={`min-w-0 ${className}`.trim()}>
+        {titleLabel ? (
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#6b7280]">
+            {titleLabel}
+          </p>
         ) : null}
-      </button>
+        <button
+          type="button"
+          onClick={() => setIsPickerOpen(true)}
+          className="flex min-h-[3.25rem] w-full min-w-0 items-center gap-2.5 rounded-[18px] border border-[#e3ebe6] bg-white px-4 text-[15px] font-semibold text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+          title={locationTitle}
+        >
+          {leadingIcon === "search" ? (
+            <Search className="h-5.5 w-5.5 shrink-0 text-[#667085]" />
+          ) : (
+            <MapPin className="h-5.5 w-5.5 shrink-0 fill-[#16A34A] text-[#16A34A]" />
+          )}
+          <span className="min-w-0 flex-1 truncate text-left">{visibleLabel}</span>
+          {isLoading ? (
+            <LoaderCircle className="h-4.5 w-4.5 shrink-0 animate-spin text-[#16A34A]" />
+          ) : showChevron ? (
+            <ChevronDown className="h-4.5 w-4.5 shrink-0 text-[#667085]" />
+          ) : null}
+        </button>
+      </div>
 
       {isPickerOpen ? (
         <LocationPickerModal

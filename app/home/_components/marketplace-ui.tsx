@@ -134,7 +134,10 @@ export function MarketplaceScreen({
                   </span>
                 </h1>
                 <div className="mt-3">
-                  <LiveLocationChip fallbackLabel={displayLocation} />
+                  <LiveLocationChip
+                    fallbackLabel={displayLocation}
+                    titleLabel="Your current location"
+                  />
                 </div>
               </div>
 
