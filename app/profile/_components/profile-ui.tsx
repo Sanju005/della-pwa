@@ -3552,6 +3552,10 @@ export function BookingReviewScreen({ booking }: BookingReviewProps) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
+  const [reviewPhotoCropState, setReviewPhotoCropState] = useState<{
+    sourceDataUrl: string;
+    remaining: string[];
+  } | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -3718,7 +3722,18 @@ export function BookingReviewScreen({ booking }: BookingReviewProps) {
               const files = Array.from(event.target.files ?? []).slice(0, 4);
               event.target.value = "";
               void Promise.all(files.map((file) => readPaymentProofAsDataUrl(file)))
-                .then((items) => setPhotos(items))
+                .then((items) => {
+                  if (items.length === 0) {
+                    return;
+                  }
+
+                  setPhotos([]);
+                  setReviewPhotoCropState({
+                    sourceDataUrl: items[0],
+                    remaining: items.slice(1),
+                  });
+                  setError("");
+                })
                 .catch(() => setError("Unable to read review photos."));
             }}
           />
@@ -3758,6 +3773,38 @@ export function BookingReviewScreen({ booking }: BookingReviewProps) {
           </button>
         </div>
       </SectionCard>
+
+      {reviewPhotoCropState ? (
+        <ImageCropModal
+          imageDataUrl={reviewPhotoCropState.sourceDataUrl}
+          tone="work"
+          onClose={() => setReviewPhotoCropState(null)}
+          onApply={async (selection) => {
+            try {
+              const croppedImage = await cropImageFromSelection(
+                reviewPhotoCropState.sourceDataUrl,
+                selection,
+              );
+              setPhotos((current) => [...current, croppedImage]);
+              setReviewPhotoCropState(
+                reviewPhotoCropState.remaining.length > 0
+                  ? {
+                      sourceDataUrl: reviewPhotoCropState.remaining[0],
+                      remaining: reviewPhotoCropState.remaining.slice(1),
+                    }
+                  : null,
+              );
+              setError("");
+            } catch (cropError) {
+              setError(
+                cropError instanceof Error
+                  ? cropError.message
+                  : "Unable to crop the review image.",
+              );
+            }
+          }}
+        />
+      ) : null}
 
       {submitted ? (
         <p className="mt-4 text-center text-[13px] font-semibold text-[#16a34a]">

@@ -527,7 +527,7 @@ function ProviderReviewModal({
   loading,
   onRatingChange,
   onCommentChange,
-  onPhotosChange,
+  onPhotoFilesChange,
   onClose,
   onSubmit,
 }: {
@@ -538,7 +538,7 @@ function ProviderReviewModal({
   loading: boolean;
   onRatingChange: (value: number) => void;
   onCommentChange: (value: string) => void;
-  onPhotosChange: (value: string[]) => void;
+  onPhotoFilesChange: (files: File[]) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
@@ -550,8 +550,7 @@ function ProviderReviewModal({
       return;
     }
 
-    const images = await Promise.all(files.map((file) => readImageAsDataUrl(file)));
-    onPhotosChange(images);
+    onPhotoFilesChange(files);
   }
 
   return (
@@ -1207,6 +1206,10 @@ export function ProviderBookingsScreen({
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewPhotos, setReviewPhotos] = useState<string[]>([]);
+  const [reviewPhotoCropState, setReviewPhotoCropState] = useState<{
+    sourceDataUrl: string;
+    remaining: string[];
+  } | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [autoReviewOpenedFor, setAutoReviewOpenedFor] = useState("");
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -1406,6 +1409,26 @@ export function ProviderBookingsScreen({
     setReviewRating(booking.providerReviewRating ?? 0);
     setReviewComment(booking.providerReviewComment ?? "");
     setReviewPhotos([]);
+    setReviewPhotoCropState(null);
+  }
+
+  async function handleProviderReviewPhotoFiles(files: File[]) {
+    try {
+      const images = await Promise.all(files.map((file) => readImageAsDataUrl(file)));
+
+      if (images.length === 0) {
+        return;
+      }
+
+      setReviewPhotos([]);
+      setReviewPhotoCropState({
+        sourceDataUrl: images[0],
+        remaining: images.slice(1),
+      });
+      state.setError("");
+    } catch {
+      state.setError("Unable to read review photos.");
+    }
   }
 
   async function handleSubmitProviderReview() {
@@ -1731,13 +1754,47 @@ export function ProviderBookingsScreen({
           loading={reviewLoading}
           onRatingChange={setReviewRating}
           onCommentChange={setReviewComment}
-          onPhotosChange={setReviewPhotos}
+          onPhotoFilesChange={(files) => {
+            void handleProviderReviewPhotoFiles(files);
+          }}
           onClose={() => {
             if (!reviewLoading) {
               setReviewBookingId("");
+              setReviewPhotoCropState(null);
             }
           }}
           onSubmit={handleSubmitProviderReview}
+        />
+      ) : null}
+      {reviewPhotoCropState ? (
+        <ImageCropModal
+          imageDataUrl={reviewPhotoCropState.sourceDataUrl}
+          tone="work"
+          onClose={() => setReviewPhotoCropState(null)}
+          onApply={async (selection) => {
+            try {
+              const croppedImage = await cropImageFromSelection(
+                reviewPhotoCropState.sourceDataUrl,
+                selection,
+              );
+              setReviewPhotos((current) => [...current, croppedImage]);
+              setReviewPhotoCropState(
+                reviewPhotoCropState.remaining.length > 0
+                  ? {
+                      sourceDataUrl: reviewPhotoCropState.remaining[0],
+                      remaining: reviewPhotoCropState.remaining.slice(1),
+                    }
+                  : null,
+              );
+              state.setError("");
+            } catch (cropError) {
+              state.setError(
+                cropError instanceof Error
+                  ? cropError.message
+                  : "Unable to crop the review image.",
+              );
+            }
+          }}
         />
       ) : null}
       <ProviderBottomNav />
