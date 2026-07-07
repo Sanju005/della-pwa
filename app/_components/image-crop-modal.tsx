@@ -256,6 +256,7 @@ export function ImageCropModal({
     mode: "move" | "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se",
   ) => {
     event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragState({
       mode,
