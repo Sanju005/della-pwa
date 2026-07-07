@@ -500,6 +500,7 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
     <ProfileShell title="My Profile" showBottomNav>
       <ProfileSummaryCard profile={profile} fullName={fullName} />
       <ProfileCompletion completion={profile.completion} />
+      <CustomerVerificationSection verified={profile.verified} />
       <WalletSummaryCard
         walletBalance={paymentSummary.walletBalance}
         walletPanel={walletPanel}
@@ -626,6 +627,92 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
         ) : null}
       </section>
     </ProfileShell>
+  );
+}
+
+function CustomerVerificationSection({
+  verified,
+}: {
+  verified: boolean;
+}) {
+  return (
+    <section className="mt-4 rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
+            <CheckShieldIcon className="h-7 w-7" />
+          </span>
+          <div>
+            <h3 className="text-[1.5rem] font-black tracking-[-0.05em] text-[#1f1630]">
+              Verification
+            </h3>
+            <p className="mt-1 text-[13px] text-[#7b728a]">
+              Verification status for your account
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/profile/edit"
+          className="rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-bold text-[#8E5EB5]"
+        >
+          Verify / Edit
+        </Link>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <Link
+          href="/profile/edit"
+          className="flex items-center justify-between gap-3 rounded-[22px] border border-[#ece4fa] bg-white px-4 py-4 shadow-[0_8px_18px_rgba(106,69,160,0.04)]"
+        >
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#f6effd] text-[#8E5EB5]">
+              <UserIcon className="h-6 w-6" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[1.05rem] font-bold tracking-[-0.03em] text-[#1f1630]">
+                Personal Account
+              </p>
+              <p className="mt-1 text-[13px] text-[#7b728a]">
+                Profile verification status
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${
+                verified
+                  ? "bg-[#eef9f0] text-[#16a34a]"
+                  : "bg-[#fff7ed] text-[#f59e0b]"
+              }`}
+            >
+              {verified ? <CheckCircleIcon className="h-4 w-4" /> : null}
+              {verified ? "Verified" : "Pending"}
+            </span>
+            <ChevronRightIcon className="h-5 w-5 text-[#98a2b3]" />
+          </div>
+        </Link>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-4 rounded-[22px] border border-[#e7dcf8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f4edff_100%)] p-4">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#7c3aed] shadow-[0_10px_24px_rgba(124,58,237,0.12)]">
+            <HelpIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-[14px] font-black text-[#1f1630]">Need help?</p>
+            <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+              Update your profile details and contact information to keep your account ready for bookings.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/profile/edit"
+          className="shrink-0 rounded-[14px] border border-[#decdf7] bg-white px-4 py-3 text-[13px] font-bold text-[#8E5EB5]"
+        >
+          Open Profile
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -885,7 +972,6 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
   const [isPending, startTransition] = useTransition();
   const [savedMessage, setSavedMessage] = useState("");
   const [form, setForm] = useState(initialProfile);
-  const [verificationBusy, startVerificationTransition] = useTransition();
   const [avatarCropState, setAvatarCropState] = useState<{
     fileName: string;
     sourceDataUrl: string;
@@ -1056,40 +1142,6 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
           </div>
           <LabeledInput label="Emergency Contact Number" value={form.emergencyContactNumber} onChange={updateField("emergencyContactNumber")} icon={<PhoneIcon className="h-5 w-5" />} />
           <LabeledInput label="Country" value={form.country} onChange={updateField("country")} icon={<PinIcon className="h-5 w-5" />} />
-        </div>
-
-        <div className="mt-5 rounded-[18px] border border-[#e4ece7] bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-[15px] font-extrabold text-[#111827]">
-                Verification
-              </h3>
-              <p className="mt-1 text-[13px] leading-5 text-[#4b5563]">
-                Your account can use all functions now. You can still mark the profile as verified here.
-              </p>
-            </div>
-            <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${form.verified ? "bg-[#f5f1fa] text-[#8E5EB5]" : "bg-[#fff7ed] text-[#f59e0b]"}`}>
-              {form.verified ? "Verified" : "Pending"}
-            </span>
-          </div>
-          <button
-            type="button"
-            disabled={verificationBusy || form.verified}
-            onClick={() => {
-              startVerificationTransition(async () => {
-                setForm((current) => ({ ...current, verified: true, completion: Math.max(current.completion, 100) }));
-                await saveCustomerProfile({
-                  ...form,
-                  verified: true,
-                  completion: Math.max(form.completion, 100),
-                });
-                setSavedMessage("Verification updated.");
-              });
-            }}
-            className="mt-4 inline-flex h-11 items-center justify-center rounded-[12px] bg-[#8E5EB5] px-4 text-[14px] font-extrabold text-white disabled:opacity-70"
-          >
-            {verificationBusy ? "Updating..." : form.verified ? "Already Verified" : "Verify Account"}
-          </button>
         </div>
 
         {savedMessage ? (
