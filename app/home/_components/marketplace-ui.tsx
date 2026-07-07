@@ -465,12 +465,18 @@ function ProviderBadge({
 }
 
 function CategoryItem({ category }: { category: HomeServiceCategory }) {
+  const isChef = category.key === "chef";
+
   return (
     <Link
       href={`/providers?service=${category.key}`}
       className="flex flex-col items-center text-center"
     >
-      <div className="flex h-[3.7rem] w-[3.7rem] items-center justify-center rounded-[18px] bg-[#f3ebfc] text-[#8E5EB5]">
+      <div
+        className={`flex items-center justify-center text-[#8E5EB5] ${
+          isChef ? "h-[4.5rem] w-[4.5rem]" : "h-[3.7rem] w-[3.7rem] rounded-[18px] bg-[#f3ebfc]"
+        }`}
+      >
         <CategoryIcon kind={category.key} />
       </div>
       <p className="mt-3 text-[13px] font-semibold tracking-[-0.02em] text-[#0F172A]">
@@ -487,7 +493,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={chefCategoryIcon}
           alt="Chef"
-          className="h-[1.7rem] w-[1.7rem]"
+          className="h-[4.1rem] w-[4.1rem] object-contain"
         />
       );
     case "maid":
