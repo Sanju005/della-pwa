@@ -48,6 +48,7 @@ export function MarketplaceScreen({
 }: HomeFeedData) {
   const [displayName, setDisplayName] = useState(greetingName);
   const [displayLocation, setDisplayLocation] = useState(locationLabel);
+  const [greetingLabel, setGreetingLabel] = useState("Hello,");
   const availablePointsLabel = "1,250 pts";
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export function MarketplaceScreen({
     }
 
     void hydrateViewerProfile();
+    setGreetingLabel(timePrefix());
 
     return () => {
       active = false;
@@ -126,7 +128,7 @@ export function MarketplaceScreen({
                   className="h-auto w-[148px]"
                 />
                 <h1 className="mt-7 text-[26px] font-normal leading-[1.2] tracking-[-0.03em] text-[#0F172A]">
-                  <span className="block">{timePrefix()}</span>
+                  <span className="block">{greetingLabel}</span>
                   <span className="mt-1 inline-flex items-center gap-1">
                     {displayName} <span aria-hidden>👋</span>
                   </span>
