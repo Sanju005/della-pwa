@@ -31,7 +31,7 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(title, {
     body,
-    icon: "/brand/app-icon.png",
+    icon: "/icon.png",
     data: {
       path,
       bookingId: payload?.data?.bookingId || "",

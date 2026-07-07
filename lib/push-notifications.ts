@@ -257,7 +257,7 @@ export async function sendPushNotificationToUser(
                   }
                 : undefined,
               notification: {
-                icon: "/brand/app-icon.png",
+                icon: "/icon.png",
               },
             },
           },

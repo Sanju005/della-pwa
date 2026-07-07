@@ -4,14 +4,6 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import swiperLogo from "../../../Logo/Swiper.png";
-import babysitterCategoryIcon from "../../../Icon/Services/baby-01.png";
-import chefCategoryIcon from "../../../Icon/Services/chef new.png";
-import cleanerCategoryIcon from "../../../Icon/Services/cleaner-01.png";
-import driverCategoryIcon from "../../../Icon/Services/driver-01.png";
-import electricianCategoryIcon from "../../../Icon/Services/Electrician-01.png";
-import maidCategoryIcon from "../../../Icon/Services/maid-01.png";
-import plumberCategoryIcon from "../../../Icon/Services/Plumber-01.png";
-import tutorCategoryIcon from "../../../Icon/Services/Tutor-01.png";
 import {
   BookOpen,
   BriefcaseBusiness,
@@ -35,9 +27,9 @@ import { LiveLocationChip } from "@/app/_components/live-location-chip";
 import {
   buildProviderDetailHref,
 } from "@/lib/provider-catalog-shared";
+import { loadStoredCustomerProfile } from "@/lib/profile-browser";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { HomeFeedData, HomeServiceCategory } from "@/lib/home-feed";
-import type { CustomerProfile } from "@/lib/profile-types";
 
 export function MarketplaceScreen({
   greetingName,
@@ -54,40 +46,10 @@ export function MarketplaceScreen({
   const availablePointsLabel = "1,250 pts";
 
   useEffect(() => {
-    let active = true;
+    const storedProfile = loadStoredCustomerProfile();
 
-    async function hydrateViewerProfile() {
-      const client = getSupabaseClient();
-
-      if (!client) {
-        return;
-      }
-
-      const {
-        data: { session },
-      } = await client.auth.getSession();
-
-      if (!active || !session) {
-        return;
-      }
-
-      const response = await fetch("/api/profile/me", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      const result = (await response.json()) as
-        | {
-            profile: CustomerProfile;
-          }
-        | { error?: string };
-
-      if (!active || !response.ok || !("profile" in result)) {
-        return;
-      }
-
-      const fullName = [result.profile.firstName, result.profile.lastName]
+    if (storedProfile) {
+      const fullName = [storedProfile.firstName, storedProfile.lastName]
         .filter(Boolean)
         .join(" ")
         .trim();
@@ -96,7 +58,7 @@ export function MarketplaceScreen({
         setDisplayName(fullName);
       }
 
-      const nextLocation = [result.profile.city, result.profile.region]
+      const nextLocation = [storedProfile.city, storedProfile.region]
         .filter(Boolean)
         .join(", ")
         .trim();
@@ -105,13 +67,7 @@ export function MarketplaceScreen({
         setDisplayLocation(nextLocation);
       }
     }
-
-    void hydrateViewerProfile();
     setGreetingLabel(timePrefix());
-
-    return () => {
-      active = false;
-    };
   }, []);
 
   return (
@@ -163,32 +119,32 @@ export function MarketplaceScreen({
 
           <Link
             href="/profile/rewards"
-            className="relative mt-6 block overflow-hidden rounded-[30px] border border-[#efe5ff] bg-[radial-gradient(circle_at_top_right,_rgba(176,108,255,0.28),_transparent_30%),linear-gradient(135deg,#ffffff_0%,#f8f2ff_42%,#eedfff_100%)] px-5 py-5 shadow-[0_18px_38px_rgba(124,58,237,0.10)]"
+            className="relative mt-6 block overflow-hidden rounded-[28px] border border-[#efe5ff] bg-[radial-gradient(circle_at_top_right,_rgba(176,108,255,0.24),_transparent_28%),linear-gradient(135deg,#ffffff_0%,#f8f2ff_42%,#eedfff_100%)] px-4 py-4 shadow-[0_16px_32px_rgba(124,58,237,0.09)]"
           >
-            <span className="pointer-events-none absolute -right-14 -top-12 h-44 w-44 rounded-full bg-[radial-gradient(circle,_rgba(196,153,255,0.36),_transparent_68%)]" />
-            <span className="pointer-events-none absolute -bottom-10 right-0 h-28 w-44 rounded-full bg-[radial-gradient(circle,_rgba(206,178,255,0.32),_transparent_70%)]" />
-            <span className="pointer-events-none absolute bottom-5 right-6 h-14 w-24 opacity-40 [background-image:radial-gradient(#ffffff_1px,transparent_1px)] [background-size:8px_8px]" />
+            <span className="pointer-events-none absolute -right-14 -top-12 h-36 w-36 rounded-full bg-[radial-gradient(circle,_rgba(196,153,255,0.34),_transparent_68%)]" />
+            <span className="pointer-events-none absolute -bottom-9 right-0 h-24 w-40 rounded-full bg-[radial-gradient(circle,_rgba(206,178,255,0.26),_transparent_70%)]" />
+            <span className="pointer-events-none absolute bottom-4 right-5 h-12 w-20 opacity-35 [background-image:radial-gradient(#ffffff_1px,transparent_1px)] [background-size:8px_8px]" />
             <div className="relative flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="inline-flex rounded-full bg-[#ede3ff] px-4 py-1.5 text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#6d3fe0]">
+                <p className="inline-flex rounded-full bg-[#ede3ff] px-3.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6d3fe0]">
                   Finance
                 </p>
-                <h2 className="mt-5 text-[1.05rem] font-bold tracking-[-0.04em] text-[#141b5f]">
+                <h2 className="mt-4 text-[0.95rem] font-bold tracking-[-0.04em] text-[#141b5f]">
                   Available Points
                 </h2>
-                <p className="mt-4 flex items-end gap-2 tracking-[-0.06em] text-[#7c3aed]">
-                  <span className="text-[3.65rem] font-black leading-none">1,250</span>
-                  <span className="pb-2 text-[2rem] font-extrabold leading-none">pts</span>
+                <p className="mt-3 flex items-end gap-1.5 tracking-[-0.06em] text-[#7c3aed]">
+                  <span className="text-[3.15rem] font-black leading-none">1,250</span>
+                  <span className="pb-1.5 text-[1.65rem] font-extrabold leading-none">pts</span>
                 </p>
-                <p className="mt-5 flex items-center gap-3 text-[12px] text-[#4b5563] min-[390px]:text-[13px]">
-                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#efe7ff] text-[#7c3aed]">
-                    <Star className="h-4 w-4 stroke-[1.9]" />
+                <p className="mt-4 flex items-center gap-2.5 text-[11px] text-[#4b5563] min-[390px]:text-[12px]">
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#efe7ff] text-[#7c3aed]">
+                    <Star className="h-3.5 w-3.5 stroke-[1.9]" />
                   </span>
                   <span>Tap to view rewards and redeem options.</span>
                 </p>
               </div>
-              <span className="inline-flex h-28 w-28 shrink-0 items-center justify-center rounded-[28px] border border-white/70 bg-[linear-gradient(180deg,#8b5cf6_0%,#4f1fd3_100%)] text-white shadow-[0_18px_30px_rgba(109,63,224,0.28)]">
-                <CreditCard className="h-12 w-12 stroke-[1.9]" />
+              <span className="inline-flex h-22 w-22 shrink-0 items-center justify-center rounded-[24px] border border-white/70 bg-[linear-gradient(180deg,#8b5cf6_0%,#4f1fd3_100%)] text-white shadow-[0_16px_26px_rgba(109,63,224,0.25)]">
+                <CreditCard className="h-9 w-9 stroke-[1.9]" />
               </span>
             </div>
           </Link>
@@ -493,65 +449,81 @@ function CategoryIcon({ kind }: { kind: string }) {
     case "chef":
       return (
         <Image
-          src={chefCategoryIcon}
+          src="/service-icons/chef-new.png"
           alt="Chef"
           className="h-[4.7rem] w-[4.7rem] object-contain"
+          width={76}
+          height={76}
         />
       );
     case "maid":
       return (
         <Image
-          src={maidCategoryIcon}
+          src="/service-icons/maid-01.png"
           alt="Maid"
           className="h-[4.7rem] w-[4.7rem] object-contain"
+          width={76}
+          height={76}
         />
       );
     case "babysitter":
       return (
         <Image
-          src={babysitterCategoryIcon}
+          src="/service-icons/baby-01.png"
           alt="Babysitter"
           className="h-[4.7rem] w-[4.7rem] object-contain"
+          width={76}
+          height={76}
         />
       );
     case "driver":
       return (
         <Image
-          src={driverCategoryIcon}
+          src="/service-icons/driver-01.png"
           alt="Driver"
           className="h-[4.7rem] w-[4.7rem] object-contain"
+          width={76}
+          height={76}
         />
       );
     case "cleaner":
       return (
         <Image
-          src={cleanerCategoryIcon}
+          src="/service-icons/cleaner-01.png"
           alt="Cleaner"
           className="h-[4.7rem] w-[4.7rem] object-contain"
+          width={76}
+          height={76}
         />
       );
     case "tutor":
       return (
         <Image
-          src={tutorCategoryIcon}
+          src="/service-icons/tutor-01.png"
           alt="Tutor"
           className="h-[4.7rem] w-[4.7rem] object-contain"
+          width={76}
+          height={76}
         />
       );
     case "plumber":
       return (
         <Image
-          src={plumberCategoryIcon}
+          src="/service-icons/plumber-01.png"
           alt="Plumber"
           className="h-[4.7rem] w-[4.7rem] object-contain"
+          width={76}
+          height={76}
         />
       );
     case "electrician":
       return (
         <Image
-          src={electricianCategoryIcon}
+          src="/service-icons/electrician-01.png"
           alt="Electrician"
           className="h-[4.7rem] w-[4.7rem] object-contain"
+          width={76}
+          height={76}
         />
       );
     default:

@@ -36,7 +36,7 @@ import {
   resolveCurrentLiveLocation,
   type StoredLiveLocation,
 } from "@/lib/live-location";
-import { saveCustomerProfile } from "@/lib/profile-browser";
+import { loadStoredCustomerProfile, saveCustomerProfile } from "@/lib/profile-browser";
 import { isPaymentProofMimeType, PAYMENT_PROOF_MAX_BYTES, readFileAsDataUrl as readPaymentProofAsDataUrl } from "@/lib/upload-proof";
 import type {
   Address,
@@ -328,7 +328,7 @@ function StickyActionBar({
 }
 
 export function ProfileOverviewScreen({ initialData }: OverviewProps) {
-  const [profile, setProfile] = useState(initialData.profile);
+  const [profile, setProfile] = useState(() => loadStoredCustomerProfile() ?? initialData.profile);
   const [favoriteProviders, setFavoriteProviders] = useState(initialData.favoriteProviders);
   const [bookingSummary, setBookingSummary] = useState(initialData.bookingSummary);
   const [paymentSummary, setPaymentSummary] = useState(initialData.paymentSummary);
@@ -728,7 +728,7 @@ export function CustomerVerificationHubScreen({ initialProfile }: EditProps) {
 }
 
 function useLiveCustomerProfile(initialProfile: CustomerProfile) {
-  const [profile, setProfile] = useState(initialProfile);
+  const [profile, setProfile] = useState(() => loadStoredCustomerProfile() ?? initialProfile);
 
   useEffect(() => {
     let active = true;
