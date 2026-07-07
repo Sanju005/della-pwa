@@ -494,7 +494,7 @@ function CategoryIcon({ kind }: { kind: string }) {
         <Image
           src={chefCategoryIcon}
           alt="Chef"
-          className="h-[4.1rem] w-[4.1rem] object-contain"
+          className="h-[4.5rem] w-[4.5rem] object-contain"
         />
       );
     case "maid":
