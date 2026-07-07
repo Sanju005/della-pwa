@@ -671,6 +671,63 @@ function CustomerVerificationSection({
 }
 
 export function CustomerVerificationHubScreen({ initialProfile }: EditProps) {
+  const profile = useLiveCustomerProfile(initialProfile);
+
+  return (
+    <ProfileShell title="Verification" showBack backHref="/profile" showBottomNav={false}>
+      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-4">
+            <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
+              <CheckShieldIcon className="h-7 w-7" />
+            </span>
+            <div>
+              <h3 className="text-[1.5rem] font-black tracking-[-0.05em] text-[#1f1630]">
+                Verification
+              </h3>
+              <p className="mt-1 text-[13px] text-[#7b728a]">
+                Verification status for your account
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/profile/edit"
+            className="rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-bold text-[#8E5EB5]"
+          >
+            Verify / Edit
+          </Link>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          <CustomerVerificationStatusCard
+            href="/profile/verification/email"
+            icon={<MailIcon className="h-6 w-6" />}
+            title="Email"
+            subtitle="Email status"
+            verified={profile.emailVerified}
+          />
+          <CustomerVerificationStatusCard
+            href="/profile/verification/phone"
+            icon={<PhoneIcon className="h-6 w-6" />}
+            title="Phone"
+            subtitle="Phone status"
+            verified={profile.phoneVerified}
+          />
+          <CustomerVerificationStatusCard
+            href="/profile/verification/identity"
+            icon={<DocumentIcon className="h-6 w-6" />}
+            title="IC / Passport"
+            subtitle="Identity check"
+            verified={profile.verified}
+            status={profile.identityVerificationStatus}
+          />
+        </div>
+      </section>
+    </ProfileShell>
+  );
+}
+
+function useLiveCustomerProfile(initialProfile: CustomerProfile) {
   const [profile, setProfile] = useState(initialProfile);
 
   useEffect(() => {
@@ -717,63 +774,9 @@ export function CustomerVerificationHubScreen({ initialProfile }: EditProps) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialProfile]);
 
-  const emailVerified = Boolean(profile.email.trim());
-  const phoneVerified = Boolean(profile.phoneNumber.trim());
-  const identityVerified = profile.verified;
-
-  return (
-    <ProfileShell title="Verification" showBack backHref="/profile" showBottomNav={false}>
-      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-4">
-            <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
-              <CheckShieldIcon className="h-7 w-7" />
-            </span>
-            <div>
-              <h3 className="text-[1.5rem] font-black tracking-[-0.05em] text-[#1f1630]">
-                Verification
-              </h3>
-              <p className="mt-1 text-[13px] text-[#7b728a]">
-                Verification status for your account
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/profile/edit"
-            className="rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-bold text-[#8E5EB5]"
-          >
-            Verify / Edit
-          </Link>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          <CustomerVerificationStatusCard
-            href="/profile/edit"
-            icon={<MailIcon className="h-6 w-6" />}
-            title="Email"
-            subtitle="Email status"
-            verified={emailVerified}
-          />
-          <CustomerVerificationStatusCard
-            href="/profile/edit"
-            icon={<PhoneIcon className="h-6 w-6" />}
-            title="Phone"
-            subtitle="Phone status"
-            verified={phoneVerified}
-          />
-          <CustomerVerificationStatusCard
-            href="/profile/edit"
-            icon={<DocumentIcon className="h-6 w-6" />}
-            title="IC / Passport"
-            subtitle="Identity check"
-            verified={identityVerified}
-          />
-        </div>
-      </section>
-    </ProfileShell>
-  );
+  return profile;
 }
 
 function CustomerVerificationStatusCard({
@@ -782,13 +785,24 @@ function CustomerVerificationStatusCard({
   title,
   subtitle,
   verified,
+  status,
 }: {
   href: string;
   icon: React.ReactNode;
   title: string;
   subtitle: string;
   verified: boolean;
+  status?: "pending" | "processing" | "verified" | "rejected";
 }) {
+  const label = verified ? "Verified" : status === "processing" ? "Processing" : status === "rejected" ? "Rejected" : "Pending";
+  const toneClass = verified
+    ? "bg-[#eef9f0] text-[#16a34a]"
+    : status === "processing"
+      ? "bg-[#eff6ff] text-[#2563eb]"
+      : status === "rejected"
+        ? "bg-[#fff1f2] text-[#dc2626]"
+        : "bg-[#fff7ed] text-[#f59e0b]";
+
   return (
     <Link
       href={href}
@@ -808,19 +822,729 @@ function CustomerVerificationStatusCard({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-3">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${
-            verified
-              ? "bg-[#eef9f0] text-[#16a34a]"
-              : "bg-[#fff7ed] text-[#f59e0b]"
-          }`}
-        >
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${toneClass}`}>
           {verified ? <CheckCircleIcon className="h-4 w-4" /> : null}
-          {verified ? "Verified" : "Pending"}
+          {label}
         </span>
         <ChevronRightIcon className="h-5 w-5 text-[#98a2b3]" />
       </div>
     </Link>
+  );
+}
+
+function OtpInputSlots({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (nextValue: string) => void;
+}) {
+  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+
+  return (
+    <div className="mt-4 flex items-center gap-3">
+      {Array.from({ length: 6 }, (_, index) => {
+        const char = value[index] ?? "";
+
+        return (
+          <input
+            key={index}
+            ref={(node) => {
+              inputsRef.current[index] = node;
+            }}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={1}
+            value={char}
+            onChange={(event) => {
+              const nextChar = event.target.value.replace(/\D/g, "").slice(-1);
+              const nextValue = value.split("");
+              nextValue[index] = nextChar;
+              onChange(nextValue.join("").slice(0, 6));
+
+              if (nextChar && index < 5) {
+                inputsRef.current[index + 1]?.focus();
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Backspace" && !char && index > 0) {
+                inputsRef.current[index - 1]?.focus();
+              }
+            }}
+            className="h-14 w-12 rounded-[14px] border border-[#e5def3] bg-white text-center text-[1.25rem] font-black text-[#1f1630] outline-none transition focus:border-[#8E5EB5] focus:ring-2 focus:ring-[#efe6fb]"
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+async function patchCustomerProfile(payload: Record<string, unknown>) {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    return { ok: false, error: "Supabase is not configured yet." };
+  }
+
+  const {
+    data: { session },
+  } = await client.auth.getSession();
+
+  if (!session) {
+    return { ok: false, error: "Your session expired. Please log in again." };
+  }
+
+  const response = await fetch("/api/profile/me", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const result = (await response.json().catch(() => ({}))) as { error?: string; profile?: CustomerProfile };
+
+  if (!response.ok) {
+    return { ok: false, error: result.error || "Unable to update verification." };
+  }
+
+  return { ok: true, profile: result.profile ?? null };
+}
+
+export function CustomerEmailVerificationScreen({ initialProfile }: EditProps) {
+  const router = useRouter();
+  const profile = useLiveCustomerProfile(initialProfile);
+  const [emailValue, setEmailValue] = useState(initialProfile.email);
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [saving, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!otpSent || countdown <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCountdown((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [otpSent, countdown]);
+
+  const canSend = /\S+@\S+\.\S+/.test(emailValue.trim());
+  const canVerify = canSend && otp.length === 6;
+
+  useEffect(() => {
+    setEmailValue(profile.email);
+  }, [profile.email]);
+
+  return (
+    <ProfileShell title="Email Verification" showBack backHref="/profile/verification" showBottomNav={false}>
+      <section className="space-y-4">
+        <div className="flex items-center justify-end">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${profile.emailVerified ? "bg-[#eef9f0] text-[#16a34a]" : "bg-[#fff7ed] text-[#f59e0b]"}`}>
+            {profile.emailVerified ? <CheckCircleIcon className="h-4 w-4" /> : null}
+            {profile.emailVerified ? "Verified" : "Pending"}
+          </span>
+        </div>
+
+        <header>
+          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">Email Verification</h1>
+          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
+            Add your email address and verify it with a one-time code.
+          </p>
+        </header>
+
+        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+          <p className="text-[15px] font-black text-[#1f1630]">Email Address</p>
+          <div className="mt-4 flex items-center rounded-[16px] border border-[#e7def4] bg-white px-4">
+            <MailIcon className="h-5 w-5 text-[#8E5EB5]" />
+            <input
+              type="email"
+              value={emailValue}
+              onChange={(event) => setEmailValue(event.target.value.trimStart())}
+              placeholder="Enter email address"
+              className="h-[52px] w-full bg-transparent px-3 text-[15px] text-[#1f1630] outline-none placeholder:text-[#b3a9c7]"
+            />
+          </div>
+
+          <button
+            type="button"
+            disabled={!canSend}
+            onClick={() => {
+              if (!canSend) {
+                return;
+              }
+              setOtp("");
+              setOtpSent(true);
+              setCountdown(30);
+              setNotice("We sent a 6-digit code to your email.");
+              setError("");
+            }}
+            className={`mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border text-[15px] font-black transition ${
+              canSend
+                ? "border-[#cdb8f3] bg-white text-[#8E5EB5] shadow-[0_12px_28px_rgba(142,94,181,0.08)]"
+                : "cursor-not-allowed border-[#eadff8] bg-[#faf7fe] text-[#c2b2dc]"
+            }`}
+          >
+            <ShareArrowIcon className="h-4.5 w-4.5" />
+            Send Code
+          </button>
+
+          <div className="mt-6">
+            <p className="text-[15px] font-black text-[#1f1630]">Enter OTP</p>
+            <OtpInputSlots value={otp} onChange={setOtp} />
+            <div className="mt-4 space-y-2 text-[13px]">
+              <div className="flex items-center gap-2 text-[#6f6681]">
+                <MessageIcon className="h-4 w-4 text-[#8E5EB5]" />
+                <span>{notice || "We sent a 6-digit code to your email"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[#6f6681]">
+                <ClockIcon className="h-4 w-4 text-[#8E5EB5]" />
+                <span>
+                  Resend code in <strong className="font-black text-[#8E5EB5]">00:{String(countdown).padStart(2, "0")}</strong>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f5efff_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#8E5EB5]">
+              <CheckShieldIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[14px] font-black text-[#1f1630]">Your security matters</p>
+              <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+                Your email address will be used for account verification and important updates.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {error ? (
+          <p className="rounded-[16px] border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-[13px] font-semibold text-[#dc2626]">
+            {error}
+          </p>
+        ) : null}
+
+        <button
+          type="button"
+          disabled={!canVerify || saving}
+          onClick={() => {
+            startTransition(async () => {
+              setError("");
+              const result = await patchCustomerProfile({
+                email: emailValue.trim(),
+                emailVerified: true,
+              });
+
+              if (!result.ok) {
+                setError(result.error || "Unable to update email verification.");
+                return;
+              }
+
+              router.push("/profile/verification");
+            });
+          }}
+          className={`inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+            canVerify && !saving
+              ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
+              : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
+          }`}
+        >
+          {saving ? "Verifying..." : "Verify Email"}
+        </button>
+      </section>
+    </ProfileShell>
+  );
+}
+
+export function CustomerPhoneVerificationScreen({ initialProfile }: EditProps) {
+  const router = useRouter();
+  const profile = useLiveCustomerProfile(initialProfile);
+  const [phoneNumber, setPhoneNumber] = useState(initialProfile.phoneNumber);
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [saving, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!otpSent || countdown <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCountdown((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [otpSent, countdown]);
+
+  const canSend = phoneNumber.trim().length >= 7;
+  const canVerify = canSend && otp.length === 6;
+
+  useEffect(() => {
+    setPhoneNumber(profile.phoneNumber);
+  }, [profile.phoneNumber]);
+
+  return (
+    <ProfileShell title="Phone Verification" showBack backHref="/profile/verification" showBottomNav={false}>
+      <section className="space-y-4">
+        <div className="flex items-center justify-end">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${profile.phoneVerified ? "bg-[#eef9f0] text-[#16a34a]" : "bg-[#fff7ed] text-[#f59e0b]"}`}>
+            {profile.phoneVerified ? <CheckCircleIcon className="h-4 w-4" /> : null}
+            {profile.phoneVerified ? "Verified" : "Pending"}
+          </span>
+        </div>
+
+        <header>
+          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">Phone Verification</h1>
+          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
+            Add your phone number and verify it with a one-time code.
+          </p>
+        </header>
+
+        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+          <p className="text-[15px] font-black text-[#1f1630]">Phone Number</p>
+          <div className="mt-4 overflow-hidden rounded-[16px] border border-[#e7def4]">
+            <div className="flex items-stretch">
+              <div className="flex w-[96px] items-center gap-2 border-r border-[#e7def4] bg-white px-3">
+                <MalaysiaFlagIcon className="h-4 w-6 rounded-[3px]" />
+                <span className="text-[16px] font-semibold text-[#1f1630]">+60</span>
+              </div>
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={phoneNumber}
+                onChange={(event) => setPhoneNumber(event.target.value.replace(/[^\d]/g, ""))}
+                placeholder="Enter phone number"
+                className="h-[52px] flex-1 bg-white px-4 text-[15px] text-[#1f1630] outline-none placeholder:text-[#b3a9c7]"
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={!canSend}
+            onClick={() => {
+              if (!canSend) {
+                return;
+              }
+              setOtp("");
+              setOtpSent(true);
+              setCountdown(30);
+              setNotice("We sent a 6-digit code by SMS to your phone.");
+              setError("");
+            }}
+            className={`mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border text-[15px] font-black transition ${
+              canSend
+                ? "border-[#cdb8f3] bg-white text-[#8E5EB5] shadow-[0_12px_28px_rgba(142,94,181,0.08)]"
+                : "cursor-not-allowed border-[#eadff8] bg-[#faf7fe] text-[#c2b2dc]"
+            }`}
+          >
+            <ShareArrowIcon className="h-4.5 w-4.5" />
+            Send OTP
+          </button>
+
+          <div className="mt-6">
+            <p className="text-[15px] font-black text-[#1f1630]">Enter OTP</p>
+            <OtpInputSlots value={otp} onChange={setOtp} />
+            <div className="mt-4 space-y-2 text-[13px]">
+              <div className="flex items-center gap-2 text-[#6f6681]">
+                <MessageIcon className="h-4 w-4 text-[#8E5EB5]" />
+                <span>{notice || "We sent a 6-digit code by SMS"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[#6f6681]">
+                <ClockIcon className="h-4 w-4 text-[#8E5EB5]" />
+                <span>
+                  Resend code in <strong className="font-black text-[#8E5EB5]">00:{String(countdown).padStart(2, "0")}</strong>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f5efff_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#8E5EB5]">
+              <CheckShieldIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[14px] font-black text-[#1f1630]">Your security matters</p>
+              <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+                Your phone number will be used for account verification and important security alerts.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {error ? (
+          <p className="rounded-[16px] border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-[13px] font-semibold text-[#dc2626]">
+            {error}
+          </p>
+        ) : null}
+
+        <button
+          type="button"
+          disabled={!canVerify || saving}
+          onClick={() => {
+            startTransition(async () => {
+              setError("");
+              const result = await patchCustomerProfile({
+                phoneNumber: phoneNumber.trim(),
+                countryCode: profile.countryCode || "+60",
+                phoneVerified: true,
+              });
+
+              if (!result.ok) {
+                setError(result.error || "Unable to update phone verification.");
+                return;
+              }
+
+              router.push("/profile/verification");
+            });
+          }}
+          className={`inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+            canVerify && !saving
+              ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
+              : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
+          }`}
+        >
+          {saving ? "Verifying..." : "Verify Number"}
+        </button>
+      </section>
+    </ProfileShell>
+  );
+}
+
+export function CustomerIdentityVerificationScreen({ initialProfile }: EditProps) {
+  const router = useRouter();
+  const profile = useLiveCustomerProfile(initialProfile);
+  const [frontFileName, setFrontFileName] = useState("");
+  const [backFileName, setBackFileName] = useState("");
+  const [frontPreview, setFrontPreview] = useState<string | null>(initialProfile.identityFrontImageUrl || null);
+  const [backPreview, setBackPreview] = useState<string | null>(initialProfile.identityBackImageUrl || null);
+  const [selectedDocumentType, setSelectedDocumentType] = useState<"ic" | "passport">(initialProfile.identityDocumentType === "passport" ? "passport" : "ic");
+  const [uploadTarget, setUploadTarget] = useState<"front" | "back" | null>(null);
+  const [cropState, setCropState] = useState<{
+    side: "front" | "back";
+    fileName: string;
+    sourceDataUrl: string;
+    tone: "document";
+  } | null>(null);
+  const [error, setError] = useState("");
+  const [saving, startTransition] = useTransition();
+  const frontGalleryInputRef = useRef<HTMLInputElement | null>(null);
+  const backGalleryInputRef = useRef<HTMLInputElement | null>(null);
+  const frontCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const backCameraInputRef = useRef<HTMLInputElement | null>(null);
+
+  const identityStatus = profile.identityVerificationStatus;
+  const isLocked = profile.verified || identityStatus === "processing";
+  const canSubmit = Boolean(frontPreview && backPreview);
+
+  useEffect(() => {
+    setFrontPreview(profile.identityFrontImageUrl || null);
+    setBackPreview(profile.identityBackImageUrl || null);
+    setSelectedDocumentType(profile.identityDocumentType === "passport" ? "passport" : "ic");
+  }, [profile.identityBackImageUrl, profile.identityDocumentType, profile.identityFrontImageUrl]);
+
+  const handleFileChange = (side: "front" | "back", source: "gallery" | "camera") =>
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+
+      if (!file) {
+        return;
+      }
+
+      if (isLocked) {
+        setError("Your identity verification is under review right now.");
+        return;
+      }
+
+      if (!isAcceptedImageFile(file)) {
+        setError(source === "camera" ? "Camera upload must be an image." : "Gallery upload must be an image for document cropping.");
+        return;
+      }
+
+      if (file.size > PAYMENT_PROOF_MAX_BYTES) {
+        setError("Each document image must be 5MB or smaller.");
+        return;
+      }
+
+      const dataUrl = await readFileAsDataUrl(file);
+      setUploadTarget(null);
+      setCropState({
+        side,
+        fileName: file.name,
+        sourceDataUrl: dataUrl,
+        tone: "document",
+      });
+      setError("");
+    };
+
+  const openSourcePicker = (side: "front" | "back") => {
+    if (isLocked) {
+      setError("Your identity verification is under review right now.");
+      return;
+    }
+
+    setUploadTarget(side);
+    setError("");
+  };
+
+  const activeInputs =
+    uploadTarget === "front"
+      ? { gallery: frontGalleryInputRef, camera: frontCameraInputRef }
+      : { gallery: backGalleryInputRef, camera: backCameraInputRef };
+
+  return (
+    <ProfileShell title="Identity Verification" showBack backHref="/profile/verification" showBottomNav={false}>
+      <section className="space-y-4">
+        <div className="flex items-center justify-end">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${
+            profile.verified
+              ? "bg-[#eef9f0] text-[#16a34a]"
+              : identityStatus === "processing"
+                ? "bg-[#eff6ff] text-[#2563eb]"
+                : identityStatus === "rejected"
+                  ? "bg-[#fff1f2] text-[#dc2626]"
+                  : "bg-[#fff7ed] text-[#f59e0b]"
+          }`}>
+            {profile.verified ? <CheckCircleIcon className="h-4 w-4" /> : null}
+            {profile.verified ? "Verified" : identityStatus === "processing" ? "Processing" : identityStatus === "rejected" ? "Rejected" : "Pending"}
+          </span>
+        </div>
+
+        <header>
+          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">Identity Verification</h1>
+          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
+            {identityStatus === "processing"
+              ? "Your IC / passport is under review. Verification usually takes up to 24 hours."
+              : "Upload your IC or passport images for identity verification."}
+          </p>
+        </header>
+
+        {identityStatus === "processing" ? (
+          <section className="rounded-[18px] border border-[#c7d2fe] bg-[#eef2ff] px-4 py-3 text-[13px] font-semibold text-[#4338ca]">
+            Your IC / Passport successfully submitted for verification. It will take up to 24 hours to activate.
+          </section>
+        ) : null}
+
+        {identityStatus === "rejected" ? (
+          <section className="rounded-[18px] border border-[#fecdd3] bg-[#fff1f2] px-4 py-3 text-[13px] font-semibold text-[#be123c]">
+            Your previous identity verification was rejected. Please upload your IC / Passport again.
+          </section>
+        ) : null}
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-white p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <p className="text-[14px] font-black text-[#1f1630]">Document Type</p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setSelectedDocumentType("ic")}
+              disabled={isLocked}
+              className={`rounded-[14px] border px-4 py-3 text-[14px] font-bold transition ${selectedDocumentType === "ic" ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]" : "border-[#e7def4] bg-white text-[#6f6681]"} ${isLocked ? "cursor-not-allowed opacity-60" : ""}`}
+            >
+              IC
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDocumentType("passport")}
+              disabled={isLocked}
+              className={`rounded-[14px] border px-4 py-3 text-[14px] font-bold transition ${selectedDocumentType === "passport" ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]" : "border-[#e7def4] bg-white text-[#6f6681]"} ${isLocked ? "cursor-not-allowed opacity-60" : ""}`}
+            >
+              Passport
+            </button>
+          </div>
+        </section>
+
+        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+          <div className="space-y-5">
+            {([
+              {
+                side: "front" as const,
+                title: selectedDocumentType === "passport" ? "Passport Main Page" : "IC Front",
+                subtitle: `Upload clear image of ${selectedDocumentType === "passport" ? "passport page" : "front side"}`,
+                fileName: frontFileName,
+                preview: frontPreview,
+                buttonLabel: selectedDocumentType === "passport" ? "Upload Passport" : "Upload Front",
+              },
+              {
+                side: "back" as const,
+                title: selectedDocumentType === "passport" ? "Passport Supporting Page" : "IC Back",
+                subtitle: `Upload clear image of ${selectedDocumentType === "passport" ? "supporting page" : "back side"}`,
+                fileName: backFileName,
+                preview: backPreview,
+                buttonLabel: selectedDocumentType === "passport" ? "Upload Page" : "Upload Back",
+              },
+            ]).map((item) => (
+              <div key={item.side}>
+                <p className="text-[15px] font-black text-[#1f1630]">{item.title}</p>
+                <div className="mt-3 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-24 w-32 overflow-hidden rounded-[14px] border border-[#ece3f8] bg-[linear-gradient(135deg,#f8f4ff_0%,#eef2ff_100%)]">
+                      {item.preview ? (
+                        <Image src={item.preview} alt={item.fileName || item.title} fill unoptimized className="object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[#8E5EB5]">
+                          <DocumentIcon className="h-10 w-10" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] leading-5 text-[#6f6681]">{item.subtitle}</p>
+                      {item.fileName ? (
+                        <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{item.fileName}</p>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => openSourcePicker(item.side)}
+                        disabled={isLocked}
+                        className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                      >
+                        <ShareArrowIcon className="h-4 w-4" />
+                        {item.buttonLabel}
+                      </button>
+                      {item.side === "front" ? (
+                        <>
+                          <input ref={frontGalleryInputRef} type="file" accept={IMAGE_UPLOAD_ACCEPT} onChange={handleFileChange("front", "gallery")} className="hidden" />
+                          <input ref={frontCameraInputRef} type="file" accept={IMAGE_UPLOAD_ACCEPT} capture="environment" onChange={handleFileChange("front", "camera")} className="hidden" />
+                        </>
+                      ) : (
+                        <>
+                          <input ref={backGalleryInputRef} type="file" accept={IMAGE_UPLOAD_ACCEPT} onChange={handleFileChange("back", "gallery")} className="hidden" />
+                          <input ref={backCameraInputRef} type="file" accept={IMAGE_UPLOAD_ACCEPT} capture="environment" onChange={handleFileChange("back", "camera")} className="hidden" />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-[22px] border border-[#eadff8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f5efff_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#8E5EB5]">
+              <DocumentIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[14px] font-black text-[#1f1630]">Image Requirements</p>
+              <ul className="mt-2 space-y-1 text-[13px] leading-5 text-[#6f6681]">
+                <li>Ensure the full IC or passport page is visible within the frame</li>
+                <li>All text must be clear and readable</li>
+                <li>Image must be in focus and not blurry</li>
+                <li>No glare or reflections on the card</li>
+                <li>Crop the image before saving to keep only the document area</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {error ? (
+          <p className="rounded-[16px] border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-[13px] font-semibold text-[#dc2626]">
+            {error}
+          </p>
+        ) : null}
+
+        <button
+          type="button"
+          disabled={!canSubmit || isLocked || saving}
+          onClick={() => {
+            startTransition(async () => {
+              if (!canSubmit || isLocked) {
+                return;
+              }
+
+              setError("");
+              const result = await patchCustomerProfile({
+                verified: false,
+                identityVerificationStatus: "processing",
+                identityDocumentType: selectedDocumentType,
+                identityFrontImageUrl: frontPreview,
+                identityBackImageUrl: backPreview,
+              });
+
+              if (!result.ok) {
+                setError(result.error || "Unable to submit identity verification.");
+                return;
+              }
+
+              const successMessage = `Your ${selectedDocumentType === "passport" ? "Passport" : "IC / Passport"} successfully submitted for verification. It will take 24 hrs to activate.`;
+              window.alert(successMessage);
+              router.push("/profile/verification");
+            });
+          }}
+          className={`inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+            canSubmit && !isLocked && !saving
+              ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
+              : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
+          }`}
+        >
+          {saving ? "Submitting..." : isLocked ? "Submitted for Review" : "Submit for Verification"}
+        </button>
+
+        {uploadTarget ? (
+          <div className="fixed inset-0 z-40 flex items-end justify-center bg-[#111827]/45 px-4 pb-6">
+            <div className="w-full max-w-[430px] rounded-[24px] bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)]">
+              <p className="text-[16px] font-black text-[#1f1630]">
+                {uploadTarget === "front" ? "Front document image" : "Back document image"}
+              </p>
+              <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+                Choose a source, then crop the document before saving.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <button type="button" onClick={() => activeInputs.gallery.current?.click()} className="inline-flex h-12 items-center justify-center rounded-[14px] border border-[#d9c8ee] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]">
+                  Choose from Gallery
+                </button>
+                <button type="button" onClick={() => activeInputs.camera.current?.click()} className="inline-flex h-12 items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-bold text-white">
+                  Open Camera
+                </button>
+              </div>
+              <button type="button" onClick={() => setUploadTarget(null)} className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-[14px] border border-[#eee5f7] bg-[#faf7fe] text-[14px] font-bold text-[#6f6681]">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      {cropState ? (
+        <ImageCropModal
+          imageDataUrl={cropState.sourceDataUrl}
+          tone={cropState.tone}
+          onClose={() => setCropState(null)}
+          onApply={async (selection) => {
+            try {
+              const croppedImage = await cropImageFromSelection(cropState.sourceDataUrl, selection);
+              if (cropState.side === "front") {
+                setFrontFileName(cropState.fileName);
+                setFrontPreview(croppedImage);
+              } else {
+                setBackFileName(cropState.fileName);
+                setBackPreview(croppedImage);
+              }
+              setCropState(null);
+              setError("");
+            } catch (cropError) {
+              setError(cropError instanceof Error ? cropError.message : "Unable to crop this document image.");
+            }
+          }}
+        />
+      ) : null}
+    </ProfileShell>
   );
 }
 
@@ -877,6 +1601,108 @@ export function RewardsScreen({ initialData }: OverviewProps) {
         feedbackMessage={referralMessage}
         onFeedbackChange={setReferralMessage}
       />
+    </ProfileShell>
+  );
+}
+
+export function WalletTopUpScreen({ initialData }: OverviewProps) {
+  const [selectedAmount, setSelectedAmount] = useState("20");
+  const [customAmount, setCustomAmount] = useState("");
+  const [notice, setNotice] = useState("");
+  const [isProcessing, startTransition] = useTransition();
+
+  const presetAmounts = ["20", "50", "100", "200"];
+  const displayAmount = customAmount.trim() || selectedAmount;
+
+  return (
+    <ProfileShell title="Top Up Wallet" showBack backHref="/profile" showBottomNav={false}>
+      <section className="rounded-[24px] border border-[#ebe2f8] bg-white p-4 shadow-[0_16px_34px_rgba(106,69,160,0.08)]">
+        <p className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#8E5EB5]">
+          Current Balance
+        </p>
+        <p className="mt-3 text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+          {formatRinggit(initialData.paymentSummary.walletBalance)}
+        </p>
+        <p className="mt-1 text-[12px] text-[#7c728f]">
+          Add funds to your wallet for future bookings and quick payments.
+        </p>
+      </section>
+
+      <section className="mt-4 rounded-[24px] border border-[#ebe2f8] bg-white p-4 shadow-[0_14px_30px_rgba(106,69,160,0.07)]">
+        <p className="text-[15px] font-black text-[#1f1630]">Choose top up amount</p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          {presetAmounts.map((amount) => (
+            <button
+              key={amount}
+              type="button"
+              onClick={() => {
+                setSelectedAmount(amount);
+                setCustomAmount("");
+              }}
+              className={`rounded-[14px] border px-4 py-4 text-left text-[15px] font-black transition ${
+                !customAmount && selectedAmount === amount
+                  ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
+                  : "border-[#e7def4] bg-white text-[#1f1630]"
+              }`}
+            >
+              {formatRinggit(Number(amount))}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-2 text-[13px] font-semibold text-[#111827]">Custom amount</p>
+          <div className="flex items-center rounded-[14px] border border-[#e7def4] bg-white px-4">
+            <span className="text-[15px] font-bold text-[#8E5EB5]">RM</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={customAmount}
+              onChange={(event) => setCustomAmount(event.target.value.replace(/[^\d]/g, ""))}
+              placeholder="Enter amount"
+              className="h-12 w-full bg-transparent px-3 text-[15px] font-semibold text-[#1f1630] outline-none placeholder:text-[#b3a9c7]"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-4 rounded-[22px] border border-[#eadff8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f5efff_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#8E5EB5]">
+            <WalletIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-[14px] font-black text-[#1f1630]">Selected amount</p>
+            <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
+              {displayAmount ? formatRinggit(Number(displayAmount)) : "Choose or enter a top up amount."}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {notice ? (
+        <p className="mt-4 rounded-[14px] border border-[#d7efdb] bg-[#effbf1] px-4 py-3 text-[12px] font-semibold text-[#1f6b37]">
+          {notice}
+        </p>
+      ) : null}
+
+      <button
+        type="button"
+        disabled={!displayAmount || Number(displayAmount) <= 0 || isProcessing}
+        onClick={() => {
+          startTransition(async () => {
+            setNotice(`Top up request for ${formatRinggit(Number(displayAmount))} is ready. Payment gateway can be connected next.`);
+          });
+        }}
+        className={`mt-5 inline-flex h-12 w-full items-center justify-center rounded-[14px] text-[15px] font-extrabold transition ${
+          displayAmount && Number(displayAmount) > 0 && !isProcessing
+            ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
+            : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
+        }`}
+      >
+        {isProcessing ? "Processing..." : "Top Up Wallet"}
+      </button>
     </ProfileShell>
   );
 }
@@ -3884,12 +4710,24 @@ function WalletSummaryCard({
   onConnectBank: () => void;
   onClosePanel: () => void;
 }) {
+  const router = useRouter();
   const bankOptions = ["Maybank", "CIMB", "Public Bank", "RHB Bank"];
   const withdrawDisabled = walletBalance <= 0;
 
   return (
     <section className="mt-4 overflow-hidden rounded-[22px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_16px_36px_rgba(104,63,155,0.1)]">
-      <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => router.push("/profile/wallet")}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            router.push("/profile/wallet");
+          }
+        }}
+        className="cursor-pointer rounded-[18px] border border-[#ede4f8] bg-white/90 p-4"
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
@@ -3908,7 +4746,10 @@ function WalletSummaryCard({
         </div>
         <button
           type="button"
-          onClick={onWithdrawClick}
+          onClick={(event) => {
+            event.stopPropagation();
+            onWithdrawClick();
+          }}
           disabled={withdrawDisabled}
           className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-extrabold transition ${
             withdrawDisabled
@@ -3929,7 +4770,10 @@ function WalletSummaryCard({
               </div>
               <button
                 type="button"
-                onClick={onClosePanel}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onClosePanel();
+                }}
                 className="text-[12px] font-bold text-[#8E5EB5]"
               >
                 Close
@@ -3940,7 +4784,10 @@ function WalletSummaryCard({
                 <button
                   key={bank}
                   type="button"
-                  onClick={() => onSelectedBankChange(bank)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectedBankChange(bank);
+                  }}
                   className={`rounded-[12px] border px-3 py-3 text-left text-[13px] font-bold ${
                     selectedBank === bank
                       ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
@@ -3953,7 +4800,10 @@ function WalletSummaryCard({
             </div>
             <button
               type="button"
-              onClick={onConnectBank}
+              onClick={(event) => {
+                event.stopPropagation();
+                onConnectBank();
+              }}
               className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#22c55e] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(34,197,94,0.18)]"
             >
               Connect and Withdraw

@@ -297,6 +297,22 @@ function buildCustomerProfile(
       customerProfile?.country?.trim() ||
       (typeof metadata?.country === "string" ? metadata.country.trim() : "") ||
       "Malaysia",
+    emailVerified: Boolean(metadata?.email_verified) || Boolean(profile.email?.trim()),
+    phoneVerified: Boolean(metadata?.phone_verified),
+    identityVerificationStatus:
+      metadata?.identity_verification_status === "processing" ||
+      metadata?.identity_verification_status === "verified" ||
+      metadata?.identity_verification_status === "rejected"
+        ? metadata.identity_verification_status
+        : "pending",
+    identityDocumentType:
+      metadata?.identity_document_type === "passport" || metadata?.identity_document_type === "ic"
+        ? metadata.identity_document_type
+        : undefined,
+    identityFrontImageUrl:
+      typeof metadata?.identity_front_image_url === "string" ? metadata.identity_front_image_url : "",
+    identityBackImageUrl:
+      typeof metadata?.identity_back_image_url === "string" ? metadata.identity_back_image_url : "",
     verified: Boolean(customerProfile?.verified) || profile.status?.toLowerCase() === "active",
     completion: customerProfile?.completion ?? 80,
   };
@@ -438,6 +454,12 @@ type UpdatePayload = {
   city?: string;
   region?: string;
   country?: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  identityVerificationStatus?: "pending" | "processing" | "verified" | "rejected";
+  identityDocumentType?: "ic" | "passport";
+  identityFrontImageUrl?: string;
+  identityBackImageUrl?: string;
   verified?: boolean;
   completion?: number;
 };
@@ -498,6 +520,38 @@ export async function PATCH(request: Request) {
         sex,
         country: payload.country?.trim() || "Malaysia",
         emergency_contact_number: emergencyContactNumber,
+        email_verified:
+          typeof payload.emailVerified === "boolean"
+            ? payload.emailVerified
+            : Boolean(currentMetadata.email_verified),
+        phone_verified:
+          typeof payload.phoneVerified === "boolean"
+            ? payload.phoneVerified
+            : Boolean(currentMetadata.phone_verified),
+        identity_verification_status:
+          typeof payload.identityVerificationStatus === "string"
+            ? payload.identityVerificationStatus
+            : typeof currentMetadata.identity_verification_status === "string"
+              ? currentMetadata.identity_verification_status
+              : "pending",
+        identity_document_type:
+          payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
+            ? payload.identityDocumentType
+            : typeof currentMetadata.identity_document_type === "string"
+              ? currentMetadata.identity_document_type
+              : "",
+        identity_front_image_url:
+          typeof payload.identityFrontImageUrl === "string"
+            ? payload.identityFrontImageUrl.trim()
+            : typeof currentMetadata.identity_front_image_url === "string"
+              ? currentMetadata.identity_front_image_url
+              : "",
+        identity_back_image_url:
+          typeof payload.identityBackImageUrl === "string"
+            ? payload.identityBackImageUrl.trim()
+            : typeof currentMetadata.identity_back_image_url === "string"
+              ? currentMetadata.identity_back_image_url
+              : "",
       },
     },
   );
@@ -545,6 +599,36 @@ export async function PATCH(request: Request) {
     );
   }
 
+  if (payload.identityVerificationStatus === "processing") {
+    const customerMessage =
+      "Your IC / Passport successfully submitted for verification. It will take up to 24 hours to activate.";
+
+    await verified.adminClient.from("notifications").insert({
+      user_id: verified.profile.id,
+      booking_id: null,
+      notification_type: "identity_verification_submitted",
+      title: "Identity verification submitted",
+      body: customerMessage,
+    });
+
+    const { data: adminProfiles } = await verified.adminClient
+      .from("profiles")
+      .select("id")
+      .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+
+    if (adminProfiles?.length) {
+      await verified.adminClient.from("notifications").insert(
+        adminProfiles.map((admin) => ({
+          user_id: admin.id,
+          booking_id: null,
+          notification_type: "identity_verification_submitted",
+          title: "Customer identity verification submitted",
+          body: `${fullName || verified.profile.full_name?.trim() || "A customer"} submitted IC / Passport for verification review.`,
+        })),
+      );
+    }
+  }
+
   const refreshedProfileResult = await verified.adminClient
     .from("profiles")
     .select("id, full_name, email, role, status, phone, avatar_url")
@@ -573,10 +657,58 @@ export async function PATCH(request: Request) {
               ...verified.authUser.user_metadata,
               country: payload.country?.trim() || "Malaysia",
               emergency_contact_number: emergencyContactNumber,
+              email_verified:
+                typeof payload.emailVerified === "boolean"
+                  ? payload.emailVerified
+                  : Boolean(currentMetadata.email_verified),
+              phone_verified:
+                typeof payload.phoneVerified === "boolean"
+                  ? payload.phoneVerified
+                  : Boolean(currentMetadata.phone_verified),
+              identity_verification_status:
+                typeof payload.identityVerificationStatus === "string"
+                  ? payload.identityVerificationStatus
+                  : typeof currentMetadata.identity_verification_status === "string"
+                    ? currentMetadata.identity_verification_status
+                    : "pending",
+              identity_document_type:
+                payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
+                  ? payload.identityDocumentType
+                  : typeof currentMetadata.identity_document_type === "string"
+                    ? currentMetadata.identity_document_type
+                    : "",
+              identity_front_image_url:
+                typeof payload.identityFrontImageUrl === "string"
+                  ? payload.identityFrontImageUrl.trim()
+                  : typeof currentMetadata.identity_front_image_url === "string"
+                    ? currentMetadata.identity_front_image_url
+                    : "",
+              identity_back_image_url:
+                typeof payload.identityBackImageUrl === "string"
+                  ? payload.identityBackImageUrl.trim()
+                  : typeof currentMetadata.identity_back_image_url === "string"
+                    ? currentMetadata.identity_back_image_url
+                    : "",
             } as Record<string, unknown>)
           : {
               country: payload.country?.trim() || "Malaysia",
               emergency_contact_number: emergencyContactNumber,
+              email_verified:
+                typeof payload.emailVerified === "boolean" ? payload.emailVerified : false,
+              phone_verified:
+                typeof payload.phoneVerified === "boolean" ? payload.phoneVerified : false,
+              identity_verification_status:
+                typeof payload.identityVerificationStatus === "string"
+                  ? payload.identityVerificationStatus
+                  : "pending",
+              identity_document_type:
+                payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
+                  ? payload.identityDocumentType
+                  : "",
+              identity_front_image_url:
+                typeof payload.identityFrontImageUrl === "string" ? payload.identityFrontImageUrl.trim() : "",
+              identity_back_image_url:
+                typeof payload.identityBackImageUrl === "string" ? payload.identityBackImageUrl.trim() : "",
             },
         firstName,
         lastName,

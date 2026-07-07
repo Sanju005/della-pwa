@@ -22,6 +22,12 @@ const emptyProfile: CustomerProfile = {
   city: "",
   region: "Malaysia",
   country: "Malaysia",
+  emailVerified: false,
+  phoneVerified: false,
+  identityVerificationStatus: "pending",
+  identityDocumentType: undefined,
+  identityFrontImageUrl: "",
+  identityBackImageUrl: "",
   verified: false,
   completion: 0,
 };

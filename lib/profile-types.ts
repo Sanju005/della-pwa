@@ -11,6 +11,12 @@ export type CustomerProfile = {
   city: string;
   region: string;
   country: string;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  identityVerificationStatus: "pending" | "processing" | "verified" | "rejected";
+  identityDocumentType?: "ic" | "passport";
+  identityFrontImageUrl?: string;
+  identityBackImageUrl?: string;
   verified: boolean;
   completion: number;
 };

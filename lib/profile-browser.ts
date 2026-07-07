@@ -25,6 +25,17 @@ function normalizeStoredCustomerProfile(value: unknown): CustomerProfile | null 
     city: raw.city ?? "",
     region: raw.region ?? "Malaysia",
     country: raw.country ?? "Malaysia",
+    emailVerified: Boolean(raw.emailVerified),
+    phoneVerified: Boolean(raw.phoneVerified),
+    identityVerificationStatus:
+      raw.identityVerificationStatus === "processing" ||
+      raw.identityVerificationStatus === "verified" ||
+      raw.identityVerificationStatus === "rejected"
+        ? raw.identityVerificationStatus
+        : "pending",
+    identityDocumentType: raw.identityDocumentType === "passport" ? "passport" : raw.identityDocumentType === "ic" ? "ic" : undefined,
+    identityFrontImageUrl: raw.identityFrontImageUrl ?? "",
+    identityBackImageUrl: raw.identityBackImageUrl ?? "",
     verified: Boolean(raw.verified),
     completion:
       typeof raw.completion === "number" && Number.isFinite(raw.completion)
