@@ -321,23 +321,27 @@ export function ImageCropModal({
                   <span
                     role="presentation"
                     onPointerDown={(event) => startDrag(event, "n")}
-                    className="absolute left-1/2 top-0 h-5 w-10 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize rounded-full border-2 border-white bg-[#8E5EB5]"
+                    className="absolute left-4 right-4 top-0 h-5 -translate-y-1/2 cursor-ns-resize"
                   />
                   <span
                     role="presentation"
                     onPointerDown={(event) => startDrag(event, "s")}
-                    className="absolute bottom-0 left-1/2 h-5 w-10 -translate-x-1/2 translate-y-1/2 cursor-ns-resize rounded-full border-2 border-white bg-[#8E5EB5]"
+                    className="absolute bottom-0 left-4 right-4 h-5 translate-y-1/2 cursor-ns-resize"
                   />
                   <span
                     role="presentation"
                     onPointerDown={(event) => startDrag(event, "w")}
-                    className="absolute left-0 top-1/2 h-10 w-5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-white bg-[#8E5EB5]"
+                    className="absolute bottom-4 left-0 top-4 w-5 -translate-x-1/2 cursor-ew-resize"
                   />
                   <span
                     role="presentation"
                     onPointerDown={(event) => startDrag(event, "e")}
-                    className="absolute right-0 top-1/2 h-10 w-5 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-white bg-[#8E5EB5]"
+                    className="absolute bottom-4 right-0 top-4 w-5 translate-x-1/2 cursor-ew-resize"
                   />
+                  <span className="pointer-events-none absolute left-1/2 top-0 h-5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#8E5EB5]" />
+                  <span className="pointer-events-none absolute bottom-0 left-1/2 h-5 w-10 -translate-x-1/2 translate-y-1/2 rounded-full border-2 border-white bg-[#8E5EB5]" />
+                  <span className="pointer-events-none absolute left-0 top-1/2 h-10 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#8E5EB5]" />
+                  <span className="pointer-events-none absolute right-0 top-1/2 h-10 w-5 translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#8E5EB5]" />
                 </>
               ) : null}
               {(["nw", "ne", "sw", "se"] as const).map((handle) => (
