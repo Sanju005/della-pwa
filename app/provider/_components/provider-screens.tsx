@@ -3822,8 +3822,8 @@ export function PaymentsScreen() {
   const [activeTab, setActiveTab] = useState<ProviderPaymentTab>("overview");
   const [activeRange, setActiveRange] = useState<ProviderPaymentRange>("custom");
   const [modal, setModal] = useState<ProviderPaymentModal>(null);
-  const [customStartDate, setCustomStartDate] = useState(getTodayIsoDate);
-  const [customEndDate, setCustomEndDate] = useState(getTodayIsoDate);
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   const [showLedger, setShowLedger] = useState(false);
   const [paymentHistorySection, setPaymentHistorySection] =
     useState<ProviderPaymentMethodSection>("cash");
@@ -3852,6 +3852,12 @@ export function PaymentsScreen() {
   const [companyProofDataUrl, setCompanyProofDataUrl] = useState("");
   const [companyProofMimeType, setCompanyProofMimeType] = useState("");
   const [companyDepositAmount, setCompanyDepositAmount] = useState("");
+
+  useEffect(() => {
+    const todayIso = getTodayIsoDate();
+    setCustomStartDate((current) => current || todayIso);
+    setCustomEndDate((current) => current || todayIso);
+  }, []);
 
   const fallback = LoadingOrError(state);
 

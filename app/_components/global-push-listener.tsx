@@ -19,39 +19,46 @@ export function GlobalPushListener() {
     let unsubscribe: (() => void) | undefined;
 
     async function bootstrapPush() {
-      const supabase = getSupabaseClient();
+      try {
+        const supabase = getSupabaseClient();
 
-      if (!supabase) {
-        return;
-      }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!active || !session) {
-        return;
-      }
-
-      const permission = await getCurrentNotificationPermission();
-
-      if (!active || permission !== "granted") {
-        return;
-      }
-
-      const token = await getCurrentFCMToken();
-
-      if (active && token) {
-        const saveResult = await saveFCMToken(token);
-
-        if (!saveResult.success) {
-          console.error("[FCM] Global token sync failed:", saveResult.error);
+        if (!supabase) {
+          return;
         }
-      }
 
-      unsubscribe = await subscribeToForegroundPush((path) => {
-        router.push(path);
-      });
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!active || !session) {
+          return;
+        }
+
+        const permission = await getCurrentNotificationPermission();
+
+        if (!active || permission !== "granted") {
+          return;
+        }
+
+        const token = await getCurrentFCMToken();
+
+        if (active && token) {
+          const saveResult = await saveFCMToken(token);
+
+          if (!saveResult.success) {
+            console.warn("[FCM] Global token sync skipped:", saveResult.error);
+          }
+        }
+
+        unsubscribe = await subscribeToForegroundPush((path) => {
+          router.push(path);
+        });
+      } catch (error) {
+        console.warn(
+          "[FCM] Global push bootstrap skipped:",
+          error instanceof Error ? error.message : "Unknown error",
+        );
+      }
     }
 
     void bootstrapPush();

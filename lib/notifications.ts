@@ -144,7 +144,7 @@ export async function saveFCMToken(fcmToken: string) {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      console.error("[FCM] Unable to load current Supabase user:", userError);
+      lastPushError = userError?.message || "User not found.";
       return { success: false, error: userError?.message || "User not found." };
     }
 
@@ -169,7 +169,7 @@ export async function saveFCMToken(fcmToken: string) {
     console.log("[FCM] Token saved successfully.");
     return { success: true };
   } catch (error) {
-    console.error("[FCM] Unexpected error while saving token:", error);
+    lastPushError = error instanceof Error ? error.message : "Unknown error";
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -192,7 +192,7 @@ export async function disablePushNotifications() {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      console.error("[FCM] Unable to load current Supabase user:", userError);
+      lastPushError = userError?.message || "User not found.";
       return { success: false, error: userError?.message || "User not found." };
     }
 
@@ -236,7 +236,7 @@ export async function disablePushNotifications() {
     console.log("[FCM] Push notifications disabled for this web device.");
     return { success: true };
   } catch (error) {
-    console.error("[FCM] Unexpected error while disabling push:", error);
+    lastPushError = error instanceof Error ? error.message : "Unknown error";
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -266,7 +266,16 @@ export async function getPushSetupState(): Promise<PushSetupState> {
 
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
+
+    if (userError) {
+      lastPushError = userError.message;
+      return {
+        permission,
+        hasSavedToken: false,
+      };
+    }
 
     if (!user) {
       return {
@@ -293,7 +302,7 @@ export async function getPushSetupState(): Promise<PushSetupState> {
       .maybeSingle();
 
     if (error) {
-      console.error("[FCM] Failed to load push setup state:", error);
+      lastPushError = error.message;
     }
 
     return {
@@ -301,7 +310,7 @@ export async function getPushSetupState(): Promise<PushSetupState> {
       hasSavedToken: Boolean(data?.fcm_token),
     };
   } catch (error) {
-    console.error("[FCM] Unexpected error while loading push setup state:", error);
+    lastPushError = error instanceof Error ? error.message : "Unknown error";
     return {
       permission: "unsupported",
       hasSavedToken: false,

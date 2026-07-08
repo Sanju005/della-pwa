@@ -15,6 +15,16 @@ function isChunkLoadErrorMessage(message: string) {
   );
 }
 
+function isHydrationErrorMessage(message: string) {
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes("minified react error #418") ||
+    normalizedMessage.includes("hydration failed") ||
+    normalizedMessage.includes("text content does not match")
+  );
+}
+
 function reloadOnceForCurrentLocation() {
   if (typeof window === "undefined") {
     return;
@@ -38,7 +48,9 @@ export function ChunkLoadRecovery() {
     }
 
     const handleError = (event: ErrorEvent) => {
-      if (isChunkLoadErrorMessage(event.message || "")) {
+      const message = event.message || "";
+
+      if (isChunkLoadErrorMessage(message) || isHydrationErrorMessage(message)) {
         reloadOnceForCurrentLocation();
       }
     };
@@ -51,7 +63,7 @@ export function ChunkLoadRecovery() {
             ? event.reason.message
             : "";
 
-      if (isChunkLoadErrorMessage(reason)) {
+      if (isChunkLoadErrorMessage(reason) || isHydrationErrorMessage(reason)) {
         reloadOnceForCurrentLocation();
       }
     };

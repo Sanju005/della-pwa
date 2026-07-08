@@ -2361,9 +2361,22 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
   const [items, setItems] = useState(bookings);
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "custom">("all");
   const [customDate, setCustomDate] = useState("");
+  const [todayFilterDate, setTodayFilterDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setTodayFilterDate(new Date());
+  }, []);
+
   const filtered = useMemo(() => {
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (!todayFilterDate) {
+      return items;
+    }
+
+    const todayStart = new Date(
+      todayFilterDate.getFullYear(),
+      todayFilterDate.getMonth(),
+      todayFilterDate.getDate(),
+    );
     const weekEnd = new Date(todayStart);
     weekEnd.setDate(todayStart.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
@@ -2419,7 +2432,7 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
       .filter(matchesTab)
       .filter(matchesFilter)
       .sort((left, right) => getBookingSortTimestamp(right) - getBookingSortTimestamp(left));
-  }, [customDate, dateFilter, initialTab, items]);
+  }, [customDate, dateFilter, initialTab, items, todayFilterDate]);
 
   useEffect(() => {
     let active = true;
