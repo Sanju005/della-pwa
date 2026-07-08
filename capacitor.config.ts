@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: "com.della.app",
   appName: "DELLA",
   webDir: "out",
-  bundledWebRuntime: false,
   server: {
     url: "https://app.dellaapp.com",
     cleartext: false,

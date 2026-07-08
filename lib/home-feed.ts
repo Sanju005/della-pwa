@@ -86,6 +86,8 @@ export type HomeProviderCard = {
   priceLabel: string;
   statusLabel: string;
   specialties: string[];
+  phoneVerified: boolean;
+  identityVerified: boolean;
   portraitSrc: string;
 };
 
@@ -296,6 +298,8 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
         priceLabel: `RM${Number(firstService?.hourly_rate ?? 25)}/hr`,
         statusLabel: "Available Today",
         specialties,
+        phoneVerified: false,
+        identityVerified: false,
         portraitSrc: buildProviderPortraitSrc({
           name: provider.marketing_name ?? "DELLA Provider",
           serviceKey: (firstService?.service_type ?? "chef") as ProviderCategoryKey,
@@ -322,6 +326,8 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
       priceLabel: `RM${listing.hourlyRate}/hr`,
       statusLabel: listing.availabilityLabel,
       specialties: listing.specialties,
+      phoneVerified: listing.phoneVerified,
+      identityVerified: listing.identityVerified,
       portraitSrc: listing.profileImageUrl,
     }));
 

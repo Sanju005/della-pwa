@@ -22,6 +22,8 @@ type ProviderServiceSpecialtyRow = {
 
 type ProviderVerificationRow = {
   email_verified: boolean | null;
+  phone_verified: boolean | null;
+  identity_verified: boolean | null;
 };
 
 type ProviderCatalogRow = {
@@ -82,6 +84,8 @@ export type ProviderListing = {
   availabilityLabel: string;
   imageTone: string;
   isApproved: boolean;
+  phoneVerified: boolean;
+  identityVerified: boolean;
   profileImageUrl: string;
   portfolioImages: ProviderPortfolioImage[];
 };
@@ -147,7 +151,9 @@ const providerCatalogSelectWithMedia = `
   bio,
   approval_status,
   provider_verifications (
-    email_verified
+    email_verified,
+    phone_verified,
+    identity_verified
   ),
   provider_services (
     service_type,
@@ -173,7 +179,9 @@ const providerCatalogSelectBase = `
   bio,
   approval_status,
   provider_verifications (
-    email_verified
+    email_verified,
+    phone_verified,
+    identity_verified
   ),
   provider_services (
     service_type,
@@ -302,6 +310,14 @@ export const getProviderCatalog = cache(
               isApproved:
                 row.approval_status === "approved" &&
                 Boolean(verificationRow?.email_verified),
+              phoneVerified:
+                row.approval_status === "approved" &&
+                Boolean(verificationRow?.email_verified) &&
+                Boolean(verificationRow?.phone_verified),
+              identityVerified:
+                row.approval_status === "approved" &&
+                Boolean(verificationRow?.email_verified) &&
+                Boolean(verificationRow?.identity_verified),
               profileImageUrl:
                 profileMediaMap.get(row.id) ||
                 buildProviderPortraitSrc({

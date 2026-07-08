@@ -7,6 +7,7 @@ import swiperLogo from "../../../Logo/Swiper.png";
 import {
   BookOpen,
   BriefcaseBusiness,
+  Check,
   ChevronRight,
   CreditCard,
   CircleUserRound,
@@ -249,6 +250,8 @@ function ProviderSliderSection({
                 providerLatitude={provider.providerLatitude}
                 providerLongitude={provider.providerLongitude}
                 portraitSrc={provider.portraitSrc}
+                phoneVerified={provider.phoneVerified}
+                identityVerified={provider.identityVerified}
               />
             </div>
           ))}
@@ -272,6 +275,8 @@ function PopularProviderCard({
   providerLatitude,
   providerLongitude,
   portraitSrc,
+  phoneVerified,
+  identityVerified,
 }: {
   href: string;
   name: string;
@@ -283,6 +288,8 @@ function PopularProviderCard({
   providerLatitude: number | null;
   providerLongitude: number | null;
   portraitSrc: string;
+  phoneVerified: boolean;
+  identityVerified: boolean;
 }) {
   return (
     <article className="mx-auto w-full max-w-[312px] rounded-[22px] border border-[#eef2ef] bg-white p-4 text-left shadow-[0_14px_32px_rgba(15,23,42,0.07)]">
@@ -314,14 +321,15 @@ function PopularProviderCard({
         </div>
 
         <div className="mt-2.5 flex flex-nowrap gap-1 overflow-hidden">
-          <ProviderBadge
+          <LiveProviderBadge
             icon={<CreditCard className="h-3.5 w-3.5" />}
             label="ID Verified"
-            accent
+            verified={identityVerified}
           />
-          <ProviderBadge
+          <LiveProviderBadge
             icon={<Smartphone className="h-3.5 w-3.5" />}
             label="Phone Verified"
+            verified={phoneVerified}
           />
         </div>
 
@@ -421,6 +429,42 @@ function ProviderBadge({
       {accent ? (
         <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#16a34a] text-white">
           <span className="text-[8px] font-bold">✓</span>
+        </span>
+      ) : null}
+      <span className="whitespace-nowrap">{label}</span>
+    </span>
+  );
+}
+
+function LiveProviderBadge({
+  icon,
+  label,
+  verified,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  verified: boolean;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-1.5 text-[8px] font-medium ${
+        verified
+          ? "border border-[#d8ebdf] bg-[#fbfefc] text-[#138a36]"
+          : "border border-[#e4d7f5] bg-white text-[#667085]"
+      }`}
+    >
+      <span
+        className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full ${
+          verified
+            ? "bg-white text-[#16a34a] ring-1 ring-[#dbeee2]"
+            : "bg-white text-[#8E5EB5] ring-1 ring-[#eadff6]"
+        }`}
+      >
+        {icon}
+      </span>
+      {verified ? (
+        <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#16a34a] text-white">
+          <Check className="h-2.5 w-2.5 stroke-[2.8]" />
         </span>
       ) : null}
       <span className="whitespace-nowrap">{label}</span>

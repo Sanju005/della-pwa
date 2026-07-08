@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,15 +8,14 @@ import {
   ArrowLeft,
   BadgeCheck,
   BriefcaseBusiness,
-  ChefHat,
   ChevronDown,
   Clock3,
   Building2,
+  Check,
   IdCard,
   MapPin,
   Phone,
   ShieldCheck,
-  Smile,
   Star,
   StarIcon,
   ThumbsUp,
@@ -67,6 +66,8 @@ type CatalogScreenListing = {
   href: string;
   portraitSrc: string;
   isApproved: boolean;
+  phoneVerified: boolean;
+  identityVerified: boolean;
 };
 
 type CatalogScreenData = {
@@ -77,17 +78,15 @@ type CatalogScreenData = {
   errorMessage: string | null;
 };
 
-const serviceIcons: Partial<
-  Record<Exclude<ServiceKey, null>, ComponentType<{ className?: string }>>
-> = {
-  chef: ChefHat,
-  maid: UserRound,
-  babysitter: UserRound,
-  driver: BriefcaseBusiness,
-  cleaner: UserRound,
-  tutor: BriefcaseBusiness,
-  plumber: BriefcaseBusiness,
-  electrician: BriefcaseBusiness,
+const serviceIcons: Partial<Record<Exclude<ServiceKey, null>, string>> = {
+  chef: "/service-icons/chef-new.png",
+  maid: "/service-icons/maid-01.png",
+  babysitter: "/service-icons/baby-01.png",
+  driver: "/service-icons/driver-01.png",
+  cleaner: "/service-icons/cleaner-01.png",
+  tutor: "/service-icons/tutor-01.png",
+  plumber: "/service-icons/plumber-01.png",
+  electrician: "/service-icons/electrician-01.png",
 };
 
 export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
@@ -166,9 +165,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
     return items;
   }, [activeTab, data.listings, sortBy, currentLocation]);
 
-  const Icon = data.service
-    ? serviceIcons[data.service] ?? BriefcaseBusiness
-    : BriefcaseBusiness;
+  const serviceIconSrc = data.service ? serviceIcons[data.service] : null;
   const serviceTitle = data.serviceLabel ? `${data.serviceLabel} Services` : "Service Providers";
   const serviceLower = (data.serviceLabel || "service").toLowerCase();
   const heroProviders = filteredListings.slice(0, 3);
@@ -242,7 +239,17 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
             <div className="rounded-[30px] bg-white px-5 py-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-[#eff4f1]">
               <div className="flex items-start gap-4">
                 <div className="inline-flex h-20 w-20 shrink-0 items-center justify-center rounded-[22px] bg-[#f3ebfc] text-[#8E5EB5] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                  <Icon className="h-12 w-12 stroke-[1.8]" />
+                  {serviceIconSrc ? (
+                    <Image
+                      src={serviceIconSrc}
+                      alt={data.serviceLabel || "Service"}
+                      width={64}
+                      height={64}
+                      className="h-16 w-16 object-contain"
+                    />
+                  ) : (
+                    <BriefcaseBusiness className="h-12 w-12 stroke-[1.8]" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1 pt-1">
                   <h1 className="text-[1.72rem] font-extrabold tracking-[-0.05em] text-[#13294b]">
@@ -576,9 +583,16 @@ function ProviderCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <VerifiedBadge icon={<IdCard className="h-3.5 w-3.5" />} label="ID Verified" />
-          <VerifiedBadge icon={<Phone className="h-3.5 w-3.5" />} label="Phone Verified" />
-          <VerifiedBadge icon={<Smile className="h-3.5 w-3.5" />} label="Face Verified" />
+          <VerifiedBadge
+            icon={<IdCard className="h-3.5 w-3.5" />}
+            label="ID Verified"
+            verified={listing.identityVerified}
+          />
+          <VerifiedBadge
+            icon={<Phone className="h-3.5 w-3.5" />}
+            label="Phone Verified"
+            verified={listing.phoneVerified}
+          />
         </div>
 
         <div className="flex flex-wrap gap-2.5">
@@ -631,15 +645,34 @@ function ProviderCard({
 function VerifiedBadge({
   icon,
   label,
+  verified,
 }: {
   icon: ReactNode;
   label: string;
+  verified: boolean;
 }) {
   return (
-    <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-[#dceadf] bg-white px-3 py-2 text-[10px] font-semibold text-[#475467]">
-      <span className="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-white text-[#8E5EB5] ring-1 ring-[#eadff6]">
+    <span
+      className={`inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-semibold ${
+        verified
+          ? "border border-[#cbe8d2] bg-[#f2fbf5] text-[#138a36]"
+          : "border border-[#e4d7f5] bg-white text-[#667085]"
+      }`}
+    >
+      <span
+        className={`inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full ${
+          verified
+            ? "bg-[#e7f8ec] text-[#16a34a] ring-1 ring-[#cbe8d2]"
+            : "bg-white text-[#8E5EB5] ring-1 ring-[#eadff6]"
+        }`}
+      >
         {icon}
       </span>
+      {verified ? (
+        <span className="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-[#16a34a] text-white">
+          <Check className="h-3 w-3 stroke-[2.6]" />
+        </span>
+      ) : null}
       <span>{label}</span>
     </span>
   );
