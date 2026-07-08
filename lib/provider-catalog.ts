@@ -55,6 +55,12 @@ type ProviderCatalogServiceRow = NonNullable<ProviderCatalogRow["provider_servic
 type ProviderProfileMediaRow = {
   id: string;
   avatar_url: string | null;
+  full_name: string | null;
+};
+
+type ProviderProfileMedia = {
+  avatarUrl: string;
+  fullName: string;
 };
 
 export type ProviderPortfolioImage = {
@@ -211,22 +217,28 @@ async function fetchProviderProfileMediaMap(
   const uniqueIds = [...new Set(providerIds.filter(Boolean))];
 
   if (uniqueIds.length === 0) {
-    return new Map<string, string>();
+    return new Map<string, ProviderProfileMedia>();
   }
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, avatar_url")
+    .select("id, avatar_url, full_name")
     .in("id", uniqueIds);
 
   if (error || !data) {
-    return new Map<string, string>();
+    return new Map<string, ProviderProfileMedia>();
   }
 
   return new Map(
     (data as ProviderProfileMediaRow[])
-      .map((row) => [row.id, row.avatar_url?.trim() || ""] as const)
-      .filter(([, avatarUrl]) => Boolean(avatarUrl)),
+      .map((row) => [
+        row.id,
+        {
+          avatarUrl: row.avatar_url?.trim() || "",
+          fullName: row.full_name?.trim() || "",
+        },
+      ] as const)
+      .filter(([, profile]) => Boolean(profile.avatarUrl) || Boolean(profile.fullName)),
   );
 }
 
@@ -281,10 +293,13 @@ export const getProviderCatalog = cache(
             ? row.provider_verifications[0]
             : row.provider_verifications;
 
+          const profileMedia = profileMediaMap.get(row.id);
+
           return [
             {
               id: row.id,
               name: row.marketing_name ?? "DELLA Provider",
+              providerName: profileMedia?.fullName || undefined,
               serviceKey: serviceRow.service_type,
               serviceLabel: humanizeService(serviceRow.service_type),
               title: humanizeService(serviceRow.service_type),
@@ -319,7 +334,7 @@ export const getProviderCatalog = cache(
                 Boolean(verificationRow?.email_verified) &&
                 Boolean(verificationRow?.identity_verified),
               profileImageUrl:
-                profileMediaMap.get(row.id) ||
+                profileMedia?.avatarUrl ||
                 buildProviderPortraitSrc({
                   name: row.marketing_name ?? "DELLA Provider",
                   serviceKey: serviceRow.service_type,

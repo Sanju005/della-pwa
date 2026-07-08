@@ -312,7 +312,8 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
             </div>
           </section>
 
-          <section className="mt-7 flex items-center gap-2.5 overflow-x-auto pb-1">
+          <section className="mt-7 pb-1">
+            <div className="grid grid-cols-3 gap-2">
               <FilterPill
               active={sortBy === "nearest"}
               onClick={() => setSortBy("nearest")}
@@ -331,6 +332,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
               icon={<BadgeCheck className="h-4 w-4" />}
               label="Low Rate"
             />
+            </div>
           </section>
 
           <section className="mt-5 overflow-hidden rounded-[24px] border border-[#E5ECE7] bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
@@ -442,14 +444,14 @@ function FilterPill({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-12 shrink-0 items-center gap-2 rounded-[18px] border px-4 text-[13px] font-semibold shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${
+      className={`inline-flex h-10 min-w-0 w-full items-center justify-center gap-1.5 rounded-[16px] border px-2.5 text-[11px] font-semibold shadow-[0_8px_20px_rgba(15,23,42,0.04)] ${
         active
           ? "border-[#dbc8ed] bg-[#f3ebfc] text-[#8E5EB5]"
           : "border-[#e7ece8] bg-white text-[#344054]"
       }`}
     >
       <span className={active ? "text-[#8E5EB5]" : "text-[#344054]"}>{icon}</span>
-      <span>{label}</span>
+      <span className="truncate">{label}</span>
     </button>
   );
 }
@@ -521,9 +523,9 @@ function ProviderCard({
           : "Popular Provider";
 
   return (
-    <article className="w-full max-w-[380px] rounded-[28px] border border-[#e7ece8] bg-white p-[18px] shadow-[0_18px_38px_rgba(15,23,42,0.07)]">
-      <div className="flex items-start gap-4">
-        <div className="relative h-[148px] w-[116px] shrink-0 overflow-hidden rounded-[20px] bg-[#eef4ef]">
+    <article className="w-full max-w-[380px] rounded-[26px] border border-[#e7ece8] bg-white p-[14px] shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
+      <div className="flex items-start gap-3">
+        <div className="relative h-[116px] w-[98px] shrink-0 overflow-hidden rounded-[18px] bg-[#eef4ef]">
           <Image
             src={listing.portraitSrc}
             alt={listing.name}
@@ -535,33 +537,33 @@ function ProviderCard({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-start justify-between gap-2.5">
+          <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1 pr-1">
               <div className="flex items-start gap-2">
-                <h3 className="min-w-0 flex-1 text-[1.04rem] font-extrabold leading-6 tracking-[-0.04em] text-[#1f2c44]">
+                <h3 className="min-w-0 flex-1 text-[0.98rem] font-extrabold leading-5 tracking-[-0.04em] text-[#1f2c44]">
                   <span className="break-words">{listing.name}</span>
                 </h3>
               </div>
-              <p className="mt-2 break-words text-[15px] font-bold leading-5 text-[#1f2c44]">
+              <p className="mt-1 break-words text-[13px] font-semibold leading-4.5 text-[#1f2c44]">
                 {fullName}
               </p>
-              <span className="mt-3 inline-flex max-w-full items-center gap-1.5 rounded-full bg-[#f3ebfc] px-3 py-1.5 text-[10px] font-semibold text-[#8E5EB5]">
-                <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-                <span className="break-words">{rankingBadge}</span>
+              <span className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full bg-[#f3ebfc] px-2 py-1 text-[9px] font-semibold text-[#8E5EB5]">
+                <ShieldCheck className="h-3 w-3 shrink-0" />
+                <span className="truncate">{rankingBadge}</span>
               </span>
             </div>
 
             <FavoriteProviderButton
               providerId={listing.id}
               serviceKey={listing.serviceKey}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#eef2ef] bg-white shadow-[0_8px_18px_rgba(15,23,42,0.06)]"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#eef2ef] bg-white shadow-[0_6px_14px_rgba(15,23,42,0.05)]"
             />
           </div>
         </div>
       </div>
 
-      <div className="mt-5 space-y-4 text-left">
-        <div className="grid grid-cols-2 gap-x-5 gap-y-3 border-b border-[#edf1ee] pb-4">
+      <div className="mt-3.5 space-y-3 text-left">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 border-b border-[#edf1ee] pb-3">
           <InfoMetric
             icon={<Star className="h-5 w-5 fill-[#f5b301] text-[#f5b301]" />}
             value={listing.rating.toFixed(1)}
@@ -582,24 +584,24 @@ function ProviderCard({
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           <VerifiedBadge
             icon={<IdCard className="h-3.5 w-3.5" />}
-            label="ID Verified"
+            label={listing.identityVerified ? "ID Verified" : "ID Pending"}
             verified={listing.identityVerified}
           />
           <VerifiedBadge
             icon={<Phone className="h-3.5 w-3.5" />}
-            label="Phone Verified"
+            label={listing.phoneVerified ? "Phone Verified" : "Phone Pending"}
             verified={listing.phoneVerified}
           />
         </div>
 
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-wrap gap-1.5">
           {serviceTags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center rounded-full bg-[#f3ebfc] px-3 py-2 text-[12px] font-semibold leading-none text-[#8E5EB5]"
+              className="inline-flex items-center rounded-full bg-[#f3ebfc] px-2.5 py-1.5 text-[10px] font-semibold leading-none text-[#8E5EB5]"
             >
               {tag}
             </span>
@@ -607,8 +609,8 @@ function ProviderCard({
         </div>
       </div>
 
-      <div className="mt-5 rounded-[20px] border border-[#edf1ee] bg-[#fbfdfb] px-1.5 py-2">
-        <div className="grid grid-cols-4 divide-x divide-[#e8eeea] text-[12px] text-[#667085]">
+      <div className="mt-4 rounded-[18px] border border-[#edf1ee] bg-[#fbfdfb] px-1 py-1.5">
+        <div className="grid grid-cols-4 divide-x divide-[#e8eeea] text-[11px] text-[#667085]">
           <StatPill
             icon={<Clock3 className="h-3.5 w-3.5 text-[#8E5EB5]" />}
             label="Replies in"
@@ -634,7 +636,7 @@ function ProviderCard({
 
       <Link
         href={listing.href}
-        className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-[18px] bg-[#8E5EB5] px-4 text-[14px] font-bold text-white shadow-[0_14px_28px_rgba(142,94,181,0.22)] transition hover:bg-[#7b4ea1]"
+        className="mt-3.5 inline-flex h-11 w-full items-center justify-center rounded-[16px] bg-[#8E5EB5] px-4 text-[13px] font-bold text-white shadow-[0_12px_24px_rgba(142,94,181,0.2)] transition hover:bg-[#7b4ea1]"
       >
         View Profile
       </Link>
@@ -656,14 +658,14 @@ function VerifiedBadge({
       className={`inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-semibold ${
         verified
           ? "border border-[#cbe8d2] bg-[#f2fbf5] text-[#138a36]"
-          : "border border-[#e4d7f5] bg-white text-[#667085]"
+          : "border border-[#fde2b7] bg-[#fff8ee] text-[#d97706]"
       }`}
     >
       <span
         className={`inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full ${
           verified
             ? "bg-[#e7f8ec] text-[#16a34a] ring-1 ring-[#cbe8d2]"
-            : "bg-white text-[#8E5EB5] ring-1 ring-[#eadff6]"
+            : "bg-white text-[#f59e0b] ring-1 ring-[#fde2b7]"
         }`}
       >
         {icon}
@@ -688,11 +690,11 @@ function InfoMetric({
   suffix?: string;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
+    <div className="flex min-w-0 items-center gap-2">
       <span className="shrink-0">{icon}</span>
-      <p className="text-[13px] font-bold leading-5 text-[#1f2c44]">
+      <p className="text-[12px] font-bold leading-4.5 text-[#1f2c44]">
         {value}
-        {suffix ? <span className="ml-1 font-medium text-[#667085]">{suffix}</span> : null}
+        {suffix ? <span className="ml-1 text-[11px] font-medium text-[#667085]">{suffix}</span> : null}
       </p>
     </div>
   );
@@ -708,12 +710,12 @@ function StatPill({
   value: string;
 }) {
   return (
-    <div className="px-2 py-3 text-center">
-      <div className="flex items-center justify-center gap-1.5">
+    <div className="px-1.5 py-2 text-center">
+      <div className="flex items-center justify-center gap-1">
         {icon}
-        <span className="text-[10px] font-semibold leading-4 text-[#98a2b3]">{label}</span>
+        <span className="text-[9px] font-semibold leading-3.5 text-[#98a2b3]">{label}</span>
       </div>
-      <p className="mt-2 text-[13px] font-bold leading-5 text-[#1f2c44]">{value}</p>
+      <p className="mt-1.5 text-[12px] font-bold leading-4.5 text-[#1f2c44]">{value}</p>
     </div>
   );
 }
