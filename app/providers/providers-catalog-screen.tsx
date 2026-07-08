@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -92,7 +92,6 @@ const serviceIcons: Partial<Record<Exclude<ServiceKey, null>, string>> = {
 };
 
 export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
-  const router = useRouter();
   const [locationDetails, setLocationDetails] = useState<StoredLiveLocation | null>(null);
   const [currentLocation, setCurrentLocation] = useState<StoredLiveLocation | null>(null);
   const [savedPlaces, setSavedPlaces] = useState<StoredLiveLocation[]>([]);
@@ -210,13 +209,12 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
         <div className="py-6">
           <header className="space-y-5">
             <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => router.push("/home")}
-                className="inline-flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-[18px] border border-[#e3ebe6] bg-white text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+              <Link
+                href="/home"
+                className="relative z-20 pointer-events-auto inline-flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-[18px] border border-[#e3ebe6] bg-white text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)] [touch-action:manipulation]"
               >
                 <ArrowLeft className="h-6 w-6" />
-              </button>
+              </Link>
               <LiveLocationChip
                 fallbackLabel="Search location or address..."
                 className="flex-1 min-w-0"
@@ -568,7 +566,6 @@ function ProviderCard({
   distanceKm: number;
   sortBy: SortKey;
 }) {
-  const router = useRouter();
   const fullName = buildProviderFullName(listing);
   const jobsCompleted = Math.max(listing.reviews * 2 + 68, 120);
   const repeatCustomers = Math.max(Math.round(listing.reviews * 0.61), 24);
@@ -588,7 +585,7 @@ function ProviderCard({
           : "Popular Provider";
 
   return (
-    <article className="w-full max-w-[380px] rounded-[26px] border border-[#e7ece8] bg-white p-[14px] shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
+    <article className="relative w-full max-w-[380px] rounded-[26px] border border-[#e7ece8] bg-white p-[14px] shadow-[0_14px_30px_rgba(15,23,42,0.06)]">
       <div className="flex items-start gap-3">
         <div className="relative h-[116px] w-[98px] shrink-0 overflow-hidden rounded-[18px] bg-[#eef4ef]">
           <Image
@@ -699,13 +696,12 @@ function ProviderCard({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => router.push(listing.href)}
-        className="mt-3.5 inline-flex h-11 w-full items-center justify-center rounded-[16px] bg-[#8E5EB5] px-4 text-[13px] font-bold text-white shadow-[0_12px_24px_rgba(142,94,181,0.2)] transition hover:bg-[#7b4ea1]"
+      <Link
+        href={listing.href}
+        className="relative z-20 pointer-events-auto mt-3.5 inline-flex h-11 w-full items-center justify-center rounded-[16px] bg-[#8E5EB5] px-4 text-[13px] font-bold text-white shadow-[0_12px_24px_rgba(142,94,181,0.2)] transition hover:bg-[#7b4ea1] [touch-action:manipulation]"
       >
         View Profile
-      </button>
+      </Link>
     </article>
   );
 }
