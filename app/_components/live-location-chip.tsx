@@ -75,13 +75,15 @@ export function LiveLocationChip({
   showChevron = true,
   mode = "current",
 }: LiveLocationChipProps) {
-  const [location, setLocation] = useState<StoredLiveLocation | null>(() =>
-    mode === "saved" ? loadStoredLiveLocation() : loadCurrentLiveLocation()
-  );
+  const [location, setLocation] = useState<StoredLiveLocation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const hasResolvedInitialLocation = useRef(false);
   const lastResolvedLocationRef = useRef<StoredLiveLocation | null>(location);
+
+  useEffect(() => {
+    setLocation(mode === "saved" ? loadStoredLiveLocation() : loadCurrentLiveLocation());
+  }, [mode]);
 
   useEffect(() => {
     if (location) {

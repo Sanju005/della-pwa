@@ -94,15 +94,14 @@ const serviceIcons: Partial<Record<Exclude<ServiceKey, null>, string>> = {
 export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
   const router = useRouter();
   const [locationDetails, setLocationDetails] = useState<StoredLiveLocation | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<StoredLiveLocation | null>(() =>
-    loadCurrentLiveLocation()
-  );
+  const [currentLocation, setCurrentLocation] = useState<StoredLiveLocation | null>(null);
   const [savedPlaces, setSavedPlaces] = useState<StoredLiveLocation[]>([]);
   const [selectedPlaceId, setSelectedPlaceId] = useState<"current" | string>("current");
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [sortBy, setSortBy] = useState<SortKey>("popular");
 
   useEffect(() => {
+    setCurrentLocation(loadCurrentLiveLocation());
     setSavedPlaces(loadSavedPlaces());
   }, []);
 
