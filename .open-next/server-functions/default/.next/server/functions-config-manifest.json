@@ -34,6 +34,7 @@
     "/api/provider/services": {},
     "/api/provider/services/[id]": {},
     "/api/providers": {},
+    "/api/reports": {},
     "/firebase-messaging-sw.js": {}
   }
 }

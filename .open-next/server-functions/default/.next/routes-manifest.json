@@ -204,6 +204,12 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
+      "page": "/admin/reports",
+      "regex": "^/admin/reports(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/reports(?:/)?$"
+    },
+    {
       "page": "/api/auth/register/customer",
       "regex": "^/api/auth/register/customer(?:/)?$",
       "routeKeys": {},
@@ -328,6 +334,12 @@
       "regex": "^/api/providers(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/providers(?:/)?$"
+    },
+    {
+      "page": "/api/reports",
+      "regex": "^/api/reports(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/reports(?:/)?$"
     },
     {
       "page": "/apple-icon.png",
@@ -486,10 +498,46 @@
       "namedRegex": "^/profile/payments(?:/)?$"
     },
     {
+      "page": "/profile/rewards",
+      "regex": "^/profile/rewards(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile/rewards(?:/)?$"
+    },
+    {
       "page": "/profile/settings",
       "regex": "^/profile/settings(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/profile/settings(?:/)?$"
+    },
+    {
+      "page": "/profile/verification",
+      "regex": "^/profile/verification(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile/verification(?:/)?$"
+    },
+    {
+      "page": "/profile/verification/email",
+      "regex": "^/profile/verification/email(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile/verification/email(?:/)?$"
+    },
+    {
+      "page": "/profile/verification/identity",
+      "regex": "^/profile/verification/identity(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile/verification/identity(?:/)?$"
+    },
+    {
+      "page": "/profile/verification/phone",
+      "regex": "^/profile/verification/phone(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile/verification/phone(?:/)?$"
+    },
+    {
+      "page": "/profile/wallet",
+      "regex": "^/profile/wallet(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/profile/wallet(?:/)?$"
     },
     {
       "page": "/provider/availability",
@@ -544,6 +592,24 @@
       "regex": "^/provider/profile(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/provider/profile(?:/)?$"
+    },
+    {
+      "page": "/provider/profile/email-verification",
+      "regex": "^/provider/profile/email\\-verification(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/provider/profile/email\\-verification(?:/)?$"
+    },
+    {
+      "page": "/provider/profile/identity-verification",
+      "regex": "^/provider/profile/identity\\-verification(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/provider/profile/identity\\-verification(?:/)?$"
+    },
+    {
+      "page": "/provider/profile/phone-verification",
+      "regex": "^/provider/profile/phone\\-verification(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/provider/profile/phone\\-verification(?:/)?$"
     },
     {
       "page": "/provider/register",
