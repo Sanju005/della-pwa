@@ -50,7 +50,9 @@ import type {
   SettingGroup,
 } from "@/lib/profile-types";
 
-const TODAY_ISO = new Date().toISOString().split("T")[0];
+function getTodayIso() {
+  return new Date().toISOString().split("T")[0] ?? "";
+}
 
 type ShellProps = {
   children: React.ReactNode;
@@ -3859,13 +3861,21 @@ export function BookingReviewScreen({ booking }: BookingReviewProps) {
 export function PaymentsScreen({ payments }: PaymentsProps) {
   const [items, setItems] = useState(payments);
   const [filterMode, setFilterMode] = useState<"month" | "custom">("month");
-  const [selectedMonth, setSelectedMonth] = useState(TODAY_ISO.slice(0, 7));
-  const [dateFrom, setDateFrom] = useState(() => {
+  const [todayIso, setTodayIso] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  useEffect(() => {
+    const resolvedTodayIso = getTodayIso();
     const initial = new Date();
     initial.setDate(initial.getDate() - 90);
-    return initial.toISOString().split("T")[0] ?? TODAY_ISO;
-  });
-  const [dateTo, setDateTo] = useState(TODAY_ISO);
+
+    setTodayIso(resolvedTodayIso);
+    setSelectedMonth((current) => current || resolvedTodayIso.slice(0, 7));
+    setDateFrom((current) => current || (initial.toISOString().split("T")[0] ?? ""));
+    setDateTo((current) => current || resolvedTodayIso);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -3925,12 +3935,20 @@ export function PaymentsScreen({ payments }: PaymentsProps) {
       ),
     );
 
-    return months.length > 0 ? months : [TODAY_ISO.slice(0, 7)];
-  }, [items]);
+    if (months.length > 0) {
+      return months;
+    }
+
+    return todayIso ? [todayIso.slice(0, 7)] : [];
+  }, [items, todayIso]);
 
   useEffect(() => {
+    if (availableMonths.length === 0) {
+      return;
+    }
+
     if (!availableMonths.includes(selectedMonth)) {
-      setSelectedMonth(availableMonths[0] ?? TODAY_ISO.slice(0, 7));
+      setSelectedMonth(availableMonths[0] ?? "");
     }
   }, [availableMonths, selectedMonth]);
 
@@ -5289,6 +5307,11 @@ function LabeledDateInput({
   icon: React.ReactNode;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [maxDate, setMaxDate] = useState("");
+
+  useEffect(() => {
+    setMaxDate(getTodayIso());
+  }, []);
 
   const openPicker = () => {
     const input = inputRef.current;
@@ -5311,7 +5334,7 @@ function LabeledDateInput({
         <input
           ref={inputRef}
           type="date"
-          max={TODAY_ISO}
+          max={maxDate || undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onClick={openPicker}

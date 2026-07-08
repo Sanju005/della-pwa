@@ -15,6 +15,7 @@ import {
   IdCard,
   MapPin,
   Phone,
+  Search,
   ShieldCheck,
   Star,
   StarIcon,
@@ -23,8 +24,6 @@ import {
 } from "lucide-react";
 import { EmptyState as SharedEmptyState } from "@/app/_components/della-ui";
 import { FavoriteProviderButton } from "@/app/_components/favorite-provider-button";
-
-import { LiveLocationChip } from "@/app/_components/live-location-chip";
 import {
   saveSelectedProviderSearchLocation,
   loadSavedPlaces,
@@ -98,6 +97,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
   const [selectedPlaceId, setSelectedPlaceId] = useState<"current" | string>("current");
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [sortBy, setSortBy] = useState<SortKey>("popular");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     setCurrentLocation(loadCurrentLiveLocation());
@@ -171,8 +171,13 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
       const matchesTab =
         activeTab === "all" ||
         (activeTab === "active-now" && listing.availabilityLabel === "Available Today");
+      const normalizedQuery = searchQuery.trim().toLowerCase();
+      const matchesQuery =
+        normalizedQuery.length === 0 ||
+        listing.name.toLowerCase().includes(normalizedQuery) ||
+        buildProviderFullName(listing).toLowerCase().includes(normalizedQuery);
 
-      return matchesTab;
+      return matchesTab && matchesQuery;
     });
 
     items = [...items].sort((left, right) => {
@@ -185,7 +190,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
     });
 
     return items;
-  }, [activeTab, data.listings, sortBy, activeLocation]);
+  }, [activeTab, data.listings, sortBy, activeLocation, searchQuery]);
 
   const serviceIconSrc = data.service ? serviceIcons[data.service] : null;
   const serviceTitle = data.serviceLabel ? `${data.serviceLabel} Services` : "Service Providers";
@@ -209,25 +214,27 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
         <div className="py-6">
           <header className="space-y-5">
             <div className="flex items-center justify-between gap-3">
-              <Link
+              <a
                 href="/home"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.location.href = "/home";
+                  }
+                }}
                 className="relative z-20 pointer-events-auto inline-flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-[18px] border border-[#e3ebe6] bg-white text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)] [touch-action:manipulation]"
               >
                 <ArrowLeft className="h-6 w-6" />
-              </Link>
-              <LiveLocationChip
-                fallbackLabel="Search location or address..."
-                className="flex-1 min-w-0"
-                onLocationChange={(location) => {
-                  setLocationDetails(location);
-                  setCurrentLocation(location);
-                  setSelectedPlaceId("current");
-                  setSavedPlaces(loadSavedPlaces());
-                }}
-                displayLabel="Search location or address..."
-                leadingIcon="search"
-                showChevron={false}
-              />
+              </a>
+              <label className="flex min-h-[3.25rem] flex-1 min-w-0 items-center gap-2.5 rounded-[18px] border border-[#e3ebe6] bg-white px-4 text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                <Search className="h-5.5 w-5.5 shrink-0 text-[#667085]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search provider name..."
+                  className="w-full min-w-0 bg-transparent text-[15px] font-semibold text-[#0F172A] outline-none placeholder:text-[#667085]"
+                />
+              </label>
             </div>
 
             <div className="rounded-[28px] border border-[#edf1ee] bg-white px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
@@ -696,12 +703,17 @@ function ProviderCard({
         </div>
       </div>
 
-      <Link
+      <a
         href={listing.href}
+        onClick={() => {
+          if (typeof window !== "undefined") {
+            window.location.href = listing.href;
+          }
+        }}
         className="relative z-20 pointer-events-auto mt-3.5 inline-flex h-11 w-full items-center justify-center rounded-[16px] bg-[#8E5EB5] px-4 text-[13px] font-bold text-white shadow-[0_12px_24px_rgba(142,94,181,0.2)] transition hover:bg-[#7b4ea1] [touch-action:manipulation]"
       >
         View Profile
-      </Link>
+      </a>
     </article>
   );
 }

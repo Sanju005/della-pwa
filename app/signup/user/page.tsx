@@ -21,7 +21,9 @@ import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
 import { getSupabaseClient } from "@/lib/supabase";
 import { malaysianStates } from "@/lib/provider-registration-config";
 
-const TODAY_ISO = new Date().toISOString().split("T")[0];
+function getTodayIso() {
+  return new Date().toISOString().split("T")[0] ?? "";
+}
 
 export default function SignupUserPage() {
   const router = useRouter();
@@ -604,6 +606,11 @@ function ControlledDateField({
   invalid?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [maxDate, setMaxDate] = useState("");
+
+  useEffect(() => {
+    setMaxDate(getTodayIso());
+  }, []);
 
   const openPicker = () => {
     const input = inputRef.current;
@@ -630,7 +637,7 @@ function ControlledDateField({
         <input
           ref={inputRef}
           type="date"
-          max={TODAY_ISO}
+          max={maxDate || undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onClick={openPicker}

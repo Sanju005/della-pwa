@@ -1285,6 +1285,11 @@ export function DashboardScreen() {
     );
   const unreadCount = state.notifications.filter((item) => !item.isRead).length;
   const displayName = data.marketingName || data.fullName || "Provider";
+  const [greetingLabel, setGreetingLabel] = useState("Hello,");
+
+  useEffect(() => {
+    setGreetingLabel(getGreeting());
+  }, []);
 
   return (
     <MobilePage className="pb-28">
@@ -1344,7 +1349,7 @@ export function DashboardScreen() {
               </span>
             </div>
 
-            <p className="mt-6 text-[14px] text-[#64748b]">{getGreeting()}</p>
+            <p className="mt-6 text-[14px] text-[#64748b]">{greetingLabel}</p>
             <h1 className="mt-1 text-[2rem] font-black tracking-[-0.06em] text-[#0f172a]">
               {displayName}
             </h1>

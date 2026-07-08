@@ -57,7 +57,9 @@ const DynamicLocationPickerMap = dynamic(
   }
 );
 
-const TODAY_ISO = new Date().toISOString().split("T")[0];
+function getTodayIso() {
+  return new Date().toISOString().split("T")[0] ?? "";
+}
 const IMAGE_UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
 const CERTIFICATE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 const PROFILE_AND_MEDIA_ACCEPT = IMAGE_UPLOAD_ACCEPT;
@@ -1755,6 +1757,11 @@ function DateInputField({
   invalid?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [maxDate, setMaxDate] = useState("");
+
+  useEffect(() => {
+    setMaxDate(getTodayIso());
+  }, []);
 
   const openPicker = () => {
     const input = inputRef.current as (HTMLInputElement & {
@@ -1778,7 +1785,7 @@ function DateInputField({
         <input
           ref={inputRef}
           type="date"
-          max={TODAY_ISO}
+          max={maxDate || undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onClick={openPicker}
