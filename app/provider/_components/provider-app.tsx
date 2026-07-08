@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { subscribeToForegroundPush } from "@/lib/notifications";
-import { getSupabaseClient } from "@/lib/supabase";
+import { getSupabaseClient, signOutLocally } from "@/lib/supabase";
 
 export type ProviderDashboardData = {
   providerId: string;
@@ -706,11 +706,12 @@ export function useProviderAppData() {
     const client = getSupabaseClient();
 
     if (!client) {
+      await signOutLocally(null);
       router.replace("/login");
       return;
     }
 
-    await client.auth.signOut();
+    await signOutLocally(client);
     router.replace("/login");
   }
 

@@ -57,5 +57,52 @@ export function getSupabaseClient() {
   return browserClient;
 }
 
+export function clearSupabaseBrowserSession() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const clearStorage = (storage: Storage) => {
+    const keysToRemove: string[] = [];
+
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+
+      if (
+        key &&
+        (key.startsWith("sb-") ||
+          key.includes("supabase") ||
+          key.includes("gotrue"))
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach((key) => storage.removeItem(key));
+  };
+
+  try {
+    clearStorage(window.localStorage);
+  } catch {
+    // Some embedded browsers can block storage access.
+  }
+
+  try {
+    clearStorage(window.sessionStorage);
+  } catch {
+    // Some embedded browsers can block storage access.
+  }
+}
+
+export async function signOutLocally(client: SupabaseClient | null) {
+  try {
+    await client?.auth.signOut({ scope: "local" });
+  } catch {
+    // Network failures should not block local logout.
+  } finally {
+    clearSupabaseBrowserSession();
+  }
+}
+
 export const supabase =
   typeof window === "undefined" ? null : getSupabaseClient();

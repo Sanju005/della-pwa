@@ -29,7 +29,7 @@ import {
   saveFCMToken,
   type PushSetupState,
 } from "@/lib/notifications";
-import { getSupabaseClient } from "@/lib/supabase";
+import { getSupabaseClient, signOutLocally } from "@/lib/supabase";
 import {
   loadSavedPlaces,
   loadStoredLiveLocation,
@@ -74,9 +74,11 @@ type AddressesProps = {
   addresses: Address[];
 };
 
+type BookingTab = BookingStatus | "all";
+
 type BookingsProps = {
   bookings: Booking[];
-  initialTab?: BookingStatus;
+  initialTab?: BookingTab;
 };
 
 type SettingsProps = {
@@ -386,23 +388,15 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
       const client = getSupabaseClient();
 
       if (!client) {
-        setLogoutError("Supabase is not configured yet.");
+        await signOutLocally(null);
+        router.replace("/login");
+        router.refresh();
         return;
       }
 
-      try {
-        const { error } = await client.auth.signOut({ scope: "local" });
-
-        if (error) {
-          setLogoutError(error.message || "Unable to log out right now.");
-          return;
-        }
-
-        router.replace("/login");
-        router.refresh();
-      } catch (error) {
-        setLogoutError(error instanceof Error ? error.message : "Failed to fetch");
-      }
+      await signOutLocally(client);
+      router.replace("/login");
+      router.refresh();
     });
   };
 
@@ -2357,7 +2351,7 @@ export function AddressesScreen({ addresses }: AddressesProps) {
   );
 }
 
-export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsProps) {
+export function BookingsScreen({ bookings, initialTab = "all" }: BookingsProps) {
   const [items, setItems] = useState(bookings);
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "custom">("all");
   const [customDate, setCustomDate] = useState("");
@@ -2413,6 +2407,10 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
     };
 
     const matchesTab = (booking: Booking) => {
+      if (initialTab === "all") {
+        return true;
+      }
+
       if (initialTab === "ongoing") {
         return booking.status === "ongoing";
       }
@@ -2591,7 +2589,9 @@ export function BookingsScreen({ bookings, initialTab = "pending" }: BookingsPro
                   ? "No completed bookings"
                   : initialTab === "cancelled"
                     ? "No cancelled bookings"
-                    : "No pending bookings"
+                    : initialTab === "pending"
+                      ? "No pending bookings"
+                      : "No bookings yet"
             }
             description={
               initialTab === "ongoing"
@@ -2854,23 +2854,15 @@ export function SettingsScreen({ groups }: SettingsProps) {
       const client = getSupabaseClient();
 
       if (!client) {
-        setLogoutError("Supabase is not configured yet.");
+        await signOutLocally(null);
+        router.replace("/login");
+        router.refresh();
         return;
       }
 
-      try {
-        const { error } = await client.auth.signOut({ scope: "local" });
-
-        if (error) {
-          setLogoutError(error.message || "Unable to log out right now.");
-          return;
-        }
-
-        router.replace("/login");
-        router.refresh();
-      } catch (error) {
-        setLogoutError(error instanceof Error ? error.message : "Failed to fetch");
-      }
+      await signOutLocally(client);
+      router.replace("/login");
+      router.refresh();
     });
   };
 
