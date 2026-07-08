@@ -26,6 +26,8 @@ import { FavoriteProviderButton } from "@/app/_components/favorite-provider-butt
 
 import { LiveLocationChip } from "@/app/_components/live-location-chip";
 import {
+  saveSelectedProviderSearchLocation,
+  loadSavedPlaces,
   loadCurrentLiveLocation,
   resolveCurrentLiveLocation,
   type StoredLiveLocation,
@@ -94,8 +96,14 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
   const [currentLocation, setCurrentLocation] = useState<StoredLiveLocation | null>(() =>
     loadCurrentLiveLocation()
   );
+  const [savedPlaces, setSavedPlaces] = useState<StoredLiveLocation[]>([]);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<"current" | string>("current");
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [sortBy, setSortBy] = useState<SortKey>("popular");
+
+  useEffect(() => {
+    setSavedPlaces(loadSavedPlaces());
+  }, []);
 
   useEffect(() => {
     if (currentLocation) {
@@ -108,6 +116,9 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
       .then((nextLocation) => {
         if (active && nextLocation) {
           setCurrentLocation(nextLocation);
+          if (selectedPlaceId === "current") {
+            setLocationDetails(nextLocation);
+          }
         }
       })
       .catch(() => {
@@ -121,13 +132,13 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
 
   const getListingDistanceKm = (listing: CatalogScreenListing) => {
     if (
-      currentLocation &&
+      activeLocation &&
       typeof listing.latitude === "number" &&
       typeof listing.longitude === "number"
     ) {
       return calculateDistanceKm(
-        currentLocation.latitude,
-        currentLocation.longitude,
+        activeLocation.latitude,
+        activeLocation.longitude,
         listing.latitude,
         listing.longitude
       );
@@ -143,6 +154,18 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
     }),
     [data.listings]
   );
+
+  const activeLocation = selectedPlaceId === "current"
+    ? locationDetails ?? currentLocation
+    : savedPlaces.find((place) => place.id === selectedPlaceId) ?? locationDetails ?? currentLocation;
+
+  useEffect(() => {
+    if (!activeLocation) {
+      return;
+    }
+
+    saveSelectedProviderSearchLocation(activeLocation);
+  }, [activeLocation]);
 
   const filteredListings = useMemo(() => {
     let items = data.listings.filter((listing) => {
@@ -163,7 +186,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
     });
 
     return items;
-  }, [activeTab, data.listings, sortBy, currentLocation]);
+  }, [activeTab, data.listings, sortBy, activeLocation]);
 
   const serviceIconSrc = data.service ? serviceIcons[data.service] : null;
   const serviceTitle = data.serviceLabel ? `${data.serviceLabel} Services` : "Service Providers";
@@ -171,8 +194,8 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
   const heroProviders = filteredListings.slice(0, 3);
   const extraProviders = Math.max(filteredListings.length - heroProviders.length, 0);
   const fullAddress =
-    locationDetails?.formattedAddress ||
-    locationDetails?.label ||
+    activeLocation?.formattedAddress ||
+    activeLocation?.label ||
     "Bandar Puteri Puchong, Subang Jaya City Council";
   const availabilitySummaryLabel =
     sortBy === "nearest"
@@ -199,6 +222,8 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
                 onLocationChange={(location) => {
                   setLocationDetails(location);
                   setCurrentLocation(location);
+                  setSelectedPlaceId("current");
+                  setSavedPlaces(loadSavedPlaces());
                 }}
                 displayLabel="Search location or address..."
                 leadingIcon="search"
@@ -207,6 +232,44 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
             </div>
 
             <div className="rounded-[28px] border border-[#edf1ee] bg-white px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+              {savedPlaces.length > 0 ? (
+                <div className="mb-4">
+                  <label className="block">
+                    <span className="mb-2 block text-[12px] font-medium text-[#98A2B3]">
+                      Use location
+                    </span>
+                    <span className="relative block">
+                      <select
+                        value={selectedPlaceId}
+                        onChange={(event) => {
+                          const nextValue = event.target.value;
+                          setSelectedPlaceId(nextValue);
+
+                          if (nextValue === "current") {
+                            setLocationDetails(currentLocation);
+                            return;
+                          }
+
+                          const selectedPlace = savedPlaces.find((place) => place.id === nextValue);
+                          if (selectedPlace) {
+                            setLocationDetails(selectedPlace);
+                          }
+                        }}
+                        className="h-11 w-full appearance-none rounded-[16px] border border-[#e3ebe6] bg-white px-4 pr-10 text-[14px] font-medium text-[#1f2c44] outline-none"
+                      >
+                        <option value="current">Current location</option>
+                        {savedPlaces.map((place) => (
+                          <option key={place.id} value={place.id}>
+                            {place.addressLabel || "Saved address"} - {place.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98A2B3]" />
+                    </span>
+                  </label>
+                </div>
+              ) : null}
+
               <div className="flex items-start gap-4">
                 <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#f3ebfc] text-[#8E5EB5]">
                   <MapPin className="h-6 w-6 fill-[#8E5EB5] text-[#8E5EB5]" />
@@ -214,7 +277,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-medium text-[#98A2B3]">Location name</p>
                   <p className="mt-1 text-[16px] font-extrabold tracking-[-0.03em] text-[#1f2c44]">
-                    {locationDetails?.addressLabel || "Home"}
+                    {activeLocation?.addressLabel || "Home"}
                   </p>
                 </div>
               </div>
@@ -236,26 +299,26 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
           </header>
 
           <section className="mt-5">
-            <div className="rounded-[30px] bg-white px-5 py-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-[#eff4f1]">
-              <div className="flex items-start gap-4">
-                <div className="inline-flex h-20 w-20 shrink-0 items-center justify-center">
+            <div className="rounded-[28px] bg-white px-4 py-3.5 shadow-[0_16px_38px_rgba(15,23,42,0.07)] ring-1 ring-[#eff4f1]">
+              <div className="flex items-start gap-3">
+                <div className="inline-flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center">
                   {serviceIconSrc ? (
                     <Image
                       src={serviceIconSrc}
                       alt={data.serviceLabel || "Service"}
                       width={74}
                       height={74}
-                      className="h-[4.6rem] w-[4.6rem] object-contain"
+                      className="h-[4.25rem] w-[4.25rem] object-contain"
                     />
                   ) : (
                     <BriefcaseBusiness className="h-12 w-12 stroke-[1.8]" />
                   )}
                 </div>
-                <div className="min-w-0 flex-1 pt-1">
-                  <h1 className="text-[1.72rem] font-extrabold tracking-[-0.05em] text-[#13294b]">
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <h1 className="text-[1.42rem] font-bold tracking-[-0.045em] text-[#13294b]">
                     {serviceTitle}
                   </h1>
-                  <p className="mt-0.5 text-[14px] leading-6 text-[#667085]">
+                  <p className="mt-1 text-[13px] leading-5 text-[#667085]">
                     Find trusted and verified
                     <br />
                     {serviceLower} services near you
@@ -263,7 +326,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 divide-x divide-[#ebf0ed] rounded-[20px] border border-[#eef3f0] bg-white">
+              <div className="mt-3.5 grid grid-cols-3 divide-x divide-[#ebf0ed] rounded-[18px] border border-[#eef3f0] bg-white">
                 <TrustBadge
                   icon={<ShieldCheck className="h-5 w-5 text-[#8E5EB5]" />}
                   title="Verified"
@@ -281,12 +344,12 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
                 />
               </div>
 
-              <div className="mt-4 flex items-center gap-3">
+              <div className="mt-3.5 flex items-center gap-2.5">
                 <div className="flex items-center">
                   {heroProviders.map((listing, index) => (
                     <div
                       key={listing.id}
-                      className={`relative h-11 w-11 overflow-hidden rounded-full border-2 border-white shadow-[0_8px_18px_rgba(15,23,42,0.08)] ${index === 0 ? "" : "-ml-2.5"}`}
+                      className={`relative h-10 w-10 overflow-hidden rounded-full border-2 border-white shadow-[0_8px_18px_rgba(15,23,42,0.08)] ${index === 0 ? "" : "-ml-2.5"}`}
                     >
                       <Image
                         src={listing.portraitSrc}
@@ -299,12 +362,12 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
                     </div>
                   ))}
                   {extraProviders > 0 ? (
-                    <div className="-ml-2.5 inline-flex h-11 min-w-11 items-center justify-center rounded-full border-2 border-white bg-[#8E5EB5] px-2 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(142,94,181,0.28)]">
+                    <div className="-ml-2.5 inline-flex h-10 min-w-10 items-center justify-center rounded-full border-2 border-white bg-[#8E5EB5] px-2 text-[12px] font-bold text-white shadow-[0_8px_18px_rgba(142,94,181,0.28)]">
                       +{extraProviders}
                     </div>
                   ) : null}
                 </div>
-                <p className="text-[15px] font-medium text-[#667085]">
+                <p className="text-[14px] font-medium text-[#667085]">
                   <span className="font-semibold text-[#344054]">{filteredListings.length}</span>{" "}
                   {serviceLower} available
                 </p>

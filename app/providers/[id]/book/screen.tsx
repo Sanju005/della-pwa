@@ -13,7 +13,9 @@ import {
   Clock3,
   IdCard,
   MapPin,
+  Minus,
   Phone,
+  Plus,
   Star,
   ShieldCheck,
   ThumbsUp,
@@ -23,6 +25,7 @@ import { FavoriteProviderButton } from "@/app/_components/favorite-provider-butt
 import { ProviderDistanceText } from "@/app/_components/provider-distance";
 import type { ProviderBookedTimeRange, ProviderDetail } from "@/lib/provider-detail";
 import {
+  loadSelectedProviderSearchLocation,
   loadCurrentLiveLocation,
   loadSavedPlaces,
   resolveCurrentLiveLocation,
@@ -153,7 +156,7 @@ export function BookingFormScreen({
   const [bookingMode, setBookingMode] = useState<BookingMode>("hourly");
   const [selectedDate, setSelectedDate] = useState(defaultDateLabel);
   const [startTime, setStartTime] = useState(defaultStartTime);
-  const [endTime, setEndTime] = useState(defaultEndTime);
+  const [hourlyDuration, setHourlyDuration] = useState(1);
   const [serviceAddress, setServiceAddress] = useState("");
   const [locationNote, setLocationNote] = useState("");
   const [savedPlaces, setSavedPlaces] = useState<StoredLiveLocation[]>([]);
@@ -182,7 +185,7 @@ export function BookingFormScreen({
 
     if (selectedDateIso !== nowInKl.date) {
       return providerStartTimeOptions.filter((option) => {
-        const candidateEnd = addHours(option, 1);
+        const candidateEnd = addHours(option, hourlyDuration);
         return !bookedTimeRangesForSelectedDate.some((bookedRange) =>
           doesTimeRangeOverlap(option, candidateEnd, bookedRange),
         );
@@ -192,38 +195,19 @@ export function BookingFormScreen({
     return providerStartTimeOptions
       .filter((option) => timeToMinutes(option) > nowInKl.minutes)
       .filter((option) => {
-        const candidateEnd = addHours(option, 1);
+        const candidateEnd = addHours(option, hourlyDuration);
         return !bookedTimeRangesForSelectedDate.some((bookedRange) =>
           doesTimeRangeOverlap(option, candidateEnd, bookedRange),
         );
       });
-  }, [bookedTimeRangesForSelectedDate, nowInKl.date, nowInKl.minutes, providerStartTimeOptions, selectedDateIso]);
-
-  const endTimeOptions = useMemo(() => {
-    if (!providerEndTime) {
-      return [];
-    }
-
-    const startMinutes = timeToMinutes(startTime);
-    const endBoundaryMinutes = timeToMinutes(providerEndTime);
-    const options: Array<{ label: string; minutes: number }> = [];
-
-    for (let current = startMinutes + 60; current <= endBoundaryMinutes; current += 60) {
-      const candidateEndLabel = minutesToTimeLabel(current);
-      const overlapsBooking = bookedTimeRangesForSelectedDate.some((bookedRange) =>
-        doesTimeRangeOverlap(startTime, candidateEndLabel, bookedRange),
-      );
-
-      if (!overlapsBooking) {
-        options.push({
-          label: candidateEndLabel,
-          minutes: current,
-        });
-      }
-    }
-
-    return options;
-  }, [bookedTimeRangesForSelectedDate, providerEndTime, startTime]);
+  }, [
+    bookedTimeRangesForSelectedDate,
+    hourlyDuration,
+    nowInKl.date,
+    nowInKl.minutes,
+    providerStartTimeOptions,
+    selectedDateIso,
+  ]);
 
   useEffect(() => {
     if (!filteredStartTimeOptions.includes(startTime)) {
@@ -235,10 +219,13 @@ export function BookingFormScreen({
   }, [filteredStartTimeOptions, startTime]);
 
   useEffect(() => {
+    const selectedSearchLocation = loadSelectedProviderSearchLocation();
     const currentLocation = loadCurrentLiveLocation();
     const availablePlaces = loadSavedPlaces();
     setSavedPlaces(availablePlaces);
     setServiceAddress(
+      selectedSearchLocation?.formattedAddress ||
+        selectedSearchLocation?.label ||
       currentLocation?.formattedAddress ||
         currentLocation?.label ||
         availablePlaces[0]?.formattedAddress ||
@@ -247,22 +234,13 @@ export function BookingFormScreen({
     );
   }, []);
 
-  useEffect(() => {
-    if (bookingMode === "hourly") {
-      const nextValidEnd = endTimeOptions[0]?.label;
-      if (nextValidEnd && !endTimeOptions.some((option) => option.label === endTime)) {
-        setEndTime(nextValidEnd);
-      }
-    }
-  }, [bookingMode, endTime, endTimeOptions]);
-
   const computedEndTime = bookingMode === "daily"
     ? providerEndTime || addHours(startTime, 9)
-    : endTime;
+    : addHours(startTime, hourlyDuration);
   const durationHours =
     bookingMode === "daily"
       ? hoursBetween(startTime, computedEndTime)
-      : hoursBetween(startTime, computedEndTime);
+      : hourlyDuration;
   const totalAmount =
     bookingMode === "daily"
       ? detail.dailyRate
@@ -418,33 +396,74 @@ export function BookingFormScreen({
                   <span className="rounded-full bg-[#F5F1FA] px-3 py-1.5 text-[12px] font-semibold text-[#8E5EB5]">
                     {detail.yearsExperience} Experience
                   </span>
-                  <span className="rounded-full bg-[#F4F5F7] px-3 py-1.5 text-[12px] font-semibold text-[#667085]">
-                    {detail.specialties[0] ?? detail.serviceLabel}
-                  </span>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-2 rounded-[16px] bg-[#FAF7FD] px-2.5 py-2.5">
-                  <div className="flex items-center gap-2 border-r border-[#E8DFF1] pr-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#F5F1FA] text-[#8E5EB5]">
+                <div className="mt-3 grid grid-cols-2 gap-2 rounded-[16px] bg-[#FAF7FD] px-3 py-3">
+                  <div
+                    className={`flex min-w-0 items-center gap-2 rounded-[12px] border px-2.5 py-2 ${
+                      detail.identityVerified
+                        ? "border-[#CBE8D2] bg-[#F2FBF5]"
+                        : "border-[#FDE2B7] bg-[#FFF8EE]"
+                    }`}
+                  >
+                    <span
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        detail.identityVerified
+                          ? "bg-[#E7F8EC] text-[#16A34A]"
+                          : "bg-[#FFF3E0] text-[#F59E0B]"
+                      }`}
+                    >
                       <IdCard className="h-4 w-4" />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-[12px] font-semibold text-[#0F172A]">
-                        ID verified
+                      <p
+                        className={`text-[11px] font-semibold leading-4 ${
+                          detail.identityVerified ? "text-[#138A36]" : "text-[#D97706]"
+                        }`}
+                      >
+                        {detail.identityVerified ? "IC Verified" : "IC Pending"}
                       </p>
                     </div>
-                    <BadgeCheck className="ml-auto h-4 w-4 shrink-0 fill-[#8E5EB5] text-[#8E5EB5]" />
+                    <BadgeCheck
+                      className={`ml-auto h-4 w-4 shrink-0 ${
+                        detail.identityVerified
+                          ? "fill-[#16A34A] text-[#16A34A]"
+                          : "fill-[#F59E0B] text-[#F59E0B]"
+                      }`}
+                    />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#F5F1FA] text-[#8E5EB5]">
+                  <div
+                    className={`flex min-w-0 items-center gap-2 rounded-[12px] border px-2.5 py-2 ${
+                      detail.phoneVerified
+                        ? "border-[#CBE8D2] bg-[#F2FBF5]"
+                        : "border-[#FDE2B7] bg-[#FFF8EE]"
+                    }`}
+                  >
+                    <span
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        detail.phoneVerified
+                          ? "bg-[#E7F8EC] text-[#16A34A]"
+                          : "bg-[#FFF3E0] text-[#F59E0B]"
+                      }`}
+                    >
                       <Phone className="h-4 w-4" />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-[12px] font-semibold text-[#0F172A]">
-                        Phone verified
+                      <p
+                        className={`text-[11px] font-semibold leading-4 ${
+                          detail.phoneVerified ? "text-[#138A36]" : "text-[#D97706]"
+                        }`}
+                      >
+                        {detail.phoneVerified ? "Phone Verified" : "Phone Pending"}
                       </p>
                     </div>
-                    <BadgeCheck className="ml-auto h-4 w-4 shrink-0 fill-[#8E5EB5] text-[#8E5EB5]" />
+                    <BadgeCheck
+                      className={`ml-auto h-4 w-4 shrink-0 ${
+                        detail.phoneVerified
+                          ? "fill-[#16A34A] text-[#16A34A]"
+                          : "fill-[#F59E0B] text-[#F59E0B]"
+                      }`}
+                    />
                   </div>
                 </div>
               </div>
@@ -540,7 +559,6 @@ export function BookingFormScreen({
                     >
                       <p className="text-[14px] font-semibold">{slot.dayLabel}</p>
                       <p className="mt-1 text-[13px]">{slot.dateLabel}</p>
-                      <p className="mt-1 text-[11px] opacity-80">{slot.timeLabel}</p>
                     </button>
                 );
               })}
@@ -581,12 +599,6 @@ export function BookingFormScreen({
                     onChange={(event) => {
                       const nextStart = event.target.value;
                       setStartTime(nextStart);
-                      if (bookingMode === "hourly") {
-                        const nextEnd = endTimeOptions.find(
-                          (option) => option.minutes > timeToMinutes(nextStart) + 60
-                        );
-                        setEndTime(nextEnd?.label ?? addHours(nextStart, 1));
-                      }
                     }}
                     className="h-12 w-full appearance-none rounded-[14px] border border-[#E5ECE7] bg-white px-4 pr-10 text-[14px] font-semibold text-[#0F172A] outline-none"
                   >
@@ -601,25 +613,32 @@ export function BookingFormScreen({
               </label>
 
               {bookingMode === "hourly" ? (
-                <label className="block">
+                <div className="block">
                   <span className="mb-2 block text-[14px] font-semibold text-[#344054]">
-                    End time
+                    How many hours
                   </span>
-                  <span className="relative block">
-                    <select
-                      value={endTime}
-                      onChange={(event) => setEndTime(event.target.value)}
-                      className="h-12 w-full appearance-none rounded-[14px] border border-[#E5ECE7] bg-white px-4 pr-10 text-[14px] font-semibold text-[#0F172A] outline-none"
+                  <div className="flex h-12 items-center justify-between rounded-[14px] border border-[#E5ECE7] bg-white px-3">
+                    <button
+                      type="button"
+                      onClick={() => setHourlyDuration((current) => Math.max(1, current - 1))}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#F5F1FA] text-[#8E5EB5]"
+                      aria-label="Decrease hours"
                     >
-                      {endTimeOptions.map((time) => (
-                        <option key={time.label} value={time.label}>
-                          {time.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#667085]" />
-                  </span>
-                </label>
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="text-[14px] font-semibold text-[#0F172A]">
+                      {hourlyDuration} {hourlyDuration === 1 ? "Hour" : "Hours"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setHourlyDuration((current) => current + 1)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#F5F1FA] text-[#8E5EB5]"
+                      aria-label="Increase hours"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
               ) : null}
             </div>
 

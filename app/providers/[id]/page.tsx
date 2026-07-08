@@ -5,12 +5,12 @@ import {
   ArrowLeft,
   BadgeCheck,
   CalendarDays,
-  CheckCheck,
   ChevronDown,
   ChevronRight,
+  IdCard,
   MapPin,
+  Phone,
   Share2,
-  ShieldCheck,
   Star,
   Timer,
   ThumbsUp,
@@ -100,8 +100,6 @@ export default async function ProviderDetailPage(props: {
                   <Star className="h-4 w-4 fill-[#F59E0B] text-[#F59E0B]" />
                   <span className="font-semibold">{detail.reviewsLabel}</span>
                 </span>
-                <span className="text-[#98A2B3]">•</span>
-                <span>{detail.jobsCompleted} Jobs Completed</span>
               </div>
 
               <div className="mt-2 flex items-start gap-1.5 text-[12px] font-semibold text-[#8E5EB5]">
@@ -117,16 +115,22 @@ export default async function ProviderDetailPage(props: {
               </div>
 
               <div className="mt-3 grid grid-cols-3 gap-2 text-left text-[11px] text-[#344054]">
-                {detail.verified ? (
-                  <InfoPill icon={<ShieldCheck className="h-4.5 w-4.5 text-[#8E5EB5]" />} label="Verified" />
-                ) : (
-                  <InfoPill icon={<ShieldCheck className="h-4.5 w-4.5 text-[#98A2B3]" />} label="Pending Review" />
-                )}
-                {detail.backgroundChecked ? (
-                  <InfoPill icon={<CheckCheck className="h-4.5 w-4.5 text-[#8E5EB5]" />} label="Background Checked" />
-                ) : (
-                  <InfoPill icon={<CheckCheck className="h-4.5 w-4.5 text-[#98A2B3]" />} label="Review in Progress" />
-                )}
+                <InfoPill
+                  icon={
+                    <IdCard
+                      className={`h-4.5 w-4.5 ${detail.identityVerified ? "text-[#16a34a]" : "text-[#f59e0b]"}`}
+                    />
+                  }
+                  label={detail.identityVerified ? "IC Verified" : "IC Pending"}
+                />
+                <InfoPill
+                  icon={
+                    <Phone
+                      className={`h-4.5 w-4.5 ${detail.phoneVerified ? "text-[#16a34a]" : "text-[#f59e0b]"}`}
+                    />
+                  }
+                  label={detail.phoneVerified ? "Mobile Verified" : "Mobile Pending"}
+                />
                 <InfoPill icon={<BadgeCheck className="h-4.5 w-4.5 text-[#8E5EB5]" />} label={detail.yearsExperience} />
               </div>
             </div>

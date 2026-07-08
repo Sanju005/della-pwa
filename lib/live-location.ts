@@ -24,6 +24,8 @@ export type StoredLiveLocation = {
 const LIVE_LOCATION_STORAGE_KEY = "della.live.location";
 const CURRENT_LIVE_LOCATION_STORAGE_KEY = "della.current.location";
 const SAVED_PLACES_STORAGE_KEY = "della.saved.places";
+const SELECTED_PROVIDER_SEARCH_LOCATION_STORAGE_KEY =
+  "della.provider.search.location";
 
 function buildLocationId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -151,6 +153,49 @@ export function loadSavedPlaces() {
   } catch {
     return [] as StoredLiveLocation[];
   }
+}
+
+export function loadSelectedProviderSearchLocation() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(
+    SELECTED_PROVIDER_SEARCH_LOCATION_STORAGE_KEY
+  );
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as StoredLiveLocation;
+    return normalizeStoredLocation(parsed);
+  } catch {
+    return null;
+  }
+}
+
+export function saveSelectedProviderSearchLocation(location: StoredLiveLocation) {
+  const normalized = normalizeStoredLocation(location);
+
+  if (typeof window === "undefined") {
+    return normalized;
+  }
+
+  window.localStorage.setItem(
+    SELECTED_PROVIDER_SEARCH_LOCATION_STORAGE_KEY,
+    JSON.stringify(normalized)
+  );
+
+  return normalized;
+}
+
+export function clearSelectedProviderSearchLocation() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(SELECTED_PROVIDER_SEARCH_LOCATION_STORAGE_KEY);
 }
 
 export function saveStoredPlace(location: StoredLiveLocation) {
