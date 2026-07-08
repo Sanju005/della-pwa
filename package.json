@@ -7,6 +7,9 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "cap:copy": "npx cap copy android",
     "seed:supabase-demo": "node scripts/seed-supabase-demo.mjs",
     "build:cf": "opennextjs-cloudflare build",
     "deploy:cf": "wrangler deploy",
@@ -15,6 +18,9 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@opennextjs/cloudflare": "^1.8.0",
     "@supabase/supabase-js": "^2.106.2",
     "firebase": "^12.14.0",
