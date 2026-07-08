@@ -1142,10 +1142,7 @@ function ProviderPushNotificationsCard() {
 
 export function DashboardScreen() {
   const state = useProviderAppData();
-  const [taskCalendarMonth, setTaskCalendarMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [taskCalendarMonth, setTaskCalendarMonth] = useState(new Date(2000, 0, 1));
   const todayKey = useResolvedTodayKey();
   const [taskCalendarDate, setTaskCalendarDate] = useState("");
   const fallback = LoadingOrError(state);
@@ -1155,6 +1152,17 @@ export function DashboardScreen() {
       setTaskCalendarDate(todayKey);
     }
   }, [taskCalendarDate, todayKey]);
+
+  useEffect(() => {
+    setTaskCalendarMonth((current) => {
+      if (current.getFullYear() !== 2000 || current.getMonth() !== 0) {
+        return current;
+      }
+
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
+  }, []);
 
   if (fallback) {
     return fallback;
@@ -1797,10 +1805,7 @@ export function BookingsScreen({
   const isLoading = state.loading;
   const setAppError = state.setError;
   const [tab, setTab] = useState<"all" | "ongoing" | "upcoming" | "pending" | "canceled" | "completes">("all");
-  const [calendarMonth, setCalendarMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [calendarMonth, setCalendarMonth] = useState(new Date(2000, 0, 1));
   const todayKey = useResolvedTodayKey();
   const [calendarDate, setCalendarDate] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState(initialBookingId);
@@ -1819,6 +1824,17 @@ export function BookingsScreen({
       setCalendarDate(todayKey);
     }
   }, [calendarDate, todayKey]);
+
+  useEffect(() => {
+    setCalendarMonth((current) => {
+      if (current.getFullYear() !== 2000 || current.getMonth() !== 0) {
+        return current;
+      }
+
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2820,10 +2836,7 @@ function getProviderTaskSteps(status: ProviderBookingItem["bookingStatus"]) {
 
 export function CalendarScreen() {
   const state = useProviderAppData();
-  const [month, setMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [month, setMonth] = useState(new Date(2000, 0, 1));
   const todayKey = useResolvedTodayKey();
   const [selectedDate, setSelectedDate] = useState("");
   const fallback = LoadingOrError(state);
@@ -2833,6 +2846,17 @@ export function CalendarScreen() {
       setSelectedDate(todayKey);
     }
   }, [selectedDate, todayKey]);
+
+  useEffect(() => {
+    setMonth((current) => {
+      if (current.getFullYear() !== 2000 || current.getMonth() !== 0) {
+        return current;
+      }
+
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
+  }, []);
 
   if (fallback) {
     return fallback;

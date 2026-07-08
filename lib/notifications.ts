@@ -139,20 +139,20 @@ export async function saveFCMToken(fcmToken: string) {
     }
 
     const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (userError || !user) {
-      lastPushError = userError?.message || "User not found.";
-      return { success: false, error: userError?.message || "User not found." };
+    if (sessionError || !session?.user) {
+      lastPushError = sessionError?.message || "User not found.";
+      return { success: false, error: sessionError?.message || "User not found." };
     }
 
-    console.log("[FCM] Saving token for user:", user.id);
+    console.log("[FCM] Saving token for user:", session.user.id);
 
     const { error } = await supabase.from("user_devices").upsert(
       {
-        user_id: user.id,
+        user_id: session.user.id,
         fcm_token: fcmToken,
         platform: "web",
       },
@@ -187,13 +187,13 @@ export async function disablePushNotifications() {
     }
 
     const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (userError || !user) {
-      lastPushError = userError?.message || "User not found.";
-      return { success: false, error: userError?.message || "User not found." };
+    if (sessionError || !session?.user) {
+      lastPushError = sessionError?.message || "User not found.";
+      return { success: false, error: sessionError?.message || "User not found." };
     }
 
     const token = await getCurrentFCMToken();
@@ -202,7 +202,7 @@ export async function disablePushNotifications() {
       const { error: deleteDbError } = await supabase
         .from("user_devices")
         .delete()
-        .eq("user_id", user.id)
+        .eq("user_id", session.user.id)
         .eq("fcm_token", token);
 
       if (deleteDbError) {
@@ -224,7 +224,7 @@ export async function disablePushNotifications() {
       const { error: deleteDbError } = await supabase
         .from("user_devices")
         .delete()
-        .eq("user_id", user.id)
+        .eq("user_id", session.user.id)
         .eq("platform", "web");
 
       if (deleteDbError) {
@@ -265,19 +265,19 @@ export async function getPushSetupState(): Promise<PushSetupState> {
     }
 
     const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (userError) {
-      lastPushError = userError.message;
+    if (sessionError) {
+      lastPushError = sessionError.message;
       return {
         permission,
         hasSavedToken: false,
       };
     }
 
-    if (!user) {
+    if (!session?.user) {
       return {
         permission,
         hasSavedToken: false,
@@ -296,7 +296,7 @@ export async function getPushSetupState(): Promise<PushSetupState> {
     const { data, error } = await supabase
       .from("user_devices")
       .select("fcm_token")
-      .eq("user_id", user.id)
+      .eq("user_id", session.user.id)
       .eq("fcm_token", token)
       .eq("platform", "web")
       .maybeSingle();

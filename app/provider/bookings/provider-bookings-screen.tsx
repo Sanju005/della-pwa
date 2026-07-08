@@ -1213,13 +1213,21 @@ export function ProviderBookingsScreen({
   } | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [autoReviewOpenedFor, setAutoReviewOpenedFor] = useState("");
-  const [calendarMonth, setCalendarMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const [calendarMonth, setCalendarMonth] = useState(new Date(2000, 0, 1));
 
   useEffect(() => {
     setTodayKey(getTodayKey());
+  }, []);
+
+  useEffect(() => {
+    setCalendarMonth((current) => {
+      if (current.getFullYear() !== 2000 || current.getMonth() !== 0) {
+        return current;
+      }
+
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    });
   }, []);
 
   useEffect(() => {
