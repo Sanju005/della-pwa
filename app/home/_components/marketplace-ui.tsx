@@ -16,7 +16,6 @@ import {
   Smartphone,
   Star,
   UserRound,
-  User,
   Heart,
 } from "lucide-react";
 import {
@@ -120,32 +119,32 @@ export function MarketplaceScreen({
 
           <Link
             href="/profile/rewards"
-            className="relative mt-6 block overflow-hidden rounded-[28px] border border-[#efe5ff] bg-[radial-gradient(circle_at_top_right,_rgba(176,108,255,0.24),_transparent_28%),linear-gradient(135deg,#ffffff_0%,#f8f2ff_42%,#eedfff_100%)] px-4 py-4 shadow-[0_16px_32px_rgba(124,58,237,0.09)]"
+            className="relative mt-5 block overflow-hidden rounded-[24px] border border-[#efe5ff] bg-[radial-gradient(circle_at_top_right,_rgba(176,108,255,0.24),_transparent_28%),linear-gradient(135deg,#ffffff_0%,#f8f2ff_42%,#eedfff_100%)] px-3.5 py-3.5 shadow-[0_14px_28px_rgba(124,58,237,0.08)]"
           >
             <span className="pointer-events-none absolute -right-14 -top-12 h-36 w-36 rounded-full bg-[radial-gradient(circle,_rgba(196,153,255,0.34),_transparent_68%)]" />
             <span className="pointer-events-none absolute -bottom-9 right-0 h-24 w-40 rounded-full bg-[radial-gradient(circle,_rgba(206,178,255,0.26),_transparent_70%)]" />
             <span className="pointer-events-none absolute bottom-4 right-5 h-12 w-20 opacity-35 [background-image:radial-gradient(#ffffff_1px,transparent_1px)] [background-size:8px_8px]" />
-            <div className="relative flex items-start justify-between gap-4">
+            <div className="relative flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="inline-flex rounded-full bg-[#ede3ff] px-3.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6d3fe0]">
+                <p className="inline-flex rounded-full bg-[#ede3ff] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[#6d3fe0]">
                   Finance
                 </p>
-                <h2 className="mt-4 text-[0.95rem] font-bold tracking-[-0.04em] text-[#141b5f]">
+                <h2 className="mt-3 text-[0.9rem] font-medium tracking-[-0.03em] text-[#141b5f]">
                   Available Points
                 </h2>
-                <p className="mt-3 flex items-end gap-1.5 tracking-[-0.06em] text-[#7c3aed]">
-                  <span className="text-[3.15rem] font-black leading-none">1,250</span>
-                  <span className="pb-1.5 text-[1.65rem] font-extrabold leading-none">pts</span>
+                <p className="mt-2.5 flex items-end gap-1 tracking-[-0.05em] text-[#7c3aed]">
+                  <span className="text-[2.85rem] font-semibold leading-none">1,250</span>
+                  <span className="pb-1 text-[1.4rem] font-medium leading-none">pts</span>
                 </p>
-                <p className="mt-4 flex items-center gap-2.5 text-[11px] text-[#4b5563] min-[390px]:text-[12px]">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#efe7ff] text-[#7c3aed]">
-                    <Star className="h-3.5 w-3.5 stroke-[1.9]" />
+                <p className="mt-3 flex items-center gap-2 text-[10px] font-normal text-[#4b5563] min-[390px]:text-[11px]">
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#efe7ff] text-[#7c3aed]">
+                    <Star className="h-3 w-3 stroke-[1.8]" />
                   </span>
                   <span>Tap to view rewards and redeem options.</span>
                 </p>
               </div>
-              <span className="inline-flex h-22 w-22 shrink-0 items-center justify-center rounded-[24px] border border-white/70 bg-[linear-gradient(180deg,#8b5cf6_0%,#4f1fd3_100%)] text-white shadow-[0_16px_26px_rgba(109,63,224,0.25)]">
-                <CreditCard className="h-9 w-9 stroke-[1.9]" />
+              <span className="inline-flex h-[5.2rem] w-[5.2rem] shrink-0 items-center justify-center rounded-[22px] border border-white/70 bg-[linear-gradient(180deg,#8b5cf6_0%,#4f1fd3_100%)] text-white shadow-[0_14px_22px_rgba(109,63,224,0.22)]">
+                <CreditCard className="h-8 w-8 stroke-[1.8]" />
               </span>
             </div>
           </Link>
@@ -242,7 +241,7 @@ function ProviderSliderSection({
                   serviceKey: provider.serviceKey,
                 })}
                 name={provider.name}
-                fullName={provider.name}
+                fullName={provider.fullName}
                 priceLabel={provider.priceLabel}
                 rating={provider.rating.toFixed(1)}
                 reviews={`${provider.reviews} reviews`}
@@ -292,7 +291,10 @@ function PopularProviderCard({
   identityVerified: boolean;
 }) {
   return (
-    <article className="mx-auto w-full max-w-[312px] rounded-[22px] border border-[#eef2ef] bg-white p-4 text-left shadow-[0_14px_32px_rgba(15,23,42,0.07)]">
+    <Link
+      href={href}
+      className="mx-auto block w-full max-w-[312px] rounded-[22px] border border-[#eef2ef] bg-white p-4 text-left shadow-[0_14px_32px_rgba(15,23,42,0.07)]"
+    >
       <div className="relative h-[168px] overflow-hidden rounded-[14px] bg-[#eef4ef]">
         <Image
           src={portraitSrc}
@@ -323,17 +325,20 @@ function PopularProviderCard({
         <div className="mt-2.5 flex flex-nowrap gap-1 overflow-hidden">
           <LiveProviderBadge
             icon={<CreditCard className="h-3.5 w-3.5" />}
-            label="ID Verified"
+            label={identityVerified ? "ID Verified" : "ID Pending"}
             verified={identityVerified}
           />
           <LiveProviderBadge
             icon={<Smartphone className="h-3.5 w-3.5" />}
-            label="Phone Verified"
+            label={phoneVerified ? "Phone Verified" : "Phone Pending"}
             verified={phoneVerified}
           />
         </div>
 
-        <div className="mt-3 border-t border-[#e8eeea] pt-3">
+        <div className="mt-3.5 flex items-center justify-between gap-3 border-t border-[#e8eeea] pt-3">
+          <p className="text-[1.08rem] font-medium leading-none tracking-[-0.01em] text-[#8E5EB5]">
+            {priceLabel}
+          </p>
           <div className="flex items-center gap-2 text-[0.8rem] font-semibold text-[#1f2c44]">
             <MapPin className="h-5.5 w-5.5 text-[#667085]" />
             <span>
@@ -345,27 +350,8 @@ function PopularProviderCard({
             </span>
           </div>
         </div>
-
-        <div className="mt-3.5 flex items-end justify-between gap-2 border-t border-[#e8eeea] pt-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-medium text-[#667085]">From</p>
-            <p className="mt-1 text-[1.08rem] font-medium leading-none tracking-[-0.01em] text-[#8E5EB5]">
-              {priceLabel}
-            </p>
-          </div>
-
-          <Link
-            href={href}
-            className="inline-flex h-[2.7rem] min-w-[7.1rem] shrink-0 items-center justify-center gap-1.5 rounded-[12px] bg-[linear-gradient(180deg,#f3ebfc_0%,#ebdef9_100%)] px-3 text-[0.68rem] font-semibold text-[#8E5EB5]"
-          >
-            <span className="inline-flex h-5.5 w-5.5 items-center justify-center rounded-full border border-[#dbc8ed] bg-white/85 text-[#8E5EB5]">
-              <User className="h-3 w-3" />
-            </span>
-            <span>View Profile</span>
-          </Link>
-        </div>
       </div>
-    </article>
+    </Link>
   );
 }
 

@@ -77,6 +77,7 @@ export type HomeProviderCard = {
   id: string;
   serviceKey: ProviderCategoryKey;
   name: string;
+  fullName: string;
   service: string;
   providerLatitude: number | null;
   providerLongitude: number | null;
@@ -287,6 +288,7 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
         id: provider.id,
         serviceKey: (firstService?.service_type ?? "chef") as ProviderCategoryKey,
         name: provider.marketing_name ?? "DELLA Provider",
+        fullName: provider.marketing_name ?? "DELLA Provider",
         service: humanizeService(firstService?.service_type ?? "other"),
         providerLatitude:
           typeof provider.latitude === "number" ? provider.latitude : null,
@@ -317,6 +319,7 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
       id: listing.id,
       serviceKey: listing.serviceKey,
       name: listing.name,
+      fullName: listing.providerName || listing.name,
       service: listing.serviceLabel,
       providerLatitude: listing.latitude,
       providerLongitude: listing.longitude,

@@ -563,6 +563,32 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
         )}
       </SectionCard>
 
+      <SectionCard
+        title="Saved Address"
+        actionHref="/profile/addresses"
+        actionLabel="Open"
+      >
+        <div className="rounded-[16px] border border-dashed border-[#d9e2dd] bg-[#fbfefc] px-4 py-4">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f5f1fa] text-[#8E5EB5]">
+              <PinIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-bold text-[#111827]">Manage your saved addresses</p>
+              <p className="mt-1 text-[12px] leading-5 text-[#6b7280]">
+                View saved addresses and add a new address for faster booking.
+              </p>
+              <Link
+                href="/profile/addresses"
+                className="mt-3 inline-flex h-10 items-center justify-center rounded-[12px] bg-[#f5f1fa] px-4 text-[13px] font-bold text-[#8E5EB5]"
+              >
+                Open Saved Addresses
+              </Link>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
       <SectionCard title="Payment Methods" actionLabel="Manage">
         {initialData.paymentMethods.map((method) => (
           <div
