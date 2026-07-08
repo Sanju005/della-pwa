@@ -508,7 +508,7 @@ export function BookingMessagesPanel({
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[11px] font-semibold text-[#94a3b8]">
+                    <p className="text-[11px] font-semibold text-[#94a3b8]" suppressHydrationWarning>
                       {formatRelativeDate(thread.lastMessageAt)}
                     </p>
                     {thread.unreadCount > 0 ? (

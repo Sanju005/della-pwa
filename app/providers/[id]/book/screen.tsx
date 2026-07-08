@@ -163,6 +163,10 @@ export function BookingFormScreen({
   const [notes, setNotes] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nowInKl, setNowInKl] = useState(() => ({
+    date: "",
+    minutes: -1,
+  }));
   const selectedDateIso = toIsoDateFromBookingLabel(selectedDate);
   const selectedAvailabilitySlot =
     detail.availability.find((slot) => toDateLabel(slot.dayLabel, slot.dateLabel) === selectedDate) ??
@@ -177,7 +181,10 @@ export function BookingFormScreen({
     () => buildHourlyStartOptions(providerStartTime, providerEndTime),
     [providerEndTime, providerStartTime],
   );
-  const nowInKl = getCurrentKualaLumpurNow();
+  useEffect(() => {
+    setNowInKl(getCurrentKualaLumpurNow());
+  }, []);
+
   const filteredStartTimeOptions = useMemo(() => {
     if (providerStartTimeOptions.length === 0) {
       return [];

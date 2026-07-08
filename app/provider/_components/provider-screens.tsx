@@ -828,9 +828,8 @@ function BookingActionBar({
 
 function getBookingTab(
   booking: ProviderBookingItem,
+  todayKey: string,
 ): "ongoing" | "upcoming" | "pending" | "canceled" | "completes" {
-  const todayKey = getTodayKey();
-
   if (booking.bucket === "requests" || booking.bookingStatus === "pending") {
     return "pending";
   }
@@ -852,6 +851,16 @@ function getBookingTab(
   }
 
   return "upcoming";
+}
+
+function useResolvedTodayKey() {
+  const [todayKey, setTodayKey] = useState("");
+
+  useEffect(() => {
+    setTodayKey(getTodayKey());
+  }, []);
+
+  return todayKey;
 }
 
 function InfoRow({
@@ -1137,8 +1146,15 @@ export function DashboardScreen() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [taskCalendarDate, setTaskCalendarDate] = useState(getTodayKey());
+  const todayKey = useResolvedTodayKey();
+  const [taskCalendarDate, setTaskCalendarDate] = useState("");
   const fallback = LoadingOrError(state);
+
+  useEffect(() => {
+    if (todayKey && !taskCalendarDate) {
+      setTaskCalendarDate(todayKey);
+    }
+  }, [taskCalendarDate, todayKey]);
 
   if (fallback) {
     return fallback;
@@ -1185,7 +1201,6 @@ export function DashboardScreen() {
   );
   const acceptedBookings = state.bookings.filter((booking) => booking.bookingStatus === "accepted");
   const ongoingBookings = state.bookings.filter((booking) => isActiveTaskStatus(booking.bookingStatus));
-  const todayKey = getTodayKey();
   const todayBookings = state.bookings
     .filter(
       (booking) =>
@@ -1786,7 +1801,8 @@ export function BookingsScreen({
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [calendarDate, setCalendarDate] = useState(getTodayKey());
+  const todayKey = useResolvedTodayKey();
+  const [calendarDate, setCalendarDate] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState(initialBookingId);
   const [commissionProofDataUrl, setCommissionProofDataUrl] = useState("");
   const [commissionProofFileName, setCommissionProofFileName] = useState("");
@@ -1797,6 +1813,12 @@ export function BookingsScreen({
     setSelectedBookingId(initialBookingId);
     setPendingInitialSelection(Boolean(initialBookingId));
   }, [initialBookingId]);
+
+  useEffect(() => {
+    if (todayKey && !calendarDate) {
+      setCalendarDate(todayKey);
+    }
+  }, [calendarDate, todayKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1974,7 +1996,6 @@ export function BookingsScreen({
     }
   }
 
-  const todayKey = getTodayKey();
   const calendarMonthLabel = new Intl.DateTimeFormat("en-MY", {
     month: "long",
     year: "numeric",
@@ -2044,7 +2065,7 @@ export function BookingsScreen({
       return;
     }
 
-    const bookingTab = getBookingTab(selectedBooking);
+    const bookingTab = getBookingTab(selectedBooking, todayKey);
     const validTabs = new Set(tabOptions.map(([value]) => value));
 
     if (validTabs.has(bookingTab)) {
@@ -2803,8 +2824,15 @@ export function CalendarScreen() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [selectedDate, setSelectedDate] = useState(getTodayKey());
+  const todayKey = useResolvedTodayKey();
+  const [selectedDate, setSelectedDate] = useState("");
   const fallback = LoadingOrError(state);
+
+  useEffect(() => {
+    if (todayKey && !selectedDate) {
+      setSelectedDate(todayKey);
+    }
+  }, [selectedDate, todayKey]);
 
   if (fallback) {
     return fallback;
@@ -2978,17 +3006,28 @@ export function MessagesScreen() {
 export function EarningsScreen() {
   const state = useProviderAppData();
   const [paymentFilter, setPaymentFilter] = useState<"date" | "week" | "month" | "range" | "all">("week");
-  const [selectedPaymentDate, setSelectedPaymentDate] = useState(getTodayKey());
-  const [rangeStartDate, setRangeStartDate] = useState(getTodayKey());
-  const [rangeEndDate, setRangeEndDate] = useState(getTodayKey());
+  const todayKey = useResolvedTodayKey();
+  const [selectedPaymentDate, setSelectedPaymentDate] = useState("");
+  const [rangeStartDate, setRangeStartDate] = useState("");
+  const [rangeEndDate, setRangeEndDate] = useState("");
   const [dailyAction, setDailyAction] = useState<"" | "withdraw" | "pay-company">("");
   const fallback = LoadingOrError(state);
+
+  useEffect(() => {
+    if (!todayKey) {
+      return;
+    }
+
+    setSelectedPaymentDate((current) => current || todayKey);
+    setRangeStartDate((current) => current || todayKey);
+    setRangeEndDate((current) => current || todayKey);
+  }, [todayKey]);
 
   if (fallback) {
     return fallback;
   }
 
-  const today = new Date(`${getTodayKey()}T00:00:00`);
+  const today = todayKey ? new Date(`${todayKey}T00:00:00`) : new Date("invalid");
   const startOfWeek = new Date(today);
   const currentDay = startOfWeek.getDay();
   const weekOffset = currentDay === 0 ? 6 : currentDay - 1;
@@ -3233,7 +3272,7 @@ export function EarningsScreen() {
             <input
               type="date"
               value={selectedPaymentDate}
-              onChange={(event) => setSelectedPaymentDate(event.target.value || getTodayKey())}
+              onChange={(event) => setSelectedPaymentDate(event.target.value || todayKey)}
               className="mt-2 h-11 w-full rounded-[14px] border border-[#ded5eb] bg-white px-4 text-[14px] text-[#1f1630] outline-none"
             />
           </label>
@@ -3245,7 +3284,7 @@ export function EarningsScreen() {
               <input
                 type="date"
                 value={rangeStartDate}
-                onChange={(event) => setRangeStartDate(event.target.value || getTodayKey())}
+                onChange={(event) => setRangeStartDate(event.target.value || todayKey)}
                 className="mt-2 h-11 w-full rounded-[14px] border border-[#ded5eb] bg-white px-4 text-[14px] text-[#1f1630] outline-none"
               />
             </label>

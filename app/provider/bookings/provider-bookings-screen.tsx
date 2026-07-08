@@ -1199,7 +1199,8 @@ export function ProviderBookingsScreen({
 }) {
   const router = useRouter();
   const state = useProviderAppData();
-  const [selectedDate, setSelectedDate] = useState(getTodayKey());
+  const [todayKey, setTodayKey] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState(initialBookingId);
   const [tab, setTab] = useState<BookingTab>("all");
   const [reviewBookingId, setReviewBookingId] = useState("");
@@ -1218,8 +1219,18 @@ export function ProviderBookingsScreen({
   });
 
   useEffect(() => {
+    setTodayKey(getTodayKey());
+  }, []);
+
+  useEffect(() => {
     setSelectedBookingId(initialBookingId);
   }, [initialBookingId]);
+
+  useEffect(() => {
+    if (todayKey && !selectedDate) {
+      setSelectedDate(todayKey);
+    }
+  }, [selectedDate, todayKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1245,7 +1256,6 @@ export function ProviderBookingsScreen({
     }
   }, []);
 
-  const todayKey = getTodayKey();
   const selectedBooking =
     state.bookings.find((booking) => booking.id === selectedBookingId) ?? null;
 
