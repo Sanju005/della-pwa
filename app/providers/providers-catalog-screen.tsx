@@ -238,14 +238,14 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
           <section className="mt-5">
             <div className="rounded-[30px] bg-white px-5 py-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] ring-1 ring-[#eff4f1]">
               <div className="flex items-start gap-4">
-                <div className="inline-flex h-20 w-20 shrink-0 items-center justify-center rounded-[22px] bg-[#f3ebfc] text-[#8E5EB5] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                <div className="inline-flex h-20 w-20 shrink-0 items-center justify-center">
                   {serviceIconSrc ? (
                     <Image
                       src={serviceIconSrc}
                       alt={data.serviceLabel || "Service"}
-                      width={64}
-                      height={64}
-                      className="h-16 w-16 object-contain"
+                      width={74}
+                      height={74}
+                      className="h-[4.6rem] w-[4.6rem] object-contain"
                     />
                   ) : (
                     <BriefcaseBusiness className="h-12 w-12 stroke-[1.8]" />
