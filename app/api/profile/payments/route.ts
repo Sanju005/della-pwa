@@ -100,27 +100,24 @@ async function verifyCustomerRequest(request: Request) {
     };
   }
 
-  let authResult: Awaited<ReturnType<typeof adminClient.auth.getUser>>;
+  let userId = "";
 
   try {
-    authResult = await retrySupabaseRequest(() => adminClient.auth.getUser(token));
+    const claimsResult = await retrySupabaseRequest(() => adminClient.auth.getClaims(token));
+
+    if (claimsResult.error || !claimsResult.data?.claims?.sub) {
+      return {
+        error: NextResponse.json({ error: "Invalid session." }, { status: 401 }),
+      };
+    }
+
+    userId = String(claimsResult.data.claims.sub);
   } catch (error) {
     return {
       error: NextResponse.json(
         { error: error instanceof Error ? error.message : "Unable to verify session." },
         { status: 503 },
       ),
-    };
-  }
-
-  const {
-    data: { user },
-    error: userError,
-  } = authResult;
-
-  if (userError || !user) {
-    return {
-      error: NextResponse.json({ error: "Invalid session." }, { status: 401 }),
     };
   }
 
@@ -131,7 +128,7 @@ async function verifyCustomerRequest(request: Request) {
       adminClient
         .from("profiles")
         .select("id, role")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle()
     );
   } catch (error) {

@@ -20,7 +20,7 @@ type ProfileRow = {
   role: string | null;
   status: string | null;
   phone: string | null;
-  avatar_url: string | null;
+  avatar_url?: string | null;
 };
 
 type CustomerProfileRow = {
@@ -56,6 +56,17 @@ type PaymentAggregateRow = {
   paid_at?: string | null;
   created_at?: string | null;
   service_title?: string | null;
+};
+
+type VerifiedCustomerRequest = {
+  adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>;
+  authUser: {
+    id: string;
+    email?: string | null;
+    phone?: string | null;
+    user_metadata?: Record<string, unknown>;
+  };
+  profile: ProfileRow;
 };
 
 function getAdminSupabaseClient() {
@@ -117,6 +128,20 @@ function stripUnsupportedCustomerProfileFields(payload: Record<string, unknown>)
   delete nextPayload.completion;
   delete nextPayload.updated_at;
   return nextPayload;
+}
+
+function getSafeAvatarUrl(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("data:") && trimmed.length > 200_000) {
+    return "";
+  }
+
+  return trimmed;
 }
 
 async function retrySupabaseRequest<T>(operation: () => PromiseLike<T>, attempts = 3) {
@@ -237,10 +262,26 @@ async function verifyCustomerRequest(request: Request) {
     return { error: NextResponse.json({ error: "Missing auth token." }, { status: 401 }) };
   }
 
-  let authResult: Awaited<ReturnType<typeof adminClient.auth.getUser>>;
+  let userId = "";
+  let authEmail = "";
+  let authPhone = "";
 
   try {
-    authResult = await retrySupabaseRequest(() => adminClient.auth.getUser(token));
+    const claimsResult = await retrySupabaseRequest(() => adminClient.auth.getClaims(token));
+
+    if (claimsResult.error || !claimsResult.data?.claims?.sub) {
+      return { error: NextResponse.json({ error: "Invalid session." }, { status: 401 }) };
+    }
+
+    userId = String(claimsResult.data.claims.sub);
+    authEmail =
+      typeof claimsResult.data.claims.email === "string"
+        ? claimsResult.data.claims.email
+        : "";
+    authPhone =
+      typeof claimsResult.data.claims.phone === "string"
+        ? claimsResult.data.claims.phone
+        : "";
   } catch (error) {
     return {
       error: NextResponse.json(
@@ -250,23 +291,14 @@ async function verifyCustomerRequest(request: Request) {
     };
   }
 
-  const {
-    data: { user },
-    error: userError,
-  } = authResult;
-
-  if (userError || !user) {
-    return { error: NextResponse.json({ error: "Invalid session." }, { status: 401 }) };
-  }
-
   let profileResult: { data: unknown; error: { message?: string } | null };
 
   try {
     profileResult = await retrySupabaseRequest(() =>
       adminClient
         .from("profiles")
-        .select("id, full_name, email, role, status, phone, avatar_url")
-        .eq("id", user.id)
+        .select("id, full_name, email, role, status, phone")
+        .eq("id", userId)
         .maybeSingle()
     );
   } catch (error) {
@@ -292,9 +324,14 @@ async function verifyCustomerRequest(request: Request) {
 
   return {
     adminClient,
-    authUser: user,
+    authUser: {
+      id: userId,
+      email: authEmail,
+      phone: authPhone,
+      user_metadata: {},
+    },
     profile: profileRow,
-  };
+  } satisfies VerifiedCustomerRequest;
 }
 
 function buildCustomerProfile(
@@ -330,8 +367,8 @@ function buildCustomerProfile(
           ? fallbackSex
           : "Male",
     dateOfBirth: customerProfile?.date_of_birth?.trim() || "",
-    avatarUrl: profile.avatar_url?.trim() || "",
-    email: profile.email?.trim() || "",
+    avatarUrl: getSafeAvatarUrl(profile.avatar_url),
+    email: profile.email?.trim() || (typeof metadata?.email === "string" ? metadata.email.trim() : ""),
     phoneNumber: phoneParts.phoneNumber,
     countryCode: phoneParts.countryCode,
     emergencyContactNumber:
@@ -361,10 +398,8 @@ function buildCustomerProfile(
       metadata?.identity_document_type === "passport" || metadata?.identity_document_type === "ic"
         ? metadata.identity_document_type
         : undefined,
-    identityFrontImageUrl:
-      typeof metadata?.identity_front_image_url === "string" ? metadata.identity_front_image_url : "",
-    identityBackImageUrl:
-      typeof metadata?.identity_back_image_url === "string" ? metadata.identity_back_image_url : "",
+    identityFrontImageUrl: "",
+    identityBackImageUrl: "",
     verified: Boolean(customerProfile?.verified) || profile.status?.toLowerCase() === "active",
     completion: customerProfile?.completion ?? 80,
   };
@@ -469,22 +504,13 @@ export async function GET(request: Request) {
       profile: buildCustomerProfile(
         verified.profile,
         customerProfile,
-        verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
-          ? (verified.authUser.user_metadata as Record<string, unknown>)
-          : undefined,
-        typeof verified.authUser.user_metadata?.first_name === "string"
-          ? verified.authUser.user_metadata.first_name
-          : typeof verified.authUser.user_metadata?.full_name === "string"
-            ? splitFullName(verified.authUser.user_metadata.full_name).firstName
-            : "",
-        typeof verified.authUser.user_metadata?.last_name === "string"
-          ? verified.authUser.user_metadata.last_name
-          : typeof verified.authUser.user_metadata?.full_name === "string"
-            ? splitFullName(verified.authUser.user_metadata.full_name).lastName
-            : "",
-        typeof verified.authUser.user_metadata?.sex === "string"
-          ? verified.authUser.user_metadata.sex
-          : "",
+        {
+          email: verified.authUser.email ?? "",
+          phone: verified.authUser.phone ?? "",
+        },
+        "",
+        "",
+        "",
       ),
       bookingSummary: mapBookingSummary(bookingRows),
       paymentSummary: buildPaymentSummary(paymentRows),
@@ -545,7 +571,7 @@ export async function PATCH(request: Request) {
       full_name: fullName || undefined,
       email: email || undefined,
       phone: normalizedPhone || undefined,
-      avatar_url: payload.avatarUrl?.trim() || undefined,
+      avatar_url: getSafeAvatarUrl(payload.avatarUrl) || undefined,
     }).filter(([, value]) => value !== undefined),
   );
 
@@ -562,7 +588,7 @@ export async function PATCH(request: Request) {
 
   const currentMetadata =
     verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
-      ? verified.authUser.user_metadata
+      ? (verified.authUser.user_metadata as Record<string, unknown>)
       : {};
 
   const { error: authUpdateError } = await verified.adminClient.auth.admin.updateUserById(
@@ -687,7 +713,7 @@ export async function PATCH(request: Request) {
 
   const refreshedProfileResult = await verified.adminClient
     .from("profiles")
-    .select("id, full_name, email, role, status, phone, avatar_url")
+    .select("id, full_name, email, role, status, phone")
     .eq("id", verified.profile.id)
     .maybeSingle();
 

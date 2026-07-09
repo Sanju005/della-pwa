@@ -3683,17 +3683,17 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/images/mock/chef-hikaru.jpg/route_client-reference-manifest.js": {
-      "bytes": 356,
-      "imports": [],
-      "format": "cjs"
-    },
     ".open-next/server-functions/default/.next/server/app/images/mock/chef-daniel.jpg/route_client-reference-manifest.js": {
       "bytes": 356,
       "imports": [],
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js": {
+      "bytes": 356,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/images/mock/chef-hikaru.jpg/route_client-reference-manifest.js": {
       "bytes": 356,
       "imports": [],
       "format": "cjs"
@@ -3927,11 +3927,6 @@
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\provider\\company-payments\\route_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-hikaru.jpg/route_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\images\\mock\\chef-hikaru.jpg\\route_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-daniel.jpg/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\images\\mock\\chef-daniel.jpg\\route_client-reference-manifest.js"
@@ -3940,6 +3935,11 @@
           "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\images\\mock\\chef-banner.png\\route_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-hikaru.jpg/route_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\images\\mock\\chef-hikaru.jpg\\route_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-sofia.jpg/route_client-reference-manifest.js",
@@ -7224,7 +7224,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/api/profile/payments/route.js": {
-      "bytes": 12321,
+      "bytes": 12354,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/shared/lib/router/utils/app-paths.js",
@@ -9924,7 +9924,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/api/profile/me/route.js": {
-      "bytes": 20427,
+      "bytes": 20078,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/shared/lib/router/utils/app-paths.js",
@@ -10800,7 +10800,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/api/bookings/route.js": {
-      "bytes": 39333,
+      "bytes": 39355,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/shared/lib/router/utils/app-paths.js",
@@ -15856,13 +15856,13 @@
         ".open-next/server-functions/default/.next/server/app/api/provider/company-payments/route_client-reference-manifest.js": {
           "bytesInOutput": 537
         },
-        ".open-next/server-functions/default/.next/server/app/images/mock/chef-hikaru.jpg/route_client-reference-manifest.js": {
-          "bytesInOutput": 531
-        },
         ".open-next/server-functions/default/.next/server/app/images/mock/chef-daniel.jpg/route_client-reference-manifest.js": {
           "bytesInOutput": 531
         },
         ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js": {
+          "bytesInOutput": 531
+        },
+        ".open-next/server-functions/default/.next/server/app/images/mock/chef-hikaru.jpg/route_client-reference-manifest.js": {
           "bytesInOutput": 532
         },
         ".open-next/server-functions/default/.next/server/app/images/mock/chef-sofia.jpg/route_client-reference-manifest.js": {
@@ -16235,7 +16235,7 @@
           "bytesInOutput": 7640
         },
         ".open-next/server-functions/default/.next/server/app/api/profile/payments/route.js": {
-          "bytesInOutput": 12614
+          "bytesInOutput": 12646
         },
         ".open-next/server-functions/default/.next/server/app/api/provider/reviews/route.js": {
           "bytesInOutput": 10687
@@ -16340,7 +16340,7 @@
           "bytesInOutput": 214855
         },
         ".open-next/server-functions/default/.next/server/app/api/profile/me/route.js": {
-          "bytesInOutput": 21021
+          "bytesInOutput": 20675
         },
         ".open-next/server-functions/default/.next/server/app/forgot-password/page.js": {
           "bytesInOutput": 29799
@@ -16373,7 +16373,7 @@
           "bytesInOutput": 28400
         },
         ".open-next/server-functions/default/.next/server/app/api/bookings/route.js": {
-          "bytesInOutput": 40445
+          "bytesInOutput": 40465
         },
         ".open-next/server-functions/default/.next/server/app/provider/more/page.js": {
           "bytesInOutput": 23790
@@ -16577,7 +16577,7 @@
           "bytesInOutput": 96093
         }
       },
-      "bytes": 7260592
+      "bytes": 7260298
     }
   }
 }
