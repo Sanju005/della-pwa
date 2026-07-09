@@ -4,6 +4,7 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
+import { uploadStoredMedia } from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -190,6 +191,17 @@ export async function POST(request: Request) {
   }
 
   const normalizedPhone = normalizePhone(phoneNumber);
+  const storedAvatarUrl = avatarDataUrl
+    ? await uploadStoredMedia(adminClient, {
+        bucket: "profile-images",
+        dataUrl: avatarDataUrl,
+        ownerId: data.user.id,
+        pathParts: ["avatar"],
+        fileName: "avatar.jpg",
+        upsert: true,
+        visibility: "public",
+      })
+    : "";
 
   const { error: profileError } = await adminClient
     .from("profiles")
@@ -199,7 +211,7 @@ export async function POST(request: Request) {
       email,
       role: "customer",
       phone: normalizedPhone,
-      avatar_url: avatarDataUrl || null,
+      avatar_url: storedAvatarUrl || null,
       status: "active",
     }, { onConflict: "id" });
 

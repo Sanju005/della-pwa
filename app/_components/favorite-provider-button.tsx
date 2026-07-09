@@ -9,7 +9,7 @@ import {
   loadStoredFavoriteProviderIds,
   saveStoredFavoriteProviderIds,
 } from "@/lib/customer-favorites-browser";
-import { getSupabaseClient } from "@/lib/supabase";
+import { getFreshSupabaseSession, getSupabaseClient } from "@/lib/supabase";
 
 const FAVORITES_UPDATED_EVENT = "della:favorites-updated";
 
@@ -35,9 +35,7 @@ async function loadFavoriteIds() {
         return cloneFavoriteIds(storedIds);
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!session) {
         const storedIds = loadStoredFavoriteProviderIds();
@@ -144,9 +142,7 @@ export function FavoriteProviderButton({
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!session) {
         router.push("/login");

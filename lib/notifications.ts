@@ -1,6 +1,6 @@
 import { deleteToken, getToken, onMessage } from "firebase/messaging";
 import { getFirebaseMessaging } from "./firebase";
-import { getSupabaseClient } from "./supabase";
+import { getFreshSupabaseSession, getSupabaseClient } from "./supabase";
 
 function getFirebaseVapidKey() {
   if (typeof window !== "undefined" && window.__DELLA_PUBLIC_CONFIG) {
@@ -138,14 +138,11 @@ export async function saveFCMToken(fcmToken: string) {
       return { success: false, error: "Supabase client is not configured." };
     }
 
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
+    const session = await getFreshSupabaseSession(supabase);
 
-    if (sessionError || !session?.user) {
-      lastPushError = sessionError?.message || "User not found.";
-      return { success: false, error: sessionError?.message || "User not found." };
+    if (!session?.user) {
+      lastPushError = "User not found.";
+      return { success: false, error: "User not found." };
     }
 
     console.log("[FCM] Saving token for user:", session.user.id);
@@ -186,14 +183,11 @@ export async function disablePushNotifications() {
       return { success: false, error: "Supabase client is not configured." };
     }
 
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
+    const session = await getFreshSupabaseSession(supabase);
 
-    if (sessionError || !session?.user) {
-      lastPushError = sessionError?.message || "User not found.";
-      return { success: false, error: sessionError?.message || "User not found." };
+    if (!session?.user) {
+      lastPushError = "User not found.";
+      return { success: false, error: "User not found." };
     }
 
     const token = await getCurrentFCMToken();
@@ -264,18 +258,7 @@ export async function getPushSetupState(): Promise<PushSetupState> {
       };
     }
 
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (sessionError) {
-      lastPushError = sessionError.message;
-      return {
-        permission,
-        hasSavedToken: false,
-      };
-    }
+    const session = await getFreshSupabaseSession(supabase);
 
     if (!session?.user) {
       return {

@@ -29,7 +29,7 @@ import {
   saveFCMToken,
   type PushSetupState,
 } from "@/lib/notifications";
-import { getSupabaseClient, signOutLocally } from "@/lib/supabase";
+import { getFreshSupabaseSession, getSupabaseClient, signOutLocally } from "@/lib/supabase";
 import {
   loadSavedPlaces,
   loadStoredLiveLocation,
@@ -462,8 +462,7 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
       let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
 
       try {
-        const result = await client.auth.getSession();
-        session = result.data.session;
+        session = await getFreshSupabaseSession(client);
       } catch {
         return;
       }
@@ -795,8 +794,7 @@ function useLiveCustomerProfile(initialProfile: CustomerProfile) {
       let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
 
       try {
-        const result = await client.auth.getSession();
-        session = result.data.session;
+        session = await getFreshSupabaseSession(client);
       } catch {
         return;
       }
@@ -943,9 +941,7 @@ async function patchCustomerProfile(payload: Record<string, unknown>) {
     return { ok: false, error: "Supabase is not configured yet." };
   }
 
-  const {
-    data: { session },
-  } = await client.auth.getSession();
+  const session = await getFreshSupabaseSession(client);
 
   if (!session) {
     return { ok: false, error: "Your session expired. Please log in again." };
@@ -1777,9 +1773,7 @@ export function FavoritesScreen({ providers }: FavoritesProps) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!active || !session) {
         return;
@@ -1830,9 +1824,7 @@ export function FavoritesScreen({ providers }: FavoritesProps) {
       return;
     }
 
-    const {
-      data: { session },
-    } = await client.auth.getSession();
+    const session = await getFreshSupabaseSession(client);
 
     if (!session) {
       setError("Your session expired. Please log in again.");
@@ -1980,8 +1972,7 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
       let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
 
       try {
-        const result = await client.auth.getSession();
-        session = result.data.session;
+        session = await getFreshSupabaseSession(client);
       } catch {
         return;
       }
@@ -2199,9 +2190,7 @@ export function AddressesScreen({ addresses }: AddressesProps) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!active || !session) {
         return;
@@ -2251,9 +2240,7 @@ export function AddressesScreen({ addresses }: AddressesProps) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!session) {
         setError("Please log in again to save addresses.");
@@ -2538,8 +2525,7 @@ export function BookingsScreen({ bookings, initialTab = "all" }: BookingsProps) 
       let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
 
       try {
-        const result = await client.auth.getSession();
-        session = result.data.session;
+        session = await getFreshSupabaseSession(client);
       } catch (error) {
         console.warn("[Bookings] Unable to read session:", error);
         return;
@@ -3126,9 +3112,7 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!session) {
         setPaymentError("Your session expired. Please log in again.");
@@ -3218,9 +3202,7 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!session) {
         setReportError("Your session expired. Please log in again.");
@@ -3683,9 +3665,7 @@ export function BookingReviewScreen({ booking }: BookingReviewProps) {
       return;
     }
 
-    const {
-      data: { session },
-    } = await client.auth.getSession();
+    const session = await getFreshSupabaseSession(client);
 
     if (!session) {
       setError("Your session expired. Please log in again.");
@@ -3973,8 +3953,7 @@ export function PaymentsScreen({ payments }: PaymentsProps) {
       let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
 
       try {
-        const result = await client.auth.getSession();
-        session = result.data.session;
+        session = await getFreshSupabaseSession(client);
       } catch {
         return;
       }
@@ -4336,9 +4315,7 @@ export function NotificationsScreen({
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!active || !session) {
         return;
@@ -4412,9 +4389,7 @@ export function NotificationsScreen({
       return;
     }
 
-    const {
-      data: { session },
-    } = await client.auth.getSession();
+    const session = await getFreshSupabaseSession(client);
 
     if (!session) {
       return;

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { sendPushNotificationToUser } from "@/lib/push-notifications";
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
+import { uploadStoredMedia } from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -135,6 +136,17 @@ export async function POST(
   }
 
   const bookingRow = booking as BookingRow;
+  const storedProofDataUrl = payload.proofDataUrl?.trim()
+    ? await uploadStoredMedia(verified.adminClient, {
+        bucket: "payment-proofs",
+        dataUrl: payload.proofDataUrl,
+        ownerId: verified.profile.id,
+        pathParts: [bookingRow.id, "customer-cash-proof"],
+        fileName: payload.proofFileName || "customer-payment-proof.jpg",
+        upsert: true,
+        visibility: "private",
+      })
+    : "";
 
   if (bookingRow.booking_status !== "final_payment_sent") {
     return NextResponse.json(
@@ -152,7 +164,7 @@ export async function POST(
       payment_method: "Cash",
       paid_at: timestamp,
       customer_confirmed_at: timestamp,
-      customer_payment_proof_data_url: payload.proofDataUrl?.trim() || null,
+      customer_payment_proof_data_url: storedProofDataUrl || null,
       customer_payment_proof_file_name: payload.proofFileName?.trim() || null,
       customer_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
     })
@@ -171,7 +183,7 @@ export async function POST(
     .update({
       booking_status: "cash_paid_by_user",
       cash_paid_by_user_at: timestamp,
-      cash_payment_proof_images: payload.proofDataUrl?.trim() ? [payload.proofDataUrl.trim()] : [],
+      cash_payment_proof_images: storedProofDataUrl ? [storedProofDataUrl] : [],
     })
     .eq("id", bookingRow.id)
     .eq("customer_id", verified.profile.id);

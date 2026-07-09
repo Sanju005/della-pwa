@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { sendPushNotificationToUser } from "@/lib/push-notifications";
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
+import { uploadStoredMediaList } from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +121,19 @@ export async function POST(
   const payload = (await request.json().catch(() => ({}))) as ReviewPayload;
   const rating = Math.max(1, Math.min(5, Math.round(Number(payload.rating ?? 0))));
   const comment = payload.comment?.trim() ?? "";
-  const photos = (payload.photos ?? []).map((photo) => photo.trim()).filter(Boolean);
+  const photos = await uploadStoredMediaList(
+    verified.adminClient,
+    (payload.photos ?? []).map((photo, index) => ({
+      dataUrl: photo.trim(),
+      fileName: `provider-review-${index + 1}.jpg`,
+    })).filter((item) => Boolean(item.dataUrl)),
+    {
+      bucket: "review-images",
+      ownerId: verified.profile.id,
+      pathPrefix: [params.id, "provider-review"],
+      visibility: "public",
+    },
+  );
 
   if (!rating || !Number.isFinite(rating)) {
     return NextResponse.json({ error: "A rating from 1 to 5 is required." }, { status: 400 });

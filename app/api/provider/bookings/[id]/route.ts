@@ -9,6 +9,10 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
+import {
+  uploadStoredMedia,
+  uploadStoredMediaList,
+} from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -517,17 +521,27 @@ export async function PATCH(
       );
     }
 
+    const storedProofDataUrl = await uploadStoredMedia(verified.adminClient, {
+      bucket: "payment-proofs",
+      dataUrl: payload.proofDataUrl,
+      ownerId: verified.profile.id,
+      pathParts: [current.id, "provider-company-payment-proof"],
+      fileName: payload.proofFileName || "provider-company-payment-proof.jpg",
+      upsert: true,
+      visibility: "private",
+    });
+
     const fullUpdatePayload = {
       company_payment_status: "payment_process",
       company_payment_requested_at: new Date().toISOString(),
       provider_company_payment_amount: depositedAmount,
-      provider_company_payment_proof_data_url: payload.proofDataUrl.trim(),
+      provider_company_payment_proof_data_url: storedProofDataUrl,
       provider_company_payment_proof_file_name: payload.proofFileName.trim(),
       provider_company_payment_proof_mime_type: payload.proofMimeType.trim(),
     };
     const fallbackUpdatePayload = {
       company_payment_status: "payment_process",
-      provider_company_payment_proof_data_url: payload.proofDataUrl.trim(),
+      provider_company_payment_proof_data_url: storedProofDataUrl,
       provider_company_payment_proof_file_name: payload.proofFileName.trim(),
       provider_company_payment_proof_mime_type: payload.proofMimeType.trim(),
     };
@@ -615,6 +629,23 @@ export async function PATCH(
     );
   }
 
+  const uploadedWorkFinishedImages =
+    payload.workFinishedImages && payload.workFinishedImages.length > 0
+      ? await uploadStoredMediaList(
+          verified.adminClient,
+          payload.workFinishedImages.map((dataUrl, index) => ({
+            dataUrl,
+            fileName: `job-complete-${index + 1}.jpg`,
+          })),
+          {
+            bucket: "job-completion-images",
+            ownerId: verified.profile.id,
+            pathPrefix: [current.id, "work-finished"],
+            visibility: "private",
+          },
+        )
+      : [];
+
   const updatePayload: Record<string, unknown> = {
     booking_status: nextStatus,
   };
@@ -638,7 +669,7 @@ export async function PATCH(
 
   if (nextStatus === "work_finished_by_provider") {
     updatePayload.work_finished_at = new Date().toISOString();
-    updatePayload.work_finished_images = payload.workFinishedImages ?? [];
+    updatePayload.work_finished_images = uploadedWorkFinishedImages;
     updatePayload.provider_response_note = note || "Provider marked work as finished.";
   }
 
@@ -651,7 +682,7 @@ export async function PATCH(
 
     if (isSendingAfterArrival) {
       updatePayload.work_finished_at = new Date().toISOString();
-      updatePayload.work_finished_images = payload.workFinishedImages ?? [];
+      updatePayload.work_finished_images = uploadedWorkFinishedImages;
     }
     updatePayload.payment_sent_at = new Date().toISOString();
     updatePayload.payment_breakdown =

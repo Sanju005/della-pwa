@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 import { createProviderRegistration } from "@/lib/provider-registration-storage";
-import type { ProviderRegistrationData } from "@/lib/provider-registration-types";
+import type {
+  ProviderRegistrationData,
+  ProviderServiceDetails,
+} from "@/lib/provider-registration-types";
+import {
+  uploadStoredMedia,
+  uploadStoredMediaList,
+} from "@/lib/server-media-storage";
 import {
   getSupabaseServiceKey,
   getSupabaseUrl,
@@ -327,6 +334,48 @@ function getRegistrationAvailabilityRange(payload: ProviderRegistrationData) {
   };
 }
 
+function buildStoredRegistrationPayload(
+  payload: ProviderRegistrationData,
+  storedAvatarUrl: string,
+  storedIdentityFrontImageUrl: string,
+  storedIdentityBackImageUrl: string,
+  storedServices: Array<{
+    serviceType: string;
+    imageDataUrls: string[];
+    certificateDataUrls: string[];
+  }>,
+) {
+  const serviceMediaByType = new Map(
+    storedServices.map((service) => [service.serviceType, service] as const),
+  );
+
+  return {
+    ...payload,
+    basicProfile: {
+      ...payload.basicProfile,
+      avatarDataUrl: storedAvatarUrl,
+    },
+    verification: {
+      ...payload.verification,
+      frontImageDataUrl: storedIdentityFrontImageUrl,
+      backImageDataUrl: storedIdentityBackImageUrl,
+    },
+    serviceDetails: Object.fromEntries(
+      Object.entries(payload.serviceDetails).map(([service, details]) => {
+        const stored = serviceMediaByType.get(toServiceType(service));
+        return [
+          service,
+          {
+            ...details,
+            imageDataUrls: stored?.imageDataUrls ?? details.imageDataUrls,
+            certificateDataUrls: stored?.certificateDataUrls ?? details.certificateDataUrls,
+          },
+        ];
+      }),
+    ) as Record<keyof ProviderRegistrationData["serviceDetails"], ProviderServiceDetails>,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as ProviderRegistrationData;
@@ -435,6 +484,41 @@ export async function POST(request: Request) {
       payload.account.phoneCountryCode,
       payload.account.phoneNumber,
     );
+    const storedAvatarUrl = payload.basicProfile.avatarDataUrl?.trim()
+      ? await uploadStoredMedia(adminClient, {
+          bucket: "profile-images",
+          dataUrl: payload.basicProfile.avatarDataUrl,
+          ownerId: providerId,
+          pathParts: ["avatar"],
+          fileName: "avatar.jpg",
+          upsert: true,
+          visibility: "public",
+        })
+      : "";
+    const storedIdentityFrontImageUrl = payload.verification.frontImageDataUrl?.trim()
+      ? await uploadStoredMedia(adminClient, {
+          bucket: "identity-documents",
+          dataUrl: payload.verification.frontImageDataUrl,
+          ownerId: providerId,
+          pathParts: ["identity", "front"],
+          fileName:
+            payload.verification.documentType === "passport" ? "passport-front.jpg" : "ic-front.jpg",
+          upsert: true,
+          visibility: "private",
+        })
+      : "";
+    const storedIdentityBackImageUrl = payload.verification.backImageDataUrl?.trim()
+      ? await uploadStoredMedia(adminClient, {
+          bucket: "identity-documents",
+          dataUrl: payload.verification.backImageDataUrl,
+          ownerId: providerId,
+          pathParts: ["identity", "back"],
+          fileName:
+            payload.verification.documentType === "passport" ? "passport-back.jpg" : "ic-back.jpg",
+          upsert: true,
+          visibility: "private",
+        })
+      : "";
     const phoneVerified = payload.verification.phoneOtp.join("") === "123456";
     const identityVerified = Boolean(
       payload.verification.documentType &&
@@ -450,7 +534,7 @@ export async function POST(request: Request) {
         email: payload.account.email.trim().toLowerCase(),
         role: PROVIDER_ROLE,
         phone: normalizedPhone,
-        avatar_url: payload.basicProfile.avatarDataUrl?.trim() || null,
+        avatar_url: storedAvatarUrl || null,
         status: "pending",
       }, { onConflict: "id" });
 
@@ -549,33 +633,59 @@ export async function POST(request: Request) {
       identityVerified,
       {
         documentType: payload.verification.documentType,
-        frontImageUrl: payload.verification.frontImageDataUrl,
-        backImageUrl: payload.verification.backImageDataUrl,
+        frontImageUrl: storedIdentityFrontImageUrl,
+        backImageUrl: storedIdentityBackImageUrl,
       },
     );
 
     const verificationSetupFailed = Boolean(verificationResult.error);
 
-    const providerServicesPayload = payload.selectedServices.map((service) => {
-      const details = payload.serviceDetails[service];
-      const imageDataUrls = normalizeStoredMedia(details.imageDataUrls);
-      const certificateDataUrls = normalizeStoredMedia(details.certificateDataUrls);
+    const providerServicesPayload = await Promise.all(
+      payload.selectedServices.map(async (service) => {
+        const details = payload.serviceDetails[service];
+        const imageDataUrls = await uploadStoredMediaList(
+          adminClient,
+          normalizeStoredMedia(details.imageDataUrls).map((dataUrl, index) => ({
+            dataUrl,
+            fileName: `${toServiceType(service)}-work-${index + 1}.jpg`,
+          })),
+          {
+            bucket: "provider-work-images",
+            ownerId: providerId,
+            pathPrefix: [toServiceType(service), "work"],
+            visibility: "public",
+          },
+        );
+        const certificateDataUrls = await uploadStoredMediaList(
+          adminClient,
+          normalizeStoredMedia(details.certificateDataUrls).map((dataUrl, index) => ({
+            dataUrl,
+            fileName: `${toServiceType(service)}-certificate-${index + 1}.jpg`,
+          })),
+          {
+            bucket: "certificates",
+            ownerId: providerId,
+            pathPrefix: [toServiceType(service), "certificates"],
+            visibility: "private",
+          },
+        );
 
-      return {
-        provider_id: providerId,
-        service_type: toServiceType(service),
-        years_experience: details.yearsExperience,
-        hourly_rate: Number(details.hourlyRate || 0),
-        daily_rate: Number(details.dailyRate || 0),
-        image_data_urls: imageDataUrls,
-        image_captions: normalizeStoredCaptions(details.imageCaptions, imageDataUrls),
-        certificate_data_urls: certificateDataUrls,
-        certificate_captions: normalizeStoredCaptions(
-          details.certificateCaptions,
-          certificateDataUrls,
-        ),
-      };
-    });
+        return {
+          provider_id: providerId,
+          service_type: toServiceType(service),
+          years_experience: details.yearsExperience,
+          hourly_rate: Number(details.hourlyRate || 0),
+          daily_rate: Number(details.dailyRate || 0),
+          image_data_urls: imageDataUrls,
+          image_captions: normalizeStoredCaptions(details.imageCaptions, imageDataUrls),
+          certificate_data_urls: certificateDataUrls,
+          certificate_captions: normalizeStoredCaptions(
+            details.certificateCaptions,
+            certificateDataUrls,
+          ),
+        };
+      }),
+    );
 
     let providerServicesWrite = await adminClient
       .from("provider_services")
@@ -638,7 +748,19 @@ export async function POST(request: Request) {
       }
     }
 
-    const record = await createProviderRegistration(payload, providerId, {
+    const registrationPayload = buildStoredRegistrationPayload(
+      payload,
+      storedAvatarUrl,
+      storedIdentityFrontImageUrl,
+      storedIdentityBackImageUrl,
+      providerServicesPayload.map((service) => ({
+        serviceType: service.service_type,
+        imageDataUrls: service.image_data_urls,
+        certificateDataUrls: service.certificate_data_urls,
+      })),
+    );
+
+    const record = await createProviderRegistration(registrationPayload, providerId, {
       phoneVerified,
       emailVerified: true,
       identityVerified,

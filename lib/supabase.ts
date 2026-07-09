@@ -1,7 +1,8 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { getSupabasePublishableKey, getSupabaseUrl } from "./supabase-env";
 
 let browserClient: SupabaseClient | null | undefined;
+const MAX_SAFE_ACCESS_TOKEN_LENGTH = 12_000;
 
 declare global {
   interface Window {
@@ -92,6 +93,57 @@ export function clearSupabaseBrowserSession() {
   } catch {
     // Some embedded browsers can block storage access.
   }
+
+  try {
+    document.cookie.split(";").forEach((cookie) => {
+      const name = cookie.split("=")[0]?.trim();
+
+      if (
+        name &&
+        (name.startsWith("sb-") ||
+          name.includes("supabase") ||
+          name.includes("gotrue"))
+      ) {
+        document.cookie = `${name}=; Max-Age=0; path=/`;
+      }
+    });
+  } catch {
+    // Cookie access can be restricted in some embedded browsers.
+  }
+
+  browserClient = undefined;
+}
+
+export function isOversizedAccessToken(session: Session | null | undefined) {
+  return (session?.access_token?.length ?? 0) > MAX_SAFE_ACCESS_TOKEN_LENGTH;
+}
+
+export async function getFreshSupabaseSession(client: SupabaseClient) {
+  let session: Session | null = null;
+
+  try {
+    const current = await client.auth.getSession();
+    session = current.data.session;
+  } catch {
+    session = null;
+  }
+
+  try {
+    const refreshed = await client.auth.refreshSession();
+    session = refreshed.data.session ?? session;
+  } catch {
+    if (isOversizedAccessToken(session)) {
+      clearSupabaseBrowserSession();
+      return null;
+    }
+  }
+
+  if (isOversizedAccessToken(session)) {
+    clearSupabaseBrowserSession();
+    return null;
+  }
+
+  return session;
 }
 
 export async function signOutLocally(client: SupabaseClient | null) {

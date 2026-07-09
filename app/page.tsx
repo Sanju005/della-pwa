@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { getSupabaseClient } from "@/lib/supabase";
+import { getFreshSupabaseSession, getSupabaseClient } from "@/lib/supabase";
 
 function isProviderRole(role: string | null | undefined) {
   return role === "provider" || role === "service_provider";
@@ -23,9 +23,7 @@ export default function AppEntryPage() {
         return;
       }
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getFreshSupabaseSession(supabase);
 
       if (!active) {
         return;

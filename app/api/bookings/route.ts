@@ -7,6 +7,10 @@ import { parsePaymentAdjustmentNote } from "@/lib/payment-adjustment";
 import { sendPushNotificationToUser } from "@/lib/push-notifications";
 import { buildProviderPortraitSrc, type ProviderCategoryKey } from "@/lib/provider-catalog";
 import {
+  resolveStoredMediaUrl,
+  resolveStoredMediaUrlList,
+} from "@/lib/server-media-storage";
+import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
@@ -708,11 +712,12 @@ function buildUserActivitySteps(status: BookingRow["booking_status"]): Booking["
   }));
 }
 
-function mapLiveBookingToUi(
+async function mapLiveBookingToUi(
+  adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
   row: BookingRow,
   providerName: string,
   providerAvatarUrl?: string
-): Booking {
+): Promise<Booking> {
   const scheduleParts = formatDateTimeLabel(
     row.scheduled_date,
     row.scheduled_start_time,
@@ -786,10 +791,18 @@ function mapLiveBookingToUi(
         : paymentRecord?.company_payment_status === "payment_process"
           ? "payment_process"
           : "pending",
-    customerPaymentProofDataUrl: paymentRecord?.customer_payment_proof_data_url ?? "",
+    customerPaymentProofDataUrl: await resolveStoredMediaUrl(adminClient, {
+      bucket: "payment-proofs",
+      value: paymentRecord?.customer_payment_proof_data_url ?? "",
+      visibility: "private",
+    }),
     customerPaymentProofFileName: paymentRecord?.customer_payment_proof_file_name ?? "",
     customerPaymentProofMimeType: paymentRecord?.customer_payment_proof_mime_type ?? "",
-    providerCompanyPaymentProofDataUrl: paymentRecord?.provider_company_payment_proof_data_url ?? "",
+    providerCompanyPaymentProofDataUrl: await resolveStoredMediaUrl(adminClient, {
+      bucket: "payment-proofs",
+      value: paymentRecord?.provider_company_payment_proof_data_url ?? "",
+      visibility: "private",
+    }),
     providerCompanyPaymentProofFileName: paymentRecord?.provider_company_payment_proof_file_name ?? "",
     providerCompanyPaymentProofMimeType: paymentRecord?.provider_company_payment_proof_mime_type ?? "",
     baseAmount: Number(row.booking_price ?? 0) || paymentAdjustment?.baseAmount,
@@ -799,8 +812,18 @@ function mapLiveBookingToUi(
         : paymentAdjustment?.additionalCharge,
     additionalChargeDescription: paymentAdjustment?.chargeDescription,
     paymentBreakdown,
-    workFinishedImages: Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
-    cashPaymentProofImages: Array.isArray(row.cash_payment_proof_images) ? row.cash_payment_proof_images : [],
+    workFinishedImages: await resolveStoredMediaUrlList(
+      adminClient,
+      "job-completion-images",
+      Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
+      "private",
+    ),
+    cashPaymentProofImages: await resolveStoredMediaUrlList(
+      adminClient,
+      "payment-proofs",
+      Array.isArray(row.cash_payment_proof_images) ? row.cash_payment_proof_images : [],
+      "private",
+    ),
     userReviewStatus:
       row.user_review_status === "submitted" || row.user_review_status === "skipped"
         ? row.user_review_status
@@ -973,13 +996,14 @@ export async function GET(request: Request) {
     );
 
     return NextResponse.json({
-      bookings: rows.map((row) =>
+      bookings: await Promise.all(rows.map((row) =>
         mapLiveBookingToUi(
+          verified.adminClient,
           row,
           providerDirectory.get(row.provider_id)?.name || "DELLA Provider",
           providerDirectory.get(row.provider_id)?.avatarUrl || ""
         )
-      ),
+      )),
     });
   } catch (error) {
     return NextResponse.json(
@@ -1205,7 +1229,8 @@ export async function POST(request: Request) {
     path: `/provider/dashboard?booking=${insertedBooking.id}`,
   });
 
-  const booking = mapLiveBookingToUi(
+  const booking = await mapLiveBookingToUi(
+    verified.adminClient,
     insertedBooking as BookingRow,
     payload.providerName
   );

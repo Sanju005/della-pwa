@@ -6,6 +6,7 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
+import { uploadStoredMediaList } from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -160,7 +161,19 @@ export async function POST(
   const rating = Math.max(1, Math.min(5, Math.round(Number(payload.rating ?? 0))));
   const comment = payload.comment?.trim() ?? "";
   const tags = (payload.tags ?? []).map((tag) => tag.trim()).filter(Boolean);
-  const photos = (payload.photos ?? []).map((photo) => photo.trim()).filter(Boolean);
+  const photos = await uploadStoredMediaList(
+    verified.adminClient,
+    (payload.photos ?? []).map((photo, index) => ({
+      dataUrl: photo.trim(),
+      fileName: `customer-review-${index + 1}.jpg`,
+    })).filter((item) => Boolean(item.dataUrl)),
+    {
+      bucket: "review-images",
+      ownerId: verified.profile.id,
+      pathPrefix: [params.id, "customer-review"],
+      visibility: "public",
+    },
+  );
   const recommend = payload.recommend !== false;
 
   if (!rating || !Number.isFinite(rating)) {

@@ -31,7 +31,7 @@ import {
   resolveCurrentLiveLocation,
   type StoredLiveLocation,
 } from "@/lib/live-location";
-import { getSupabaseClient } from "@/lib/supabase";
+import { getFreshSupabaseSession, getSupabaseClient } from "@/lib/supabase";
 
 type BookingMode = "hourly" | "daily";
 
@@ -298,9 +298,7 @@ export function BookingFormScreen({
         throw new Error("Supabase is not configured yet.");
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!session) {
         router.push("/login");

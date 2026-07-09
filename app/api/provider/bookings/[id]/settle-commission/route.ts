@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
+import { uploadStoredMedia } from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,6 +114,17 @@ export async function POST(
   const payload = (await request.json().catch(() => ({}))) as CommissionProofPayload;
   const params = await context.params;
   const depositedAmount = Number(payload.depositedAmount ?? 0);
+  const storedProofDataUrl = payload.proofDataUrl?.trim()
+    ? await uploadStoredMedia(verified.adminClient, {
+        bucket: "payment-proofs",
+        dataUrl: payload.proofDataUrl,
+        ownerId: verified.profile.id,
+        pathParts: [params.id, "provider-company-payment-proof"],
+        fileName: payload.proofFileName || "provider-company-payment-proof.jpg",
+        upsert: true,
+        visibility: "private",
+      })
+    : "";
 
   if (!payload.proofDataUrl?.trim() || !payload.proofFileName?.trim() || !payload.proofMimeType?.trim()) {
     return NextResponse.json(
@@ -155,13 +167,13 @@ export async function POST(
     company_payment_status: "payment_process",
     company_payment_requested_at: new Date().toISOString(),
     provider_company_payment_amount: depositedAmount,
-    provider_company_payment_proof_data_url: payload.proofDataUrl?.trim() || null,
+    provider_company_payment_proof_data_url: storedProofDataUrl || null,
     provider_company_payment_proof_file_name: payload.proofFileName?.trim() || null,
     provider_company_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
   };
   const fallbackUpdatePayload = {
     company_payment_status: "payment_process",
-    provider_company_payment_proof_data_url: payload.proofDataUrl?.trim() || null,
+    provider_company_payment_proof_data_url: storedProofDataUrl || null,
     provider_company_payment_proof_file_name: payload.proofFileName?.trim() || null,
     provider_company_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
   };

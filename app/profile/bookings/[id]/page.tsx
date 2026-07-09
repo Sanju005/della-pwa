@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { AppButton, LoadingState } from "@/app/_components/della-ui";
 import { BookingDetailScreen } from "@/app/profile/_components/profile-ui";
-import { getSupabaseClient } from "@/lib/supabase";
+import { getFreshSupabaseSession, getSupabaseClient } from "@/lib/supabase";
 import type { Booking } from "@/lib/profile-types";
 
 export default function ProfileBookingDetailPage({
@@ -50,9 +50,7 @@ export default function ProfileBookingDetailPage({
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!active || !session) {
         setMissing(true);

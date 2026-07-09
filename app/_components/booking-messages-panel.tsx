@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, FileText, MapPin, MessageCircleMore, Paperclip, SendHorizonal } from "lucide-react";
 
-import { getSupabaseClient } from "@/lib/supabase";
+import { getFreshSupabaseSession, getSupabaseClient } from "@/lib/supabase";
 import {
   isPaymentProofMimeType,
   PAYMENT_PROOF_MAX_BYTES,
@@ -168,9 +168,7 @@ export function BookingMessagesPanel({
       throw new Error("Supabase is not configured yet.");
     }
 
-    const {
-      data: { session },
-    } = await client.auth.getSession();
+    const session = await getFreshSupabaseSession(client);
 
     if (!session) {
       router.push("/login");
@@ -274,9 +272,7 @@ export function BookingMessagesPanel({
           return;
         }
 
-        const {
-          data: { session },
-        } = await client.auth.getSession();
+        const session = await getFreshSupabaseSession(client);
 
         if (!active || !session) {
           setLoading(false);

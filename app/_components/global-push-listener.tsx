@@ -9,7 +9,7 @@ import {
   saveFCMToken,
   subscribeToForegroundPush,
 } from "@/lib/notifications";
-import { getSupabaseClient } from "@/lib/supabase";
+import { getFreshSupabaseSession, getSupabaseClient } from "@/lib/supabase";
 
 export function GlobalPushListener() {
   const router = useRouter();
@@ -26,9 +26,7 @@ export function GlobalPushListener() {
           return;
         }
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getFreshSupabaseSession(supabase);
 
         if (!active || !session) {
           return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { getSupabaseClient } from "./supabase";
+import { getFreshSupabaseSession, getSupabaseClient } from "./supabase";
 import type { CustomerProfile } from "./profile-types";
 
 const PROFILE_STORAGE_KEY = "della.customer.profile";
@@ -72,9 +72,7 @@ export async function saveCustomerProfile(profile: CustomerProfile) {
   }
 
   try {
-    const {
-      data: { session },
-    } = await client.auth.getSession();
+    const session = await getFreshSupabaseSession(client);
 
     if (!session) {
       return { mode: "local" as const };

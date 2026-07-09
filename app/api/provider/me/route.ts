@@ -5,6 +5,11 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
+import {
+  resolveStoredMediaUrl,
+  resolveStoredMediaUrlList,
+  uploadStoredMedia,
+} from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -448,7 +453,8 @@ async function ensureProviderProfile(
   return fetchProviderSnapshot(adminClient, profile.id);
 }
 
-function buildResponse(
+async function buildResponse(
+  adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
   profile: ProfileRow,
   providerProfile: ProviderProfileRow,
   authUser: { email_confirmed_at?: string | null; user_metadata?: unknown },
@@ -464,7 +470,7 @@ function buildResponse(
     identityVerified,
   );
 
-  return {
+  const response = {
     providerId: profile.id,
     fullName: profile.full_name ?? "",
     email: profile.email ?? "",
@@ -512,6 +518,23 @@ function buildResponse(
         certificateCaptions: service.certificate_captions ?? [],
       })) ?? [],
   };
+
+  for (const service of response.services) {
+    service.imageDataUrls = await resolveStoredMediaUrlList(
+      adminClient,
+      "provider-work-images",
+      service.imageDataUrls,
+      "public",
+    );
+    service.certificateDataUrls = await resolveStoredMediaUrlList(
+      adminClient,
+      "certificates",
+      service.certificateDataUrls,
+      "private",
+    );
+  }
+
+  return response;
 }
 
 export async function GET(request: Request) {
@@ -531,7 +554,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json(
-    buildResponse(verified.profile, providerProfile, verified.authUser),
+    await buildResponse(verified.adminClient, verified.profile, providerProfile, verified.authUser),
   );
 }
 
@@ -668,14 +691,38 @@ export async function PATCH(request: Request) {
     typeof payload.identityFrontImageUrl === "string" ||
     typeof payload.identityBackImageUrl === "string"
   ) {
+    const storedIdentityFrontImageUrl = payload.identityFrontImageUrl?.trim()
+      ? await uploadStoredMedia(verified.adminClient, {
+          bucket: "identity-documents",
+          dataUrl: payload.identityFrontImageUrl,
+          ownerId: verified.profile.id,
+          pathParts: ["identity", "front"],
+          fileName:
+            payload.identityDocumentType === "passport" ? "passport-front.jpg" : "ic-front.jpg",
+          upsert: true,
+          visibility: "private",
+        })
+      : payload.identityFrontImageUrl?.trim();
+    const storedIdentityBackImageUrl = payload.identityBackImageUrl?.trim()
+      ? await uploadStoredMedia(verified.adminClient, {
+          bucket: "identity-documents",
+          dataUrl: payload.identityBackImageUrl,
+          ownerId: verified.profile.id,
+          pathParts: ["identity", "back"],
+          fileName:
+            payload.identityDocumentType === "passport" ? "passport-back.jpg" : "ic-back.jpg",
+          upsert: true,
+          visibility: "private",
+        })
+      : payload.identityBackImageUrl?.trim();
     const verificationPayload = {
       phone_verified: payload.phoneVerified,
       email_verified: Boolean(verified.authUser.email_confirmed_at),
       identity_verified: payload.identityVerified,
       kyc_verified: payload.identityVerified,
       identity_document_type: payload.identityDocumentType,
-      identity_front_image_url: payload.identityFrontImageUrl?.trim(),
-      identity_back_image_url: payload.identityBackImageUrl?.trim(),
+      identity_front_image_url: storedIdentityFrontImageUrl,
+      identity_back_image_url: storedIdentityBackImageUrl,
     };
     const verificationPayloadWithoutDocuments = stripVerificationDocumentFields(verificationPayload);
 
@@ -859,7 +906,8 @@ export async function PATCH(request: Request) {
   }
 
   return NextResponse.json(
-    buildResponse(
+    await buildResponse(
+      verified.adminClient,
       refreshedProfile.data as ProfileRow,
       providerProfile,
       verified.authUser,

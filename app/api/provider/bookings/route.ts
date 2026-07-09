@@ -5,6 +5,10 @@ import { parsePaymentAdjustmentNote } from "@/lib/payment-adjustment";
 import { calculateCommission } from "@/lib/payments";
 import { normalizeBookingWorkflowStatus } from "@/lib/booking-workflow";
 import {
+  resolveStoredMediaUrl,
+  resolveStoredMediaUrlList,
+} from "@/lib/server-media-storage";
+import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
@@ -487,7 +491,7 @@ export async function GET(request: Request) {
   );
 
   return NextResponse.json({
-    bookings: rows.map((row) => {
+    bookings: await Promise.all(rows.map(async (row) => {
       const normalizedStatus = normalizeBookingWorkflowStatus(row.booking_status);
       const parsedAdjustment = parsePaymentAdjustmentNote(row.provider_response_note);
       const quotedAmount =
@@ -571,10 +575,18 @@ export async function GET(request: Request) {
             ? Number(row.payment_records[0]?.admin_company_received_amount ?? 0)
             : 0,
         providerNetAmount,
-        customerPaymentProofDataUrl: row.payment_records?.[0]?.customer_payment_proof_data_url ?? "",
+        customerPaymentProofDataUrl: await resolveStoredMediaUrl(verified.adminClient, {
+          bucket: "payment-proofs",
+          value: row.payment_records?.[0]?.customer_payment_proof_data_url ?? "",
+          visibility: "private",
+        }),
         customerPaymentProofFileName: row.payment_records?.[0]?.customer_payment_proof_file_name ?? "",
         customerPaymentProofMimeType: row.payment_records?.[0]?.customer_payment_proof_mime_type ?? "",
-        providerCompanyPaymentProofDataUrl: row.payment_records?.[0]?.provider_company_payment_proof_data_url ?? "",
+        providerCompanyPaymentProofDataUrl: await resolveStoredMediaUrl(verified.adminClient, {
+          bucket: "payment-proofs",
+          value: row.payment_records?.[0]?.provider_company_payment_proof_data_url ?? "",
+          visibility: "private",
+        }),
         providerCompanyPaymentProofFileName: row.payment_records?.[0]?.provider_company_payment_proof_file_name ?? "",
         providerCompanyPaymentProofMimeType: row.payment_records?.[0]?.provider_company_payment_proof_mime_type ?? "",
         additionalCharge:
@@ -588,8 +600,18 @@ export async function GET(request: Request) {
                 .filter((item) => typeof item?.description === "string" && typeof item?.amount === "number")
                 .map((item) => ({ description: item.description ?? "", amount: Number(item.amount ?? 0) }))
             : parsedAdjustment?.rows ?? [],
-        workFinishedImages: Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
-        cashPaymentProofImages: Array.isArray(row.cash_payment_proof_images) ? row.cash_payment_proof_images : [],
+        workFinishedImages: await resolveStoredMediaUrlList(
+          verified.adminClient,
+          "job-completion-images",
+          Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
+          "private",
+        ),
+        cashPaymentProofImages: await resolveStoredMediaUrlList(
+          verified.adminClient,
+          "payment-proofs",
+          Array.isArray(row.cash_payment_proof_images) ? row.cash_payment_proof_images : [],
+          "private",
+        ),
         userReviewStatus:
           row.user_review_status === "submitted" || row.user_review_status === "skipped"
             ? row.user_review_status
@@ -620,6 +642,6 @@ export async function GET(request: Request) {
         providerReviewComment: row.provider_review_records?.[0]?.comment ?? "",
         providerReviewedAt: row.provider_review_records?.[0]?.created_at ?? "",
       };
-    }),
+    })),
   });
 }

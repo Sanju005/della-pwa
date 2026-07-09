@@ -5,6 +5,7 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
+import { uploadStoredMediaList } from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -139,7 +140,19 @@ export async function PATCH(
     return NextResponse.json({ error: "Service was not found." }, { status: 404 });
   }
 
-  const imageDataUrls = normalizeMedia(payload.imageDataUrls);
+  const imageDataUrls = await uploadStoredMediaList(
+    verified.adminClient,
+    normalizeMedia(payload.imageDataUrls).map((dataUrl, index) => ({
+      dataUrl,
+      fileName: `service-image-${index + 1}.jpg`,
+    })),
+    {
+      bucket: "provider-work-images",
+      ownerId: verified.profile.id,
+      pathPrefix: [params.id, "work"],
+      visibility: "public",
+    },
+  );
   const imageCaptions = normalizeCaptions(payload.imageCaptions, imageDataUrls);
 
   const updateService = await verified.adminClient
