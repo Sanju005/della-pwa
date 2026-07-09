@@ -14,12 +14,26 @@ type ProfileRow = {
 
 type PaymentRow = {
   id: string;
+  booking_id?: string | null;
   provider_id: string | null;
   service_title: string | null;
   amount: number | null;
   payment_method: string | null;
   status: string | null;
   paid_at: string | null;
+  created_at: string | null;
+};
+
+type BookingPaymentFallbackRow = {
+  id: string;
+  provider_id: string | null;
+  service_label: string | null;
+  booking_status: string | null;
+  final_amount: number | null;
+  quoted_amount: number | null;
+  booking_price: number | null;
+  cash_paid_by_user_at: string | null;
+  completed_at: string | null;
   created_at: string | null;
 };
 
@@ -48,6 +62,24 @@ function getAdminSupabaseClient() {
   });
 }
 
+async function retrySupabaseRequest<T>(operation: () => PromiseLike<T>, attempts = 3) {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 async function verifyCustomerRequest(request: Request) {
   const adminClient = getAdminSupabaseClient();
 
@@ -68,10 +100,23 @@ async function verifyCustomerRequest(request: Request) {
     };
   }
 
+  let authResult: Awaited<ReturnType<typeof adminClient.auth.getUser>>;
+
+  try {
+    authResult = await retrySupabaseRequest(() => adminClient.auth.getUser(token));
+  } catch (error) {
+    return {
+      error: NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to verify session." },
+        { status: 503 },
+      ),
+    };
+  }
+
   const {
     data: { user },
     error: userError,
-  } = await adminClient.auth.getUser(token);
+  } = authResult;
 
   if (userError || !user) {
     return {
@@ -79,11 +124,26 @@ async function verifyCustomerRequest(request: Request) {
     };
   }
 
-  const { data: profile, error: profileError } = await adminClient
-    .from("profiles")
-    .select("id, role")
-    .eq("id", user.id)
-    .maybeSingle();
+  let profileResult: { data: unknown; error: { message?: string } | null };
+
+  try {
+    profileResult = await retrySupabaseRequest(() =>
+      adminClient
+        .from("profiles")
+        .select("id, role")
+        .eq("id", user.id)
+        .maybeSingle()
+    );
+  } catch (error) {
+    return {
+      error: NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to load customer profile." },
+        { status: 503 },
+      ),
+    };
+  }
+
+  const { data: profile, error: profileError } = profileResult;
 
   if (profileError || !profile) {
     return {
@@ -111,16 +171,28 @@ async function loadProviderNames(
     return new Map<string, string>();
   }
 
-  const { data } = await adminClient
-    .from("provider_profiles")
-    .select("id, marketing_name")
-    .in("id", providerIds);
+  const { data } = await retrySupabaseRequest(() =>
+    adminClient
+      .from("provider_profiles")
+      .select("id, marketing_name")
+      .in("id", providerIds)
+  );
 
   return new Map(
     ((data ?? []) as ProviderProfileRow[]).map((row) => [
       row.id,
       row.marketing_name?.trim() || "DELLA Provider",
     ]),
+  );
+}
+
+function isCompletedBookingStatus(status: string | null | undefined) {
+  const normalized = status?.trim().toLowerCase() ?? "";
+  return (
+    normalized === "completed" ||
+    normalized === "paid" ||
+    normalized === "review_requested" ||
+    normalized === "reviewed"
   );
 }
 
@@ -150,6 +222,31 @@ function toPaymentHistoryItem(
   };
 }
 
+function toFallbackPaymentHistoryItem(
+  row: BookingPaymentFallbackRow,
+  providerName: string,
+): PaymentHistoryItem | null {
+  if (!isCompletedBookingStatus(row.booking_status)) {
+    return null;
+  }
+
+  const paidAt = row.cash_paid_by_user_at?.trim() || row.completed_at?.trim() || row.created_at?.trim() || null;
+  if (!paidAt) {
+    return null;
+  }
+
+  return {
+    id: `booking-${row.id}`,
+    serviceCategory: "Service",
+    serviceTitle: `${row.service_label?.trim() || "Service"} Service`,
+    provider: providerName,
+    amount: Number(row.final_amount ?? row.quoted_amount ?? row.booking_price ?? 0),
+    paidAt,
+    paymentMethod: "Cash",
+    status: "paid",
+  };
+}
+
 export async function GET(request: Request) {
   const verified = await verifyCustomerRequest(request);
 
@@ -157,13 +254,15 @@ export async function GET(request: Request) {
     return verified.error;
   }
 
-  const { data, error } = await verified.adminClient
-    .from("payments")
-    .select("id, provider_id, service_title, amount, payment_method, status, paid_at, created_at")
-    .eq("customer_id", verified.profile.id)
-    .order("paid_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false, nullsFirst: false })
-    .limit(200);
+  const { data, error } = await retrySupabaseRequest(() =>
+    verified.adminClient
+      .from("payments")
+      .select("id, booking_id, provider_id, service_title, amount, payment_method, status, paid_at, created_at")
+      .eq("customer_id", verified.profile.id)
+      .order("paid_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false })
+      .limit(200)
+  );
 
   if (error) {
     return NextResponse.json(
@@ -173,14 +272,46 @@ export async function GET(request: Request) {
   }
 
   const rows = (data ?? []) as PaymentRow[];
-  const providerNames = await loadProviderNames(
-    verified.adminClient,
-    [...new Set(rows.map((row) => row.provider_id).filter((value): value is string => Boolean(value)))],
+  const paidBookingIds = new Set(rows.map((row) => row.booking_id).filter(Boolean));
+  const { data: fallbackBookingRows, error: fallbackError } = await retrySupabaseRequest(() =>
+    verified.adminClient
+      .from("bookings")
+      .select("id, provider_id, service_label, booking_status, final_amount, quoted_amount, booking_price, cash_paid_by_user_at, completed_at, created_at")
+      .eq("customer_id", verified.profile.id)
+      .in("booking_status", ["completed", "paid", "review_requested", "reviewed"])
+      .order("completed_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false })
+      .limit(200)
   );
 
-  const payments = rows
-    .map((row) => toPaymentHistoryItem(row, providerNames.get(row.provider_id ?? "") || "DELLA Provider"))
-    .filter((item): item is PaymentHistoryItem => item !== null);
+  if (fallbackError) {
+    return NextResponse.json(
+      { error: fallbackError.message || "Unable to load payments." },
+      { status: 500 },
+    );
+  }
+
+  const fallbackRows = ((fallbackBookingRows ?? []) as BookingPaymentFallbackRow[]).filter(
+    (row) => !paidBookingIds.has(row.id),
+  );
+  const providerNames = await loadProviderNames(
+    verified.adminClient,
+    [
+      ...new Set(
+        [...rows.map((row) => row.provider_id), ...fallbackRows.map((row) => row.provider_id)]
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ],
+  );
+
+  const payments = [
+    ...rows
+      .map((row) => toPaymentHistoryItem(row, providerNames.get(row.provider_id ?? "") || "DELLA Provider"))
+      .filter((item): item is PaymentHistoryItem => item !== null),
+    ...fallbackRows
+      .map((row) => toFallbackPaymentHistoryItem(row, providerNames.get(row.provider_id ?? "") || "DELLA Provider"))
+      .filter((item): item is PaymentHistoryItem => item !== null),
+  ].sort((left, right) => new Date(right.paidAt).getTime() - new Date(left.paidAt).getTime());
 
   return NextResponse.json({ payments });
 }

@@ -65,6 +65,32 @@ function getCurrentKualaLumpurNow() {
   };
 }
 
+function waitForBookingRetry(attempt: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, 400 * (attempt + 1));
+  });
+}
+
+async function fetchBookingJsonWithRetry<T>(init: RequestInit, attempts = 3) {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch("/api/bookings", init);
+      const result = (await response.json().catch(() => null)) as T | null;
+      return { response, result };
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < attempts - 1) {
+        await waitForBookingRetry(attempt);
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Failed to fetch");
+}
+
 function timeToMinutes(label: string) {
   const [time, period] = label.split(" ");
   const [rawHour, rawMinute] = time.split(":").map(Number);
@@ -281,7 +307,9 @@ export function BookingFormScreen({
         return;
       }
 
-      const response = await fetch("/api/bookings", {
+      const { response, result: payload } = await fetchBookingJsonWithRetry<
+        { error?: string; booking?: unknown }
+      >({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -307,9 +335,6 @@ export function BookingFormScreen({
       });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
         throw new Error(payload?.error ?? "Unable to create booking right now.");
       }
 

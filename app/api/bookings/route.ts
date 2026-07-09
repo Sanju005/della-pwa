@@ -79,8 +79,11 @@ type BookingRow = {
   location_text: string;
   booking_mode: "hourly" | "daily";
   booking_status:
+    | "pending"
     | "pending_provider_response"
+    | "declined"
     | "declined_by_provider"
+    | "confirmed"
     | "accepted"
     | "on_the_way"
     | "arrived"
@@ -89,8 +92,12 @@ type BookingRow = {
     | "final_payment_sent"
     | "cash_paid_by_user"
     | "payment_received_by_provider"
+    | "paid"
     | "completed"
-    | "cancelled";
+    | "review_requested"
+    | "reviewed"
+    | "cancelled"
+    | "canceled";
   scheduled_date: string;
   scheduled_start_time: string;
   scheduled_end_time: string;
@@ -286,6 +293,24 @@ function isValidBody(value: BookingBody): value is CompleteBookingBody {
   );
 }
 
+async function retrySupabaseRequest<T>(operation: () => PromiseLike<T>, attempts = 3) {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 async function verifyCustomerRequest(request: Request) {
   const adminClient = getAdminSupabaseClient();
 
@@ -312,10 +337,23 @@ async function verifyCustomerRequest(request: Request) {
     };
   }
 
+  let authResult: Awaited<ReturnType<typeof adminClient.auth.getUser>>;
+
+  try {
+    authResult = await retrySupabaseRequest(() => adminClient.auth.getUser(token));
+  } catch (error) {
+    return {
+      error: NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to verify session." },
+        { status: 503 }
+      ),
+    };
+  }
+
   const {
     data: { user },
     error: userError,
-  } = await adminClient.auth.getUser(token);
+  } = authResult;
 
   if (userError || !user) {
     return {
@@ -326,11 +364,29 @@ async function verifyCustomerRequest(request: Request) {
     };
   }
 
-  const { data: profile, error: profileError } = await adminClient
-    .from("profiles")
-    .select("id, full_name, role")
-    .eq("id", user.id)
-    .maybeSingle();
+  let profileResult: {
+    data: unknown;
+    error: { message?: string } | null;
+  };
+
+  try {
+    profileResult = await retrySupabaseRequest(() =>
+      adminClient
+        .from("profiles")
+        .select("id, full_name, role")
+        .eq("id", user.id)
+        .maybeSingle()
+    );
+  } catch (error) {
+    return {
+      error: NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to load customer profile." },
+        { status: 503 }
+      ),
+    };
+  }
+
+  const { data: profile, error: profileError } = profileResult;
 
   if (profileError || !profile) {
     return {
@@ -787,14 +843,18 @@ async function loadProviderDirectory(
   }
 
   const [{ data: providerProfiles }, { data: profiles }] = await Promise.all([
-    adminClient
-      .from("provider_profiles")
-      .select("id, marketing_name")
-      .in("id", providerIds),
-    adminClient
-      .from("profiles")
-      .select("id, full_name, avatar_url")
-      .in("id", providerIds),
+    retrySupabaseRequest(() =>
+      adminClient
+        .from("provider_profiles")
+        .select("id, marketing_name")
+        .in("id", providerIds)
+    ),
+    retrySupabaseRequest(() =>
+      adminClient
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .in("id", providerIds)
+    ),
   ]);
 
   const marketingNameById = new Map(
@@ -819,107 +879,118 @@ async function loadProviderDirectory(
 }
 
 export async function GET(request: Request) {
-  const verified = await verifyCustomerRequest(request);
+  try {
+    const verified = await verifyCustomerRequest(request);
 
-  if ("error" in verified) {
-    return verified.error;
-  }
+    if ("error" in verified) {
+      return verified.error;
+    }
 
-  let { data, error } = await verified.adminClient
-    .from("bookings")
-    .select(`
-      id,
-      provider_id,
-      service_key,
-      service_label,
-      location_text,
-      booking_mode,
-      booking_status,
-      scheduled_date,
-      scheduled_start_time,
-      scheduled_end_time,
-      customer_note,
-      provider_response_note,
-      decline_reason,
-      quoted_amount,
-      work_finished_at,
-      work_finished_images,
-      work_confirmed_by_user_at,
-      payment_sent_at,
-      payment_breakdown,
-      booking_price,
-      additional_charges,
-      discount_amount,
-      final_amount,
-      cash_paid_by_user_at,
-      cash_payment_proof_images,
-      payment_received_by_provider_at,
-      user_review_status,
-      provider_review_status,
-      created_at,
-      accepted_at,
-      on_the_way_at,
-      arrived_at,
-      completed_at,
-      payment_records:payments(${CUSTOMER_PAYMENT_RECORDS_SELECT_FULL})
-    `)
-    .eq("customer_id", verified.profile.id)
-    .order("created_at", { ascending: false });
+    let { data, error } = await retrySupabaseRequest(() =>
+      verified.adminClient
+        .from("bookings")
+        .select(`
+          id,
+          provider_id,
+          service_key,
+          service_label,
+          location_text,
+          booking_mode,
+          booking_status,
+          scheduled_date,
+          scheduled_start_time,
+          scheduled_end_time,
+          customer_note,
+          provider_response_note,
+          decline_reason,
+          quoted_amount,
+          work_finished_at,
+          work_finished_images,
+          work_confirmed_by_user_at,
+          payment_sent_at,
+          payment_breakdown,
+          booking_price,
+          additional_charges,
+          discount_amount,
+          final_amount,
+          cash_paid_by_user_at,
+          cash_payment_proof_images,
+          payment_received_by_provider_at,
+          user_review_status,
+          provider_review_status,
+          created_at,
+          accepted_at,
+          on_the_way_at,
+          arrived_at,
+          completed_at,
+          payment_records:payments(${CUSTOMER_PAYMENT_RECORDS_SELECT_FULL})
+        `)
+        .eq("customer_id", verified.profile.id)
+        .order("created_at", { ascending: false })
+    );
 
-  if (error && (isMissingTaskPathSchemaError(error.message) || isMissingPaymentSchemaError(error.message))) {
-    const fallbackRead = await verified.adminClient
-      .from("bookings")
-      .select(`
-        id,
-        provider_id,
-        service_key,
-        service_label,
-        location_text,
-        booking_mode,
-        booking_status,
-        scheduled_date,
-        scheduled_start_time,
-        scheduled_end_time,
-        customer_note,
-        provider_response_note,
-        decline_reason,
-        quoted_amount,
-        created_at,
-        accepted_at,
-        on_the_way_at,
-        arrived_at,
-        completed_at,
-        payment_records:payments(${CUSTOMER_PAYMENT_RECORDS_SELECT_FALLBACK})
-      `)
-      .eq("customer_id", verified.profile.id)
-      .order("created_at", { ascending: false });
+    if (error && (isMissingTaskPathSchemaError(error.message) || isMissingPaymentSchemaError(error.message))) {
+      const fallbackRead = await retrySupabaseRequest(() =>
+        verified.adminClient
+          .from("bookings")
+          .select(`
+            id,
+            provider_id,
+            service_key,
+            service_label,
+            location_text,
+            booking_mode,
+            booking_status,
+            scheduled_date,
+            scheduled_start_time,
+            scheduled_end_time,
+            customer_note,
+            provider_response_note,
+            decline_reason,
+            quoted_amount,
+            created_at,
+            accepted_at,
+            on_the_way_at,
+            arrived_at,
+            completed_at,
+            payment_records:payments(${CUSTOMER_PAYMENT_RECORDS_SELECT_FALLBACK})
+          `)
+          .eq("customer_id", verified.profile.id)
+          .order("created_at", { ascending: false })
+      );
 
-    data = fallbackRead.data as typeof data;
-    error = fallbackRead.error;
-  }
+      data = fallbackRead.data as typeof data;
+      error = fallbackRead.error;
+    }
 
-  if (error) {
+    if (error) {
+      return NextResponse.json(
+        { error: mapBookingSchemaError(error.message) || "Unable to load bookings." },
+        { status: 500 }
+      );
+    }
+
+    const rows = (data ?? []) as BookingRow[];
+    const providerDirectory = await loadProviderDirectory(
+      verified.adminClient,
+      [...new Set(rows.map((row) => row.provider_id))]
+    );
+
+    return NextResponse.json({
+      bookings: rows.map((row) =>
+        mapLiveBookingToUi(
+          row,
+          providerDirectory.get(row.provider_id)?.name || "DELLA Provider",
+          providerDirectory.get(row.provider_id)?.avatarUrl || ""
+        )
+      ),
+    });
+  } catch (error) {
     return NextResponse.json(
-      { error: mapBookingSchemaError(error.message) || "Unable to load bookings." },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "Unable to load bookings." },
+      { status: 503 }
     );
   }
-
-  const rows = (data ?? []) as BookingRow[];
-  const providerDirectory = await loadProviderDirectory(
-    verified.adminClient,
-    [...new Set(rows.map((row) => row.provider_id))]
-  );
-
-  return NextResponse.json({
-    bookings: rows.map((row) =>
-      mapLiveBookingToUi(
-        row,
-        providerDirectory.get(row.provider_id)?.name || "DELLA Provider",
-        providerDirectory.get(row.provider_id)?.avatarUrl || ""
-      )
-    ),
-  });
 }
 
 export async function POST(request: Request) {

@@ -18,6 +18,10 @@ export function normalizeBookingWorkflowStatus(status: string | null | undefined
       return "pending_provider_response";
     case "declined":
       return "declined_by_provider";
+    case "confirmed":
+      return "accepted";
+    case "canceled":
+      return "cancelled";
     case "accepted":
     case "on_the_way":
     case "arrived":
@@ -30,7 +34,6 @@ export function normalizeBookingWorkflowStatus(status: string | null | undefined
     case "cancelled":
       return status;
     case "paid":
-      return "cash_paid_by_user";
     case "review_requested":
     case "reviewed":
       return "completed";

@@ -119,15 +119,35 @@ function stripUnsupportedCustomerProfileFields(payload: Record<string, unknown>)
   return nextPayload;
 }
 
+async function retrySupabaseRequest<T>(operation: () => PromiseLike<T>, attempts = 3) {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 async function fetchCustomerProfileRow(
   adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
   customerId: string,
 ) {
-  const primary = await adminClient
-    .from("customer_profiles")
-    .select(customerProfileSelectWithOptionalColumns)
-    .eq("id", customerId)
-    .maybeSingle();
+  const primary = await retrySupabaseRequest(() =>
+    adminClient
+      .from("customer_profiles")
+      .select(customerProfileSelectWithOptionalColumns)
+      .eq("id", customerId)
+      .maybeSingle()
+  );
 
   if (!primary.error) {
     return primary.data as CustomerProfileRow | null;
@@ -137,11 +157,13 @@ async function fetchCustomerProfileRow(
     throw primary.error;
   }
 
-  const fallback = await adminClient
-    .from("customer_profiles")
-    .select(customerProfileSelectBase)
-    .eq("id", customerId)
-    .maybeSingle();
+  const fallback = await retrySupabaseRequest(() =>
+    adminClient
+      .from("customer_profiles")
+      .select(customerProfileSelectBase)
+      .eq("id", customerId)
+      .maybeSingle()
+  );
 
   if (fallback.error) {
     throw fallback.error;
@@ -215,33 +237,63 @@ async function verifyCustomerRequest(request: Request) {
     return { error: NextResponse.json({ error: "Missing auth token." }, { status: 401 }) };
   }
 
+  let authResult: Awaited<ReturnType<typeof adminClient.auth.getUser>>;
+
+  try {
+    authResult = await retrySupabaseRequest(() => adminClient.auth.getUser(token));
+  } catch (error) {
+    return {
+      error: NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to verify session." },
+        { status: 503 },
+      ),
+    };
+  }
+
   const {
     data: { user },
     error: userError,
-  } = await adminClient.auth.getUser(token);
+  } = authResult;
 
   if (userError || !user) {
     return { error: NextResponse.json({ error: "Invalid session." }, { status: 401 }) };
   }
 
-  const { data: profile, error: profileError } = await adminClient
-    .from("profiles")
-    .select("id, full_name, email, role, status, phone, avatar_url")
-    .eq("id", user.id)
-    .maybeSingle();
+  let profileResult: { data: unknown; error: { message?: string } | null };
+
+  try {
+    profileResult = await retrySupabaseRequest(() =>
+      adminClient
+        .from("profiles")
+        .select("id, full_name, email, role, status, phone, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle()
+    );
+  } catch (error) {
+    return {
+      error: NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to load customer profile." },
+        { status: 503 },
+      ),
+    };
+  }
+
+  const { data: profile, error: profileError } = profileResult;
 
   if (profileError || !profile) {
     return { error: NextResponse.json({ error: "Customer profile was not found." }, { status: 404 }) };
   }
 
-  if (isProviderRole(profile.role)) {
+  const profileRow = profile as ProfileRow;
+
+  if (isProviderRole(profileRow.role)) {
     return { error: NextResponse.json({ error: "This account is a provider account." }, { status: 403 }) };
   }
 
   return {
     adminClient,
     authUser: user,
-    profile: profile as ProfileRow,
+    profile: profileRow,
   };
 }
 
@@ -393,18 +445,22 @@ export async function GET(request: Request) {
   try {
     const [customerProfile, bookingsResult, paymentsResult] = await Promise.all([
       fetchCustomerProfileRow(verified.adminClient, verified.profile.id),
-      verified.adminClient
-        .from("bookings")
-        .select("booking_status")
-        .eq("customer_id", verified.profile.id)
-        .limit(200),
-      verified.adminClient
-        .from("payments")
-        .select("amount, status, paid_at, created_at, service_title")
-        .eq("customer_id", verified.profile.id)
-        .order("paid_at", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false, nullsFirst: false })
-        .limit(200),
+      retrySupabaseRequest(() =>
+        verified.adminClient
+          .from("bookings")
+          .select("booking_status")
+          .eq("customer_id", verified.profile.id)
+          .limit(200)
+      ),
+      retrySupabaseRequest(() =>
+        verified.adminClient
+          .from("payments")
+          .select("amount, status, paid_at, created_at, service_title")
+          .eq("customer_id", verified.profile.id)
+          .order("paid_at", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false, nullsFirst: false })
+          .limit(200)
+      ),
     ]);
     const bookingRows = (bookingsResult.data ?? []) as BookingAggregateRow[];
     const paymentRows = (paymentsResult.data ?? []) as PaymentAggregateRow[];

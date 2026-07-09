@@ -54,6 +54,32 @@ function getTodayIso() {
   return new Date().toISOString().split("T")[0] ?? "";
 }
 
+function waitForClientRetry(attempt: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, 350 * (attempt + 1));
+  });
+}
+
+async function fetchJsonWithRetry<T>(input: RequestInfo | URL, init?: RequestInit, attempts = 3) {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      const result = (await response.json().catch(() => null)) as T | null;
+      return { response, result };
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < attempts - 1) {
+        await waitForClientRetry(attempt);
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Failed to fetch");
+}
+
 type ShellProps = {
   children: React.ReactNode;
   title: string;
@@ -433,30 +459,34 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
+
+      try {
+        const result = await client.auth.getSession();
+        session = result.data.session;
+      } catch {
+        return;
+      }
 
       if (!active || !session) {
         return;
       }
 
       try {
-        const response = await fetch("/api/profile/me", {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        const result = (await response.json()) as
+        const { response, result } = await fetchJsonWithRetry<
           | {
               profile: CustomerProfile;
               bookingSummary: ProfileOverviewData["bookingSummary"];
               paymentSummary: ProfileOverviewData["paymentSummary"];
             }
-          | { error?: string };
+          | { error?: string }
+        >("/api/profile/me", {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
 
-        if (!active || !response.ok || !("profile" in result)) {
+        if (!active || !response.ok || !result || !("profile" in result)) {
           return;
         }
 
@@ -762,28 +792,32 @@ function useLiveCustomerProfile(initialProfile: CustomerProfile) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
+
+      try {
+        const result = await client.auth.getSession();
+        session = result.data.session;
+      } catch {
+        return;
+      }
 
       if (!active || !session) {
         return;
       }
 
       try {
-        const response = await fetch("/api/profile/me", {
+        const { response, result } = await fetchJsonWithRetry<
+          | {
+              profile: CustomerProfile;
+            }
+          | { error?: string }
+        >("/api/profile/me", {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
           },
         });
 
-        const result = (await response.json()) as
-          | {
-              profile: CustomerProfile;
-            }
-          | { error?: string };
-
-        if (active && response.ok && "profile" in result) {
+        if (active && response.ok && result && "profile" in result) {
           setProfile(result.profile);
         }
       } catch {
@@ -1943,27 +1977,31 @@ export function EditProfileScreen({ initialProfile }: EditProps) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
+
+      try {
+        const result = await client.auth.getSession();
+        session = result.data.session;
+      } catch {
+        return;
+      }
 
       if (!active || !session) {
         return;
       }
 
-      const response = await fetch("/api/profile/me", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      const result = (await response.json()) as
+      const { response, result } = await fetchJsonWithRetry<
         | {
             profile: CustomerProfile;
           }
-        | { error?: string };
+        | { error?: string }
+      >("/api/profile/me", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }).catch(() => ({ response: null, result: null }));
 
-      if (!active || !response.ok || !("profile" in result)) {
+      if (!active || !response?.ok || !result || !("profile" in result)) {
         return;
       }
 
@@ -2450,34 +2488,74 @@ export function BookingsScreen({ bookings, initialTab = "all" }: BookingsProps) 
       }, delayMs);
     };
 
+    const waitForRetry = (attempt: number) =>
+      new Promise((resolve) => {
+        setTimeout(resolve, 350 * (attempt + 1));
+      });
+
+    async function fetchBookingsWithRetry(sessionToken: string) {
+      let lastError: unknown = null;
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const response = await fetch("/api/bookings", {
+            headers: {
+              Authorization: `Bearer ${sessionToken}`,
+            },
+          });
+
+          const result = (await response.json().catch(() => null)) as
+            | { bookings: Booking[] }
+            | { error?: string }
+            | null;
+
+          if (response.ok && result && "bookings" in result) {
+            return result.bookings;
+          }
+
+          lastError = result && "error" in result ? result.error : response.statusText;
+        } catch (error) {
+          lastError = error;
+        }
+
+        if (attempt < 2) {
+          await waitForRetry(attempt);
+        }
+      }
+
+      if (lastError) {
+        console.warn("[Bookings] Live bookings refresh skipped:", lastError);
+      }
+
+      return null;
+    }
+
     async function loadLiveBookings() {
       if (!client) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
+
+      try {
+        const result = await client.auth.getSession();
+        session = result.data.session;
+      } catch (error) {
+        console.warn("[Bookings] Unable to read session:", error);
+        return;
+      }
 
       if (!active || !session) {
         return;
       }
 
-      const response = await fetch("/api/bookings", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      const liveBookings = await fetchBookingsWithRetry(session.access_token);
 
-      const result = (await response.json()) as
-        | { bookings: Booking[] }
-        | { error?: string };
-
-      if (!active || !response.ok || !("bookings" in result)) {
+      if (!active || !liveBookings) {
         return;
       }
 
-      setItems(result.bookings);
+      setItems(liveBookings);
 
       if (!bookingsChannel) {
         bookingsChannel = client
@@ -3892,25 +3970,29 @@ export function PaymentsScreen({ payments }: PaymentsProps) {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      let session: Awaited<ReturnType<typeof client.auth.getSession>>["data"]["session"] = null;
+
+      try {
+        const result = await client.auth.getSession();
+        session = result.data.session;
+      } catch {
+        return;
+      }
 
       if (!active || !session) {
         return;
       }
 
-      const response = await fetch("/api/profile/payments", {
+      const { response, result } = await fetchJsonWithRetry<
+        | { payments: PaymentHistoryItem[] }
+        | { error?: string }
+      >("/api/profile/payments", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
-      });
+      }).catch(() => ({ response: null, result: null }));
 
-      const result = (await response.json()) as
-        | { payments: PaymentHistoryItem[] }
-        | { error?: string };
-
-      if (!active || !response.ok || !("payments" in result)) {
+      if (!active || !response?.ok || !result || !("payments" in result)) {
         return;
       }
 
