@@ -18,6 +18,7 @@ declare global {
       firebaseAppId?: string | null;
       firebaseVapidKey?: string | null;
     };
+    __DELLA_SUPABASE_BROWSER_CLIENT?: SupabaseClient | null;
   }
 }
 
@@ -37,6 +38,11 @@ function getRuntimeSupabaseConfig() {
 }
 
 export function getSupabaseClient() {
+  if (typeof window !== "undefined" && window.__DELLA_SUPABASE_BROWSER_CLIENT !== undefined) {
+    browserClient = window.__DELLA_SUPABASE_BROWSER_CLIENT;
+    return browserClient;
+  }
+
   if (browserClient !== undefined) {
     return browserClient;
   }
@@ -45,6 +51,9 @@ export function getSupabaseClient() {
 
   if (!url || !publishableKey) {
     browserClient = null;
+    if (typeof window !== "undefined") {
+      window.__DELLA_SUPABASE_BROWSER_CLIENT = browserClient;
+    }
     return browserClient;
   }
 
@@ -55,6 +64,11 @@ export function getSupabaseClient() {
       detectSessionInUrl: true,
     },
   });
+
+  if (typeof window !== "undefined") {
+    window.__DELLA_SUPABASE_BROWSER_CLIENT = browserClient;
+  }
+
   return browserClient;
 }
 
@@ -112,6 +126,10 @@ export function clearSupabaseBrowserSession() {
   }
 
   browserClient = undefined;
+
+  if (typeof window !== "undefined") {
+    window.__DELLA_SUPABASE_BROWSER_CLIENT = undefined;
+  }
 }
 
 export function isOversizedAccessToken(session: Session | null | undefined) {
