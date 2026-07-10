@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { subscribeToForegroundPush } from "@/lib/notifications";
-import { getSupabaseClient, signOutLocally } from "@/lib/supabase";
+import { getFreshSupabaseSession, getSupabaseClient, signOutLocally } from "@/lib/supabase";
 
 export type ProviderDashboardData = {
   providerId: string;
@@ -279,6 +279,14 @@ export function getTodayKey() {
   }).format(new Date());
 }
 
+async function safeJsonResponse<T>(response: Response): Promise<T | { error?: string }> {
+  try {
+    return (await response.json()) as T | { error?: string };
+  } catch {
+    return { error: `Unable to read ${response.url || "response"}."` };
+  }
+}
+
 export function useProviderAppData() {
   const router = useRouter();
   const [data, setData] = useState<ProviderDashboardData | null>(null);
@@ -296,51 +304,63 @@ export function useProviderAppData() {
 
   async function loadWorkspace(accessToken: string) {
     setError("");
+    let profileResponse: Response;
+    let bookingsResponse: Response;
+    let notificationsResponse: Response;
+    let availabilityResponse: Response;
+    let messagesResponse: Response;
+    let reviewsResponse: Response;
 
-    const [
-      profileResponse,
-      bookingsResponse,
-      notificationsResponse,
-      availabilityResponse,
-      messagesResponse,
-      reviewsResponse,
-    ] = await Promise.all([
-      fetch("/api/provider/me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-      fetch("/api/provider/bookings", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-      fetch("/api/notifications", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-      fetch("/api/provider/availability", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-      fetch("/api/provider/messages", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-      fetch("/api/provider/reviews", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }),
-    ]);
+    try {
+      [
+        profileResponse,
+        bookingsResponse,
+        notificationsResponse,
+        availabilityResponse,
+        messagesResponse,
+        reviewsResponse,
+      ] = await Promise.all([
+        fetch("/api/provider/me", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        fetch("/api/provider/bookings", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        fetch("/api/notifications", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        fetch("/api/provider/availability", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        fetch("/api/provider/messages", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        fetch("/api/provider/reviews", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+      ]);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to load provider data.");
+      setLoading(false);
+      return false;
+    }
 
-    const profileResult = (await profileResponse.json()) as
+    const profileResult = (await safeJsonResponse<ProviderDashboardData>(profileResponse)) as
       | ProviderDashboardData
       | { error?: string };
-    const bookingsResult = (await bookingsResponse.json()) as
+    const bookingsResult = (await safeJsonResponse<{ bookings: ProviderBookingItem[] }>(bookingsResponse)) as
       | { bookings: ProviderBookingItem[] }
       | { error?: string };
-    const notificationsResult = (await notificationsResponse.json()) as
+    const notificationsResult = (await safeJsonResponse<{ notifications: ProviderNotificationItem[] }>(notificationsResponse)) as
       | { notifications: ProviderNotificationItem[] }
       | { error?: string };
-    const availabilityResult = (await availabilityResponse.json()) as
+    const availabilityResult = (await safeJsonResponse<{ enabled: boolean; entries: ProviderAvailabilityItem[] }>(availabilityResponse)) as
       | { enabled: boolean; entries: ProviderAvailabilityItem[] }
       | { error?: string };
-    const messagesResult = (await messagesResponse.json()) as
+    const messagesResult = (await safeJsonResponse<{ threads: ProviderMessageThread[] }>(messagesResponse)) as
       | { threads: ProviderMessageThread[] }
       | { error?: string };
-    const reviewsResult = (await reviewsResponse.json()) as
+    const reviewsResult = (await safeJsonResponse<{ reviews: ProviderReviewItem[] }>(reviewsResponse)) as
       | { reviews: ProviderReviewItem[] }
       | { error?: string };
 
@@ -433,9 +453,7 @@ export function useProviderAppData() {
         return;
       }
 
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const session = await getFreshSupabaseSession(client);
 
       if (!active) {
         return;
