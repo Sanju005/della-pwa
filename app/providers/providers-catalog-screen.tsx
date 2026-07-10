@@ -28,6 +28,7 @@ import {
   saveSelectedProviderSearchLocation,
   loadSavedPlaces,
   loadCurrentLiveLocation,
+  loadSelectedProviderSearchLocation,
   resolveCurrentLiveLocation,
   type StoredLiveLocation,
 } from "@/lib/live-location";
@@ -100,8 +101,30 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    setCurrentLocation(loadCurrentLiveLocation());
-    setSavedPlaces(loadSavedPlaces());
+    const initialCurrentLocation = loadCurrentLiveLocation();
+    const initialSavedPlaces = loadSavedPlaces();
+    const initialSelectedSearchLocation = loadSelectedProviderSearchLocation();
+
+    setCurrentLocation(initialCurrentLocation);
+    setSavedPlaces(initialSavedPlaces);
+
+    if (!initialSelectedSearchLocation) {
+      setLocationDetails(initialCurrentLocation);
+      return;
+    }
+
+    const matchedSavedPlace = initialSavedPlaces.find(
+      (place) => place.id === initialSelectedSearchLocation.id
+    );
+
+    if (matchedSavedPlace?.id) {
+      setSelectedPlaceId(matchedSavedPlace.id);
+      setLocationDetails(matchedSavedPlace);
+      return;
+    }
+
+    setSelectedPlaceId("current");
+    setLocationDetails(initialSelectedSearchLocation);
   }, []);
 
   useEffect(() => {

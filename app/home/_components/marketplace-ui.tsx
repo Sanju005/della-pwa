@@ -29,6 +29,14 @@ import {
 } from "@/lib/provider-catalog-shared";
 import { loadStoredCustomerProfile } from "@/lib/profile-browser";
 import { getSupabaseClient } from "@/lib/supabase";
+import {
+  loadCurrentLiveLocation,
+  loadSavedPlaces,
+  loadSelectedProviderSearchLocation,
+  saveSelectedProviderSearchLocation,
+  saveStoredLiveLocation,
+  type StoredLiveLocation,
+} from "@/lib/live-location";
 import type { HomeFeedData, HomeServiceCategory } from "@/lib/home-feed";
 
 export function MarketplaceScreen({
@@ -43,11 +51,20 @@ export function MarketplaceScreen({
   const [displayName, setDisplayName] = useState(greetingName);
   const [displayLocation, setDisplayLocation] = useState(locationLabel);
   const [greetingLabel, setGreetingLabel] = useState("Hello,");
+  const [currentLocation, setCurrentLocation] = useState<StoredLiveLocation | null>(null);
+  const [savedPlaces, setSavedPlaces] = useState<StoredLiveLocation[]>([]);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<"current" | string>("current");
   const availablePointsLabel = "1,250 pts";
 
   useEffect(() => {
     const storedProfile = loadStoredCustomerProfile();
     const client = getSupabaseClient();
+    const initialCurrentLocation = loadCurrentLiveLocation();
+    const initialSavedPlaces = loadSavedPlaces();
+    const initialSelectedSearchLocation = loadSelectedProviderSearchLocation();
+
+    setCurrentLocation(initialCurrentLocation);
+    setSavedPlaces(initialSavedPlaces);
 
     void (async () => {
       if (client) {
@@ -87,10 +104,66 @@ export function MarketplaceScreen({
           setDisplayLocation(nextLocation);
         }
       }
+
+      if (initialSelectedSearchLocation) {
+        const matchedSavedPlace = initialSavedPlaces.find(
+          (place) => place.id === initialSelectedSearchLocation.id
+        );
+
+        if (matchedSavedPlace?.id) {
+          setSelectedPlaceId(matchedSavedPlace.id);
+          setDisplayLocation(
+            matchedSavedPlace.formattedAddress?.trim() || matchedSavedPlace.label
+          );
+          saveStoredLiveLocation(matchedSavedPlace);
+          return;
+        }
+
+        setDisplayLocation(
+          initialSelectedSearchLocation.formattedAddress?.trim() ||
+            initialSelectedSearchLocation.label
+        );
+        return;
+      }
+
+      if (initialCurrentLocation) {
+        setDisplayLocation(
+          initialCurrentLocation.formattedAddress?.trim() ||
+            initialCurrentLocation.label
+        );
+      }
     })();
 
     setGreetingLabel(timePrefix());
   }, []);
+
+  useEffect(() => {
+    if (selectedPlaceId === "current") {
+      if (!currentLocation) {
+        return;
+      }
+
+      setDisplayLocation(
+        currentLocation.formattedAddress?.trim() || currentLocation.label
+      );
+      saveSelectedProviderSearchLocation(currentLocation);
+      return;
+    }
+
+    const selectedSavedPlace = savedPlaces.find(
+      (place) => place.id === selectedPlaceId
+    );
+
+    if (!selectedSavedPlace) {
+      return;
+    }
+
+    setDisplayLocation(
+      selectedSavedPlace.formattedAddress?.trim() || selectedSavedPlace.label
+    );
+    saveStoredLiveLocation(selectedSavedPlace);
+    saveSelectedProviderSearchLocation(selectedSavedPlace);
+  }, [currentLocation, savedPlaces, selectedPlaceId]);
 
   return (
     <main className="min-h-[100dvh] overflow-x-hidden bg-[#fbf8ff]">
@@ -114,9 +187,43 @@ export function MarketplaceScreen({
                   </span>
                 </h1>
                 <div className="mt-3">
+                  {savedPlaces.length > 0 ? (
+                    <label className="mb-2 block">
+                      <span className="mb-2 block text-[11px] font-bold uppercase tracking-[0.08em] text-[#6b7280]">
+                        Search by location
+                      </span>
+                      <span className="relative block">
+                        <select
+                          value={selectedPlaceId}
+                          onChange={(event) => setSelectedPlaceId(event.target.value)}
+                          className="h-11 w-full appearance-none rounded-[18px] border border-[#e3ebe6] bg-white px-4 pr-10 text-[14px] font-semibold text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)] outline-none"
+                        >
+                          <option value="current">Current location</option>
+                          {savedPlaces.map((place) => (
+                            <option key={place.id} value={place.id}>
+                              {place.addressLabel || "Saved location"} - {place.label}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronRight className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-[#667085]" />
+                      </span>
+                    </label>
+                  ) : null}
                   <LiveLocationChip
                     fallbackLabel={displayLocation}
-                    titleLabel="Your current location"
+                    displayLabel={displayLocation}
+                    titleLabel={selectedPlaceId === "current" ? "Current location" : "Saved location"}
+                    mode={selectedPlaceId === "current" ? "current" : "saved"}
+                    onLocationChange={(location) => {
+                      if (selectedPlaceId === "current") {
+                        setCurrentLocation(location);
+                      }
+
+                      setDisplayLocation(
+                        location.formattedAddress?.trim() || location.label
+                      );
+                      saveSelectedProviderSearchLocation(location);
+                    }}
                   />
                 </div>
               </div>
