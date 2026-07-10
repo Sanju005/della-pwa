@@ -47,26 +47,48 @@ export function MarketplaceScreen({
 
   useEffect(() => {
     const storedProfile = loadStoredCustomerProfile();
+    const client = getSupabaseClient();
 
-    if (storedProfile) {
-      const fullName = [storedProfile.firstName, storedProfile.lastName]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+    void (async () => {
+      if (client) {
+        try {
+          const session = await client.auth.getSession();
+          const metadata =
+            session.data.session?.user.user_metadata &&
+            typeof session.data.session.user.user_metadata === "object"
+              ? (session.data.session.user.user_metadata as Record<string, unknown>)
+              : null;
+          const sessionFirstName =
+            typeof metadata?.first_name === "string"
+              ? metadata.first_name.trim()
+              : "";
 
-      if (fullName) {
-        setDisplayName(fullName);
+          if (sessionFirstName) {
+            setDisplayName(sessionFirstName);
+          }
+        } catch {
+          // Fall back to local profile below if session lookup fails.
+        }
       }
 
-      const nextLocation = [storedProfile.city, storedProfile.region]
-        .filter(Boolean)
-        .join(", ")
-        .trim();
+      if (storedProfile) {
+        const firstName = storedProfile.firstName.trim();
 
-      if (nextLocation) {
-        setDisplayLocation(nextLocation);
+        if (firstName) {
+          setDisplayName(firstName);
+        }
+
+        const nextLocation = [storedProfile.city, storedProfile.region]
+          .filter(Boolean)
+          .join(", ")
+          .trim();
+
+        if (nextLocation) {
+          setDisplayLocation(nextLocation);
+        }
       }
-    }
+    })();
+
     setGreetingLabel(timePrefix());
   }, []);
 

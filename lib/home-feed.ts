@@ -341,11 +341,8 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
   const popularMaidProviders = mapCatalogToHomeCards(maidCatalog.listings);
 
   return {
-    greetingName: customerRow?.full_name ?? "Guest",
-    locationLabel:
-      [customerProfile?.city, customerProfile?.state]
-        .filter(Boolean)
-        .join(", ") || "Kuala Lumpur",
+    greetingName: "Guest",
+    locationLabel: "Kuala Lumpur",
     categories: serviceOrder.map((key) => ({
       key,
       label: humanizeService(key),
