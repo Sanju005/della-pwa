@@ -157,6 +157,9 @@ export async function POST(request: Request) {
       role: "customer",
       country,
       emergency_contact_number: emergencyContactNumber,
+      email_verified: false,
+      phone_verified: false,
+      identity_verification_status: "pending",
     },
   });
 
@@ -235,6 +238,7 @@ export async function POST(request: Request) {
         region: state,
         state,
         country,
+        verified: false,
       },
       { onConflict: "id" }
     );

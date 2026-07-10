@@ -399,7 +399,7 @@ function buildCustomerProfile(
       customerProfile?.country?.trim() ||
       (typeof metadata?.country === "string" ? metadata.country.trim() : "") ||
       "Malaysia",
-    emailVerified: Boolean(metadata?.email_verified) || Boolean(profile.email?.trim()),
+    emailVerified: Boolean(metadata?.email_verified),
     phoneVerified: Boolean(metadata?.phone_verified),
     identityVerificationStatus:
       metadata?.identity_verification_status === "processing" ||
@@ -415,7 +415,9 @@ function buildCustomerProfile(
           : undefined,
     identityFrontImageUrl: customerProfile?.identity_front_image_url?.trim() || "",
     identityBackImageUrl: customerProfile?.identity_back_image_url?.trim() || "",
-    verified: Boolean(customerProfile?.verified) || profile.status?.toLowerCase() === "active",
+    verified:
+      Boolean(customerProfile?.verified) ||
+      metadata?.identity_verification_status === "verified",
     completion: customerProfile?.completion ?? 80,
   };
 }
