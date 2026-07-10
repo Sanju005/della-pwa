@@ -24,6 +24,7 @@ export default function ProfileBookingDetailPage({
     let bookingsChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
     let paymentsChannel: ReturnType<NonNullable<typeof client>["channel"]> | null = null;
     let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
     const scheduleRefresh = (callback: () => Promise<void>, delayMs = 400) => {
       if (refreshTimeout) {
@@ -85,10 +86,10 @@ export default function ProfileBookingDetailPage({
               event: "*",
               schema: "public",
               table: "bookings",
-              filter: `customer_id=eq.${session.user.id}`,
+              filter: `id=eq.${id}`,
             },
             () => {
-              scheduleRefresh(loadBooking);
+              scheduleRefresh(loadBooking, 0);
             },
           )
           .subscribe();
@@ -106,10 +107,16 @@ export default function ProfileBookingDetailPage({
               filter: `booking_id=eq.${id}`,
             },
             () => {
-              scheduleRefresh(loadBooking);
+              scheduleRefresh(loadBooking, 0);
             },
           )
           .subscribe();
+      }
+
+      if (!pollingInterval) {
+        pollingInterval = setInterval(() => {
+          scheduleRefresh(loadBooking, 0);
+        }, 5000);
       }
     }
 
@@ -119,6 +126,9 @@ export default function ProfileBookingDetailPage({
       active = false;
       if (refreshTimeout) {
         clearTimeout(refreshTimeout);
+      }
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
       }
       if (client && bookingsChannel) {
         void client.removeChannel(bookingsChannel);
