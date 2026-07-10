@@ -1145,6 +1145,7 @@ export function DashboardScreen() {
   const [taskCalendarMonth, setTaskCalendarMonth] = useState(new Date(2000, 0, 1));
   const todayKey = useResolvedTodayKey();
   const [taskCalendarDate, setTaskCalendarDate] = useState("");
+  const [greetingLabel, setGreetingLabel] = useState("Hello,");
   const fallback = LoadingOrError(state);
 
   useEffect(() => {
@@ -1162,6 +1163,10 @@ export function DashboardScreen() {
       const now = new Date();
       return new Date(now.getFullYear(), now.getMonth(), 1);
     });
+  }, []);
+
+  useEffect(() => {
+    setGreetingLabel(getGreeting());
   }, []);
 
   if (fallback) {
@@ -1308,11 +1313,6 @@ export function DashboardScreen() {
     );
   const unreadCount = state.notifications.filter((item) => !item.isRead).length;
   const displayName = data.marketingName || data.fullName || "Provider";
-  const [greetingLabel, setGreetingLabel] = useState("Hello,");
-
-  useEffect(() => {
-    setGreetingLabel(getGreeting());
-  }, []);
 
   return (
     <MobilePage className="pb-28">
@@ -1889,12 +1889,6 @@ export function BookingsScreen({
     }
   }, [bookings, isLoading, pendingInitialSelection, selectedBookingId, setAppError]);
 
-  const fallback = LoadingOrError(state);
-
-  if (fallback) {
-    return fallback;
-  }
-
   function openBooking(bookingId: string) {
     setSelectedBookingId(bookingId);
     router.push(`/provider/bookings/${bookingId}`, { scroll: false });
@@ -2095,6 +2089,12 @@ export function BookingsScreen({
       setTab(tabOptions[0][0] as typeof tab);
     }
   }, [selectedBooking, tab, tabOptions]);
+
+  const fallback = LoadingOrError(state);
+
+  if (fallback) {
+    return fallback;
+  }
 
   const items = bookings.filter((booking) => {
     if (tab === "pending") {
@@ -6320,9 +6320,9 @@ export function PhoneVerificationScreen() {
 
 export function EmailVerificationScreen() {
   const state = useProviderAppData();
-  const fallback = LoadingOrError(state);
   const [draftEmail, setDraftEmail] = useState<string | null>(null);
   const emailValue = draftEmail ?? state.data?.email ?? "";
+  const fallback = LoadingOrError(state);
 
   if (fallback) {
     return fallback;
