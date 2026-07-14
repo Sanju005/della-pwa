@@ -18,10 +18,26 @@ export async function cropImageFromSelection(
   return new Promise<string>((resolve, reject) => {
     const image = new window.Image();
     image.onload = () => {
-      const sourceX = Math.round((selection.x / 100) * image.width);
-      const sourceY = Math.round((selection.y / 100) * image.height);
-      const sourceWidth = Math.round((selection.width / 100) * image.width);
-      const sourceHeight = Math.round((selection.height / 100) * image.height);
+      const imageWidth = image.naturalWidth || image.width;
+      const imageHeight = image.naturalHeight || image.height;
+      const sourceX = Math.max(
+        0,
+        Math.min(imageWidth - 1, Math.round((selection.x / 100) * imageWidth)),
+      );
+      const sourceY = Math.max(
+        0,
+        Math.min(imageHeight - 1, Math.round((selection.y / 100) * imageHeight)),
+      );
+      const requestedWidth = Math.round((selection.width / 100) * imageWidth);
+      const requestedHeight = Math.round((selection.height / 100) * imageHeight);
+      const sourceWidth = Math.max(1, Math.min(imageWidth - sourceX, requestedWidth));
+      const sourceHeight = Math.max(1, Math.min(imageHeight - sourceY, requestedHeight));
+
+      if (!imageWidth || !imageHeight || sourceWidth < 1 || sourceHeight < 1) {
+        reject(new Error("Unable to crop this image."));
+        return;
+      }
+
       const maxOutputSize = 1280;
       const scale = Math.min(1, maxOutputSize / Math.max(sourceWidth, sourceHeight));
       const canvas = document.createElement("canvas");
@@ -50,7 +66,8 @@ export async function cropImageFromSelection(
 
       resolve(canvas.toDataURL("image/jpeg", 0.86));
     };
-    image.onerror = () => reject(new Error("Unable to load this image for cropping."));
+    image.onerror = () =>
+      reject(new Error("This image format could not be cropped. Please use JPG, PNG, WEBP, or GIF."));
     image.src = sourceDataUrl;
   });
 }

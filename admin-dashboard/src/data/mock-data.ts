@@ -23,7 +23,7 @@ export const dashboardMetrics: Array<MetricCard & { icon: typeof Users }> = [
     value: "12,845",
     delta: "+8.5%",
     trend: "up",
-    accent: "from-[#5B5CEB] to-[#7C4DFF]",
+    accent: "from-[#d946ef] to-[#ec4899]",
     icon: Users,
   },
   {
@@ -31,7 +31,7 @@ export const dashboardMetrics: Array<MetricCard & { icon: typeof Users }> = [
     value: "2,350",
     delta: "+6.2%",
     trend: "up",
-    accent: "from-[#1098F7] to-[#2DD4BF]",
+    accent: "from-[#f472b6] to-[#ec4899]",
     icon: BriefcaseBusiness,
   },
   {
@@ -39,7 +39,7 @@ export const dashboardMetrics: Array<MetricCard & { icon: typeof Users }> = [
     value: "1,245",
     delta: "+7.1%",
     trend: "up",
-    accent: "from-[#22C55E] to-[#0EA5A4]",
+    accent: "from-[#fb7185] to-[#ec4899]",
     icon: ClipboardCheck,
   },
   {
@@ -47,7 +47,7 @@ export const dashboardMetrics: Array<MetricCard & { icon: typeof Users }> = [
     value: "RM 256,890",
     delta: "+12.6%",
     trend: "up",
-    accent: "from-[#F59E0B] to-[#FB7185]",
+    accent: "from-[#f97316] to-[#ec4899]",
     icon: CircleDollarSign,
   },
   {
@@ -55,7 +55,7 @@ export const dashboardMetrics: Array<MetricCard & { icon: typeof Users }> = [
     value: "32",
     delta: "-4.2%",
     trend: "down",
-    accent: "from-[#F97316] to-[#EF4444]",
+    accent: "from-[#fb7185] to-[#e11d48]",
     icon: ShieldCheck,
   },
   {
@@ -63,7 +63,7 @@ export const dashboardMetrics: Array<MetricCard & { icon: typeof Users }> = [
     value: "19",
     delta: "-2.8%",
     trend: "down",
-    accent: "from-[#0F766E] to-[#2DD4BF]",
+    accent: "from-[#c026d3] to-[#ec4899]",
     icon: MessageSquareWarning,
   },
 ];
@@ -72,25 +72,25 @@ export const approvalItems: ApprovalItem[] = [
   {
     title: "Service Providers",
     pending: 12,
-    accent: "bg-[#eff6ff] text-[#2563eb]",
+    accent: "bg-[#fdf2f8] text-[#c026d3]",
     note: "Profiles waiting for ops review",
   },
   {
     title: "Documents",
     pending: 8,
-    accent: "bg-[#f5f3ff] text-[#7c3aed]",
+    accent: "bg-[#fdf2f8] text-[#db2777]",
     note: "Identity and license checks",
   },
   {
     title: "Listings",
     pending: 5,
-    accent: "bg-[#ecfdf5] text-[#059669]",
+    accent: "bg-[#fff1f6] text-[#ec4899]",
     note: "Visibility approval required",
   },
   {
     title: "Withdrawals",
     pending: 7,
-    accent: "bg-[#fff7ed] text-[#ea580c]",
+    accent: "bg-[#fff1f2] text-[#e11d48]",
     note: "Manual finance confirmation",
   },
 ];

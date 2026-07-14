@@ -53,12 +53,17 @@ export type StatusTone =
 
 export type DashboardBooking = {
   id: string;
+  rawId?: string;
   service: string;
   provider: string;
+  providerId?: string;
   customer: string;
+  customerId?: string;
   status: string;
   amount: string;
   schedule: string;
+  bookingDate?: string;
+  bookingTime?: string;
   fixedAmount?: string;
   additionalAmount?: string;
   totalAmount?: string;
@@ -68,12 +73,19 @@ export type DashboardBooking = {
 
 export type PaymentRow = {
   id: string;
+  rawId?: string;
   customer: string;
+  customerId?: string;
   provider: string;
+  providerId?: string;
   amount: string;
   method: string;
   status: string;
   date: string;
+  createdAt?: string;
+  settlementStatus?: string;
+  companySlipName?: string;
+  companySlipUrl?: string;
 };
 
 export type UserRow = {
@@ -241,6 +253,13 @@ export type ProviderIdentityDocument = {
   previewUrl: string;
 };
 
+export type ProviderMediaItem = {
+  id: string;
+  label: string;
+  fileName: string;
+  previewUrl: string;
+};
+
 export type ProviderTaskRow = {
   id: string;
   service: string;
@@ -275,6 +294,8 @@ export type ProviderCommissionRow = {
   submittedAt: string;
   status: "processing" | "paid";
   proofName: string;
+  proofUrl?: string;
+  proofMimeType?: string;
 };
 
 export type ProviderDetailRecord = {
@@ -282,6 +303,7 @@ export type ProviderDetailRecord = {
   name: string;
   email: string;
   status: string;
+  profileImageUrl?: string;
   roleBadge: string;
   joinedAt: string;
   lastLogin: string;
@@ -327,6 +349,8 @@ export type ProviderDetailRecord = {
   skills: ProviderSkill[];
   documents: ProviderDocumentItem[];
   identityDocuments?: ProviderIdentityDocument[];
+  workGallery?: ProviderMediaItem[];
+  certificates?: ProviderMediaItem[];
   completedTaskRows: ProviderTaskRow[];
   upcomingTaskRows: ProviderUpcomingTaskRow[];
   payoutRows: ProviderPayoutRow[];

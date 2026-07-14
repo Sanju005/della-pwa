@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
+import { uploadStoredMedia } from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -272,6 +273,16 @@ export async function POST(request: Request) {
     );
   }
 
+  const storedProofDataUrl = await uploadStoredMedia(verified.adminClient, {
+    bucket: "payment-proofs",
+    dataUrl: payload.proofDataUrl,
+    ownerId: verified.profile.id,
+    pathParts: ["company-payments", `${Date.now()}`],
+    fileName: payload.proofFileName || "provider-company-payment-proof.jpg",
+    upsert: true,
+    visibility: "private",
+  });
+
   let { data: pendingPaymentRows, error: pendingPaymentError } = await verified.adminClient
     .from("payments")
     .select("id")
@@ -312,7 +323,7 @@ export async function POST(request: Request) {
       payable_amount_snapshot: summary?.payableAmount ?? 0,
       submitted_amount: depositedAmount,
       status: "processing",
-      proof_data_url: payload.proofDataUrl.trim(),
+      proof_data_url: storedProofDataUrl || payload.proofDataUrl.trim(),
       proof_file_name: payload.proofFileName.trim(),
       proof_mime_type: payload.proofMimeType.trim(),
     })
@@ -325,6 +336,11 @@ export async function POST(request: Request) {
       .from("payments")
       .update({
         company_payment_status: "payment_process",
+        company_payment_requested_at: new Date().toISOString(),
+        provider_company_payment_amount: depositedAmount,
+        provider_company_payment_proof_data_url: storedProofDataUrl || null,
+        provider_company_payment_proof_file_name: payload.proofFileName.trim(),
+        provider_company_payment_proof_mime_type: payload.proofMimeType.trim(),
       })
       .in("id", pendingPaymentIds);
 
@@ -374,6 +390,11 @@ export async function POST(request: Request) {
     .from("payments")
     .update({
       company_payment_status: "payment_process",
+      company_payment_requested_at: new Date().toISOString(),
+      provider_company_payment_amount: depositedAmount,
+      provider_company_payment_proof_data_url: storedProofDataUrl || null,
+      provider_company_payment_proof_file_name: payload.proofFileName.trim(),
+      provider_company_payment_proof_mime_type: payload.proofMimeType.trim(),
       company_payment_submission_id: submission.id,
     })
     .in("id", pendingPaymentIds);
@@ -383,6 +404,11 @@ export async function POST(request: Request) {
       .from("payments")
       .update({
         company_payment_status: "payment_process",
+        company_payment_requested_at: new Date().toISOString(),
+        provider_company_payment_amount: depositedAmount,
+        provider_company_payment_proof_data_url: storedProofDataUrl || null,
+        provider_company_payment_proof_file_name: payload.proofFileName.trim(),
+        provider_company_payment_proof_mime_type: payload.proofMimeType.trim(),
       })
       .in("id", pendingPaymentIds);
 

@@ -688,6 +688,12 @@
       "regex": "^/signup/user/welcome(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/signup/user/welcome(?:/)?$"
+    },
+    {
+      "page": "/support",
+      "regex": "^/support(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/support(?:/)?$"
     }
   ],
   "dataRoutes": [],

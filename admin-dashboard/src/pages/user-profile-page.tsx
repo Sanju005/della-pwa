@@ -86,7 +86,8 @@ function avatarGradient(name: string) {
 }
 
 function isPdfDataUrl(value?: string) {
-  return (value ?? "").startsWith("data:application/pdf");
+  const normalized = (value ?? "").toLowerCase();
+  return normalized.startsWith("data:application/pdf") || normalized.includes(".pdf");
 }
 
 export function UserProfilePage() {

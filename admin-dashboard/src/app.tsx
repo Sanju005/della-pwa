@@ -2,7 +2,7 @@ import { Suspense, lazy } from "react";
 import { Navigate, RouterProvider, createBrowserRouter, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/auth-provider";
 import { AdminShell } from "./components/admin-shell";
-import { complaints, payments, providers as mockProviders, reviews, bookings } from "./data/mock-data";
+import { complaints, providers as mockProviders, reviews, bookings } from "./data/mock-data";
 
 const DashboardPage = lazy(async () => {
   const module = await import("./pages/dashboard-page");
@@ -42,6 +42,26 @@ const UserProfilePage = lazy(async () => {
 const ProviderProfilePage = lazy(async () => {
   const module = await import("./pages/provider-profile-page");
   return { default: module.ProviderProfilePage };
+});
+
+const BookingsPage = lazy(async () => {
+  const module = await import("./pages/bookings-page");
+  return { default: module.BookingsPage };
+});
+
+const PaymentsPage = lazy(async () => {
+  const module = await import("./pages/payments-page");
+  return { default: module.PaymentsPage };
+});
+
+const BookingDetailPage = lazy(async () => {
+  const module = await import("./pages/booking-detail-page");
+  return { default: module.BookingDetailPage };
+});
+
+const PaymentDetailPage = lazy(async () => {
+  const module = await import("./pages/payment-detail-page");
+  return { default: module.PaymentDetailPage };
 });
 
 const ProvidersPage = lazy(async () => {
@@ -193,55 +213,19 @@ const router = createBrowserRouter([
       },
       {
         path: "tasks-bookings",
-        element: withSuspense((
-          <ResourcePage
-            title="Tasks / Bookings"
-            description="Real-time service operations and fulfilment pipeline."
-            rows={bookings}
-            columns={[
-              { key: "id", label: "ID" },
-              { key: "service", label: "Service" },
-              { key: "provider", label: "Provider" },
-              { key: "customer", label: "Customer" },
-              { key: "status", label: "Status" },
-              { key: "amount", label: "Amount" },
-              { key: "schedule", label: "Date & Time" },
-            ]}
-            statusKey="status"
-            searchPlaceholder="Search bookings, customers, or providers..."
-            stats={[
-              { label: "Open tasks", value: "1,245", note: "Pending, accepted, and in progress" },
-              { label: "Completed today", value: "235", note: "Freshly settled jobs" },
-              { label: "Cancelled", value: "83", note: "Needs quality follow-up" },
-            ]}
-          />
-        )),
+        element: withSuspense(<BookingsPage />),
+      },
+      {
+        path: "tasks-bookings/:bookingId",
+        element: withSuspense(<BookingDetailPage />),
       },
       {
         path: "payments",
-        element: withSuspense((
-          <ResourcePage
-            title="Payments"
-            description="Customer collections, settlement state, and refund monitoring."
-            rows={payments}
-            columns={[
-              { key: "id", label: "ID" },
-              { key: "customer", label: "Customer" },
-              { key: "provider", label: "Provider" },
-              { key: "amount", label: "Amount" },
-              { key: "method", label: "Method" },
-              { key: "status", label: "Status" },
-              { key: "date", label: "Date" },
-            ]}
-            statusKey="status"
-            searchPlaceholder="Search payments, customers, or methods..."
-            stats={[
-              { label: "Total volume", value: "RM256,890", note: "Month-to-date collections" },
-              { label: "Pending", value: "RM18,760", note: "Awaiting settlement or capture" },
-              { label: "Refunds", value: "RM7,340", note: "Requires finance review where needed" },
-            ]}
-          />
-        )),
+        element: withSuspense(<PaymentsPage />),
+      },
+      {
+        path: "payments/:paymentId",
+        element: withSuspense(<PaymentDetailPage />),
       },
       {
         path: "reviews",

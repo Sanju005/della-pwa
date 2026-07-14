@@ -11,7 +11,11 @@ import {
   type CropSelection,
   type CropTone,
 } from "@/app/_components/image-crop-modal";
-import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
+import {
+  IMAGE_UPLOAD_ACCEPT,
+  isAcceptedImageFile,
+  isCroppableImageFile,
+} from "@/lib/image-upload";
 import {
   availabilityDays,
   createDefaultProviderRegistration,
@@ -467,6 +471,10 @@ export function ProviderRegistrationWizard() {
   }) => {
     if (!isAcceptedImageFile(file)) {
       throw new Error("Only JPG, JPEG, PNG, GIF, WEBP, TIFF, or JFIF images are allowed.");
+    }
+
+    if (!isCroppableImageFile(file)) {
+      throw new Error("This image cannot be cropped here. Please use JPG, PNG, WEBP, or GIF.");
     }
 
     if (file.size > maxSizeBytes) {

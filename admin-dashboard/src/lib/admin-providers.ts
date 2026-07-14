@@ -6,6 +6,7 @@ import type {
   ProviderDetailRecord,
   ProviderDocumentItem,
   ProviderIdentityDocument,
+  ProviderMediaItem,
   ProviderPayoutRow,
   ProviderRow,
   ProviderTaskRow,
@@ -37,11 +38,15 @@ type ProviderProfileRow = {
   approval_status?: string | null;
   is_visible?: boolean | null;
   provider_services?:
-    | Array<{
+      | Array<{
         service_type?: string | null;
         years_experience?: string | null;
         hourly_rate?: number | null;
         daily_rate?: number | null;
+        image_data_urls?: string[] | null;
+        image_captions?: string[] | null;
+        certificate_data_urls?: string[] | null;
+        certificate_captions?: string[] | null;
         provider_service_specialties?: Array<{ specialty?: string | null }> | null;
       }>
     | null;
@@ -51,22 +56,30 @@ type ProviderProfileRow = {
         identity_verified?: boolean | null;
         kyc_verified?: boolean | null;
         background_check_verified?: boolean | null;
+        document_type?: string | null;
+        document_front_url?: string | null;
+        document_back_url?: string | null;
         identity_document_type?: string | null;
         identity_front_image_url?: string | null;
         identity_back_image_url?: string | null;
-        updated_at?: string | null;
         created_at?: string | null;
+        reviewed_at?: string | null;
+        last_reviewed_at?: string | null;
       }
     | Array<{
         phone_verified?: boolean | null;
         identity_verified?: boolean | null;
         kyc_verified?: boolean | null;
         background_check_verified?: boolean | null;
+        document_type?: string | null;
+        document_front_url?: string | null;
+        document_back_url?: string | null;
         identity_document_type?: string | null;
         identity_front_image_url?: string | null;
         identity_back_image_url?: string | null;
-        updated_at?: string | null;
         created_at?: string | null;
+        reviewed_at?: string | null;
+        last_reviewed_at?: string | null;
       }>
     | null;
 };
@@ -77,6 +90,7 @@ type ProviderAccountRow = {
   email: string | null;
   role: string | null;
   status: string | null;
+  avatar_url?: string | null;
   phone?: string | null;
   created_at?: string | null;
 };
@@ -112,7 +126,9 @@ type LivePaymentRow = {
   company_payment_status?: "pending" | "payment_process" | "paid" | null;
   provider_company_payment_amount?: number | null;
   admin_company_received_amount?: number | null;
+  provider_company_payment_proof_data_url?: string | null;
   provider_company_payment_proof_file_name?: string | null;
+  provider_company_payment_proof_mime_type?: string | null;
   company_payment_requested_at?: string | null;
 };
 
@@ -123,7 +139,9 @@ type LiveCompanyPaymentSubmissionRow = {
   submitted_amount?: number | null;
   admin_received_amount?: number | null;
   status?: "processing" | "paid" | null;
+  proof_data_url?: string | null;
   proof_file_name?: string | null;
+  proof_mime_type?: string | null;
   submitted_at?: string | null;
   reviewed_at?: string | null;
 };
@@ -174,6 +192,10 @@ const providerProfileSelectWithAddress = `
     years_experience,
     hourly_rate,
     daily_rate,
+    image_data_urls,
+    image_captions,
+    certificate_data_urls,
+    certificate_captions,
     provider_service_specialties (
       specialty
     )
@@ -182,7 +204,16 @@ const providerProfileSelectWithAddress = `
     phone_verified,
     identity_verified,
     kyc_verified,
-    background_check_verified
+    background_check_verified,
+    document_type,
+    document_front_url,
+    document_back_url,
+    identity_document_type,
+    identity_front_image_url,
+    identity_back_image_url,
+    created_at,
+    reviewed_at,
+    last_reviewed_at
   )
 `;
 
@@ -203,6 +234,10 @@ const providerProfileSelectBase = `
     years_experience,
     hourly_rate,
     daily_rate,
+    image_data_urls,
+    image_captions,
+    certificate_data_urls,
+    certificate_captions,
     provider_service_specialties (
       specialty
     )
@@ -212,11 +247,15 @@ const providerProfileSelectBase = `
     identity_verified,
     kyc_verified,
     background_check_verified,
+    document_type,
+    document_front_url,
+    document_back_url,
     identity_document_type,
     identity_front_image_url,
     identity_back_image_url,
     created_at,
-    updated_at
+    reviewed_at,
+    last_reviewed_at
   )
 `;
 
@@ -548,7 +587,7 @@ async function fetchProviderAccountById(providerId: string) {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, status, phone, created_at")
+    .select("id, full_name, email, role, status, phone, created_at, avatar_url")
     .eq("id", providerId)
     .maybeSingle();
 
@@ -618,7 +657,7 @@ async function tryFetchProviderPayments(providerId: string) {
 
   const { data, error } = await supabase
     .from("payments")
-    .select("id, booking_id, status, amount, payment_method, created_at, provider_id, company_commission_amount, company_payment_status, provider_company_payment_amount, admin_company_received_amount, provider_company_payment_proof_file_name, company_payment_requested_at")
+    .select("id, booking_id, status, amount, payment_method, created_at, provider_id, company_commission_amount, company_payment_status, provider_company_payment_amount, admin_company_received_amount, provider_company_payment_proof_data_url, provider_company_payment_proof_file_name, provider_company_payment_proof_mime_type, company_payment_requested_at")
     .eq("provider_id", providerId)
     .order("created_at", { ascending: false })
     .limit(30);
@@ -637,7 +676,7 @@ async function tryFetchProviderCompanyPaymentSubmissions(providerId: string) {
 
   const { data, error } = await supabase
     .from("provider_company_payment_submissions")
-    .select("id, provider_id, payable_amount_snapshot, submitted_amount, admin_received_amount, status, proof_file_name, submitted_at, reviewed_at")
+    .select("id, provider_id, payable_amount_snapshot, submitted_amount, admin_received_amount, status, proof_data_url, proof_file_name, proof_mime_type, submitted_at, reviewed_at")
     .eq("provider_id", providerId)
     .order("submitted_at", { ascending: false })
     .limit(30);
@@ -717,37 +756,136 @@ function buildPayoutRows(livePayments: LivePaymentRow[]): ProviderPayoutRow[] {
 
 function buildCommissionRows(
   liveSubmissions: LiveCompanyPaymentSubmissionRow[],
-): ProviderCommissionRow[] {
-  return liveSubmissions.map((row) => ({
-    submissionId: row.id,
-    payableAmount: formatCurrency(row.payable_amount_snapshot ?? 0),
-    depositedAmount: formatCurrency(row.submitted_amount ?? 0),
-    adminReceivedAmount: formatCurrency(row.admin_received_amount ?? 0),
-    submittedAt: formatDateTime(row.submitted_at ?? row.reviewed_at),
-    status: row.status === "paid" ? "paid" : "processing",
-    proofName: row.proof_file_name?.trim() || "No slip uploaded",
-  }));
+): Promise<ProviderCommissionRow[]> {
+  return Promise.all(
+    liveSubmissions.map(async (row) => ({
+      submissionId: row.id,
+      payableAmount: formatCurrency(row.payable_amount_snapshot ?? 0),
+      depositedAmount: formatCurrency(row.submitted_amount ?? 0),
+      adminReceivedAmount: formatCurrency(row.admin_received_amount ?? 0),
+      submittedAt: formatDateTime(row.submitted_at ?? row.reviewed_at),
+      status: row.status === "paid" ? "paid" : "processing",
+      proofName: row.proof_file_name?.trim() || "No slip uploaded",
+      proofUrl: await resolveAdminPaymentProofUrl(row.proof_data_url),
+      proofMimeType: row.proof_mime_type?.trim() || undefined,
+    })),
+  );
 }
 
-function buildCommissionRowsFromPayments(
+function isDataUrl(value: string) {
+  return value.startsWith("data:");
+}
+
+function isHttpUrl(value: string) {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+async function resolveAdminPaymentProofUrl(value?: string | null) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed || isDataUrl(trimmed) || isHttpUrl(trimmed) || !supabase) {
+    return trimmed;
+  }
+
+  const signed = await supabase.storage
+    .from("payment-proofs")
+    .createSignedUrl(trimmed, 60 * 60);
+
+  if (signed.error || !signed.data?.signedUrl) {
+    return "";
+  }
+
+  return signed.data.signedUrl;
+}
+
+type AdminMediaBucket =
+  | "profile-images"
+  | "provider-work-images"
+  | "job-completion-images"
+  | "payment-proofs"
+  | "certificates"
+  | "identity-documents";
+
+async function resolveAdminMediaUrl(
+  bucket: AdminMediaBucket,
+  value?: string | null,
+  visibility: "public" | "private" = "public",
+) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed || isDataUrl(trimmed) || isHttpUrl(trimmed) || !supabase) {
+    return trimmed;
+  }
+
+  if (visibility === "public") {
+    const { data } = supabase.storage.from(bucket).getPublicUrl(trimmed);
+    return data.publicUrl;
+  }
+
+  const signed = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(trimmed, 60 * 60);
+
+  if (signed.error || !signed.data?.signedUrl) {
+    return "";
+  }
+
+  return signed.data.signedUrl;
+}
+
+function toMediaFileName(value?: string | null, fallback = "file") {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed) {
+    return fallback;
+  }
+
+  const parts = trimmed.split("/");
+  return parts[parts.length - 1] || fallback;
+}
+
+async function buildProviderMediaItems(
+  values: string[] | null | undefined,
+  captions: string[] | null | undefined,
+  bucket: AdminMediaBucket,
+  visibility: "public" | "private",
+  prefix: string,
+): Promise<ProviderMediaItem[]> {
+  const items = (values ?? []).map((item) => item?.trim() ?? "").filter(Boolean);
+
+  return Promise.all(
+    items.map(async (item, index) => ({
+      id: `${prefix}-${index + 1}`,
+      label: captions?.[index]?.trim() || `${toTitleCase(prefix)} ${index + 1}`,
+      fileName: toMediaFileName(item, `${prefix}-${index + 1}`),
+      previewUrl: await resolveAdminMediaUrl(bucket, item, visibility),
+    })),
+  );
+}
+
+async function buildCommissionRowsFromPayments(
   livePayments: LivePaymentRow[],
-): ProviderCommissionRow[] {
-  return livePayments
-    .filter((row) =>
+): Promise<ProviderCommissionRow[]> {
+  return Promise.all(
+    livePayments
+      .filter((row) =>
       Number(row.company_commission_amount ?? 0) > 0 &&
       (row.company_payment_status === "payment_process" || row.company_payment_status === "paid")
     )
-    .map((row) => ({
-      submissionId: `payment:${row.id}`,
-      payableAmount: formatCurrency(row.company_commission_amount ?? 0),
-      depositedAmount: formatCurrency(
-        row.provider_company_payment_amount ?? row.company_commission_amount ?? 0,
-      ),
-      adminReceivedAmount: formatCurrency(row.admin_company_received_amount ?? 0),
-      submittedAt: formatDateTime(row.company_payment_requested_at ?? row.created_at),
-      status: row.company_payment_status === "paid" ? "paid" : "processing",
-      proofName: row.provider_company_payment_proof_file_name?.trim() || "No slip uploaded",
-    }));
+      .map(async (row) => ({
+        submissionId: `payment:${row.id}`,
+        payableAmount: formatCurrency(row.company_commission_amount ?? 0),
+        depositedAmount: formatCurrency(
+          row.provider_company_payment_amount ?? row.company_commission_amount ?? 0,
+        ),
+        adminReceivedAmount: formatCurrency(row.admin_company_received_amount ?? 0),
+        submittedAt: formatDateTime(row.company_payment_requested_at ?? row.created_at),
+        status: row.company_payment_status === "paid" ? "paid" : "processing",
+        proofName: row.provider_company_payment_proof_file_name?.trim() || "No slip uploaded",
+        proofUrl: await resolveAdminPaymentProofUrl(row.provider_company_payment_proof_data_url),
+        proofMimeType: row.provider_company_payment_proof_mime_type?.trim() || undefined,
+      })),
+  );
 }
 
 function buildReviewRows(liveReviews: LiveReviewRow[], customerNames: Map<string, string>): UserReviewItem[] {
@@ -870,11 +1008,81 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   ]);
   const taskRows = liveTasks?.length ? buildTaskRows(liveTasks, customerNames) : null;
   const payoutRows = livePayments?.length ? buildPayoutRows(livePayments) : fallback.payoutRows;
-  const commissionRows = liveCompanyPaymentSubmissions?.length
-    ? buildCommissionRows(liveCompanyPaymentSubmissions)
-    : livePayments?.length
-      ? buildCommissionRowsFromPayments(livePayments)
+  const paymentCommissionRows = livePayments?.length
+    ? await buildCommissionRowsFromPayments(livePayments)
+    : [];
+  const commissionRows = paymentCommissionRows.length
+    ? paymentCommissionRows
+    : liveCompanyPaymentSubmissions?.length
+      ? await buildCommissionRows(liveCompanyPaymentSubmissions)
       : [];
+  const profileImageUrl = await resolveAdminMediaUrl("profile-images", liveAccount?.avatar_url, "public");
+  const identityDocumentType =
+    verification?.identity_document_type?.trim() ||
+    verification?.document_type?.trim() ||
+    "";
+  const identityFrontValue =
+    verification?.identity_front_image_url?.trim() ||
+    verification?.document_front_url?.trim() ||
+    "";
+  const identityBackValue =
+    verification?.identity_back_image_url?.trim() ||
+    verification?.document_back_url?.trim() ||
+    "";
+  const identityDocuments = (
+    await Promise.all([
+      identityFrontValue
+        ? (async () => ({
+            id: "identity-front",
+            label:
+              identityDocumentType === "passport"
+                ? "Passport Main Page"
+                : "IC Front",
+            fileName: toMediaFileName(
+              identityFrontValue,
+              identityDocumentType === "passport" ? "passport-main" : "ic-front",
+            ),
+            previewUrl: await resolveAdminMediaUrl(
+              "identity-documents",
+              identityFrontValue,
+              "private",
+            ),
+          }))()
+        : null,
+      identityBackValue
+        ? (async () => ({
+            id: "identity-back",
+            label:
+              identityDocumentType === "passport"
+                ? "Passport Supporting Page"
+                : "IC Back",
+            fileName: toMediaFileName(
+              identityBackValue,
+              identityDocumentType === "passport" ? "passport-supporting" : "ic-back",
+            ),
+            previewUrl: await resolveAdminMediaUrl(
+              "identity-documents",
+              identityBackValue,
+              "private",
+            ),
+          }))()
+        : null,
+    ])
+  ).filter((item): item is ProviderIdentityDocument => Boolean(item?.previewUrl));
+  const workGallery = await buildProviderMediaItems(
+    firstService?.image_data_urls,
+    firstService?.image_captions,
+    "provider-work-images",
+    "public",
+    "work image",
+  );
+  const certificates = await buildProviderMediaItems(
+    firstService?.certificate_data_urls,
+    firstService?.certificate_captions,
+    "certificates",
+    "private",
+    "certificate",
+  );
   const reviewRows = liveReviews?.length
     ? buildReviewRows(liveReviews, customerNames)
     : getMockProviderReviews(fallback.name).length
@@ -888,39 +1096,9 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     liveProfile.average_rating,
     liveProfile.total_reviews
   );
-  const identityDocuments = [
-    verification?.identity_front_image_url
-      ? {
-          id: "identity-front",
-          label:
-            verification?.identity_document_type === "passport"
-              ? "Passport Main Page"
-              : "IC Front",
-          fileName:
-            verification?.identity_document_type === "passport"
-              ? "passport-main.jpg"
-              : "ic-front.jpg",
-          previewUrl: verification.identity_front_image_url,
-        }
-      : null,
-    verification?.identity_back_image_url
-      ? {
-          id: "identity-back",
-          label:
-            verification?.identity_document_type === "passport"
-              ? "Passport Supporting Page"
-              : "IC Back",
-          fileName:
-            verification?.identity_document_type === "passport"
-              ? "passport-supporting.jpg"
-              : "ic-back.jpg",
-          previewUrl: verification.identity_back_image_url,
-        }
-      : null,
-  ].filter((item): item is ProviderIdentityDocument => Boolean(item));
   const identitySubmittedAt =
-    verification?.updated_at || verification?.created_at
-      ? formatDateTime(verification.updated_at ?? verification.created_at)
+    verification?.last_reviewed_at || verification?.reviewed_at || verification?.created_at
+      ? formatDateTime(verification.last_reviewed_at ?? verification.reviewed_at ?? verification.created_at)
       : "";
 
   const status = formatStatus(liveAccount?.status ?? (liveProfile.is_visible === false ? "paused" : "active"));
@@ -930,6 +1108,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     providerId,
     name: liveProfile.marketing_name?.trim() || liveAccount?.full_name?.trim() || fallback.name,
     email: liveAccount?.email?.trim() || fallback.email,
+    profileImageUrl: profileImageUrl || fallback.profileImageUrl,
     status,
     joinedAt: formatDateTime(liveAccount?.created_at) || fallback.joinedAt,
     lastLogin: fallback.lastLogin,
@@ -975,7 +1154,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
         ? "Processing"
         : "Pending",
     identityDocumentType:
-      verification?.identity_document_type === "passport" ? "Passport" : "IC / Passport",
+      identityDocumentType === "passport" ? "Passport" : "IC / Passport",
     identitySubmittedAt,
     metrics,
     serviceAreas,
@@ -994,6 +1173,8 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
       ...fallback.documents.slice(2),
     ] satisfies ProviderDocumentItem[],
     identityDocuments,
+    workGallery: workGallery.length ? workGallery : fallback.workGallery,
+    certificates: certificates.length ? certificates : fallback.certificates,
     completedTaskRows: taskRows?.completedTaskRows.length ? taskRows.completedTaskRows : fallback.completedTaskRows,
     upcomingTaskRows: taskRows?.upcomingTaskRows.length ? taskRows.upcomingTaskRows : fallback.upcomingTaskRows,
     payoutRows,
@@ -1076,6 +1257,66 @@ export async function setProviderVisibility(providerId: string, active: boolean)
   if (error) {
     return { error: error.message || "Unable to update provider visibility." };
   }
+
+  return { error: null };
+}
+
+export async function setProviderIdentityVerified(providerId: string, verified: boolean) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const now = new Date().toISOString();
+  const payload = {
+    identity_verified: verified,
+    kyc_verified: verified,
+    updated_at: now,
+  };
+
+  const { data: existingRow, error: readError } = await supabase
+    .from("provider_verifications")
+    .select("id, provider_id")
+    .or(`provider_id.eq.${providerId},id.eq.${providerId}`)
+    .limit(1)
+    .maybeSingle();
+
+  if (readError) {
+    return { error: readError.message || "Unable to load identity verification record." };
+  }
+
+  if (existingRow) {
+    const identifierColumn = existingRow.provider_id ? "provider_id" : "id";
+    const identifierValue = existingRow.provider_id ?? existingRow.id;
+
+    const { error } = await supabase
+      .from("provider_verifications")
+      .update(payload)
+      .eq(identifierColumn, identifierValue);
+
+    if (error) {
+      return { error: error.message || "Unable to update identity verification." };
+    }
+  } else {
+    const { error } = await supabase.from("provider_verifications").insert({
+      provider_id: providerId,
+      ...payload,
+      created_at: now,
+    });
+
+    if (error) {
+      return { error: error.message || "Unable to create identity verification record." };
+    }
+  }
+
+  await supabase.from("notifications").insert({
+    user_id: providerId,
+    booking_id: null,
+    notification_type: verified ? "identity_verified" : "identity_review_pending",
+    title: verified ? "Identity verified" : "Identity review updated",
+    body: verified
+      ? "Admin has approved your identity verification documents."
+      : "Admin changed your identity verification status back to pending review.",
+  });
 
   return { error: null };
 }

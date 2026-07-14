@@ -28,6 +28,7 @@ import { providerDetailRecords } from "../data/provider-detail-mocks";
 import {
   getProviderProfileWithFallback,
   markCompanyPaymentReceived,
+  setProviderIdentityVerified,
   setProviderSuspended,
   setProviderVisibility,
   updateProviderProfile,
@@ -84,6 +85,11 @@ function initials(name: string) {
     .join("");
 }
 
+function isPdfAsset(value?: string) {
+  const normalized = (value ?? "").toLowerCase();
+  return normalized.startsWith("data:application/pdf") || normalized.includes(".pdf");
+}
+
 function SummaryMetric({
   label,
   value,
@@ -138,6 +144,7 @@ export function ProviderProfilePage() {
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [verifyingIdentity, setVerifyingIdentity] = useState(false);
   const [receivingPaymentId, setReceivingPaymentId] = useState("");
   const [receivedAmounts, setReceivedAmounts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
@@ -327,6 +334,40 @@ export function ProviderProfilePage() {
         : current,
     );
     flash("Company payment marked as received.");
+  }
+
+  async function handleIdentityVerification(verified: boolean) {
+    if (verifyingIdentity) {
+      return;
+    }
+
+    setVerifyingIdentity(true);
+    const result = await setProviderIdentityVerified(detail.providerId, verified);
+    setVerifyingIdentity(false);
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    setProvider((current) =>
+      current
+        ? {
+            ...current,
+            kycStatus: verified ? "Verified" : "Pending",
+            identityVerificationStatus: verified ? "Verified" : current.identityDocuments?.length ? "Processing" : "Pending",
+            documents: current.documents.map((document) =>
+              document.label === "Identity Verification"
+                ? {
+                    ...document,
+                    status: verified ? "Verified" : current.identityDocuments?.length ? "Processing" : "Pending",
+                  }
+                : document,
+            ),
+          }
+        : current,
+    );
+    flash(verified ? "Identity documents verified." : "Identity status changed back to pending.");
   }
 
   function renderOverview() {
@@ -678,11 +719,19 @@ export function ProviderProfilePage() {
               <div
                 className={`grid size-[104px] shrink-0 place-items-center rounded-[30px] bg-gradient-to-br ${avatarGradient(detail.name)} shadow-inner ring-8 ring-slate-50`}
               >
-                <div className="grid size-[82px] place-items-center rounded-[26px] bg-white/70 backdrop-blur">
-                  <span className="font-display text-[2rem] font-extrabold text-slate-700">
-                    {initials(detail.name)}
-                  </span>
-                </div>
+                {detail.profileImageUrl ? (
+                  <img
+                    src={detail.profileImageUrl}
+                    alt={detail.name}
+                    className="size-[82px] rounded-[26px] object-cover ring-4 ring-white/70"
+                  />
+                ) : (
+                  <div className="grid size-[82px] place-items-center rounded-[26px] bg-white/70 backdrop-blur">
+                    <span className="font-display text-[2rem] font-extrabold text-slate-700">
+                      {initials(detail.name)}
+                    </span>
+                  </div>
+                )}
               </div>
               <span className="absolute bottom-2 right-2 size-4 rounded-full border-2 border-white bg-emerald-500" />
             </div>
@@ -890,7 +939,20 @@ export function ProviderProfilePage() {
                               />
                             )}
                           </td>
-                          <td className="py-3 text-slate-500">{row.proofName}</td>
+                          <td className="py-3 text-slate-500">
+                            {row.proofUrl ? (
+                              <a
+                                href={row.proofUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-semibold text-violet-700 underline decoration-violet-200 underline-offset-2"
+                              >
+                                {row.proofName || "View slip"}
+                              </a>
+                            ) : (
+                              row.proofName
+                            )}
+                          </td>
                           <td className="py-3 text-slate-500">{row.submittedAt}</td>
                           <td className="py-3"><MiniStatus status={row.status === "processing" ? "Pending" : row.status} /></td>
                           <td className="py-3">
@@ -963,7 +1025,21 @@ export function ProviderProfilePage() {
                     {detail.identityDocumentType} submitted {detail.identitySubmittedAt ? `on ${detail.identitySubmittedAt}` : "for review"}.
                   </p>
                 </div>
-                <MiniStatus status={detail.identityVerificationStatus ?? "Pending"} />
+                <div className="flex flex-wrap items-center gap-3">
+                  <MiniStatus status={detail.identityVerificationStatus ?? "Pending"} />
+                  <button
+                    type="button"
+                    onClick={() => void handleIdentityVerification(detail.identityVerificationStatus !== "Verified")}
+                    disabled={verifyingIdentity}
+                    className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 disabled:opacity-60"
+                  >
+                    {verifyingIdentity
+                      ? "Saving..."
+                      : detail.identityVerificationStatus === "Verified"
+                        ? "Mark Pending"
+                        : "Mark Verified"}
+                  </button>
+                </div>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 {detail.identityDocuments.map((document) => (
@@ -975,11 +1051,86 @@ export function ProviderProfilePage() {
                     className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
-                      <img src={document.previewUrl} alt={document.label} className="h-full w-full object-cover" />
+                      {isPdfAsset(document.previewUrl) ? (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
+                          <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                          <span className="text-[12px] font-semibold">{document.fileName}</span>
+                        </div>
+                      ) : (
+                        <img src={document.previewUrl} alt={document.label} className="h-full w-full object-cover" />
+                      )}
                     </div>
                     <div className="mt-3">
                       <p className="text-sm font-semibold text-slate-900">{document.label}</p>
                       <p className="mt-1 text-[12px] text-slate-500">{document.fileName}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {detail.profileImageUrl ? (
+            <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+              <h3 className="text-sm font-bold text-slate-950">Profile Photo</h3>
+              <a
+                href={detail.profileImageUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 block max-w-[220px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3"
+              >
+                <img src={detail.profileImageUrl} alt={`${detail.name} profile`} className="aspect-square w-full rounded-[16px] object-cover" />
+              </a>
+            </div>
+          ) : null}
+          {detail.workGallery?.length ? (
+            <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+              <h3 className="text-sm font-bold text-slate-950">Work Images</h3>
+              <div className="mt-4 grid gap-4 md:grid-cols-3">
+                {detail.workGallery.map((item) => (
+                  <a
+                    key={item.id}
+                    href={item.previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                      <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                    </div>
+                    <div className="mt-3">
+                      <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                      <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {detail.certificates?.length ? (
+            <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+              <h3 className="text-sm font-bold text-slate-950">Certificates</h3>
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {detail.certificates.map((item) => (
+                  <a
+                    key={item.id}
+                    href={item.previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                      {isPdfAsset(item.previewUrl) ? (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
+                          <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                          <span className="text-[12px] font-semibold">{item.fileName}</span>
+                        </div>
+                      ) : (
+                        <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                      )}
+                    </div>
+                    <div className="mt-3">
+                      <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                      <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
                     </div>
                   </a>
                 ))}

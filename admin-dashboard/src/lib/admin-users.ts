@@ -118,6 +118,32 @@ function relationNode(value?: ProfileRelation) {
   return value ?? null;
 }
 
+function isDataUrl(value: string) {
+  return value.startsWith("data:");
+}
+
+function isHttpUrl(value: string) {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+async function resolveCompletionImageUrl(value?: string | null) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed || isDataUrl(trimmed) || isHttpUrl(trimmed) || !supabase) {
+    return trimmed;
+  }
+
+  const signed = await supabase.storage
+    .from("job-completion-images")
+    .createSignedUrl(trimmed, 60 * 60);
+
+  if (signed.error || !signed.data?.signedUrl) {
+    return "";
+  }
+
+  return signed.data.signedUrl;
+}
+
 function relationItem<T>(value: T | T[] | null | undefined) {
   if (Array.isArray(value)) {
     return value[0] ?? null;
@@ -421,7 +447,7 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
 
   const column = role === "provider" ? "provider_id" : "customer_id";
 
-  let { data, error } = await supabase
+  const primaryRead = await supabase
     .from("bookings")
     .select(`
       id,
@@ -448,6 +474,9 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
     .order("scheduled_date", { ascending: false })
     .limit(12);
 
+  let data = primaryRead.data as LiveBookingRow[] | null;
+  let error = primaryRead.error;
+
   if (error) {
     const fallbackRead = await supabase
       .from("bookings")
@@ -470,7 +499,7 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
       .order("scheduled_date", { ascending: false })
       .limit(12);
 
-    data = fallbackRead.data;
+    data = fallbackRead.data as LiveBookingRow[] | null;
     error = fallbackRead.error;
   }
 
@@ -478,7 +507,7 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
     return null;
   }
 
-  return (data as LiveBookingRow[]).map((row) => {
+  return Promise.all((data as LiveBookingRow[]).map(async (row) => {
     const providerProfile = relationNode(row.provider_profiles);
     const providerService = relationItem(row.provider_services);
     const customerName = profileNames.get(row.customer_id ?? "");
@@ -488,6 +517,11 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
       ? row.additional_charges.reduce((sum, item) => sum + Number(item?.amount ?? 0), 0)
       : 0;
     const totalAmount = Number(row.final_amount ?? row.total_amount ?? fixedAmount + additionalAmount);
+    const completionImages = await Promise.all(
+      (Array.isArray(row.work_finished_images) ? row.work_finished_images : []).map((image) =>
+        resolveCompletionImageUrl(image),
+      ),
+    );
 
     return {
       id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
@@ -501,9 +535,9 @@ async function tryFetchLiveBookings(userId: string, role: string, profileNames: 
       additionalAmount: formatCurrency(additionalAmount),
       totalAmount: formatCurrency(totalAmount),
       description: row.provider_response_note?.trim() || "",
-      completionImages: Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
+      completionImages: completionImages.filter(Boolean),
     } satisfies DashboardBooking;
-  });
+  }));
 }
 
 async function tryFetchLivePayments(userId: string, role: string, profileNames: ProfileNameMap) {

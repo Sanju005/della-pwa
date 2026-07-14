@@ -82,6 +82,20 @@ type ProfileRow = {
   avatar_url: string | null;
 };
 
+function getSafeAvatarUrl(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed.startsWith("data:") && trimmed.length > 2_000_000) {
+    return "";
+  }
+
+  return trimmed;
+}
+
 function getAdminSupabaseClient() {
   const url = getSupabaseUrl();
   const serviceRoleKey = getSupabaseServiceKey();
@@ -459,6 +473,11 @@ async function buildResponse(
   providerProfile: ProviderProfileRow,
   authUser: { email_confirmed_at?: string | null; user_metadata?: unknown },
 ) {
+  const avatarUrl = await resolveStoredMediaUrl(adminClient, {
+    bucket: "profile-images",
+    value: profile.avatar_url,
+    visibility: "public",
+  });
   const metadata =
     "user_metadata" in authUser && authUser.user_metadata && typeof authUser.user_metadata === "object"
       ? (authUser.user_metadata as Record<string, unknown>)
@@ -479,7 +498,7 @@ async function buildResponse(
       typeof metadata.emergency_contact_number === "string"
         ? metadata.emergency_contact_number
         : "",
-    avatarUrl: profile.avatar_url ?? "",
+    avatarUrl: getSafeAvatarUrl(avatarUrl),
     accountStatus: toTitleCase(profile.status),
     marketingName: providerProfile.marketing_name ?? "",
     serviceLocation: providerProfile.service_location ?? "",
@@ -560,6 +579,7 @@ export async function GET(request: Request) {
 
 type UpdatePayload = {
   fullName?: string;
+  avatarUrl?: string;
   marketingName?: string;
   serviceLocation?: string;
   serviceRadiusKm?: number;
@@ -586,11 +606,32 @@ export async function PATCH(request: Request) {
     verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
       ? verified.authUser.user_metadata
       : {};
+  const storedAvatarUrl = payload.avatarUrl?.trim()
+    ? await uploadStoredMedia(verified.adminClient, {
+        bucket: "profile-images",
+        dataUrl: payload.avatarUrl,
+        ownerId: verified.profile.id,
+        pathParts: ["avatar"],
+        fileName: "avatar.jpg",
+        upsert: true,
+        visibility: "public",
+      })
+    : "";
 
-  if (typeof payload.fullName === "string" && payload.fullName.trim()) {
+  const profilePayload = Object.fromEntries(
+    Object.entries({
+      full_name:
+        typeof payload.fullName === "string" && payload.fullName.trim()
+          ? payload.fullName.trim()
+          : undefined,
+      avatar_url: storedAvatarUrl || undefined,
+    }).filter(([, value]) => value !== undefined),
+  );
+
+  if (Object.keys(profilePayload).length > 0) {
     const { error } = await verified.adminClient
       .from("profiles")
-      .update({ full_name: payload.fullName.trim() })
+      .update(profilePayload)
       .eq("id", verified.profile.id);
 
     if (error) {

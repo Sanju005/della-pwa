@@ -77,11 +77,11 @@ export function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
-        <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.08)] xl:p-6">
+        <div className="rounded-[30px] border border-[#f5dae8] bg-white/92 p-5 shadow-[0_24px_80px_rgba(214,51,132,0.08)] xl:p-6">
           <SectionTitle
             title="Bookings / tasks overview"
             description="Service flow over the last seven days."
-            action={<div className="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">Last 7 days</div>}
+            action={<div className="rounded-full bg-[#fff1f6] px-3 py-2 text-xs font-semibold text-[#b4236b]">Last 7 days</div>}
           />
 
           <div className="mt-8 grid h-[280px] grid-cols-7 items-end gap-3">
@@ -96,8 +96,8 @@ export function DashboardPage() {
             ].map((point) => (
               <div key={point.day} className="flex h-full flex-col justify-end gap-3">
                 <div className="flex h-full items-end gap-1">
-                  <div className="w-full rounded-t-2xl bg-[#2563eb]" style={{ height: `${point.active}%` }} />
-                  <div className="w-full rounded-t-2xl bg-[#16a34a]" style={{ height: `${point.completed}%` }} />
+                  <div className="w-full rounded-t-2xl bg-[#f472b6]" style={{ height: `${point.active}%` }} />
+                  <div className="w-full rounded-t-2xl bg-[#ec4899]" style={{ height: `${point.completed}%` }} />
                   <div className="w-full rounded-t-2xl bg-[#fb7185]" style={{ height: `${point.cancelled}%` }} />
                 </div>
                 <p className="text-center text-xs font-medium text-slate-400">{point.day}</p>
@@ -107,11 +107,11 @@ export function DashboardPage() {
 
           <div className="mt-6 flex flex-wrap gap-4 text-xs font-semibold text-slate-500">
             <span className="inline-flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#2563eb]" />
+              <span className="size-2 rounded-full bg-[#f472b6]" />
               Active
             </span>
             <span className="inline-flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#16a34a]" />
+              <span className="size-2 rounded-full bg-[#ec4899]" />
               Completed
             </span>
             <span className="inline-flex items-center gap-2">
@@ -122,10 +122,10 @@ export function DashboardPage() {
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+          <section className="rounded-[30px] border border-[#f5dae8] bg-white/92 p-5 shadow-[0_24px_80px_rgba(214,51,132,0.08)]">
             <SectionTitle title="Task mix" />
             <div className="mt-6 flex items-center justify-center">
-              <div className="relative grid size-52 place-items-center rounded-full bg-[conic-gradient(#f59e0b_0deg_92deg,#3b82f6_92deg_210deg,#8b5cf6_210deg_292deg,#34d399_292deg_360deg)]">
+              <div className="relative grid size-52 place-items-center rounded-full bg-[conic-gradient(#fb7185_0deg_92deg,#f472b6_92deg_210deg,#d946ef_210deg_292deg,#ec4899_292deg_360deg)]">
                 <div className="grid size-32 place-items-center rounded-full bg-white shadow-inner">
                   <div className="text-center">
                     <p className="font-display text-4xl font-extrabold text-slate-950">1,245</p>
@@ -145,12 +145,12 @@ export function DashboardPage() {
                   <div className="flex items-center gap-3">
                     <span className={`size-2.5 rounded-full ${
                       status === "amber"
-                        ? "bg-amber-400"
+                        ? "bg-[#fb7185]"
                         : status === "sky"
-                          ? "bg-sky-500"
+                          ? "bg-[#f472b6]"
                           : status === "violet"
-                            ? "bg-violet-500"
-                            : "bg-emerald-500"
+                            ? "bg-[#d946ef]"
+                            : "bg-[#ec4899]"
                     }`} />
                     <span className="font-medium text-slate-600">{label}</span>
                   </div>
@@ -162,13 +162,13 @@ export function DashboardPage() {
             </div>
           </section>
 
-          <section className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-            <SectionTitle title="Pending approvals" action={<span className="text-sm font-semibold text-emerald-700">View all</span>} />
+          <section className="rounded-[30px] border border-[#f5dae8] bg-white/92 p-5 shadow-[0_24px_80px_rgba(214,51,132,0.08)]">
+            <SectionTitle title="Pending approvals" action={<span className="text-sm font-semibold text-[#b4236b]">View all</span>} />
             <div className="mt-5 space-y-3">
               {approvals.map((item) => (
                 <div
                   key={item.title}
-                  className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/90 px-4 py-4"
+                  className="flex items-center justify-between rounded-2xl border border-[#f7e3ec] bg-[#fff8fb] px-4 py-4"
                 >
                   <div>
                     <p className="font-semibold text-slate-900">{item.title}</p>
@@ -204,11 +204,11 @@ export function DashboardPage() {
       </div>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_1.1fr_0.8fr]">
-        <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-          <SectionTitle title="Recent reviews" action={<span className="text-sm font-semibold text-emerald-700">View all</span>} />
+        <div className="rounded-[30px] border border-[#f5dae8] bg-white/92 p-5 shadow-[0_24px_80px_rgba(214,51,132,0.08)]">
+          <SectionTitle title="Recent reviews" action={<span className="text-sm font-semibold text-[#b4236b]">View all</span>} />
           <div className="mt-5 space-y-4">
             {reviews.map((review) => (
-              <article key={review.id} className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
+              <article key={review.id} className="rounded-2xl border border-[#f7e3ec] bg-[#fff8fb] p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="font-semibold text-slate-950">{review.customer}</p>
@@ -222,13 +222,13 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-          <SectionTitle title="Recent complaints" action={<span className="text-sm font-semibold text-emerald-700">View all</span>} />
+        <div className="rounded-[30px] border border-[#f5dae8] bg-white/92 p-5 shadow-[0_24px_80px_rgba(214,51,132,0.08)]">
+          <SectionTitle title="Recent complaints" action={<span className="text-sm font-semibold text-[#b4236b]">View all</span>} />
           <div className="mt-5 space-y-3">
             {complaints.map((complaint) => (
               <div
                 key={complaint.id}
-                className="rounded-2xl border border-slate-100 bg-slate-50/90 px-4 py-4"
+                className="rounded-2xl border border-[#f7e3ec] bg-[#fff8fb] px-4 py-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -256,8 +256,8 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-[30px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-          <SectionTitle title="Users overview" action={<span className="text-sm font-semibold text-emerald-700">View report</span>} />
+        <div className="rounded-[30px] border border-[#f5dae8] bg-white/92 p-5 shadow-[0_24px_80px_rgba(214,51,132,0.08)]">
+          <SectionTitle title="Users overview" action={<span className="text-sm font-semibold text-[#b4236b]">View report</span>} />
           <div className="mt-8 flex justify-center">
             <div className="grid size-52 place-items-center rounded-full bg-[conic-gradient(#2563eb_0deg_276deg,#8b5cf6_276deg_336deg,#fb7185_336deg_360deg)]">
               <div className="grid size-32 place-items-center rounded-full bg-white shadow-inner">

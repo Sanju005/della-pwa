@@ -45,7 +45,7 @@ export function AdminStatCard({
   const positive = trend === "up";
 
   return (
-    <article className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+    <article className="rounded-[28px] border border-[#f6d8e7] bg-white/92 p-5 shadow-[0_20px_60px_rgba(214,51,132,0.06)]">
       <div className="flex items-start justify-between gap-4">
         <div className={cx("grid size-14 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-lg", accent)}>
           {icon}
@@ -53,7 +53,7 @@ export function AdminStatCard({
         <span
           className={cx(
             "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
-            positive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+            positive ? "bg-[#fff1f6] text-[#c0266b]" : "bg-[#fff1f2] text-[#e11d48]"
           )}
         >
           {positive ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
@@ -96,7 +96,7 @@ export function LoadingState({
 }) {
   return (
     <div className="rounded-[24px] border border-white/70 bg-white/85 px-5 py-10 text-center shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
-      <LoaderCircle className="mx-auto size-8 animate-spin text-emerald-600" />
+      <LoaderCircle className="mx-auto size-8 animate-spin text-[#d63384]" />
       <h3 className="mt-4 text-lg font-bold text-slate-950">{title}</h3>
       <p className="mt-2 text-sm leading-7 text-slate-500">{description}</p>
     </div>
