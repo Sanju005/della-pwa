@@ -17,7 +17,11 @@ import {
   RegisterShell,
   RegisterTitle,
 } from "../../register/_components/register-ui";
-import { IMAGE_UPLOAD_ACCEPT, isAcceptedImageFile } from "@/lib/image-upload";
+import {
+  IMAGE_UPLOAD_ACCEPT,
+  isAcceptedImageFile,
+  isCroppableImageFile,
+} from "@/lib/image-upload";
 import { getSupabaseClient } from "@/lib/supabase";
 import { malaysianStates } from "@/lib/provider-registration-config";
 
@@ -51,7 +55,7 @@ export default function SignupUserPage() {
   const [selectedAddressPreview, setSelectedAddressPreview] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState("");
-  const [invalidFields, setInvalidFields] = useState<string[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [cropState, setCropState] = useState<{
     fileName: string;
     sourceDataUrl: string;
@@ -107,18 +111,40 @@ export default function SignupUserPage() {
     }
 
     if (!isAcceptedImageFile(file)) {
-      setError("Please choose a JPG, PNG, GIF, WEBP, TIFF, or JFIF image for the profile photo.");
+      setFieldErrors((current) => ({
+        ...current,
+        profileImage: "Please choose a JPG, PNG, GIF, WEBP, TIFF, or JFIF image for the profile photo.",
+      }));
+      return;
+    }
+
+    if (!isCroppableImageFile(file)) {
+      setFieldErrors((current) => ({
+        ...current,
+        profileImage: "This image cannot be cropped here. Please use JPG, PNG, WEBP, or GIF.",
+      }));
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      setError("Profile photo must be 2MB or smaller.");
+      setFieldErrors((current) => ({
+        ...current,
+        profileImage: "Profile photo must be 2MB or smaller.",
+      }));
       return;
     }
 
     void (async () => {
       try {
         setError("");
+        setFieldErrors((current) => {
+          if (!current.profileImage) {
+            return current;
+          }
+          const next = { ...current };
+          delete next.profileImage;
+          return next;
+        });
         setCropState({
           fileName: file.name,
           sourceDataUrl: await readFileAsDataUrl(file),
@@ -126,7 +152,10 @@ export default function SignupUserPage() {
           aspectRatio: 1,
         });
       } catch {
-        setError("Unable to process the selected profile image.");
+        setFieldErrors((current) => ({
+          ...current,
+          profileImage: "Unable to process the selected profile image.",
+        }));
       }
     })();
   };
@@ -163,33 +192,66 @@ export default function SignupUserPage() {
   };
 
   const clearInvalidField = (field: string) => {
-    setInvalidFields((current) => current.filter((item) => item !== field));
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
   };
 
   const handleSubmit = () => {
-    const missingFields = [
-      !firstName ? "firstName" : null,
-      !lastName ? "lastName" : null,
-      !sex ? "sex" : null,
-      !dateOfBirth ? "dateOfBirth" : null,
-      !email ? "email" : null,
-      !phoneNumber ? "phoneNumber" : null,
-      !emergencyContactNumber ? "emergencyContactNumber" : null,
-      !addressLine1 ? "addressLine1" : null,
-      !postcode ? "postcode" : null,
-      !city ? "city" : null,
-      !stateName ? "state" : null,
-      !country ? "country" : null,
-      !password ? "password" : null,
-      !confirmPassword ? "confirmPassword" : null,
-    ].filter((value): value is string => Boolean(value));
+    const nextFieldErrors: Record<string, string> = {};
 
-    setInvalidFields(missingFields);
+    if (!firstName) {
+      nextFieldErrors.firstName = "First name is required.";
+    }
+    if (!lastName) {
+      nextFieldErrors.lastName = "Last name is required.";
+    }
+    if (!sex) {
+      nextFieldErrors.sex = "Please select gender.";
+    }
+    if (!dateOfBirth) {
+      nextFieldErrors.dateOfBirth = "Date of birth is required.";
+    }
+    if (!email) {
+      nextFieldErrors.email = "Email is required.";
+    }
+    if (!phoneNumber) {
+      nextFieldErrors.phoneNumber = "Phone number is required.";
+    }
+    if (!emergencyContactNumber) {
+      nextFieldErrors.emergencyContactNumber = "Emergency contact number is required.";
+    }
+    if (!addressLine1) {
+      nextFieldErrors.addressLine1 = "Address line 1 is required.";
+    }
+    if (!postcode) {
+      nextFieldErrors.postcode = "Postcode is required.";
+    }
+    if (!city) {
+      nextFieldErrors.city = "City is required.";
+    }
+    if (!stateName) {
+      nextFieldErrors.state = "State is required.";
+    }
+    if (!country) {
+      nextFieldErrors.country = "Country is required.";
+    }
+    if (!password) {
+      nextFieldErrors.password = "Password is required.";
+    }
+    if (!confirmPassword) {
+      nextFieldErrors.confirmPassword = "Please confirm your password.";
+    }
 
-    if (
-      missingFields.length > 0
-    ) {
-      setError("Please fill in all required fields.");
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setError("");
       return;
     }
 
@@ -200,6 +262,7 @@ export default function SignupUserPage() {
 
     startTransition(async () => {
       setError("");
+      setFieldErrors({});
 
       const response = await fetch("/api/auth/register/customer", {
         method: "POST",
@@ -240,7 +303,6 @@ export default function SignupUserPage() {
         return;
       }
 
-      setInvalidFields([]);
       if (result.requiresEmailVerification) {
         router.push(`/signup/check-email?email=${encodeURIComponent(result.email)}`);
         return;
@@ -278,7 +340,7 @@ export default function SignupUserPage() {
       />
 
       <div className="mt-8 space-y-4">
-        <ProfileImageField value={avatarDataUrl} onChange={handleAvatarChange} />
+        <ProfileImageField value={avatarDataUrl} onChange={handleAvatarChange} error={fieldErrors.profileImage} />
         <ControlledField
           label="First Name"
           placeholder="Enter your first name"
@@ -288,7 +350,8 @@ export default function SignupUserPage() {
             setFirstName(value);
           }}
           icon={<Icons.User className="h-5 w-5" />}
-          invalid={invalidFields.includes("firstName")}
+          error={fieldErrors.firstName}
+          invalid={Boolean(fieldErrors.firstName)}
         />
         <ControlledField
           label="Last Name"
@@ -299,7 +362,8 @@ export default function SignupUserPage() {
             setLastName(value);
           }}
           icon={<Icons.User className="h-5 w-5" />}
-          invalid={invalidFields.includes("lastName")}
+          error={fieldErrors.lastName}
+          invalid={Boolean(fieldErrors.lastName)}
         />
         <ControlledSelectField
           label="Gender"
@@ -311,7 +375,8 @@ export default function SignupUserPage() {
           icon={<Icons.User className="h-5 w-5" />}
           options={["Male", "Female"]}
           hidePlaceholder
-          invalid={invalidFields.includes("sex")}
+          error={fieldErrors.sex}
+          invalid={Boolean(fieldErrors.sex)}
         />
         <ControlledDateField
           label="Date of Birth"
@@ -321,7 +386,8 @@ export default function SignupUserPage() {
             setDateOfBirth(value);
           }}
           icon={<CalendarIcon className="h-5 w-5" />}
-          invalid={invalidFields.includes("dateOfBirth")}
+          error={fieldErrors.dateOfBirth}
+          invalid={Boolean(fieldErrors.dateOfBirth)}
         />
         <ControlledField
           label="Email"
@@ -333,7 +399,8 @@ export default function SignupUserPage() {
           }}
           icon={<Icons.Mail className="h-5 w-5" />}
           type="email"
-          invalid={invalidFields.includes("email")}
+          error={fieldErrors.email}
+          invalid={Boolean(fieldErrors.email)}
         />
         <ControlledPhoneField
           value={phoneNumber}
@@ -341,7 +408,8 @@ export default function SignupUserPage() {
             clearInvalidField("phoneNumber");
             setPhoneNumber(value);
           }}
-          invalid={invalidFields.includes("phoneNumber")}
+          error={fieldErrors.phoneNumber}
+          invalid={Boolean(fieldErrors.phoneNumber)}
         />
         <ControlledPhoneField
           label="Emergency Contact Number"
@@ -350,7 +418,8 @@ export default function SignupUserPage() {
             clearInvalidField("emergencyContactNumber");
             setEmergencyContactNumber(value);
           }}
-          invalid={invalidFields.includes("emergencyContactNumber")}
+          error={fieldErrors.emergencyContactNumber}
+          invalid={Boolean(fieldErrors.emergencyContactNumber)}
         />
         <div className="rounded-[22px] border border-[#e7ece8] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.03)]">
           <h2 className="text-[15px] font-extrabold text-[#111827]">Saved Address</h2>
@@ -374,7 +443,8 @@ export default function SignupUserPage() {
                 setAddressLine1(value);
               }}
               icon={<MapPinIcon className="h-5 w-5" />}
-              invalid={invalidFields.includes("addressLine1")}
+              error={fieldErrors.addressLine1}
+              invalid={Boolean(fieldErrors.addressLine1)}
             />
             {addressSuggestions.length > 0 ? (
               <div className="rounded-[16px] border border-[#e5e7eb] bg-[#fbfcff] p-2">
@@ -419,7 +489,8 @@ export default function SignupUserPage() {
                 setPostcode(value);
               }}
               icon={<MapPinIcon className="h-5 w-5" />}
-              invalid={invalidFields.includes("postcode")}
+              error={fieldErrors.postcode}
+              invalid={Boolean(fieldErrors.postcode)}
             />
             <ControlledField
               label="City"
@@ -430,7 +501,8 @@ export default function SignupUserPage() {
                 setCity(value);
               }}
               icon={<MapPinIcon className="h-5 w-5" />}
-              invalid={invalidFields.includes("city")}
+              error={fieldErrors.city}
+              invalid={Boolean(fieldErrors.city)}
             />
             <ControlledSelectField
               label="State"
@@ -441,7 +513,8 @@ export default function SignupUserPage() {
               }}
               icon={<MapPinIcon className="h-5 w-5" />}
               options={malaysianStates}
-              invalid={invalidFields.includes("state")}
+              error={fieldErrors.state}
+              invalid={Boolean(fieldErrors.state)}
             />
             <ControlledField
               label="Country"
@@ -452,7 +525,8 @@ export default function SignupUserPage() {
                 setCountry(value);
               }}
               icon={<MapPinIcon className="h-5 w-5" />}
-              invalid={invalidFields.includes("country")}
+              error={fieldErrors.country}
+              invalid={Boolean(fieldErrors.country)}
             />
           </div>
         </div>
@@ -467,7 +541,8 @@ export default function SignupUserPage() {
           icon={<Icons.Lock className="h-5 w-5" />}
           rightIcon={<Icons.EyeOff className="h-5 w-5" />}
           type="password"
-          invalid={invalidFields.includes("password")}
+          error={fieldErrors.password}
+          invalid={Boolean(fieldErrors.password)}
         />
         <div className="rounded-[18px] bg-[#f5f1fa] px-4 py-3 text-[13px] leading-6 text-[#4b5563]">
           <p>At least 8 characters</p>
@@ -486,7 +561,8 @@ export default function SignupUserPage() {
           icon={<Icons.Lock className="h-5 w-5" />}
           rightIcon={<Icons.EyeOff className="h-5 w-5" />}
           type="password"
-          invalid={invalidFields.includes("confirmPassword")}
+          error={fieldErrors.confirmPassword}
+          invalid={Boolean(fieldErrors.confirmPassword)}
         />
       </div>
 
@@ -543,8 +619,12 @@ export default function SignupUserPage() {
               const cropped = await cropImageFromSelection(cropState.sourceDataUrl, selection);
               setAvatarDataUrl(cropped);
               setCropState(null);
+              clearInvalidField("profileImage");
             } catch {
-              setError("Unable to process the selected profile image.");
+              setFieldErrors((current) => ({
+                ...current,
+                profileImage: "Unable to process the selected profile image.",
+              }));
             }
           }}
         />
@@ -556,9 +636,11 @@ export default function SignupUserPage() {
 function ProfileImageField({
   value,
   onChange,
+  error,
 }: {
   value: string;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  error?: string;
 }) {
   return (
     <label className="block">
@@ -585,6 +667,7 @@ function ProfileImageField({
               onChange={onChange}
               className="mt-3 block w-full text-[13px] text-[#4b5563] file:mr-3 file:rounded-[10px] file:border-0 file:bg-[#8E5EB5] file:px-3 file:py-2 file:font-bold file:text-white"
             />
+            {error ? <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
           </div>
         </div>
       </div>
@@ -597,12 +680,14 @@ function ControlledDateField({
   value,
   onChange,
   icon,
+  error,
   invalid = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   icon: ReactNode;
+  error?: string;
   invalid?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -652,6 +737,7 @@ function ControlledDateField({
           <CalendarIcon className="h-5 w-5" />
         </button>
       </div>
+      {error ? <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
     </label>
   );
 }
@@ -663,6 +749,7 @@ function ControlledSelectField({
   icon,
   options,
   hidePlaceholder = false,
+  error,
   invalid = false,
 }: {
   label: string;
@@ -671,6 +758,7 @@ function ControlledSelectField({
   icon: ReactNode;
   options: string[];
   hidePlaceholder?: boolean;
+  error?: string;
   invalid?: boolean;
 }) {
   return (
@@ -700,6 +788,7 @@ function ControlledSelectField({
           <ChevronDownIcon className="h-5 w-5" />
         </span>
       </div>
+      {error ? <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
     </label>
   );
 }
@@ -712,6 +801,7 @@ function ControlledField({
   icon,
   rightIcon,
   type = "text",
+  error,
   invalid = false,
 }: {
   label: string;
@@ -721,6 +811,7 @@ function ControlledField({
   icon: ReactNode;
   rightIcon?: ReactNode;
   type?: string;
+  error?: string;
   invalid?: boolean;
 }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -759,6 +850,7 @@ function ControlledField({
           </button>
         ) : null}
       </div>
+      {error ? <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
     </label>
   );
 }
@@ -767,11 +859,13 @@ function ControlledPhoneField({
   label = "Phone Number",
   value,
   onChange,
+  error,
   invalid = false,
 }: {
   label?: string;
   value: string;
   onChange: (value: string) => void;
+  error?: string;
   invalid?: boolean;
 }) {
   return (
@@ -801,6 +895,7 @@ function ControlledPhoneField({
           />
         </div>
       </div>
+      {error ? <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
     </label>
   );
 }

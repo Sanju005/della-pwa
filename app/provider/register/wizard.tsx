@@ -152,7 +152,8 @@ export function ProviderRegistrationWizard() {
   const [stepIndex, setStepIndex] = useState(0);
   const [registrationId, setRegistrationId] = useState("");
   const [submitError, setSubmitError] = useState("");
-  const [invalidBasicFields, setInvalidBasicFields] = useState<string[]>([]);
+  const [basicFieldErrors, setBasicFieldErrors] = useState<Record<string, string>>({});
+  const [servicesError, setServicesError] = useState("");
   const [isSubmitting, startTransition] = useTransition();
   const [hasProviderSession, setHasProviderSession] = useState(false);
   const [cropState, setCropState] = useState<{
@@ -236,54 +237,90 @@ export function ProviderRegistrationWizard() {
 
   const goNext = () => {
     if (activeStep.type === "basic") {
-      const missingFields = [
-        !data.basicProfile.firstName.trim() ? "firstName" : null,
-        !data.basicProfile.lastName.trim() ? "lastName" : null,
-        !data.basicProfile.sex ? "sex" : null,
-        !data.basicProfile.dateOfBirth.trim() ? "dateOfBirth" : null,
-        !data.basicProfile.addressLine1.trim() ? "addressLine1" : null,
-        !data.basicProfile.postcode.trim() ? "postcode" : null,
-        !data.basicProfile.city.trim() ? "city" : null,
-        !data.basicProfile.state.trim() ? "state" : null,
-        !data.basicProfile.country.trim() ? "country" : null,
-        !data.account.email.trim() ? "email" : null,
-        !data.account.phoneNumber.trim() ? "phoneNumber" : null,
-        !data.basicProfile.emergencyContactNumber.trim() ? "emergencyContactNumber" : null,
-        !data.account.password ? "password" : null,
-        !data.account.confirmPassword ? "confirmPassword" : null,
-      ].filter((value): value is string => Boolean(value));
+      const nextBasicErrors: Record<string, string> = {};
 
-      if (missingFields.length > 0) {
-        setInvalidBasicFields(missingFields);
-        setSubmitError("Please fill in all required fields before continuing.");
+      if (!data.basicProfile.firstName.trim()) {
+        nextBasicErrors.firstName = "First name is required.";
+      }
+      if (!data.basicProfile.lastName.trim()) {
+        nextBasicErrors.lastName = "Last name is required.";
+      }
+      if (!data.basicProfile.sex) {
+        nextBasicErrors.sex = "Please select gender.";
+      }
+      if (!data.basicProfile.dateOfBirth.trim()) {
+        nextBasicErrors.dateOfBirth = "Date of birth is required.";
+      }
+      if (!data.basicProfile.addressLine1.trim()) {
+        nextBasicErrors.addressLine1 = "Address line 1 is required.";
+      }
+      if (!data.basicProfile.postcode.trim()) {
+        nextBasicErrors.postcode = "Postcode is required.";
+      }
+      if (!data.basicProfile.city.trim()) {
+        nextBasicErrors.city = "City is required.";
+      }
+      if (!data.basicProfile.state.trim()) {
+        nextBasicErrors.state = "State is required.";
+      }
+      if (!data.basicProfile.country.trim()) {
+        nextBasicErrors.country = "Country is required.";
+      }
+      if (!data.account.email.trim()) {
+        nextBasicErrors.email = "Email is required.";
+      }
+      if (!data.account.phoneNumber.trim()) {
+        nextBasicErrors.phoneNumber = "Phone number is required.";
+      }
+      if (!data.basicProfile.emergencyContactNumber.trim()) {
+        nextBasicErrors.emergencyContactNumber = "Emergency contact number is required.";
+      }
+      if (!data.account.password) {
+        nextBasicErrors.password = "Password is required.";
+      }
+      if (!data.account.confirmPassword) {
+        nextBasicErrors.confirmPassword = "Please confirm your password.";
+      }
+
+      if (Object.keys(nextBasicErrors).length > 0) {
+        setBasicFieldErrors(nextBasicErrors);
+        setSubmitError("");
         return;
       }
 
       if (data.account.password !== data.account.confirmPassword) {
-        setInvalidBasicFields(["password", "confirmPassword"]);
-        setSubmitError("Passwords do not match.");
+        setBasicFieldErrors({
+          password: "Passwords do not match.",
+          confirmPassword: "Passwords do not match.",
+        });
+        setSubmitError("");
         return;
       }
 
       if (data.account.password.length < 8) {
-        setInvalidBasicFields(["password"]);
-        setSubmitError("Password must be at least 8 characters long.");
+        setBasicFieldErrors({
+          password: "Password must be at least 8 characters long.",
+        });
+        setSubmitError("");
         return;
       }
 
       const passwordRuleFailures = getPasswordRuleFailures(data.account.password);
       if (passwordRuleFailures.length > 0) {
-        setInvalidBasicFields(["password", "confirmPassword"]);
-        setSubmitError("Password must contain uppercase, lowercase, number, and symbol.");
+        setBasicFieldErrors({
+          password: "Password must contain uppercase, lowercase, number, and symbol.",
+        });
+        setSubmitError("");
         return;
       }
 
-      setInvalidBasicFields([]);
+      setBasicFieldErrors({});
       setSubmitError("");
     }
 
     if (activeStep.type === "services" && data.selectedServices.length === 0) {
-      setSubmitError("Please select at least one service before continuing.");
+      setServicesError("Please select at least one service.");
+      setSubmitError("");
       return;
     }
 
@@ -374,6 +411,21 @@ export function ProviderRegistrationWizard() {
     field: keyof ProviderRegistrationData["basicProfile"],
     value: string | number
   ) => {
+    setBasicFieldErrors((current) => {
+      const keysToClear =
+        field === "avatarDataUrl" || field === "profileImageName"
+          ? [field, "profileImage"]
+          : [field];
+      if (!keysToClear.some((key) => current[key])) {
+        return current;
+      }
+
+      const next = { ...current };
+      for (const key of keysToClear) {
+        delete next[key];
+      }
+      return next;
+    });
     setData((current) => ({
       ...current,
       basicProfile: { ...current.basicProfile, [field]: value },
@@ -384,6 +436,15 @@ export function ProviderRegistrationWizard() {
     field: keyof ProviderRegistrationData["account"],
     value: string
   ) => {
+    setBasicFieldErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
     setData((current) => ({
       ...current,
       account: { ...current.account, [field]: value },
@@ -391,6 +452,7 @@ export function ProviderRegistrationWizard() {
   };
 
   const toggleService = (service: ProviderService) => {
+    setServicesError("");
     setData((current) => {
       const selected = current.selectedServices.includes(service)
         ? current.selectedServices.filter((item) => item !== service)
@@ -529,11 +591,12 @@ export function ProviderRegistrationWizard() {
                 updateBasic={updateBasic}
                 updateAccount={updateAccount}
                 openCropper={openCropper}
-                invalidFields={invalidBasicFields}
-                clearInvalidField={(field) =>
-                  setInvalidBasicFields((current) =>
-                    current.filter((item) => item !== field)
-                  )
+                fieldErrors={basicFieldErrors}
+                setFieldError={(field, message) =>
+                  setBasicFieldErrors((current) => ({
+                    ...current,
+                    [field]: message,
+                  }))
                 }
                 setSubmitError={setSubmitError}
               />
@@ -542,6 +605,7 @@ export function ProviderRegistrationWizard() {
               <SelectServicesStep
                 selectedServices={data.selectedServices}
                 onToggle={toggleService}
+                error={servicesError}
               />
             ) : null}
             {activeStep.type === "service-detail" ? (
@@ -665,8 +729,8 @@ function BasicProfileStep({
   updateBasic,
   updateAccount,
   openCropper,
-  invalidFields,
-  clearInvalidField,
+  fieldErrors,
+  setFieldError,
   setSubmitError,
 }: {
   data: ProviderRegistrationData;
@@ -685,8 +749,8 @@ function BasicProfileStep({
     aspectRatio?: number;
     onApply: (dataUrl: string, fileName: string) => void;
   }) => Promise<void>;
-  invalidFields: string[];
-  clearInvalidField: (field: string) => void;
+  fieldErrors: Record<string, string>;
+  setFieldError: (field: string, message: string) => void;
   setSubmitError: (value: string) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -702,7 +766,6 @@ function BasicProfileStep({
     void (async () => {
       try {
         setSubmitError("");
-        clearInvalidField("profileImage");
         await openCropper({
           file,
           tone: "profile",
@@ -713,9 +776,11 @@ function BasicProfileStep({
           },
         });
       } catch (error) {
-        setSubmitError(
-          error instanceof Error ? error.message : "Unable to process the profile photo."
+        setFieldError(
+          "profileImage",
+          error instanceof Error ? error.message : "Unable to process the profile photo.",
         );
+        setSubmitError("");
       }
     })();
   };
@@ -755,6 +820,11 @@ function BasicProfileStep({
                 onChange={handleAvatarChange}
                 className="mt-3 block w-full text-[13px] text-[#4b5563] file:mr-3 file:rounded-[10px] file:border-0 file:bg-[#8E5EB5] file:px-3 file:py-2 file:font-bold file:text-white"
               />
+              {fieldErrors.profileImage ? (
+                <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">
+                  {fieldErrors.profileImage}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -763,40 +833,32 @@ function BasicProfileStep({
       <InputField
         label="First Name"
         value={data.basicProfile.firstName}
-        invalid={invalidFields.includes("firstName")}
-        onChange={(value) => {
-          clearInvalidField("firstName");
-          updateBasic("firstName", value);
-        }}
+        error={fieldErrors.firstName}
+        invalid={Boolean(fieldErrors.firstName)}
+        onChange={(value) => updateBasic("firstName", value)}
       />
       <InputField
         label="Last Name"
         value={data.basicProfile.lastName}
-        invalid={invalidFields.includes("lastName")}
-        onChange={(value) => {
-          clearInvalidField("lastName");
-          updateBasic("lastName", value);
-        }}
+        error={fieldErrors.lastName}
+        invalid={Boolean(fieldErrors.lastName)}
+        onChange={(value) => updateBasic("lastName", value)}
       />
       <SelectField
         label="Gender"
         value={data.basicProfile.sex}
-        invalid={invalidFields.includes("sex")}
-        onChange={(value) => {
-          clearInvalidField("sex");
-          updateBasic("sex", value);
-        }}
+        error={fieldErrors.sex}
+        invalid={Boolean(fieldErrors.sex)}
+        onChange={(value) => updateBasic("sex", value)}
         options={sexOptions}
       />
       <InputField label="Marketing Name" hint="e.g. Della Home Chef" value={data.basicProfile.marketingName} onChange={(value) => updateBasic("marketingName", value)} />
       <DateInputField
         label="Date of Birth"
         value={data.basicProfile.dateOfBirth}
-        invalid={invalidFields.includes("dateOfBirth")}
-        onChange={(value) => {
-          clearInvalidField("dateOfBirth");
-          updateBasic("dateOfBirth", value);
-        }}
+        error={fieldErrors.dateOfBirth}
+        invalid={Boolean(fieldErrors.dateOfBirth)}
+        onChange={(value) => updateBasic("dateOfBirth", value)}
       />
       <div className="rounded-[16px] border border-[#ebe4f6] bg-[#fbf8ff] px-4 py-3">
         <p className="text-[13px] font-extrabold uppercase tracking-[0.08em] text-[#8E5EB5]">
@@ -809,76 +871,58 @@ function BasicProfileStep({
       <InputField
         label="Unit No"
         value={data.basicProfile.unitNumber}
-        onChange={(value) => {
-          clearInvalidField("unitNumber");
-          updateBasic("unitNumber", value);
-        }}
+        onChange={(value) => updateBasic("unitNumber", value)}
       />
       <InputField
         label="Address Line 1"
         value={data.basicProfile.addressLine1}
-        invalid={invalidFields.includes("addressLine1")}
-        onChange={(value) => {
-          clearInvalidField("addressLine1");
-          updateBasic("addressLine1", value);
-        }}
+        error={fieldErrors.addressLine1}
+        invalid={Boolean(fieldErrors.addressLine1)}
+        onChange={(value) => updateBasic("addressLine1", value)}
       />
       <InputField
         label="Address Line 2"
         value={data.basicProfile.addressLine2}
-        onChange={(value) => {
-          clearInvalidField("addressLine2");
-          updateBasic("addressLine2", value);
-        }}
+        onChange={(value) => updateBasic("addressLine2", value)}
       />
       <div className="grid grid-cols-2 gap-3">
         <InputField
           label="Postcode"
           value={data.basicProfile.postcode}
-          invalid={invalidFields.includes("postcode")}
-          onChange={(value) => {
-            clearInvalidField("postcode");
-            updateBasic("postcode", value);
-          }}
+          error={fieldErrors.postcode}
+          invalid={Boolean(fieldErrors.postcode)}
+          onChange={(value) => updateBasic("postcode", value)}
         />
         <InputField
           label="City"
           value={data.basicProfile.city}
-          invalid={invalidFields.includes("city")}
-          onChange={(value) => {
-            clearInvalidField("city");
-            updateBasic("city", value);
-          }}
+          error={fieldErrors.city}
+          invalid={Boolean(fieldErrors.city)}
+          onChange={(value) => updateBasic("city", value)}
         />
       </div>
       <SelectField
         label="State"
         value={data.basicProfile.state}
-        invalid={invalidFields.includes("state")}
-        onChange={(value) => {
-          clearInvalidField("state");
-          updateBasic("state", value);
-        }}
+        error={fieldErrors.state}
+        invalid={Boolean(fieldErrors.state)}
+        onChange={(value) => updateBasic("state", value)}
         options={malaysianStates}
       />
       <InputField
         label="Country"
         value={data.basicProfile.country}
-        invalid={invalidFields.includes("country")}
-        onChange={(value) => {
-          clearInvalidField("country");
-          updateBasic("country", value);
-        }}
+        error={fieldErrors.country}
+        invalid={Boolean(fieldErrors.country)}
+        onChange={(value) => updateBasic("country", value)}
       />
 
       <InputField
         label="Email"
         value={data.account.email}
-        invalid={invalidFields.includes("email")}
-        onChange={(value) => {
-          clearInvalidField("email");
-          updateAccount("email", value);
-        }}
+        error={fieldErrors.email}
+        invalid={Boolean(fieldErrors.email)}
+        onChange={(value) => updateAccount("email", value)}
       />
       <div>
         <p className="mb-2 text-[13px] font-semibold text-[#111827]">Phone</p>
@@ -888,35 +932,33 @@ function BasicProfileStep({
             <span>{data.account.phoneCountryCode}</span>
             <ChevronDownIcon className="ml-auto h-4 w-4 text-[#6b7280]" />
           </div>
-          <div className={`flex flex-1 items-center rounded-[12px] border px-4 ${invalidFields.includes("phoneNumber") ? "border-[#ef4444] bg-[#fff5f5]" : "border-[#dfe8e2]"}`}>
+          <div className={`flex flex-1 items-center rounded-[12px] border px-4 ${fieldErrors.phoneNumber ? "border-[#ef4444] bg-[#fff5f5]" : "border-[#dfe8e2]"}`}>
             <input
               value={data.account.phoneNumber}
               onChange={(event) => {
-                clearInvalidField("phoneNumber");
                 updateAccount("phoneNumber", event.target.value);
               }}
               className="h-11 w-full border-0 bg-transparent text-[14px] text-[#111827] outline-none"
             />
           </div>
         </div>
+        {fieldErrors.phoneNumber ? (
+          <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{fieldErrors.phoneNumber}</p>
+        ) : null}
       </div>
       <InputField
         label="Emergency Contact Number"
         value={data.basicProfile.emergencyContactNumber}
-        invalid={invalidFields.includes("emergencyContactNumber")}
-        onChange={(value) => {
-          clearInvalidField("emergencyContactNumber");
-          updateBasic("emergencyContactNumber", value);
-        }}
+        error={fieldErrors.emergencyContactNumber}
+        invalid={Boolean(fieldErrors.emergencyContactNumber)}
+        onChange={(value) => updateBasic("emergencyContactNumber", value)}
       />
       <InputField
         label="Password"
         value={data.account.password}
-        invalid={invalidFields.includes("password")}
-        onChange={(value) => {
-          clearInvalidField("password");
-          updateAccount("password", value);
-        }}
+        error={fieldErrors.password}
+        invalid={Boolean(fieldErrors.password)}
+        onChange={(value) => updateAccount("password", value)}
         rightIcon={<EyeIcon className="h-4 w-4 text-[#6b7280]" />}
         type="password"
       />
@@ -940,11 +982,9 @@ function BasicProfileStep({
       <InputField
         label="Retype Password"
         value={data.account.confirmPassword}
-        invalid={invalidFields.includes("confirmPassword")}
-        onChange={(value) => {
-          clearInvalidField("confirmPassword");
-          updateAccount("confirmPassword", value);
-        }}
+        error={fieldErrors.confirmPassword}
+        invalid={Boolean(fieldErrors.confirmPassword)}
+        onChange={(value) => updateAccount("confirmPassword", value)}
         rightIcon={<EyeIcon className="h-4 w-4 text-[#6b7280]" />}
         type="password"
       />
@@ -955,9 +995,11 @@ function BasicProfileStep({
 function SelectServicesStep({
   selectedServices,
   onToggle,
+  error,
 }: {
   selectedServices: ProviderService[];
   onToggle: (service: ProviderService) => void;
+  error?: string;
 }) {
   return (
     <div className="space-y-3">
@@ -982,6 +1024,7 @@ function SelectServicesStep({
           </button>
         );
       })}
+      {error ? <p className="text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
     </div>
   );
 }
@@ -1704,6 +1747,7 @@ function InputField({
   value,
   onChange,
   hint,
+  error,
   rightIcon,
   compact = false,
   type = "text",
@@ -1713,6 +1757,7 @@ function InputField({
   value: string;
   onChange: (value: string) => void;
   hint?: string;
+  error?: string;
   rightIcon?: React.ReactNode;
   compact?: boolean;
   type?: string;
@@ -1749,6 +1794,7 @@ function InputField({
           </button>
         ) : null}
       </div>
+      {error ? <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
     </label>
   );
 }
@@ -1757,11 +1803,13 @@ function DateInputField({
   label,
   value,
   onChange,
+  error,
   invalid = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  error?: string;
   invalid?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1808,6 +1856,7 @@ function DateInputField({
           <CalendarIcon className="h-4 w-4 text-[#6b7280]" />
         </button>
       </div>
+      {error ? <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
     </label>
   );
 }
@@ -1848,6 +1897,7 @@ function SelectField({
   onChange,
   options,
   placeholder,
+  error,
   invalid = false,
   compact = false,
 }: {
@@ -1856,6 +1906,7 @@ function SelectField({
   onChange: (value: string) => void;
   options: string[];
   placeholder?: string;
+  error?: string;
   invalid?: boolean;
   compact?: boolean;
 }) {
@@ -1879,6 +1930,7 @@ function SelectField({
         </select>
         <ChevronDownIcon className="ml-3 h-4 w-4 text-[#6b7280]" />
       </div>
+      {error ? <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">{error}</p> : null}
     </label>
   );
 }
