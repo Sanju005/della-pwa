@@ -135,6 +135,7 @@ function combineResidentialAddress(data: ProviderRegistrationData["basicProfile"
 
 type FlowStep =
   | { type: "basic"; label: string }
+  | { type: "pre-verification"; label: string }
   | { type: "services"; label: string }
   | { type: "service-detail"; label: string; service: ProviderService }
   | { type: "availability"; label: string }
@@ -154,6 +155,7 @@ export function ProviderRegistrationWizard() {
   const [submitError, setSubmitError] = useState("");
   const [basicFieldErrors, setBasicFieldErrors] = useState<Record<string, string>>({});
   const [servicesError, setServicesError] = useState("");
+  const [showBasicProfileSavedModal, setShowBasicProfileSavedModal] = useState(false);
   const [isSubmitting, startTransition] = useTransition();
   const [hasProviderSession, setHasProviderSession] = useState(false);
   const [cropState, setCropState] = useState<{
@@ -173,6 +175,7 @@ export function ProviderRegistrationWizard() {
 
     return [
       { type: "basic", label: "Basic Profile" },
+      { type: "pre-verification", label: "Email Verification" },
       { type: "services", label: "Select Services" },
       ...dynamicServiceSteps,
       { type: "availability", label: "Availability" },
@@ -186,6 +189,7 @@ export function ProviderRegistrationWizard() {
   }, [data.selectedServices]);
 
   const activeStep = steps[Math.min(stepIndex, steps.length - 1)];
+  const getStepIndex = (type: FlowStep["type"]) => steps.findIndex((step) => step.type === type);
 
   const submitRegistration = async () => {
     const response = await fetch("/api/provider/register", {
@@ -316,6 +320,8 @@ export function ProviderRegistrationWizard() {
 
       setBasicFieldErrors({});
       setSubmitError("");
+      setShowBasicProfileSavedModal(true);
+      return;
     }
 
     if (activeStep.type === "services" && data.selectedServices.length === 0) {
@@ -601,6 +607,9 @@ export function ProviderRegistrationWizard() {
                 setSubmitError={setSubmitError}
               />
             ) : null}
+            {activeStep.type === "pre-verification" ? (
+              <PreVerificationStep data={data} onUpdate={updateVerification} />
+            ) : null}
             {activeStep.type === "services" ? (
               <SelectServicesStep
                 selectedServices={data.selectedServices}
@@ -701,6 +710,18 @@ export function ProviderRegistrationWizard() {
           </div>
         </div>
       </div>
+      {showBasicProfileSavedModal ? (
+        <BasicProfileSavedModal
+          onVerifyNow={() => {
+            setShowBasicProfileSavedModal(false);
+            setStepIndex(getStepIndex("pre-verification"));
+          }}
+          onVerifyLater={() => {
+            setShowBasicProfileSavedModal(false);
+            setStepIndex(getStepIndex("services"));
+          }}
+        />
+      ) : null}
       {cropState ? (
         <ImageCropModal
           imageDataUrl={cropState.sourceDataUrl}
@@ -1482,6 +1503,46 @@ function VerificationStep({
   );
 }
 
+function PreVerificationStep({
+  data,
+  onUpdate,
+}: {
+  data: ProviderRegistrationData;
+  onUpdate: (
+    field: keyof ProviderRegistrationData["verification"],
+    value: string | string[]
+  ) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="rounded-[18px] border border-[#d7efdd] bg-[linear-gradient(180deg,#fbfffc_0%,#f2fbf4_100%)] p-5 shadow-[0_14px_30px_rgba(22,163,74,0.08)]">
+        <div className="relative mx-auto flex h-20 w-20 items-center justify-center">
+          <span className="absolute inset-0 animate-ping rounded-full bg-[#8E5EB5]/15" />
+          <span className="absolute inset-2 rounded-full bg-[#8E5EB5]/10" />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-[#8E5EB5] text-white shadow-[0_16px_28px_rgba(142,94,181,0.22)]">
+            <CheckCircleFilledIcon className="h-7 w-7" />
+          </div>
+        </div>
+        <h2 className="mt-4 text-center text-[22px] font-extrabold tracking-[-0.04em] text-[#111827]">
+          Verify Your Email
+        </h2>
+        <p className="mt-2 text-center text-[13px] leading-6 text-[#4b5563]">
+          Your personal details are saved in this registration flow. We will send your activation
+          email to <span className="font-bold text-[#111827]">{data.account.email || "your email"}</span>{" "}
+          after you submit the provider registration.
+        </p>
+      </div>
+
+      <VerificationStep data={data} onUpdate={onUpdate} />
+
+      <div className="rounded-[16px] border border-[#e5d9f3] bg-white px-4 py-3 text-[12px] leading-5 text-[#6b7280] shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+        You can continue to select the services you provide after this step and finish account
+        activation once your registration is submitted.
+      </div>
+    </div>
+  );
+}
+
 function IdentityStep({
   data,
   onUpdate,
@@ -1712,6 +1773,55 @@ function SubmissionChoiceStep({
       >
         Go to Profile
       </Link>
+    </div>
+  );
+}
+
+function BasicProfileSavedModal({
+  onVerifyNow,
+  onVerifyLater,
+}: {
+  onVerifyNow: () => void;
+  onVerifyLater: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#111827]/45 px-4 pb-6 pt-10 sm:items-center">
+      <div className="w-full max-w-[390px] overflow-hidden rounded-[28px] border border-[#e6daf1] bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.22)] animate-[fade-in_220ms_ease-out]">
+        <div className="relative mx-auto flex h-24 w-24 items-center justify-center">
+          <span className="absolute inset-0 animate-ping rounded-full bg-[#8E5EB5]/15" />
+          <span className="absolute inset-2 rounded-full bg-[#8E5EB5]/10" />
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[#8E5EB5] text-white shadow-[0_18px_30px_rgba(142,94,181,0.24)]">
+            <CheckIcon className="h-8 w-8" />
+          </div>
+        </div>
+        <h2 className="mt-5 text-center text-[24px] font-extrabold tracking-[-0.04em] text-[#111827]">
+          Your Personal Details Are Saved
+        </h2>
+        <p className="mt-3 text-center text-[14px] leading-6 text-[#4b5563]">
+          You can review the email verification step now, or verify later and continue selecting
+          the services you provide.
+        </p>
+        <p className="mt-2 text-center text-[12px] leading-5 text-[#6b7280]">
+          Your activation email will be sent after you submit the full provider registration.
+        </p>
+
+        <div className="mt-6 space-y-3">
+          <button
+            type="button"
+            onClick={onVerifyNow}
+            className="inline-flex h-12 w-full items-center justify-center rounded-[12px] bg-[#8E5EB5] text-[15px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.2)]"
+          >
+            Verify Now
+          </button>
+          <button
+            type="button"
+            onClick={onVerifyLater}
+            className="inline-flex h-12 w-full items-center justify-center rounded-[12px] border border-[#d8e4dc] bg-white text-[15px] font-extrabold text-[#111827] shadow-[0_10px_22px_rgba(15,23,42,0.04)]"
+          >
+            Verify Later
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2434,6 +2544,8 @@ function UploadCard({
 
 function buttonLabel(step: FlowStep) {
   switch (step.type) {
+    case "pre-verification":
+      return "Continue to Services";
     case "service-detail":
       return "Save Service";
     case "location":
@@ -2460,6 +2572,8 @@ function screenHeading(step: FlowStep) {
   switch (step.type) {
     case "basic":
       return "Create Your Profile";
+    case "pre-verification":
+      return "Verify Your Email";
     case "services":
       return "Select Services";
     case "service-detail":
@@ -2485,6 +2599,8 @@ function screenSubtitle(step: FlowStep) {
   switch (step.type) {
     case "basic":
       return "Add your profile, contact, and login details";
+    case "pre-verification":
+      return "Review activation and continue to your service setup";
     case "services":
       return "Select one or more services you provide";
     case "service-detail":
