@@ -712,11 +712,7 @@ export function ProviderRegistrationWizard() {
       </div>
       {showBasicProfileSavedModal ? (
         <BasicProfileSavedModal
-          onVerifyNow={() => {
-            setShowBasicProfileSavedModal(false);
-            setStepIndex(getStepIndex("pre-verification"));
-          }}
-          onVerifyLater={() => {
+          onContinue={() => {
             setShowBasicProfileSavedModal(false);
             setStepIndex(getStepIndex("services"));
           }}
@@ -1778,11 +1774,9 @@ function SubmissionChoiceStep({
 }
 
 function BasicProfileSavedModal({
-  onVerifyNow,
-  onVerifyLater,
+  onContinue,
 }: {
-  onVerifyNow: () => void;
-  onVerifyLater: () => void;
+  onContinue: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#111827]/45 px-4 pb-6 pt-10 sm:items-center">
@@ -1798,29 +1792,19 @@ function BasicProfileSavedModal({
           Your Personal Details Are Saved
         </h2>
         <p className="mt-3 text-center text-[14px] leading-6 text-[#4b5563]">
-          You can review the email verification step now, or verify later and continue selecting
-          the services you provide.
+          Your personal details have been saved successfully.
         </p>
         <p className="mt-2 text-center text-[12px] leading-5 text-[#6b7280]">
-          Your activation email will be sent after you submit the full provider registration.
+          Next, select the services you provide to continue your provider registration.
         </p>
 
-        <div className="mt-6 space-y-3">
-          <button
-            type="button"
-            onClick={onVerifyNow}
-            className="inline-flex h-12 w-full items-center justify-center rounded-[12px] bg-[#8E5EB5] text-[15px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.2)]"
-          >
-            Verify Now
-          </button>
-          <button
-            type="button"
-            onClick={onVerifyLater}
-            className="inline-flex h-12 w-full items-center justify-center rounded-[12px] border border-[#d8e4dc] bg-white text-[15px] font-extrabold text-[#111827] shadow-[0_10px_22px_rgba(15,23,42,0.04)]"
-          >
-            Verify Later
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onContinue}
+          className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-[12px] bg-[#8E5EB5] text-[15px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.2)]"
+        >
+          Select Services
+        </button>
       </div>
     </div>
   );
