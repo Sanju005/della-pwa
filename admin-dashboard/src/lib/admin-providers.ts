@@ -165,6 +165,10 @@ type ProfileNameRow = {
   email: string | null;
 };
 
+const APP_BASE_URL =
+  (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
+  "https://app.dellaapp.com";
+
 const providerProfileSelectWithAddress = `
   id,
   marketing_name,
@@ -822,15 +826,37 @@ async function resolveAdminMediaUrl(
     return data.publicUrl;
   }
 
-  const signed = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(trimmed, 60 * 60);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (signed.error || !signed.data?.signedUrl) {
+  if (!session?.access_token) {
     return "";
   }
 
-  return signed.data.signedUrl;
+  const response = await fetch(`${APP_BASE_URL}/api/admin/media-sign`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      bucket,
+      path: trimmed,
+      expiresInSeconds: 60 * 60,
+    }),
+  });
+
+  const result = (await response.json()) as {
+    signedUrl?: string;
+    error?: string;
+  };
+
+  if (!response.ok || !result.signedUrl) {
+    return "";
+  }
+
+  return result.signedUrl;
 }
 
 function toMediaFileName(value?: string | null, fallback = "file") {
@@ -861,6 +887,68 @@ async function buildProviderMediaItems(
       previewUrl: await resolveAdminMediaUrl(bucket, item, visibility),
     })),
   );
+}
+
+async function buildProviderMediaItemsFromServices(
+  services:
+    | Array<{
+        service_type?: string | null;
+        image_data_urls?: string[] | null;
+        image_captions?: string[] | null;
+        certificate_data_urls?: string[] | null;
+        certificate_captions?: string[] | null;
+      }>
+    | null
+    | undefined,
+  kind: "work" | "certificate",
+): Promise<ProviderMediaItem[]> {
+  const items = (services ?? []).flatMap((service, serviceIndex) => {
+    const values =
+      kind === "work"
+        ? service.image_data_urls ?? []
+        : service.certificate_data_urls ?? [];
+    const captions =
+      kind === "work"
+        ? service.image_captions ?? []
+        : service.certificate_captions ?? [];
+    const serviceLabel = humanizeService(service.service_type);
+
+    return values
+      .map((value, index) => {
+        const trimmed = value?.trim() ?? "";
+
+        if (!trimmed) {
+          return null;
+        }
+
+        return {
+          id: `${kind}-${serviceIndex + 1}-${index + 1}`,
+          label:
+            captions[index]?.trim() ||
+            `${serviceLabel} ${kind === "work" ? "Work Image" : "Certificate"} ${index + 1}`,
+          fileName: toMediaFileName(
+            trimmed,
+            `${kind}-${serviceIndex + 1}-${index + 1}`,
+          ),
+          rawValue: trimmed,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  });
+
+  const bucket = kind === "work" ? "provider-work-images" : "certificates";
+  const visibility = kind === "work" ? "public" : "private";
+
+  const resolved = await Promise.all(
+    items.map(async (item) => ({
+      id: item.id,
+      label: item.label,
+      fileName: item.fileName,
+      previewUrl: await resolveAdminMediaUrl(bucket, item.rawValue, visibility),
+    })),
+  );
+
+  return resolved.filter((item) => Boolean(item.previewUrl));
 }
 
 async function buildCommissionRowsFromPayments(
@@ -1069,18 +1157,12 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
         : null,
     ])
   ).filter((item): item is ProviderIdentityDocument => Boolean(item?.previewUrl));
-  const workGallery = await buildProviderMediaItems(
-    firstService?.image_data_urls,
-    firstService?.image_captions,
-    "provider-work-images",
-    "public",
-    "work image",
+  const workGallery = await buildProviderMediaItemsFromServices(
+    liveProfile.provider_services,
+    "work",
   );
-  const certificates = await buildProviderMediaItems(
-    firstService?.certificate_data_urls,
-    firstService?.certificate_captions,
-    "certificates",
-    "private",
+  const certificates = await buildProviderMediaItemsFromServices(
+    liveProfile.provider_services,
     "certificate",
   );
   const reviewRows = liveReviews?.length
