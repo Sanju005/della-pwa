@@ -1270,6 +1270,8 @@ export async function setProviderIdentityVerified(providerId: string, verified: 
   const payload = {
     identity_verified: verified,
     kyc_verified: verified,
+    reviewed_at: now,
+    last_reviewed_at: now,
     updated_at: now,
   };
 

@@ -182,6 +182,7 @@ export function createDefaultProviderRegistration(): ProviderRegistrationData {
       country: "Malaysia",
       serviceLocation: "",
       serviceRadius: 15,
+      emergencyContact: "",
       emergencyContactNumber: "",
     },
     account: {

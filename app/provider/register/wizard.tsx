@@ -34,6 +34,12 @@ import type {
 } from "@/lib/provider-registration-types";
 import { providerServices } from "@/lib/provider-registration-types";
 
+type RegistrationUploadBucket =
+  | "profile-images"
+  | "provider-work-images"
+  | "certificates"
+  | "identity-documents";
+
 type ReverseLocationResponse = {
   label: string;
   formattedAddress?: string;
@@ -104,6 +110,164 @@ async function readFileAsDataUrl(file: File) {
   });
 }
 
+function isDataUrl(value: string) {
+  return value.trim().startsWith("data:");
+}
+
+function sanitizeUploadSegment(value: string) {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "file";
+}
+
+function cloneRegistrationData(data: ProviderRegistrationData): ProviderRegistrationData {
+  return {
+    ...data,
+    basicProfile: { ...data.basicProfile },
+    account: { ...data.account },
+    selectedServices: [...data.selectedServices],
+    availability: {
+      ...data.availability,
+      days: [...data.availability.days],
+    },
+    providerLocation: { ...data.providerLocation },
+    verification: {
+      ...data.verification,
+      phoneOtp: [...data.verification.phoneOtp],
+      emailOtp: [...data.verification.emailOtp],
+    },
+    serviceDetails: Object.fromEntries(
+      providerServices.map((service) => [
+        service,
+        {
+          ...data.serviceDetails[service],
+          specialties: [...data.serviceDetails[service].specialties],
+          imageCaptions: [...data.serviceDetails[service].imageCaptions],
+          imageDataUrls: [...data.serviceDetails[service].imageDataUrls],
+          certificateCaptions: [...data.serviceDetails[service].certificateCaptions],
+          certificateDataUrls: [...data.serviceDetails[service].certificateDataUrls],
+        },
+      ]),
+    ) as ProviderRegistrationData["serviceDetails"],
+  };
+}
+
+async function uploadRegistrationAsset(options: {
+  bucket: RegistrationUploadBucket;
+  dataUrl: string;
+  fileName: string;
+  ownerId: string;
+  pathParts: string[];
+  visibility: "public" | "private";
+}) {
+  if (!isDataUrl(options.dataUrl)) {
+    return options.dataUrl;
+  }
+
+  const response = await fetch("/api/provider/register/upload", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(options),
+  });
+
+  const result = (await response.json()) as { value?: string; error?: string };
+
+  if (!response.ok || !result.value) {
+    throw new Error(result.error || "Unable to upload registration asset.");
+  }
+
+  return result.value;
+}
+
+async function prepareRegistrationPayloadForSubmit(
+  data: ProviderRegistrationData,
+  ownerId: string,
+) {
+  const nextData = cloneRegistrationData(data);
+  const emergencyContact =
+    nextData.basicProfile.emergencyContact.trim() ||
+    nextData.basicProfile.emergencyContactNumber.trim();
+
+  nextData.basicProfile.emergencyContact = emergencyContact;
+  nextData.basicProfile.emergencyContactNumber = emergencyContact;
+
+  nextData.basicProfile.avatarDataUrl = await uploadRegistrationAsset({
+    bucket: "profile-images",
+    dataUrl: nextData.basicProfile.avatarDataUrl,
+    fileName: nextData.basicProfile.profileImageName || "avatar.jpg",
+    ownerId,
+    pathParts: ["profile", "avatar"],
+    visibility: "public",
+  });
+
+  const documentType =
+    nextData.verification.documentType.trim().toLowerCase().includes("passport")
+      ? "passport"
+      : "ic";
+
+  nextData.verification.frontImageDataUrl = await uploadRegistrationAsset({
+    bucket: "identity-documents",
+    dataUrl: nextData.verification.frontImageDataUrl,
+    fileName:
+      nextData.verification.frontImageName ||
+      `${documentType === "passport" ? "passport" : "ic"}-front.jpg`,
+    ownerId,
+    pathParts: ["identity", "front"],
+    visibility: "private",
+  });
+
+  nextData.verification.backImageDataUrl = await uploadRegistrationAsset({
+    bucket: "identity-documents",
+    dataUrl: nextData.verification.backImageDataUrl,
+    fileName:
+      nextData.verification.backImageName ||
+      `${documentType === "passport" ? "passport" : "ic"}-back.jpg`,
+    ownerId,
+    pathParts: ["identity", "back"],
+    visibility: "private",
+  });
+
+  await Promise.all(
+    nextData.selectedServices.map(async (service) => {
+      const serviceKey = sanitizeUploadSegment(service.toLowerCase());
+      const details = nextData.serviceDetails[service];
+
+      details.imageDataUrls = await Promise.all(
+        details.imageDataUrls.map((value, index) =>
+          uploadRegistrationAsset({
+            bucket: "provider-work-images",
+            dataUrl: value,
+            fileName: `${serviceKey}-work-${index + 1}.jpg`,
+            ownerId,
+            pathParts: [serviceKey, "work", `${index + 1}`],
+            visibility: "public",
+          }),
+        ),
+      );
+
+      details.certificateDataUrls = await Promise.all(
+        details.certificateDataUrls.map((value, index) =>
+          uploadRegistrationAsset({
+            bucket: "certificates",
+            dataUrl: value,
+            fileName:
+              details.certificateCaptions[index]?.trim() ||
+              `${serviceKey}-certificate-${index + 1}`,
+            ownerId,
+            pathParts: [serviceKey, "certificates", `${index + 1}`],
+            visibility: "private",
+          }),
+        ),
+      );
+    }),
+  );
+
+  return nextData;
+}
+
 async function prepareCertificateUpload(file: File) {
   if (file.type !== "application/pdf" && !isAcceptedImageFile(file)) {
     throw new Error("Certificates must be JPG, JPEG, PNG, GIF, TIFF, JFIF, or PDF.");
@@ -165,6 +329,7 @@ export function ProviderRegistrationWizard() {
     aspectRatio?: number;
     onApply: (dataUrl: string, fileName: string) => void;
   } | null>(null);
+  const uploadOwnerIdRef = useRef(`provider-registration-${crypto.randomUUID()}`);
 
   const steps = useMemo<FlowStep[]>(() => {
     const dynamicServiceSteps = data.selectedServices.map((service) => ({
@@ -192,12 +357,16 @@ export function ProviderRegistrationWizard() {
   const getStepIndex = (type: FlowStep["type"]) => steps.findIndex((step) => step.type === type);
 
   const submitRegistration = async () => {
+    const payload = await prepareRegistrationPayloadForSubmit(
+      data,
+      uploadOwnerIdRef.current,
+    );
     const response = await fetch("/api/provider/register", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
 
         const result = (await response.json()) as
@@ -390,6 +559,14 @@ export function ProviderRegistrationWizard() {
             )
               ? "processing"
               : "pending",
+            identityDocumentType: data.verification.documentType
+              .trim()
+              .toLowerCase()
+              .includes("passport")
+              ? "passport"
+              : "ic",
+            identityFrontImageUrl: data.verification.frontImageDataUrl,
+            identityBackImageUrl: data.verification.backImageDataUrl,
           }),
         });
 
@@ -965,10 +1142,13 @@ function BasicProfileStep({
       </div>
       <InputField
         label="Emergency Contact Number"
-        value={data.basicProfile.emergencyContactNumber}
+        value={data.basicProfile.emergencyContact || data.basicProfile.emergencyContactNumber}
         error={fieldErrors.emergencyContactNumber}
         invalid={Boolean(fieldErrors.emergencyContactNumber)}
-        onChange={(value) => updateBasic("emergencyContactNumber", value)}
+        onChange={(value) => {
+          updateBasic("emergencyContact", value);
+          updateBasic("emergencyContactNumber", value);
+        }}
       />
       <InputField
         label="Password"

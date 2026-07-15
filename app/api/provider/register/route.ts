@@ -108,6 +108,14 @@ function buildResidentialAddress(payload: ProviderRegistrationData) {
     .join(", ");
 }
 
+function getEmergencyContact(payload: ProviderRegistrationData) {
+  return (
+    payload.basicProfile.emergencyContact?.trim() ||
+    payload.basicProfile.emergencyContactNumber?.trim() ||
+    ""
+  );
+}
+
 function isMissingColumnError(message?: string) {
   const normalized = message?.trim().toLowerCase() ?? "";
 
@@ -273,6 +281,89 @@ async function upsertProviderVerification(
     );
 }
 
+async function ensureProviderAdminMetadata(
+  adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
+  providerId: string,
+) {
+  const attemptedPayloads: Array<Record<string, unknown>> = [
+    {
+      provider_id: providerId,
+      review_status: "pending_review",
+      approval_status: "pending_review",
+    },
+    {
+      provider_id: providerId,
+      approval_status: "pending_review",
+    },
+    {
+      provider_id: providerId,
+    },
+  ];
+
+  let lastError: { message?: string } | null = null;
+
+  for (const payload of attemptedPayloads) {
+    const upsertByProviderId = await adminClient
+      .from("provider_admin_metadata")
+      .upsert(payload, { onConflict: "provider_id" });
+
+    if (!upsertByProviderId.error) {
+      return upsertByProviderId;
+    }
+
+    lastError = upsertByProviderId.error;
+
+    if (isMissingConflictTargetError(upsertByProviderId.error.message)) {
+      const existing = await adminClient
+        .from("provider_admin_metadata")
+        .select("id")
+        .eq("provider_id", providerId)
+        .maybeSingle();
+
+      if (existing.data?.id) {
+        const updateResult = await adminClient
+          .from("provider_admin_metadata")
+          .update(payload)
+          .eq("id", existing.data.id);
+
+        if (!updateResult.error) {
+          return updateResult;
+        }
+
+        lastError = updateResult.error;
+      } else {
+        const insertResult = await adminClient
+          .from("provider_admin_metadata")
+          .insert(payload);
+
+        if (!insertResult.error) {
+          return insertResult;
+        }
+
+        lastError = insertResult.error;
+      }
+    }
+
+    const upsertById = await adminClient
+      .from("provider_admin_metadata")
+      .upsert(
+        {
+          id: providerId,
+          ...payload,
+        },
+        { onConflict: "id" },
+      );
+
+    if (!upsertById.error) {
+      return upsertById;
+    }
+
+    lastError = upsertById.error;
+  }
+
+  return { error: lastError ?? { message: "Unable to create provider admin metadata." } };
+}
+
 function isMissingProviderServiceMediaColumnError(message?: string) {
   const normalized = message?.trim().toLowerCase() ?? "";
 
@@ -353,6 +444,12 @@ function buildStoredRegistrationPayload(
     ...payload,
     basicProfile: {
       ...payload.basicProfile,
+      emergencyContact:
+        payload.basicProfile.emergencyContact?.trim() ||
+        payload.basicProfile.emergencyContactNumber?.trim(),
+      emergencyContactNumber:
+        payload.basicProfile.emergencyContactNumber?.trim() ||
+        payload.basicProfile.emergencyContact?.trim(),
       avatarDataUrl: storedAvatarUrl,
     },
     verification: {
@@ -391,9 +488,11 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!payload.basicProfile.country.trim() || !payload.basicProfile.emergencyContactNumber.trim()) {
+    const emergencyContact = getEmergencyContact(payload);
+
+    if (!payload.basicProfile.country.trim() || !emergencyContact) {
       return NextResponse.json(
-        { error: "Country and emergency contact number are required." },
+        { error: "Country and emergency contact are required." },
         { status: 400 }
       );
     }
@@ -452,7 +551,19 @@ export async function POST(request: Request) {
         role: PROVIDER_ROLE,
         marketing_name: payload.basicProfile.marketingName.trim(),
         country: payload.basicProfile.country.trim(),
-        emergency_contact_number: payload.basicProfile.emergencyContactNumber.trim(),
+        emergency_contact: emergencyContact,
+        emergency_contact_number: emergencyContact,
+        identity_verification_status:
+          payload.verification.documentType.trim() &&
+          payload.verification.frontImageName.trim() &&
+          payload.verification.backImageName.trim()
+            ? "processing"
+            : "pending",
+        identity_document_type: payload.verification.documentType.trim().toLowerCase().includes("passport")
+          ? "passport"
+          : payload.verification.documentType.trim()
+            ? "ic"
+            : "",
       },
     });
 
@@ -520,11 +631,12 @@ export async function POST(request: Request) {
         })
       : "";
     const phoneVerified = payload.verification.phoneOtp.join("") === "123456";
-    const identityVerified = Boolean(
+    const hasSubmittedIdentityDocuments = Boolean(
       payload.verification.documentType &&
         payload.verification.frontImageName &&
         payload.verification.backImageName,
     );
+    const identityVerified = false;
 
     const { error: profileError } = await adminClient
       .from("profiles")
@@ -595,6 +707,18 @@ export async function POST(request: Request) {
     if (providerProfileError) {
       return NextResponse.json(
         { error: "Account created, but provider profile setup failed." },
+        { status: 500 }
+      );
+    }
+
+    const providerAdminMetadataWrite = await ensureProviderAdminMetadata(
+      adminClient,
+      providerId,
+    );
+
+    if (providerAdminMetadataWrite.error) {
+      return NextResponse.json(
+        { error: "Account created, but provider admin metadata setup failed." },
         { status: 500 }
       );
     }

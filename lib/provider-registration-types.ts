@@ -41,6 +41,7 @@ export type ProviderRegistrationData = {
     country: string;
     serviceLocation: string;
     serviceRadius: number;
+    emergencyContact: string;
     emergencyContactNumber: string;
   };
   account: {
