@@ -24,8 +24,15 @@ function getAdminClient() {
 }
 
 export async function GET() {
-  const reports = await listIssueReports();
-  return NextResponse.json({ reports });
+  try {
+    const reports = await listIssueReports();
+    return NextResponse.json({ reports });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to load reports." },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -55,7 +62,7 @@ export async function POST(request: Request) {
 
   const { data: profile } = await adminClient
     .from("profiles")
-    .select("first_name, last_name, email")
+    .select("full_name, email")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -78,23 +85,30 @@ export async function POST(request: Request) {
   }
 
   const reporterName =
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
+    profile?.full_name?.trim() ||
     user.email ||
     "Customer";
 
-  const report = await createIssueReport({
-    bookingId: payload.bookingId,
-    bookingTitle: payload.bookingTitle?.trim() || "Booking Issue",
-    providerName: payload.providerName?.trim() || "Unknown Provider",
-    schedule: payload.schedule?.trim() || "",
-    location: payload.location?.trim() || "",
-    paymentAmount: Number(payload.paymentAmount ?? 0),
-    paymentMethod: payload.paymentMethod?.trim() || "Cash",
-    reporterUserId: user.id,
-    reporterEmail: profile?.email?.trim() || user.email || "",
-    reporterName,
-    message: payload.message.trim(),
-  });
+  try {
+    const report = await createIssueReport({
+      bookingId: payload.bookingId,
+      bookingTitle: payload.bookingTitle?.trim() || "Booking Issue",
+      providerName: payload.providerName?.trim() || "Unknown Provider",
+      schedule: payload.schedule?.trim() || "",
+      location: payload.location?.trim() || "",
+      paymentAmount: Number(payload.paymentAmount ?? 0),
+      paymentMethod: payload.paymentMethod?.trim() || "Cash",
+      reporterUserId: user.id,
+      reporterEmail: profile?.email?.trim() || user.email || "",
+      reporterName,
+      message: payload.message.trim(),
+    });
 
-  return NextResponse.json({ success: true, report });
+    return NextResponse.json({ success: true, report });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to submit report." },
+      { status: 500 },
+    );
+  }
 }
