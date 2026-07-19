@@ -5428,69 +5428,73 @@ export function ServicesScreen() {
                 placeholder="Malay, Arabic, Event catering"
               />
             </label>
-            {editingServiceId ? (
-              <div className="rounded-[18px] border border-[#e7eee8] bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-[12px] font-bold text-[#64748b]">Current Service Image</span>
-                    <p className="mt-1 text-[12px] text-[#94a3b8]">
-                      Update the main image using gallery or camera, then crop before saving.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center gap-4 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
-                  <div className="relative h-24 w-28 overflow-hidden rounded-[14px] border border-[#ece3f8] bg-[linear-gradient(135deg,#f8f4ff_0%,#eef2ff_100%)]">
-                    {serviceImageDataUrls[0] ? (
-                      <Image
-                        src={serviceImageDataUrls[0]}
-                        alt={serviceImageFileName || `${formatServiceLabel(form.serviceType)} service image`}
-                        fill
-                        unoptimized
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[#8E5EB5]">
-                        <BriefcaseBusiness className="h-9 w-9" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] leading-5 text-[#6f6681]">
-                      Replace the current service cover image.
-                    </p>
-                    {serviceImageFileName ? (
-                      <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{serviceImageFileName}</p>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setServiceImageSourceTarget("service");
-                        setMessage("");
-                      }}
-                      className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
-                    >
-                      <Upload className="h-4 w-4" />
-                      Change Service Image
-                    </button>
-                    <input
-                      ref={serviceGalleryInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleServiceImageChange("gallery")}
-                      className="hidden"
-                    />
-                    <input
-                      ref={serviceCameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleServiceImageChange("camera")}
-                      className="hidden"
-                    />
-                  </div>
+            <div className="rounded-[18px] border border-[#e7eee8] bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="text-[12px] font-bold text-[#64748b]">
+                    {editingServiceId ? "Current Service Image" : "Service Image"}
+                  </span>
+                  <p className="mt-1 text-[12px] text-[#94a3b8]">
+                    {editingServiceId
+                      ? "Update the main image using gallery or camera, then crop before saving."
+                      : "Add a main service image using gallery or camera, then crop before saving."}
+                  </p>
                 </div>
               </div>
-            ) : null}
+              <div className="mt-4 flex items-center gap-4 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
+                <div className="relative h-24 w-28 overflow-hidden rounded-[14px] border border-[#ece3f8] bg-[linear-gradient(135deg,#f8f4ff_0%,#eef2ff_100%)]">
+                  {serviceImageDataUrls[0] ? (
+                    <Image
+                      src={serviceImageDataUrls[0]}
+                      alt={serviceImageFileName || `${formatServiceLabel(form.serviceType)} service image`}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[#8E5EB5]">
+                      <BriefcaseBusiness className="h-9 w-9" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] leading-5 text-[#6f6681]">
+                    {editingServiceId
+                      ? "Replace the current service cover image."
+                      : "Upload a cover image for this service."}
+                  </p>
+                  {serviceImageFileName ? (
+                    <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{serviceImageFileName}</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setServiceImageSourceTarget("service");
+                      setMessage("");
+                    }}
+                    className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {editingServiceId ? "Change Service Image" : "Upload Service Image"}
+                  </button>
+                  <input
+                    ref={serviceGalleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleServiceImageChange("gallery")}
+                    className="hidden"
+                  />
+                  <input
+                    ref={serviceCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleServiceImageChange("camera")}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
           {message ? (
             <p className="mt-4 rounded-[16px] border border-[#dbeee2] bg-[#f6fff8] px-4 py-3 text-[13px] font-semibold text-[#15803d]">
@@ -6370,6 +6374,7 @@ export function IdentityVerificationScreen() {
   const backGalleryInputRef = useRef<HTMLInputElement | null>(null);
   const frontCameraInputRef = useRef<HTMLInputElement | null>(null);
   const backCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const hydratedSavedIdentityRef = useRef(false);
   const fallback = LoadingOrError(state);
 
   if (fallback) {
@@ -6380,6 +6385,36 @@ export function IdentityVerificationScreen() {
   const identityStatus = data.identityVerificationStatus;
   const isIdentityLocked = data.identityVerified || identityStatus === "processing";
   const canSubmit = Boolean(frontPreview && backPreview);
+
+  useEffect(() => {
+    if (hydratedSavedIdentityRef.current) {
+      return;
+    }
+
+    if (data.identityDocumentType) {
+      setSelectedDocumentType(data.identityDocumentType);
+    }
+
+    if (data.identityFrontImageUrl) {
+      setFrontPreview(data.identityFrontImageUrl);
+      setFrontFileName(
+        data.identityDocumentType === "passport" ? "passport-front" : "ic-front",
+      );
+    }
+
+    if (data.identityBackImageUrl) {
+      setBackPreview(data.identityBackImageUrl);
+      setBackFileName(
+        data.identityDocumentType === "passport" ? "passport-back" : "ic-back",
+      );
+    }
+
+    hydratedSavedIdentityRef.current = true;
+  }, [
+    data.identityBackImageUrl,
+    data.identityDocumentType,
+    data.identityFrontImageUrl,
+  ]);
 
   const handleFileChange = (side: "front" | "back", source: "gallery" | "camera") =>
     async (event: ChangeEvent<HTMLInputElement>) => {

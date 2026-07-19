@@ -36,6 +36,9 @@ export type ProviderDashboardData = {
   phoneVerified: boolean;
   identityVerified: boolean;
   identityVerificationStatus: "pending" | "processing" | "verified" | "rejected";
+  identityDocumentType?: "ic" | "passport";
+  identityFrontImageUrl: string;
+  identityBackImageUrl: string;
   kycVerified: boolean;
   backgroundCheckVerified: boolean;
   services: Array<{

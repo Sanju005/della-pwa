@@ -1,4 +1,11 @@
 import { approvalItems, complaints, dashboardMetrics } from "../data/mock-data";
+import { listApprovalQueueWithFallback } from "./admin-approvals";
+import { listBookingsWithFallback } from "./admin-bookings";
+import { listComplaintsWithFallback } from "./admin-complaints";
+import { listPaymentsWithFallback } from "./admin-payments";
+import { listReviewsWithFallback } from "./admin-reviews";
+import { listUsersWithFallback } from "./admin-users";
+import type { ApprovalItem, ComplaintRow, DashboardBooking, PaymentRow, ReviewRow, UserRow } from "../types";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 type LiveMetricCard = {
@@ -21,6 +28,11 @@ type DashboardSnapshot = {
   metrics: LiveMetricCard[];
   approvals: LiveApprovalItem[];
   complaintsOpen: number;
+  recentBookings: DashboardBooking[];
+  recentPayments: PaymentRow[];
+  recentReviews: ReviewRow[];
+  recentComplaints: ComplaintRow[];
+  userRows: UserRow[];
 };
 
 async function countRows(table: string, filters?: Array<[string, string | boolean]>) {
@@ -85,6 +97,11 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       metrics: dashboardMetrics,
       approvals: approvalItems,
       complaintsOpen: fallbackComplaintCount(),
+      recentBookings: [],
+      recentPayments: [],
+      recentReviews: [],
+      recentComplaints: complaints,
+      userRows: [],
     };
   }
 
@@ -94,7 +111,13 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     activeTasks,
     paymentTotal,
     pendingApprovals,
-    liveComplaintsOpen,
+    liveComplaintsOpenTable,
+    approvalRows,
+    recentBookings,
+    recentPayments,
+    recentReviews,
+    recentComplaints,
+    userRows,
   ] = await Promise.all([
     countRows("profiles"),
     countRows("profiles", [["role", "provider"]]),
@@ -102,7 +125,18 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     sumPaymentAmounts(),
     countRows("provider_profiles", [["approval_status", "pending"]]),
     countRows("complaints", [["status", "open"]]),
+    listApprovalQueueWithFallback(),
+    listBookingsWithFallback(),
+    listPaymentsWithFallback(),
+    listReviewsWithFallback(),
+    listComplaintsWithFallback(),
+    listUsersWithFallback(),
   ]);
+
+  const liveComplaintsOpen =
+    recentComplaints.filter((item) => item.status.toLowerCase() === "open").length ||
+    liveComplaintsOpenTable ||
+    fallbackComplaintCount();
 
   const metrics: LiveMetricCard[] = dashboardMetrics.map((metric) => {
     switch (metric.title) {
@@ -143,20 +177,39 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     }
   });
 
+  const liveApprovalRows = approvalRows.length ? approvalRows : [];
+  const documentApprovals = liveApprovalRows.filter((row) =>
+    ["document review", "processing", "pending"].some((value) =>
+      row.verification.toLowerCase().includes(value),
+    ),
+  ).length;
+  const listingApprovals = liveApprovalRows.filter((row) =>
+    !["approved", "verified", "complete"].some((value) =>
+      row.verification.toLowerCase().includes(value),
+    ),
+  ).length;
   const approvals: LiveApprovalItem[] = approvalItems.map((item) => {
+    let pending = item.pending;
+
     if (item.title === "Service Providers") {
-      return {
-        ...item,
-        pending: pendingApprovals ?? item.pending,
-      };
+      pending = liveApprovalRows.length || pendingApprovals || item.pending;
+    } else if (item.title === "Documents") {
+      pending = documentApprovals || item.pending;
+    } else if (item.title === "Listings") {
+      pending = listingApprovals || item.pending;
     }
 
-    return item;
+    return { ...item, pending };
   });
 
   return {
     metrics,
     approvals,
     complaintsOpen: liveComplaintsOpen ?? fallbackComplaintCount(),
+    recentBookings: recentBookings.slice(0, 5),
+    recentPayments: recentPayments.slice(0, 5),
+    recentReviews: recentReviews.slice(0, 4),
+    recentComplaints: recentComplaints.slice(0, 5),
+    userRows: userRows.slice(0, 200),
   };
 }

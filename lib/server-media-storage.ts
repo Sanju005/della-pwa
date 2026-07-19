@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getSupabaseUrl } from "@/lib/supabase-env";
+
 type MediaBucket =
   | "profile-images"
   | "provider-work-images"
@@ -53,7 +55,7 @@ function isHttpUrl(value: string) {
 }
 
 function parseDataUrl(dataUrl: string) {
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  const match = dataUrl.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/i);
 
   if (!match) {
     throw new Error("Invalid data URL.");
@@ -64,6 +66,61 @@ function parseDataUrl(dataUrl: string) {
     mimeType: mimeType.toLowerCase(),
     buffer: Buffer.from(base64Payload, "base64"),
   };
+}
+
+function extractStoragePathFromUrl(bucket: MediaBucket, value: string) {
+  if (!isHttpUrl(value)) {
+    return "";
+  }
+
+  const candidates = [
+    `/storage/v1/object/public/${bucket}/`,
+    `/storage/v1/object/sign/${bucket}/`,
+    `/storage/v1/object/authenticated/${bucket}/`,
+  ];
+
+  try {
+    const parsed = new URL(value);
+    const supabaseUrl = getSupabaseUrl();
+
+    if (supabaseUrl) {
+      const parsedSupabaseUrl = new URL(supabaseUrl);
+
+      if (parsed.origin !== parsedSupabaseUrl.origin) {
+        return "";
+      }
+    }
+
+    for (const prefix of candidates) {
+      const prefixIndex = parsed.pathname.indexOf(prefix);
+
+      if (prefixIndex === -1) {
+        continue;
+      }
+
+      const rawPath = parsed.pathname.slice(prefixIndex + prefix.length);
+      return decodeURIComponent(rawPath).trim();
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function normalizeStoredMediaValue(bucket: MediaBucket, value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (isDataUrl(trimmed)) {
+    return trimmed;
+  }
+
+  const storagePath = extractStoragePathFromUrl(bucket, trimmed);
+  return storagePath || trimmed;
 }
 
 function getExtension(mimeType: string, fileName?: string | null) {
@@ -91,7 +148,7 @@ export async function uploadStoredMedia(
   adminClient: SupabaseClient,
   options: UploadStoredMediaOptions,
 ) {
-  const trimmed = options.dataUrl.trim();
+  const trimmed = normalizeStoredMediaValue(options.bucket, options.dataUrl);
 
   if (!trimmed) {
     return "";
@@ -156,9 +213,9 @@ export async function resolveStoredMediaUrl(
   adminClient: SupabaseClient,
   options: ResolveStoredMediaOptions,
 ) {
-  const trimmed = options.value?.trim() ?? "";
+  const trimmed = normalizeStoredMediaValue(options.bucket, options.value?.trim() ?? "");
 
-  if (!trimmed || isDataUrl(trimmed) || isHttpUrl(trimmed)) {
+  if (!trimmed || isDataUrl(trimmed)) {
     return trimmed;
   }
 

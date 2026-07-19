@@ -2,7 +2,6 @@ import { Suspense, lazy } from "react";
 import { Navigate, RouterProvider, createBrowserRouter, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/auth-provider";
 import { AdminShell } from "./components/admin-shell";
-import { complaints, providers as mockProviders, reviews, bookings } from "./data/mock-data";
 
 const DashboardPage = lazy(async () => {
   const module = await import("./pages/dashboard-page");
@@ -67,6 +66,21 @@ const PaymentDetailPage = lazy(async () => {
 const ProvidersPage = lazy(async () => {
   const module = await import("./pages/providers-page");
   return { default: module.ProvidersPage };
+});
+
+const ProviderApprovalsPage = lazy(async () => {
+  const module = await import("./pages/provider-approvals-page");
+  return { default: module.ProviderApprovalsPage };
+});
+
+const ReviewsPage = lazy(async () => {
+  const module = await import("./pages/reviews-page");
+  return { default: module.ReviewsPage };
+});
+
+const ComplaintsPage = lazy(async () => {
+  const module = await import("./pages/complaints-page");
+  return { default: module.ComplaintsPage };
 });
 
 const UsersPage = lazy(async () => {
@@ -188,28 +202,7 @@ const router = createBrowserRouter([
       },
       {
         path: "provider-approvals",
-        element: withSuspense((
-          <ResourcePage
-            title="Provider Approvals"
-            description="Pending provider and listing approval decisions."
-            rows={mockProviders.filter((provider) => provider.status !== "Approved")}
-            columns={[
-              { key: "id", label: "ID" },
-              { key: "provider", label: "Provider" },
-              { key: "service", label: "Service" },
-              { key: "status", label: "Status" },
-              { key: "zone", label: "Zone" },
-              { key: "verification", label: "Verification" },
-            ]}
-            statusKey="status"
-            searchPlaceholder="Search pending approvals..."
-            stats={[
-              { label: "Profiles", value: "12", note: "Profiles waiting for initial ops review" },
-              { label: "Documents", value: "8", note: "KYC and compliance checks" },
-              { label: "Listings", value: "5", note: "Marketplace visibility approvals" },
-            ]}
-          />
-        )),
+        element: withSuspense(<ProviderApprovalsPage />),
       },
       {
         path: "tasks-bookings",
@@ -229,55 +222,11 @@ const router = createBrowserRouter([
       },
       {
         path: "reviews",
-        element: withSuspense((
-          <ResourcePage
-            title="Reviews"
-            description="Moderation and quality signals from marketplace feedback."
-            rows={reviews}
-            columns={[
-              { key: "id", label: "ID" },
-              { key: "customer", label: "Customer" },
-              { key: "provider", label: "Provider" },
-              { key: "rating", label: "Rating" },
-              { key: "comment", label: "Comment" },
-              { key: "status", label: "Status" },
-              { key: "date", label: "Date" },
-            ]}
-            statusKey="status"
-            searchPlaceholder="Search reviews, comments, or providers..."
-            stats={[
-              { label: "Published", value: "8,432", note: "Visible marketplace reviews" },
-              { label: "Flagged", value: "17", note: "Awaiting moderation" },
-              { label: "Average rating", value: "4.82", note: "Rolling 30-day platform score" },
-            ]}
-          />
-        )),
+        element: withSuspense(<ReviewsPage />),
       },
       {
         path: "complaints",
-        element: withSuspense((
-          <ResourcePage
-            title="Complaints"
-            description="Trust, support, and service recovery queue."
-            rows={complaints}
-            columns={[
-              { key: "ticket", label: "Ticket" },
-              { key: "subject", label: "Subject" },
-              { key: "customer", label: "Customer" },
-              { key: "owner", label: "Owner" },
-              { key: "status", label: "Status" },
-              { key: "priority", label: "Priority" },
-              { key: "updated", label: "Updated" },
-            ]}
-            statusKey="status"
-            searchPlaceholder="Search complaints, owners, or ticket IDs..."
-            stats={[
-              { label: "Open", value: "19", note: "Cases needing immediate attention" },
-              { label: "Escalated", value: "4", note: "High-risk incidents" },
-              { label: "Resolved", value: "143", note: "Closed this month" },
-            ]}
-          />
-        )),
+        element: withSuspense(<ComplaintsPage />),
       },
       {
         path: "settings",

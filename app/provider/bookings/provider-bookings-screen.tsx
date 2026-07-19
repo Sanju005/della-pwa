@@ -94,6 +94,62 @@ function isOngoingStatus(status: ProviderBookingItem["bookingStatus"]) {
   ].includes(status);
 }
 
+function CompletionProofGrid({
+  bookingId,
+  images,
+  onRemove,
+}: {
+  bookingId: string;
+  images: string[];
+  onRemove?: (index: number) => void;
+}) {
+  if (images.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4">
+      <p className="text-[13px] font-extrabold text-[#1f1630]">
+        Completion Images ({images.length})
+      </p>
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+        {images.map((image, index) => (
+          <div
+            key={`${bookingId}-completion-proof-${index}`}
+            className="relative aspect-[0.88] overflow-hidden rounded-[22px] bg-white p-3 shadow-[0_16px_34px_rgba(86,38,135,0.08)]"
+          >
+            <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[18px] border-2 border-dashed border-[#ff5ab8] bg-[#fffdfd]">
+              {isPdfWorkProof(image) ? (
+                <div className="flex flex-col items-center justify-center gap-3 px-3 text-center text-[#e83e9a]">
+                  <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                  <ImageIcon className="h-8 w-8" />
+                  <span className="text-[11px] font-semibold leading-4">Proof file {index + 1}</span>
+                </div>
+              ) : (
+                <img
+                  src={image}
+                  alt={`Completion proof ${index + 1}`}
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </div>
+            {onRemove ? (
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#1f1630]/70 text-[12px] font-black text-white"
+                aria-label={`Remove completion proof ${index + 1}`}
+              >
+                x
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function formatStepDate(value?: string) {
   if (!value) {
     return "";
@@ -928,61 +984,29 @@ function BookingDetails({
                   </div>
                 </div>
 
+                <CompletionProofGrid
+                  bookingId={booking.id}
+                  images={workFinishedImages}
+                  onRemove={(index) =>
+                    setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                  }
+                />
                 <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
-                  {Array.from({ length: WORK_FINISHED_IMAGE_MAX_COUNT }).map((_, index) => {
-                    const image = workFinishedImages[index];
-
-                    if (image) {
-                      return (
-                        <div
-                          key={`${booking.id}-work-image-${index}`}
-                          className="relative aspect-[0.88] overflow-hidden rounded-[22px] bg-white p-3 shadow-[0_16px_34px_rgba(86,38,135,0.08)]"
-                        >
-                          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[18px] border-2 border-dashed border-[#ff5ab8] bg-[#fffdfd]">
-                            {isPdfWorkProof(image) ? (
-                              <div className="flex flex-col items-center justify-center gap-3 px-3 text-center text-[#e83e9a]">
-                                <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
-                                <ImageIcon className="h-8 w-8" />
-                                <span className="text-[11px] font-semibold leading-4">Proof file {index + 1}</span>
-                              </div>
-                            ) : (
-                              <img
-                                src={image}
-                                alt={`Completion proof ${index + 1}`}
-                                className="h-full w-full object-cover"
-                              />
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
-                            }
-                            className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#1f1630]/70 text-[12px] font-black text-white"
-                            aria-label={`Remove completion proof ${index + 1}`}
-                          >
-                            x
-                          </button>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <button
-                        key={`${booking.id}-work-image-slot-${index}`}
-                        type="button"
-                        onClick={() => workFinishedInputRef.current?.click()}
-                        className="aspect-[0.88] rounded-[22px] bg-white p-3 shadow-[0_16px_34px_rgba(86,38,135,0.08)]"
-                      >
-                        <span className="flex h-full w-full flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-[#ff5ab8] bg-[#fffdfd] text-[#e83e9a]">
-                          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95),rgba(248,214,233,0.95))] shadow-[0_10px_22px_rgba(232,62,154,0.12)]">
-                            <Plus className="h-6 w-6" />
-                          </span>
-                          <ImageIcon className="mt-4 h-9 w-9" />
+                  {Array.from({ length: Math.max(0, WORK_FINISHED_IMAGE_MAX_COUNT - workFinishedImages.length) }).map((_, index) => (
+                    <button
+                      key={`${booking.id}-work-image-slot-${index}`}
+                      type="button"
+                      onClick={() => workFinishedInputRef.current?.click()}
+                      className="aspect-[0.88] rounded-[22px] bg-white p-3 shadow-[0_16px_34px_rgba(86,38,135,0.08)]"
+                    >
+                      <span className="flex h-full w-full flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-[#ff5ab8] bg-[#fffdfd] text-[#e83e9a]">
+                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95),rgba(248,214,233,0.95))] shadow-[0_10px_22px_rgba(232,62,154,0.12)]">
+                          <Plus className="h-6 w-6" />
                         </span>
-                      </button>
-                    );
-                  })}
+                        <ImageIcon className="mt-4 h-9 w-9" />
+                      </span>
+                    </button>
+                  ))}
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-3 text-[#1f1630]">
@@ -1099,16 +1123,17 @@ function BookingDetails({
             timeLabel={formatStepTime(booking.reviewRequestedAt || booking.paidAt)}
             expanded={stepState.userCompleted === "current" || stepState.userCompleted === "done"}
           >
+            <CompletionProofGrid bookingId={booking.id} images={booking.workFinishedImages ?? []} />
             {booking.bookingStatus === "payment_received_by_provider" ? (
               <button
                 type="button"
                 onClick={() => onCompleteProviderJob(booking.id)}
-                className="inline-flex h-12 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] text-[16px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.24)]"
+                className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] text-[16px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.24)]"
               >
                 Complete Job
               </button>
             ) : (
-              <p className="text-[13px] leading-6 text-[#64748b]">
+              <p className="mt-4 text-[13px] leading-6 text-[#64748b]">
                 The provider completion step is finished.
               </p>
             )}

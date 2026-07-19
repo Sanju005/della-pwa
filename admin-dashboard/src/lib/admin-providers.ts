@@ -93,6 +93,34 @@ type ProviderAccountRow = {
   avatar_url?: string | null;
   phone?: string | null;
   created_at?: string | null;
+  emergency_contact?: string | null;
+  emergency_contact_number?: string | null;
+};
+
+type ProviderRegistrationSnapshot = {
+  id: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  status?: string | null;
+  data?: {
+    basicProfile?: {
+      emergencyContact?: string | null;
+      emergencyContactNumber?: string | null;
+      avatarDataUrl?: string | null;
+    } | null;
+    verification?: {
+      documentType?: string | null;
+      frontImageDataUrl?: string | null;
+      backImageDataUrl?: string | null;
+    } | null;
+    serviceDetails?: Record<
+      string,
+      {
+        imageDataUrls?: string[] | null;
+        certificateDataUrls?: string[] | null;
+      }
+    > | null;
+  } | null;
 };
 
 type LiveBookingRow = {
@@ -589,9 +617,37 @@ async function fetchProviderAccountById(providerId: string) {
     return null;
   }
 
-  const { data, error } = await supabase
+  const primary = await supabase
+    .from("profiles")
+    .select("id, full_name, email, role, status, phone, created_at, avatar_url, emergency_contact, emergency_contact_number")
+    .eq("id", providerId)
+    .maybeSingle();
+
+  if (!primary.error && primary.data) {
+    return primary.data as ProviderAccountRow;
+  }
+
+  const fallback = await supabase
     .from("profiles")
     .select("id, full_name, email, role, status, phone, created_at, avatar_url")
+    .eq("id", providerId)
+    .maybeSingle();
+
+  if (fallback.error || !fallback.data) {
+    return null;
+  }
+
+  return fallback.data as ProviderAccountRow;
+}
+
+async function fetchProviderRegistrationSnapshot(providerId: string) {
+  if (!isSupabaseConfigured || !supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("provider_registration_submissions")
+    .select("id, created_at, updated_at, status, data")
     .eq("id", providerId)
     .maybeSingle();
 
@@ -599,7 +655,7 @@ async function fetchProviderAccountById(providerId: string) {
     return null;
   }
 
-  return data as ProviderAccountRow;
+  return data as ProviderRegistrationSnapshot;
 }
 
 function mapProviderRow(liveProfile: ProviderProfileRow, liveAccount: ProviderAccountRow | null): ProviderRow {
@@ -1073,6 +1129,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   }
 
   const liveAccount = await fetchProviderAccountById(providerId);
+  const registrationSnapshot = await fetchProviderRegistrationSnapshot(providerId);
   const fallback =
     findMockProviderDetail(providerId, liveProfile.marketing_name ?? liveAccount?.full_name, liveAccount?.email) ??
     providerDetailRecords["PRV-2034"]!;
@@ -1107,14 +1164,17 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const profileImageUrl = await resolveAdminMediaUrl("profile-images", liveAccount?.avatar_url, "public");
   const identityDocumentType =
     verification?.identity_document_type?.trim() ||
+    registrationSnapshot?.data?.verification?.documentType?.trim() ||
     verification?.document_type?.trim() ||
     "";
   const identityFrontValue =
     verification?.identity_front_image_url?.trim() ||
+    registrationSnapshot?.data?.verification?.frontImageDataUrl?.trim() ||
     verification?.document_front_url?.trim() ||
     "";
   const identityBackValue =
     verification?.identity_back_image_url?.trim() ||
+    registrationSnapshot?.data?.verification?.backImageDataUrl?.trim() ||
     verification?.document_back_url?.trim() ||
     "";
   const identityDocuments = (
@@ -1165,6 +1225,13 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     liveProfile.provider_services,
     "certificate",
   );
+  const snapshotServiceDetails = registrationSnapshot?.data?.serviceDetails ?? null;
+  const emergencyContact =
+    liveAccount?.emergency_contact_number?.trim() ||
+    liveAccount?.emergency_contact?.trim() ||
+    registrationSnapshot?.data?.basicProfile?.emergencyContactNumber?.trim() ||
+    registrationSnapshot?.data?.basicProfile?.emergencyContact?.trim() ||
+    fallback.emergencyContact;
   const reviewRows = liveReviews?.length
     ? buildReviewRows(liveReviews, customerNames)
     : getMockProviderReviews(fallback.name).length
@@ -1199,6 +1266,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     rating: typeof liveProfile.average_rating === "number" ? liveProfile.average_rating.toFixed(1) : fallback.rating,
     ratingNote: `(${liveProfile.total_reviews ?? (Number(fallback.totalReviews) || 0)} reviews)`,
     phone: liveAccount?.phone?.trim() || fallback.phone,
+    emergencyContact,
     dob: formatDateOfBirth(liveProfile.date_of_birth) || fallback.dob,
     gender:
       liveProfile.sex === "Male" || liveProfile.sex === "Female"
@@ -1255,8 +1323,34 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
       ...fallback.documents.slice(2),
     ] satisfies ProviderDocumentItem[],
     identityDocuments,
-    workGallery: workGallery.length ? workGallery : fallback.workGallery,
-    certificates: certificates.length ? certificates : fallback.certificates,
+    workGallery:
+      workGallery.length
+        ? workGallery
+        : await (async () => {
+            const items = Object.entries(snapshotServiceDetails ?? {}).flatMap(([service, details]) =>
+              (details?.imageDataUrls ?? []).map((value, index) => ({
+                id: `snapshot-work-${service}-${index + 1}`,
+                label: `${humanizeService(service)} Work ${index + 1}`,
+                fileName: toMediaFileName(value, `${service}-work-${index + 1}`),
+                previewUrl: value,
+              })),
+            );
+            return items.filter((item) => item.previewUrl);
+          })().then((items) => (items.length ? items : fallback.workGallery)),
+    certificates:
+      certificates.length
+        ? certificates
+        : await (async () => {
+            const items = Object.entries(snapshotServiceDetails ?? {}).flatMap(([service, details]) =>
+              (details?.certificateDataUrls ?? []).map((value, index) => ({
+                id: `snapshot-certificate-${service}-${index + 1}`,
+                label: `${humanizeService(service)} Certificate ${index + 1}`,
+                fileName: toMediaFileName(value, `${service}-certificate-${index + 1}`),
+                previewUrl: value,
+              })),
+            );
+            return items.filter((item) => item.previewUrl);
+          })().then((items) => (items.length ? items : fallback.certificates)),
     completedTaskRows: taskRows?.completedTaskRows.length ? taskRows.completedTaskRows : fallback.completedTaskRows,
     upcomingTaskRows: taskRows?.upcomingTaskRows.length ? taskRows.upcomingTaskRows : fallback.upcomingTaskRows,
     payoutRows,

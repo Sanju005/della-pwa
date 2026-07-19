@@ -5,6 +5,7 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
+import { uploadStoredMediaList } from "@/lib/server-media-storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ type ServicePayload = {
   hourlyRate?: number;
   dailyRate?: number;
   specialties?: string[];
+  imageDataUrls?: string[];
+  imageCaptions?: string[];
 };
 
 function isProviderRole(role: string | null | undefined) {
@@ -101,6 +104,23 @@ function normalizeSpecialties(items: string[] | undefined) {
     .filter(Boolean);
 }
 
+function normalizeMedia(items: string[] | undefined) {
+  return (items ?? []).map((item) => item.trim()).filter(Boolean);
+}
+
+function normalizeCaptions(items: string[] | undefined, media: string[]) {
+  return media.map((_, index) => items?.[index]?.trim() ?? "");
+}
+
+function isMissingProviderServiceMediaColumnError(message?: string) {
+  const normalized = message?.trim().toLowerCase() ?? "";
+
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("image_data_urls") || normalized.includes("image_captions"))
+  );
+}
+
 export async function POST(request: Request) {
   const verified = await verifyProviderRequest(request);
 
@@ -168,6 +188,39 @@ export async function POST(request: Request) {
     if (specialtyWrite.error) {
       return NextResponse.json(
         { error: specialtyWrite.error.message || "Service was added, but specialties could not be saved." },
+        { status: 500 },
+      );
+    }
+  }
+
+  const imageDataUrls = await uploadStoredMediaList(
+    verified.adminClient,
+    normalizeMedia(payload.imageDataUrls).map((dataUrl, index) => ({
+      dataUrl,
+      fileName: `service-image-${index + 1}.jpg`,
+    })),
+    {
+      bucket: "provider-work-images",
+      ownerId: verified.profile.id,
+      pathPrefix: [insertedServiceId, "work"],
+      visibility: "public",
+    },
+  );
+  const imageCaptions = normalizeCaptions(payload.imageCaptions, imageDataUrls);
+
+  if (imageDataUrls.length > 0) {
+    const mediaWrite = await verified.adminClient
+      .from("provider_services")
+      .update({
+        image_data_urls: imageDataUrls,
+        image_captions: imageCaptions,
+      })
+      .eq("id", insertedServiceId)
+      .eq("provider_id", verified.profile.id);
+
+    if (mediaWrite.error && !isMissingProviderServiceMediaColumnError(mediaWrite.error.message)) {
+      return NextResponse.json(
+        { error: mediaWrite.error.message || "Service was added, but images could not be saved." },
         { status: 500 },
       );
     }

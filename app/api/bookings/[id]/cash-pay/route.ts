@@ -19,6 +19,7 @@ type BookingRow = {
   customer_id: string;
   provider_id: string;
   service_label: string;
+  quoted_amount?: number | null;
   booking_status:
     | "pending_provider_response"
     | "declined_by_provider"
@@ -126,7 +127,7 @@ export async function POST(
   const params = await context.params;
   const { data: booking, error: bookingError } = await verified.adminClient
     .from("bookings")
-    .select("id, customer_id, provider_id, service_label, booking_status")
+    .select("id, customer_id, provider_id, service_label, quoted_amount, booking_status")
     .eq("id", params.id)
     .eq("customer_id", verified.profile.id)
     .maybeSingle();
@@ -157,19 +158,27 @@ export async function POST(
 
   const timestamp = new Date().toISOString();
 
+  const paymentPayload = {
+    booking_id: bookingRow.id,
+    customer_id: verified.profile.id,
+    provider_id: bookingRow.provider_id,
+    service_title: `${bookingRow.service_label} Service`,
+    currency: "myr",
+    amount: Number(bookingRow.quoted_amount ?? 0),
+    payment_provider: "manual",
+    payment_option: "cash",
+    status: "paid",
+    payment_method: "Cash",
+    paid_at: timestamp,
+    customer_confirmed_at: timestamp,
+    customer_payment_proof_data_url: storedProofDataUrl || null,
+    customer_payment_proof_file_name: payload.proofFileName?.trim() || null,
+    customer_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
+  };
+
   const { error: paymentError } = await verified.adminClient
     .from("payments")
-    .update({
-      status: "paid",
-      payment_method: "Cash",
-      paid_at: timestamp,
-      customer_confirmed_at: timestamp,
-      customer_payment_proof_data_url: storedProofDataUrl || null,
-      customer_payment_proof_file_name: payload.proofFileName?.trim() || null,
-      customer_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
-    })
-    .eq("booking_id", bookingRow.id)
-    .eq("customer_id", verified.profile.id);
+    .upsert(paymentPayload, { onConflict: "booking_id" });
 
   if (paymentError) {
     return NextResponse.json(

@@ -1,9 +1,12 @@
 import "server-only";
 
+import { createClient } from "@supabase/supabase-js";
+
 import type {
   ProviderRegistrationData,
   ProviderRegistrationRecord,
 } from "./provider-registration-types";
+import { getSupabaseServiceKey, getSupabaseUrl } from "./supabase-env";
 
 const expectedOtp = "123456";
 
@@ -16,6 +19,57 @@ declare global {
 
 function isWorkerdRuntime() {
   return typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
+}
+
+type ProviderRegistrationSubmissionRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  status: "pending_admin_approval";
+  phone_verified: boolean;
+  email_verified: boolean;
+  identity_verified: boolean;
+  data: ProviderRegistrationData;
+};
+
+function getAdminClient() {
+  const url = getSupabaseUrl();
+  const serviceKey = getSupabaseServiceKey();
+
+  if (!url || !serviceKey) {
+    return null;
+  }
+
+  return createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+function isMissingRegistrationsSchemaError(message?: string | null) {
+  const normalized = message?.trim().toLowerCase() ?? "";
+
+  return (
+    normalized.includes("provider_registration_submissions") &&
+    (normalized.includes("does not exist") ||
+      normalized.includes("schema cache") ||
+      normalized.includes("relation"))
+  );
+}
+
+function mapRowToRecord(row: ProviderRegistrationSubmissionRow): ProviderRegistrationRecord {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    status: row.status,
+    phoneVerified: row.phone_verified,
+    emailVerified: row.email_verified,
+    identityVerified: row.identity_verified,
+    data: row.data,
+  };
 }
 
 async function ensureNodeDataFile() {
@@ -71,6 +125,23 @@ function writeWorkerRegistrations(records: ProviderRegistrationRecord[]) {
 }
 
 async function readRegistrations() {
+  const adminClient = getAdminClient();
+
+  if (adminClient) {
+    const { data, error } = await adminClient
+      .from("provider_registration_submissions")
+      .select("id, created_at, updated_at, status, phone_verified, email_verified, identity_verified, data")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      return (data as ProviderRegistrationSubmissionRow[]).map(mapRowToRecord);
+    }
+
+    if (error && !isMissingRegistrationsSchemaError(error.message)) {
+      throw new Error(error.message || "Unable to load provider registrations.");
+    }
+  }
+
   if (isWorkerdRuntime()) {
     return readWorkerRegistrations();
   }
@@ -79,6 +150,33 @@ async function readRegistrations() {
 }
 
 async function writeRegistrations(records: ProviderRegistrationRecord[]) {
+  const adminClient = getAdminClient();
+
+  if (adminClient) {
+    const payload = records.map((record) => ({
+      id: record.id,
+      created_at: record.createdAt,
+      updated_at: record.updatedAt,
+      status: record.status,
+      phone_verified: record.phoneVerified,
+      email_verified: record.emailVerified,
+      identity_verified: record.identityVerified,
+      data: record.data,
+    }));
+
+    const { error } = await adminClient
+      .from("provider_registration_submissions")
+      .upsert(payload, { onConflict: "id" });
+
+    if (!error) {
+      return;
+    }
+
+    if (!isMissingRegistrationsSchemaError(error.message)) {
+      throw new Error(error.message || "Unable to save provider registrations.");
+    }
+  }
+
   if (isWorkerdRuntime()) {
     writeWorkerRegistrations(records);
     return;
@@ -124,6 +222,24 @@ export async function createProviderRegistration(
 }
 
 export async function getProviderRegistration(id: string) {
+  const adminClient = getAdminClient();
+
+  if (adminClient) {
+    const { data, error } = await adminClient
+      .from("provider_registration_submissions")
+      .select("id, created_at, updated_at, status, phone_verified, email_verified, identity_verified, data")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!error && data) {
+      return mapRowToRecord(data as ProviderRegistrationSubmissionRow);
+    }
+
+    if (error && !isMissingRegistrationsSchemaError(error.message)) {
+      throw new Error(error.message || "Unable to load provider registration.");
+    }
+  }
+
   const records = await readRegistrations();
   return records.find((record) => record.id === id) ?? null;
 }

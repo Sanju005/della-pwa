@@ -494,6 +494,11 @@ export async function GET(request: Request) {
     bookings: await Promise.all(rows.map(async (row) => {
       const normalizedStatus = normalizeBookingWorkflowStatus(row.booking_status);
       const parsedAdjustment = parsePaymentAdjustmentNote(row.provider_response_note);
+      const customerPaymentProofValue =
+        row.payment_records?.[0]?.customer_payment_proof_data_url?.trim() ||
+        (Array.isArray(row.cash_payment_proof_images) && typeof row.cash_payment_proof_images[0] === "string"
+          ? row.cash_payment_proof_images[0]
+          : "");
       const quotedAmount =
         typeof row.payment_records?.[0]?.amount === "number"
           ? Number(row.payment_records[0]?.amount ?? 0)
@@ -577,7 +582,7 @@ export async function GET(request: Request) {
         providerNetAmount,
         customerPaymentProofDataUrl: await resolveStoredMediaUrl(verified.adminClient, {
           bucket: "payment-proofs",
-          value: row.payment_records?.[0]?.customer_payment_proof_data_url ?? "",
+          value: customerPaymentProofValue,
           visibility: "private",
         }),
         customerPaymentProofFileName: row.payment_records?.[0]?.customer_payment_proof_file_name ?? "",

@@ -730,6 +730,11 @@ async function mapLiveBookingToUi(
   const workflowStatus = normalizeBookingWorkflowStatus(row.booking_status);
   const paymentAdjustment = parsePaymentAdjustmentNote(row.provider_response_note);
   const paymentRecord = row.payment_records?.[0] ?? null;
+  const cashPaymentProofValue =
+    paymentRecord?.customer_payment_proof_data_url?.trim() ||
+    (Array.isArray(row.cash_payment_proof_images) && typeof row.cash_payment_proof_images[0] === "string"
+      ? row.cash_payment_proof_images[0]
+      : "");
   const paidAmount = typeof paymentRecord?.amount === "number"
     ? Number(paymentRecord.amount)
     : Number(row.final_amount ?? 0) || (paymentAdjustment?.finalAmount ?? Number(row.quoted_amount ?? 0));
@@ -793,7 +798,7 @@ async function mapLiveBookingToUi(
           : "pending",
     customerPaymentProofDataUrl: await resolveStoredMediaUrl(adminClient, {
       bucket: "payment-proofs",
-      value: paymentRecord?.customer_payment_proof_data_url ?? "",
+      value: cashPaymentProofValue,
       visibility: "private",
     }),
     customerPaymentProofFileName: paymentRecord?.customer_payment_proof_file_name ?? "",

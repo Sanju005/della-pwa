@@ -1,10 +1,11 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import { bookings, dashboardMetrics, payments, approvalItems, complaints, reviews } from "../data/mock-data";
+import { approvalItems, dashboardMetrics } from "../data/mock-data";
 import { DataTable } from "../components/data-table";
 import { StatusBadge, statusToTone } from "../components/status-badge";
 import { AdminStatCard, LoadingState, SectionTitle } from "../components/ui-kit";
 import { getDashboardSnapshot } from "../lib/dashboard-metrics";
+import type { ComplaintRow, DashboardBooking, PaymentRow, ReviewRow, UserRow } from "../types";
 
 const bookingColumns = [
   { key: "id", label: "ID" },
@@ -29,6 +30,11 @@ const paymentColumns = [
 export function DashboardPage() {
   const [metrics, setMetrics] = useState(dashboardMetrics);
   const [approvals, setApprovals] = useState(approvalItems);
+  const [bookings, setBookings] = useState<DashboardBooking[]>([]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [reviews, setReviews] = useState<ReviewRow[]>([]);
+  const [complaints, setComplaints] = useState<ComplaintRow[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,6 +49,11 @@ export function DashboardPage() {
 
       setMetrics(snapshot.metrics);
       setApprovals(snapshot.approvals);
+      setBookings(snapshot.recentBookings);
+      setPayments(snapshot.recentPayments);
+      setReviews(snapshot.recentReviews);
+      setComplaints(snapshot.recentComplaints);
+      setUsers(snapshot.userRows);
       setLoading(false);
     }
 
@@ -56,6 +67,29 @@ export function DashboardPage() {
   if (loading) {
     return <LoadingState />;
   }
+
+  const totalTasks = bookings.length;
+  const pendingTasks = bookings.filter((row) => row.status.toLowerCase() === "pending").length;
+  const acceptedTasks = bookings.filter((row) => row.status.toLowerCase() === "accepted").length;
+  const inProgressTasks = bookings.filter((row) => row.status.toLowerCase() === "in progress").length;
+  const completedTasks = bookings.filter((row) => row.status.toLowerCase() === "completed").length;
+  const activeUsers = users.filter((row) => ["active", "verified"].includes(row.status.toLowerCase())).length;
+  const inactiveUsers = users.filter((row) => row.status.toLowerCase() === "inactive").length;
+  const bannedUsers = users.filter((row) => ["banned", "suspended", "deleted"].includes(row.status.toLowerCase())).length;
+  const totalUsers = users.length;
+
+  const taskMix = [
+    ["Pending", String(pendingTasks), totalTasks ? `${((pendingTasks / totalTasks) * 100).toFixed(1)}%` : "0.0%", "amber"],
+    ["Accepted", String(acceptedTasks), totalTasks ? `${((acceptedTasks / totalTasks) * 100).toFixed(1)}%` : "0.0%", "sky"],
+    ["In Progress", String(inProgressTasks), totalTasks ? `${((inProgressTasks / totalTasks) * 100).toFixed(1)}%` : "0.0%", "violet"],
+    ["Completed", String(completedTasks), totalTasks ? `${((completedTasks / totalTasks) * 100).toFixed(1)}%` : "0.0%", "emerald"],
+  ] as const;
+
+  const userOverview = [
+    ["Active users", activeUsers, totalUsers ? `${((activeUsers / totalUsers) * 100).toFixed(1)}%` : "0.0%", "bg-[#2563eb]"],
+    ["Inactive users", inactiveUsers, totalUsers ? `${((inactiveUsers / totalUsers) * 100).toFixed(1)}%` : "0.0%", "bg-[#8b5cf6]"],
+    ["Banned users", bannedUsers, totalUsers ? `${((bannedUsers / totalUsers) * 100).toFixed(1)}%` : "0.0%", "bg-[#fb7185]"],
+  ] as const;
 
   return (
     <div className="space-y-6">
@@ -128,19 +162,14 @@ export function DashboardPage() {
               <div className="relative grid size-52 place-items-center rounded-full bg-[conic-gradient(#fb7185_0deg_92deg,#f472b6_92deg_210deg,#d946ef_210deg_292deg,#ec4899_292deg_360deg)]">
                 <div className="grid size-32 place-items-center rounded-full bg-white shadow-inner">
                   <div className="text-center">
-                    <p className="font-display text-4xl font-extrabold text-slate-950">1,245</p>
+                    <p className="font-display text-4xl font-extrabold text-slate-950">{totalTasks || 0}</p>
                     <p className="text-sm text-slate-500">Total</p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="mt-6 space-y-3 text-sm">
-              {[
-                ["Pending", "320", "25.7%", "amber"],
-                ["Accepted", "410", "32.9%", "sky"],
-                ["In Progress", "280", "22.5%", "violet"],
-                ["Completed", "235", "18.9%", "emerald"],
-              ].map(([label, value, percent, status]) => (
+              {taskMix.map(([label, value, percent, status]) => (
                 <div key={label} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className={`size-2.5 rounded-full ${
@@ -261,26 +290,22 @@ export function DashboardPage() {
           <div className="mt-8 flex justify-center">
             <div className="grid size-52 place-items-center rounded-full bg-[conic-gradient(#2563eb_0deg_276deg,#8b5cf6_276deg_336deg,#fb7185_336deg_360deg)]">
               <div className="grid size-32 place-items-center rounded-full bg-white shadow-inner">
-                <div className="text-center">
-                  <p className="font-display text-4xl font-extrabold text-slate-950">12,845</p>
-                  <p className="text-sm text-slate-500">Total users</p>
+                  <div className="text-center">
+                    <p className="font-display text-4xl font-extrabold text-slate-950">{totalUsers || 0}</p>
+                    <p className="text-sm text-slate-500">Total users</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div className="mt-6 space-y-3 text-sm">
-            {[
-              ["Active users", "9,856", "76.7%", "bg-[#2563eb]"],
-              ["Inactive users", "2,145", "16.7%", "bg-[#8b5cf6]"],
-              ["Banned users", "844", "6.6%", "bg-[#fb7185]"],
-            ].map(([label, value, percent, tone]) => (
+            <div className="mt-6 space-y-3 text-sm">
+            {userOverview.map(([label, value, percent, tone]) => (
               <div key={label} className="flex items-center justify-between">
                 <span className="flex items-center gap-3 text-slate-600">
                   <span className={`size-2.5 rounded-full ${tone}`} />
                   {label}
                 </span>
                 <span className="font-semibold text-slate-950">
-                  {value} <span className="text-slate-400">{percent}</span>
+                  {value.toLocaleString("en-MY")} <span className="text-slate-400">{percent}</span>
                 </span>
               </div>
             ))}

@@ -154,6 +154,18 @@ function normalizeIdentityVerificationStatus(
   return "pending";
 }
 
+function getEmergencyContactNumber(metadata: Record<string, unknown>) {
+  if (typeof metadata.emergency_contact_number === "string" && metadata.emergency_contact_number.trim()) {
+    return metadata.emergency_contact_number.trim();
+  }
+
+  if (typeof metadata.emergency_contact === "string" && metadata.emergency_contact.trim()) {
+    return metadata.emergency_contact.trim();
+  }
+
+  return "";
+}
+
 function isMissingProviderProfileColumnError(message?: string) {
   const normalized = message?.trim().toLowerCase() ?? "";
 
@@ -488,16 +500,29 @@ async function buildResponse(
     metadata.identity_verification_status,
     identityVerified,
   );
+  const identityDocumentType =
+    verification?.identity_document_type === "passport"
+      ? "passport"
+      : verification?.identity_document_type === "ic"
+        ? "ic"
+        : undefined;
+  const identityFrontImageUrl = await resolveStoredMediaUrl(adminClient, {
+    bucket: "identity-documents",
+    value: verification?.identity_front_image_url,
+    visibility: "private",
+  });
+  const identityBackImageUrl = await resolveStoredMediaUrl(adminClient, {
+    bucket: "identity-documents",
+    value: verification?.identity_back_image_url,
+    visibility: "private",
+  });
 
   const response = {
     providerId: profile.id,
     fullName: profile.full_name ?? "",
     email: profile.email ?? "",
     phone: profile.phone ?? "",
-    emergencyContactNumber:
-      typeof metadata.emergency_contact_number === "string"
-        ? metadata.emergency_contact_number
-        : "",
+    emergencyContactNumber: getEmergencyContactNumber(metadata),
     avatarUrl: getSafeAvatarUrl(avatarUrl),
     accountStatus: toTitleCase(profile.status),
     marketingName: providerProfile.marketing_name ?? "",
@@ -516,6 +541,9 @@ async function buildResponse(
     phoneVerified: Boolean(verification?.phone_verified),
     identityVerified,
     identityVerificationStatus,
+    identityDocumentType,
+    identityFrontImageUrl,
+    identityBackImageUrl,
     kycVerified: Boolean(verification?.kyc_verified),
     backgroundCheckVerified: Boolean(verification?.background_check_verified),
     services:
@@ -671,9 +699,11 @@ export async function PATCH(request: Request) {
           emergency_contact_number:
             typeof payload.emergencyContactNumber === "string"
               ? payload.emergencyContactNumber.trim()
-              : typeof currentMetadata.emergency_contact_number === "string"
-                ? currentMetadata.emergency_contact_number
-                : "",
+              : getEmergencyContactNumber(currentMetadata),
+          emergency_contact:
+            typeof payload.emergencyContactNumber === "string"
+              ? payload.emergencyContactNumber.trim()
+              : getEmergencyContactNumber(currentMetadata),
           identity_verification_status:
             typeof payload.identityVerificationStatus === "string"
               ? payload.identityVerificationStatus
