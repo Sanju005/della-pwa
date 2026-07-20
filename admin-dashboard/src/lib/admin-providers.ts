@@ -20,6 +20,7 @@ type ProviderProfileRow = {
   marketing_name?: string | null;
   sex?: string | null;
   date_of_birth?: string | null;
+  residential_address?: string | null;
   service_location?: string | null;
   formatted_address?: string | null;
   road?: string | null;
@@ -104,9 +105,18 @@ type ProviderRegistrationSnapshot = {
   status?: string | null;
   data?: {
     basicProfile?: {
+      firstName?: string | null;
+      lastName?: string | null;
       emergencyContact?: string | null;
       emergencyContactNumber?: string | null;
       avatarDataUrl?: string | null;
+      unitNumber?: string | null;
+      addressLine1?: string | null;
+      addressLine2?: string | null;
+      postcode?: string | null;
+      city?: string | null;
+      state?: string | null;
+      country?: string | null;
     } | null;
     verification?: {
       documentType?: string | null;
@@ -209,6 +219,7 @@ const providerProfileSelectWithAddress = `
   marketing_name,
   sex,
   date_of_birth,
+  residential_address,
   service_location,
   formatted_address,
   road,
@@ -261,6 +272,7 @@ const providerProfileSelectBase = `
   marketing_name,
   sex,
   date_of_birth,
+  residential_address,
   service_location,
   service_radius_km,
   bio,
@@ -507,6 +519,113 @@ function findMockProviderDetail(id: string, name?: string | null, email?: string
 
     return false;
   });
+}
+
+function createEmptyProviderDetail(providerId: string, name?: string | null, email?: string | null): ProviderDetailRecord {
+  return {
+    providerId,
+    name: name?.trim() || "DELLA Provider",
+    email: email?.trim() || "No email",
+    status: "Pending",
+    roleBadge: "Provider",
+    joinedAt: "Recently joined",
+    lastLogin: "No recent login",
+    serviceType: "Service",
+    serviceArea: "Malaysia",
+    rating: "0.0",
+    ratingNote: "(0 reviews)",
+    phone: "Not provided",
+    dob: "Not provided",
+    gender: "Not provided",
+    language: "Not provided",
+    nationalId: "Not provided",
+    emergencyContact: "Not provided",
+    address: "Not provided",
+    about: "Provider profile details are still syncing from registration.",
+    approvalStatus: "Pending",
+    backgroundCheck: "Pending",
+    kycStatus: "Pending",
+    memberSince: "Recently",
+    device: "Not available",
+    completedJobs: "0",
+    cancellationRate: "0.0%",
+    responseRate: "0.0%",
+    averageRating: "0.0",
+    totalReviews: "0",
+    onTimeRate: "0.0%",
+    repeatCustomers: "0.0%",
+    workingDays: "Not set",
+    workingHours: "Not set",
+    totalTasks: "0",
+    completedTasks: "0",
+    upcomingTasks: "0",
+    activeTime: "0h 0m",
+    areaCount: "1",
+    totalEarnings: "RM0.00",
+    withdrawn: "RM0.00",
+    reviewsCount: "0",
+    metrics: [
+      { id: "live-pm-1", label: "Total Tasks", value: "0", note: "View all tasks", tone: "emerald" },
+      { id: "live-pm-2", label: "Completed Tasks", value: "0", note: "0.0%", tone: "emerald" },
+      { id: "live-pm-3", label: "Upcoming Tasks", value: "0", note: "Next 7 days", tone: "violet" },
+      { id: "live-pm-4", label: "Active Time", value: "0h 0m", note: "Total logged hours", tone: "sky" },
+      { id: "live-pm-5", label: "Service Areas", value: "1", note: "Areas covered", tone: "amber" },
+      { id: "live-pm-6", label: "Total Earnings", value: "RM0.00", note: "All time", tone: "emerald" },
+      { id: "live-pm-7", label: "Withdrawn", value: "RM0.00", note: "Total withdrawn", tone: "violet" },
+      { id: "live-pm-8", label: "Reviews", value: "0", note: "0.0 average", tone: "amber" },
+    ],
+    serviceAreas: [],
+    skills: [],
+    documents: [],
+    completedTaskRows: [],
+    upcomingTaskRows: [],
+    payoutRows: [],
+    commissionRows: [],
+    recentActions: [],
+    activityLog: [],
+  };
+}
+
+function buildSnapshotResidentialAddress(snapshot?: ProviderRegistrationSnapshot | null) {
+  const basicProfile = snapshot?.data?.basicProfile;
+
+  if (!basicProfile) {
+    return "";
+  }
+
+  return [
+    basicProfile.unitNumber,
+    basicProfile.addressLine1,
+    basicProfile.addressLine2,
+    basicProfile.postcode,
+    basicProfile.city,
+    basicProfile.state,
+    basicProfile.country,
+  ]
+    .map((value) => value?.trim() || "")
+    .filter(Boolean)
+    .join(", ");
+}
+
+function buildProviderAddressLabel(
+  profile: ProviderProfileRow,
+  snapshot?: ProviderRegistrationSnapshot | null,
+) {
+  const directAddress = [
+    profile.residential_address,
+    profile.formatted_address,
+    [profile.house_number, profile.road, profile.suburb].map((value) => value?.trim() || "").filter(Boolean).join(", "),
+    [profile.postcode, profile.city, profile.state, profile.country].map((value) => value?.trim() || "").filter(Boolean).join(", "),
+  ]
+    .map((value) => value?.trim() || "")
+    .filter(Boolean)
+    .join(", ");
+
+  if (directAddress) {
+    return directAddress;
+  }
+
+  return buildSnapshotResidentialAddress(snapshot);
 }
 
 function getMockTasks(name: string) {
@@ -1172,7 +1291,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const effectiveRegistrationSnapshot = registrationSnapshot ?? debugRegistrationSnapshot;
   const fallback =
     findMockProviderDetail(providerId, liveProfile.marketing_name ?? liveAccount?.full_name, liveAccount?.email) ??
-    providerDetailRecords["PRV-2034"]!;
+    createEmptyProviderDetail(providerId, liveProfile.marketing_name ?? liveAccount?.full_name, liveAccount?.email);
 
   const firstService = relationItem(liveProfile.provider_services);
   const verification = relationItem(liveProfile.provider_verifications);
@@ -1310,6 +1429,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     ratingNote: `(${liveProfile.total_reviews ?? (Number(fallback.totalReviews) || 0)} reviews)`,
     phone: liveAccount?.phone?.trim() || fallback.phone,
     emergencyContact,
+    address: buildProviderAddressLabel(liveProfile, effectiveRegistrationSnapshot) || fallback.address,
     dob: formatDateOfBirth(liveProfile.date_of_birth) || fallback.dob,
     gender:
       liveProfile.sex === "Male" || liveProfile.sex === "Female"
@@ -1351,6 +1471,18 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     identitySubmittedAt,
     metrics,
     serviceAreas,
+    skills:
+      (liveProfile.provider_services ?? [])
+        .flatMap((service) => [
+          service.service_type ? { id: `skill-service-${service.service_type}`, label: humanizeService(service.service_type) } : null,
+          ...(service.provider_service_specialties ?? []).map((specialty, index) =>
+            specialty.specialty?.trim()
+              ? { id: `skill-specialty-${service.service_type ?? "service"}-${index + 1}`, label: specialty.specialty.trim() }
+              : null,
+          ),
+        ])
+        .filter((item): item is { id: string; label: string } => Boolean(item))
+        .slice(0, 8),
     documents: [
       {
         id: "live-doc-1",
