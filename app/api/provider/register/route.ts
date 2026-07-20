@@ -127,6 +127,8 @@ function isMissingColumnError(message?: string) {
       normalized.includes("postcode") ||
       normalized.includes("road") ||
       normalized.includes("suburb") ||
+      normalized.includes("emergency_contact") ||
+      normalized.includes("emergency_contact_number") ||
       normalized.includes("verification_status") ||
       normalized.includes("house_number") ||
       normalized.includes("latitude") ||
@@ -638,17 +640,36 @@ export async function POST(request: Request) {
     );
     const identityVerified = false;
 
-    const { error: profileError } = await adminClient
+    const baseProfilePayload = {
+      id: providerId,
+      full_name: fullName,
+      email: payload.account.email.trim().toLowerCase(),
+      role: PROVIDER_ROLE,
+      phone: normalizedPhone,
+      avatar_url: storedAvatarUrl || null,
+      status: "pending",
+    };
+
+    const profileWithEmergencyPayload = {
+      ...baseProfilePayload,
+      emergency_contact: emergencyContact || null,
+      emergency_contact_number: emergencyContact || null,
+    };
+
+    let profileError: { message?: string } | null = null;
+    const profileWrite = await adminClient
       .from("profiles")
-      .upsert({
-        id: providerId,
-        full_name: fullName,
-        email: payload.account.email.trim().toLowerCase(),
-        role: PROVIDER_ROLE,
-        phone: normalizedPhone,
-        avatar_url: storedAvatarUrl || null,
-        status: "pending",
-      }, { onConflict: "id" });
+      .upsert(profileWithEmergencyPayload, { onConflict: "id" });
+
+    profileError = profileWrite.error;
+
+    if (profileError && isMissingColumnError(profileError.message)) {
+      const fallbackProfileWrite = await adminClient
+        .from("profiles")
+        .upsert(baseProfilePayload, { onConflict: "id" });
+
+      profileError = fallbackProfileWrite.error;
+    }
 
     if (profileError) {
       return NextResponse.json(

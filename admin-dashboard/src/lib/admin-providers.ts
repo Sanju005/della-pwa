@@ -123,6 +123,13 @@ type ProviderRegistrationSnapshot = {
   } | null;
 };
 
+type ProviderAdminDebugPayload = {
+  stored?: {
+    authMetadata?: Record<string, unknown> | null;
+    providerRegistrationSnapshot?: ProviderRegistrationSnapshot | null;
+  } | null;
+};
+
 type LiveBookingRow = {
   id: string;
   booking_status?: string | null;
@@ -658,6 +665,32 @@ async function fetchProviderRegistrationSnapshot(providerId: string) {
   return data as ProviderRegistrationSnapshot;
 }
 
+async function fetchProviderAdminDebugPayload(providerId: string) {
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return null;
+  }
+
+  const response = await fetch(`${APP_BASE_URL}/api/admin/provider-registration-debug/${providerId}`, {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as ProviderAdminDebugPayload;
+}
+
 function mapProviderRow(liveProfile: ProviderProfileRow, liveAccount: ProviderAccountRow | null): ProviderRow {
   const mockRow = findMockProviderRowByIdOrName(
     liveProfile.id,
@@ -1129,7 +1162,14 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   }
 
   const liveAccount = await fetchProviderAccountById(providerId);
-  const registrationSnapshot = await fetchProviderRegistrationSnapshot(providerId);
+  const [registrationSnapshot, debugPayload] = await Promise.all([
+    fetchProviderRegistrationSnapshot(providerId),
+    fetchProviderAdminDebugPayload(providerId),
+  ]);
+  const debugRegistrationSnapshot =
+    debugPayload?.stored?.providerRegistrationSnapshot ?? null;
+  const authMetadata = debugPayload?.stored?.authMetadata ?? null;
+  const effectiveRegistrationSnapshot = registrationSnapshot ?? debugRegistrationSnapshot;
   const fallback =
     findMockProviderDetail(providerId, liveProfile.marketing_name ?? liveAccount?.full_name, liveAccount?.email) ??
     providerDetailRecords["PRV-2034"]!;
@@ -1164,17 +1204,18 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const profileImageUrl = await resolveAdminMediaUrl("profile-images", liveAccount?.avatar_url, "public");
   const identityDocumentType =
     verification?.identity_document_type?.trim() ||
-    registrationSnapshot?.data?.verification?.documentType?.trim() ||
+    effectiveRegistrationSnapshot?.data?.verification?.documentType?.trim() ||
+    (typeof authMetadata?.identity_document_type === "string" ? authMetadata.identity_document_type.trim() : "") ||
     verification?.document_type?.trim() ||
     "";
   const identityFrontValue =
     verification?.identity_front_image_url?.trim() ||
-    registrationSnapshot?.data?.verification?.frontImageDataUrl?.trim() ||
+    effectiveRegistrationSnapshot?.data?.verification?.frontImageDataUrl?.trim() ||
     verification?.document_front_url?.trim() ||
     "";
   const identityBackValue =
     verification?.identity_back_image_url?.trim() ||
-    registrationSnapshot?.data?.verification?.backImageDataUrl?.trim() ||
+    effectiveRegistrationSnapshot?.data?.verification?.backImageDataUrl?.trim() ||
     verification?.document_back_url?.trim() ||
     "";
   const identityDocuments = (
@@ -1225,12 +1266,14 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     liveProfile.provider_services,
     "certificate",
   );
-  const snapshotServiceDetails = registrationSnapshot?.data?.serviceDetails ?? null;
+  const snapshotServiceDetails = effectiveRegistrationSnapshot?.data?.serviceDetails ?? null;
   const emergencyContact =
     liveAccount?.emergency_contact_number?.trim() ||
     liveAccount?.emergency_contact?.trim() ||
-    registrationSnapshot?.data?.basicProfile?.emergencyContactNumber?.trim() ||
-    registrationSnapshot?.data?.basicProfile?.emergencyContact?.trim() ||
+    (typeof authMetadata?.emergency_contact_number === "string" ? authMetadata.emergency_contact_number.trim() : "") ||
+    (typeof authMetadata?.emergency_contact === "string" ? authMetadata.emergency_contact.trim() : "") ||
+    effectiveRegistrationSnapshot?.data?.basicProfile?.emergencyContactNumber?.trim() ||
+    effectiveRegistrationSnapshot?.data?.basicProfile?.emergencyContact?.trim() ||
     fallback.emergencyContact;
   const reviewRows = liveReviews?.length
     ? buildReviewRows(liveReviews, customerNames)

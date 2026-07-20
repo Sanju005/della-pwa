@@ -111,10 +111,12 @@ export async function GET(
       .eq("provider_id", id),
     getProviderRegistration(id),
   ]);
+  const authUser = await verified.adminClient.auth.admin.getUserById(id);
 
   return NextResponse.json({
     providerId: id,
     stored: {
+      authMetadata: authUser.data?.user?.user_metadata ?? null,
       profile: profileRow.data ?? null,
       providerProfile: providerProfileRow.data ?? null,
       providerVerification: verificationRow.data ?? null,
@@ -122,6 +124,7 @@ export async function GET(
       providerRegistrationSnapshot: registrationRow,
     },
     errors: {
+      authMetadata: authUser.error?.message ?? null,
       profile: profileRow.error?.message ?? null,
       providerProfile: providerProfileRow.error?.message ?? null,
       providerVerification: verificationRow.error?.message ?? null,
