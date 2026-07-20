@@ -1,6 +1,8 @@
 {
   "version": 1,
   "functions": {
+    "/api/admin/media-sign": {},
+    "/api/admin/provider-registration-debug/[id]": {},
     "/api/auth/register/customer": {},
     "/api/bookings": {},
     "/api/bookings/[id]/cash-pay": {},
@@ -30,6 +32,7 @@
     "/api/provider/messages/[bookingId]": {},
     "/api/provider/register": {},
     "/api/provider/register/[id]": {},
+    "/api/provider/register/upload": {},
     "/api/provider/reviews": {},
     "/api/provider/services": {},
     "/api/provider/services/[id]": {},

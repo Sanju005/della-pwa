@@ -23,6 +23,14 @@
   },
   "dynamicRoutes": [
     {
+      "page": "/api/admin/provider-registration-debug/[id]",
+      "regex": "^/api/admin/provider\\-registration\\-debug/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/provider\\-registration\\-debug/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/api/bookings/[id]/cash-pay",
       "regex": "^/api/bookings/([^/]+?)/cash\\-pay(?:/)?$",
       "routeKeys": {
@@ -210,6 +218,12 @@
       "namedRegex": "^/admin/reports(?:/)?$"
     },
     {
+      "page": "/api/admin/media-sign",
+      "regex": "^/api/admin/media\\-sign(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/media\\-sign(?:/)?$"
+    },
+    {
       "page": "/api/auth/register/customer",
       "regex": "^/api/auth/register/customer(?:/)?$",
       "routeKeys": {},
@@ -316,6 +330,12 @@
       "regex": "^/api/provider/register(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/provider/register(?:/)?$"
+    },
+    {
+      "page": "/api/provider/register/upload",
+      "regex": "^/api/provider/register/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/provider/register/upload(?:/)?$"
     },
     {
       "page": "/api/provider/reviews",
