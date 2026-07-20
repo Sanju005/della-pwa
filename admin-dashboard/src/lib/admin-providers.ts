@@ -137,6 +137,40 @@ type ProviderAdminDebugPayload = {
   stored?: {
     authMetadata?: Record<string, unknown> | null;
     providerRegistrationSnapshot?: ProviderRegistrationSnapshot | null;
+    profile?: ProviderAccountRow | null;
+    providerProfile?: Omit<ProviderProfileRow, "provider_services" | "provider_verifications"> | null;
+    providerVerification?:
+      | {
+          phone_verified?: boolean | null;
+          email_verified?: boolean | null;
+          identity_verified?: boolean | null;
+          kyc_verified?: boolean | null;
+          background_check_verified?: boolean | null;
+          document_type?: string | null;
+          document_front_url?: string | null;
+          document_back_url?: string | null;
+          identity_document_type?: string | null;
+          identity_front_image_url?: string | null;
+          identity_back_image_url?: string | null;
+          created_at?: string | null;
+          reviewed_at?: string | null;
+          last_reviewed_at?: string | null;
+        }
+      | null;
+    providerServices?:
+      | Array<{
+          id?: string | null;
+          service_type?: string | null;
+          years_experience?: string | null;
+          hourly_rate?: number | null;
+          daily_rate?: number | null;
+          image_data_urls?: string[] | null;
+          image_captions?: string[] | null;
+          certificate_data_urls?: string[] | null;
+          certificate_captions?: string[] | null;
+          provider_service_specialties?: Array<{ specialty?: string | null }> | null;
+        }>
+      | null;
   } | null;
 };
 
@@ -1273,11 +1307,16 @@ export function buildProviderStats(rows: ProviderRow[]) {
 }
 
 export async function getProviderProfileWithFallback(providerId: string): Promise<ProviderProfilePayload> {
-  const liveProfile = await fetchProviderProfileById(providerId);
+  const initialLiveProfile = await fetchProviderProfileById(providerId);
 
-  if (!liveProfile) {
-    const fallback = providerDetailRecords[providerId] ?? null;
-    return { detail: fallback };
+  if (!initialLiveProfile) {
+    const debugPayload = await fetchProviderAdminDebugPayload(providerId);
+    const debugProfile = debugPayload?.stored?.providerProfile;
+
+    if (!debugProfile) {
+      const fallback = providerDetailRecords[providerId] ?? null;
+      return { detail: fallback };
+    }
   }
 
   const liveAccount = await fetchProviderAccountById(providerId);
@@ -1288,10 +1327,28 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const debugRegistrationSnapshot =
     debugPayload?.stored?.providerRegistrationSnapshot ?? null;
   const authMetadata = debugPayload?.stored?.authMetadata ?? null;
+  const debugProfile = debugPayload?.stored?.providerProfile ?? null;
+  const debugVerification = debugPayload?.stored?.providerVerification ?? null;
+  const debugServices = debugPayload?.stored?.providerServices ?? null;
+  const liveProfile =
+    initialLiveProfile ??
+    (debugProfile
+      ? {
+          ...debugProfile,
+          provider_services: debugServices,
+          provider_verifications: debugVerification ? [debugVerification] : null,
+        }
+      : null);
+  const effectiveLiveAccount = liveAccount ?? debugPayload?.stored?.profile ?? null;
   const effectiveRegistrationSnapshot = registrationSnapshot ?? debugRegistrationSnapshot;
+
+  if (!liveProfile) {
+    const fallback = providerDetailRecords[providerId] ?? null;
+    return { detail: fallback };
+  }
   const fallback =
-    findMockProviderDetail(providerId, liveProfile.marketing_name ?? liveAccount?.full_name, liveAccount?.email) ??
-    createEmptyProviderDetail(providerId, liveProfile.marketing_name ?? liveAccount?.full_name, liveAccount?.email);
+    findMockProviderDetail(providerId, liveProfile.marketing_name ?? effectiveLiveAccount?.full_name, effectiveLiveAccount?.email) ??
+    createEmptyProviderDetail(providerId, liveProfile.marketing_name ?? effectiveLiveAccount?.full_name, effectiveLiveAccount?.email);
 
   const firstService = relationItem(liveProfile.provider_services);
   const verification = relationItem(liveProfile.provider_verifications);
@@ -1387,8 +1444,8 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   );
   const snapshotServiceDetails = effectiveRegistrationSnapshot?.data?.serviceDetails ?? null;
   const emergencyContact =
-    liveAccount?.emergency_contact_number?.trim() ||
-    liveAccount?.emergency_contact?.trim() ||
+    effectiveLiveAccount?.emergency_contact_number?.trim() ||
+    effectiveLiveAccount?.emergency_contact?.trim() ||
     (typeof authMetadata?.emergency_contact_number === "string" ? authMetadata.emergency_contact_number.trim() : "") ||
     (typeof authMetadata?.emergency_contact === "string" ? authMetadata.emergency_contact.trim() : "") ||
     effectiveRegistrationSnapshot?.data?.basicProfile?.emergencyContactNumber?.trim() ||
@@ -1417,17 +1474,17 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const detail: ProviderDetailRecord = {
     ...fallback,
     providerId,
-    name: liveProfile.marketing_name?.trim() || liveAccount?.full_name?.trim() || fallback.name,
-    email: liveAccount?.email?.trim() || fallback.email,
+    name: liveProfile.marketing_name?.trim() || effectiveLiveAccount?.full_name?.trim() || fallback.name,
+    email: effectiveLiveAccount?.email?.trim() || fallback.email,
     profileImageUrl: profileImageUrl || fallback.profileImageUrl,
     status,
-    joinedAt: formatDateTime(liveAccount?.created_at) || fallback.joinedAt,
+    joinedAt: formatDateTime(effectiveLiveAccount?.created_at) || fallback.joinedAt,
     lastLogin: fallback.lastLogin,
     serviceType: humanizeService(firstService?.service_type),
     serviceArea: buildProviderAreaLabel(liveProfile) || fallback.serviceArea,
     rating: typeof liveProfile.average_rating === "number" ? liveProfile.average_rating.toFixed(1) : fallback.rating,
     ratingNote: `(${liveProfile.total_reviews ?? (Number(fallback.totalReviews) || 0)} reviews)`,
-    phone: liveAccount?.phone?.trim() || fallback.phone,
+    phone: effectiveLiveAccount?.phone?.trim() || fallback.phone,
     emergencyContact,
     address: buildProviderAddressLabel(liveProfile, effectiveRegistrationSnapshot) || fallback.address,
     dob: formatDateOfBirth(liveProfile.date_of_birth) || fallback.dob,
@@ -1439,7 +1496,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     approvalStatus: formatStatus(liveProfile.approval_status),
     backgroundCheck: verification?.background_check_verified ? "Verified" : fallback.backgroundCheck,
     kycStatus: verification?.kyc_verified || verification?.identity_verified ? "Verified" : fallback.kycStatus,
-    memberSince: formatDate(liveAccount?.created_at) || fallback.memberSince,
+    memberSince: formatDate(effectiveLiveAccount?.created_at) || fallback.memberSince,
     completedJobs:
       taskRows?.completedTaskRows.length ? String(taskRows.completedTaskRows.length) : fallback.completedJobs,
     cancellationRate:
