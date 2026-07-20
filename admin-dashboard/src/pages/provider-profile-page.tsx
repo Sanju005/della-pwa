@@ -24,7 +24,6 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { InfoRow, MetricTile, MiniStatus, PillBadge, SurfaceCard, TableShell } from "../components/user-detail-ui";
-import { providerDetailRecords } from "../data/provider-detail-mocks";
 import {
   getProviderProfileWithFallback,
   markCompanyPaymentReceived,
@@ -139,9 +138,7 @@ export function ProviderProfilePage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>("Overview");
   const [message, setMessage] = useState<string | null>(null);
-  const [provider, setProvider] = useState<ProviderDetailRecord | null>(
-    providerDetailRecords[providerId] ?? providerDetailRecords["PRV-2034"] ?? null
-  );
+  const [provider, setProvider] = useState<ProviderDetailRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [verifyingIdentity, setVerifyingIdentity] = useState(false);
@@ -149,11 +146,11 @@ export function ProviderProfilePage() {
   const [receivedAmounts, setReceivedAmounts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    name: provider?.name ?? "",
-    email: provider?.email ?? "",
-    phone: provider?.phone ?? "",
-    serviceArea: provider?.serviceArea ?? "",
-    about: provider?.about ?? "",
+    name: "",
+    email: "",
+    phone: "",
+    serviceArea: "",
+    about: "",
   });
 
   useEffect(() => {
@@ -162,29 +159,36 @@ export function ProviderProfilePage() {
     setActiveTab("Overview");
     setMessage(null);
     setLoading(true);
+    setProvider(null);
+    setForm({
+      name: "",
+      email: "",
+      phone: "",
+      serviceArea: "",
+      about: "",
+    });
 
     async function loadProvider() {
-      const fallback = providerDetailRecords[providerId] ?? providerDetailRecords["PRV-2034"] ?? null;
+      try {
+        const payload = await getProviderProfileWithFallback(providerId);
 
-      if (active) {
-        setProvider(fallback);
+        if (!active) {
+          return;
+        }
+
+        setProvider(payload.detail);
+        setForm({
+          name: payload.detail?.name ?? "",
+          email: payload.detail?.email ?? "",
+          phone: payload.detail?.phone ?? "",
+          serviceArea: payload.detail?.serviceArea ?? "",
+          about: payload.detail?.about ?? "",
+        });
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-
-      const payload = await getProviderProfileWithFallback(providerId);
-
-      if (!active) {
-        return;
-      }
-
-      setProvider(payload.detail);
-      setForm({
-        name: payload.detail?.name ?? "",
-        email: payload.detail?.email ?? "",
-        phone: payload.detail?.phone ?? "",
-        serviceArea: payload.detail?.serviceArea ?? "",
-        about: payload.detail?.about ?? "",
-      });
-      setLoading(false);
     }
 
     void loadProvider();
