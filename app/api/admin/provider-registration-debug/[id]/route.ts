@@ -14,6 +14,22 @@ const ALLOWED_ADMIN_ROLES = new Set([
   "customer_care",
 ]);
 
+function buildCorsHeaders(origin: string | null) {
+  const allowedOrigin =
+    origin === "https://admin.dellaapp.com" ||
+    origin === "http://localhost:5173" ||
+    origin === "http://127.0.0.1:5173"
+      ? origin
+      : "https://admin.dellaapp.com";
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    Vary: "Origin",
+  };
+}
+
 function getAdminClient() {
   const url = getSupabaseUrl();
   const serviceKey = getSupabaseServiceKey();
@@ -76,14 +92,26 @@ async function verifyAdminRequest(request: Request) {
   return { adminClient } as const;
 }
 
+export async function OPTIONS(request: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: buildCorsHeaders(request.headers.get("origin")),
+  });
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const corsHeaders = buildCorsHeaders(request.headers.get("origin"));
   const verified = await verifyAdminRequest(request);
 
-  if ("error" in verified) {
-    return verified.error;
+  if ("error" in verified && verified.error) {
+    const failureResponse = verified.error;
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      failureResponse.headers.set(key, value);
+    });
+    return failureResponse;
   }
 
   const { id } = await params;
@@ -113,22 +141,25 @@ export async function GET(
   ]);
   const authUser = await verified.adminClient.auth.admin.getUserById(id);
 
-  return NextResponse.json({
-    providerId: id,
-    stored: {
-      authMetadata: authUser.data?.user?.user_metadata ?? null,
-      profile: profileRow.data ?? null,
-      providerProfile: providerProfileRow.data ?? null,
-      providerVerification: verificationRow.data ?? null,
-      providerServices: servicesRow.data ?? [],
-      providerRegistrationSnapshot: registrationRow,
+  return NextResponse.json(
+    {
+      providerId: id,
+      stored: {
+        authMetadata: authUser.data?.user?.user_metadata ?? null,
+        profile: profileRow.data ?? null,
+        providerProfile: providerProfileRow.data ?? null,
+        providerVerification: verificationRow.data ?? null,
+        providerServices: servicesRow.data ?? [],
+        providerRegistrationSnapshot: registrationRow,
+      },
+      errors: {
+        authMetadata: authUser.error?.message ?? null,
+        profile: profileRow.error?.message ?? null,
+        providerProfile: providerProfileRow.error?.message ?? null,
+        providerVerification: verificationRow.error?.message ?? null,
+        providerServices: servicesRow.error?.message ?? null,
+      },
     },
-    errors: {
-      authMetadata: authUser.error?.message ?? null,
-      profile: profileRow.error?.message ?? null,
-      providerProfile: providerProfileRow.error?.message ?? null,
-      providerVerification: verificationRow.error?.message ?? null,
-      providerServices: servicesRow.error?.message ?? null,
-    },
-  });
+    { headers: corsHeaders },
+  );
 }

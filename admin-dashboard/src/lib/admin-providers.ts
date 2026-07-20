@@ -831,11 +831,17 @@ async function fetchProviderAdminDebugPayload(providerId: string) {
     return null;
   }
 
-  const response = await fetch(`${APP_BASE_URL}/api/admin/provider-registration-debug/${providerId}`, {
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${APP_BASE_URL}/api/admin/provider-registration-debug/${providerId}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+  } catch {
+    return null;
+  }
 
   if (!response.ok) {
     return null;
