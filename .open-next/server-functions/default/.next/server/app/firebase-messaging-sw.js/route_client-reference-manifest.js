@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/firebase-messaging-sw.js/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"D:\\della-pwa\\app\\firebase-messaging-sw.js\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

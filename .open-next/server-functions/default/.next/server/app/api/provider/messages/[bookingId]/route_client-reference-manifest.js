@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/provider/messages/[bookingId]/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"D:\\della-pwa\\app\\api\\provider\\messages\\[bookingId]\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};
