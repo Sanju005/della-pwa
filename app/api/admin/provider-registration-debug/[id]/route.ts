@@ -119,7 +119,7 @@ export async function GET(
   const [profileRow, providerProfileRow, verificationRow, servicesRow, registrationRow] = await Promise.all([
     verified.adminClient
       .from("profiles")
-      .select("id, full_name, email, role, status, phone, avatar_url, emergency_contact, emergency_contact_number, created_at")
+      .select("id, full_name, first_name, last_name, email, role, status, phone, avatar_url, emergency_contact, emergency_contact_number, created_at")
       .eq("id", id)
       .maybeSingle(),
     verified.adminClient

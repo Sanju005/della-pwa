@@ -88,6 +88,8 @@ type ProviderProfileRow = {
 type ProviderAccountRow = {
   id: string;
   full_name: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   email: string | null;
   role: string | null;
   status: string | null;
@@ -662,6 +664,40 @@ function buildProviderAddressLabel(
   return buildSnapshotResidentialAddress(snapshot);
 }
 
+function metadataText(metadata: Record<string, unknown> | null | undefined, key: string) {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function joinNameParts(firstName?: string | null, lastName?: string | null) {
+  return [firstName, lastName]
+    .map((value) => value?.trim() || "")
+    .filter(Boolean)
+    .join(" ");
+}
+
+function buildProviderPersonName(
+  account?: ProviderAccountRow | null,
+  snapshot?: ProviderRegistrationSnapshot | null,
+  authMetadata?: Record<string, unknown> | null,
+) {
+  const snapshotProfile = snapshot?.data?.basicProfile;
+  const profileName = joinNameParts(account?.first_name, account?.last_name);
+  const snapshotName = joinNameParts(snapshotProfile?.firstName, snapshotProfile?.lastName);
+  const metadataName = joinNameParts(
+    metadataText(authMetadata, "first_name"),
+    metadataText(authMetadata, "last_name"),
+  );
+
+  return (
+    profileName ||
+    snapshotName ||
+    metadataName ||
+    account?.full_name?.trim() ||
+    metadataText(authMetadata, "full_name")
+  );
+}
+
 function getMockTasks(name: string) {
   const normalized = name.trim().toLowerCase();
 
@@ -779,7 +815,7 @@ async function fetchProviderAccountById(providerId: string) {
 
   const primary = await supabase
     .from("profiles")
-    .select("id, full_name, email, role, status, phone, created_at, avatar_url, emergency_contact, emergency_contact_number")
+    .select("id, full_name, first_name, last_name, email, role, status, phone, created_at, avatar_url, emergency_contact, emergency_contact_number")
     .eq("id", providerId)
     .maybeSingle();
 
@@ -1355,6 +1391,10 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const fallback =
     findMockProviderDetail(providerId, liveProfile.marketing_name ?? effectiveLiveAccount?.full_name, effectiveLiveAccount?.email) ??
     createEmptyProviderDetail(providerId, liveProfile.marketing_name ?? effectiveLiveAccount?.full_name, effectiveLiveAccount?.email);
+  const personName =
+    buildProviderPersonName(effectiveLiveAccount, effectiveRegistrationSnapshot, authMetadata) ||
+    liveProfile.marketing_name?.trim() ||
+    fallback.name;
 
   const firstService = relationItem(liveProfile.provider_services);
   const verification = relationItem(liveProfile.provider_verifications);
@@ -1480,7 +1520,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const detail: ProviderDetailRecord = {
     ...fallback,
     providerId,
-    name: liveProfile.marketing_name?.trim() || effectiveLiveAccount?.full_name?.trim() || fallback.name,
+    name: personName,
     email: effectiveLiveAccount?.email?.trim() || fallback.email,
     profileImageUrl: profileImageUrl || fallback.profileImageUrl,
     status,
