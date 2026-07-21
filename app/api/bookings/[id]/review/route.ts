@@ -123,9 +123,15 @@ async function verifyCustomerRequest(request: Request) {
   };
 }
 
-function isMissingReviewedAtColumnError(message?: string | null) {
+function isMissingBookingReviewStatusColumnError(message?: string | null) {
   const normalized = message?.trim().toLowerCase() ?? "";
-  return normalized.includes("column") && normalized.includes("reviewed_at");
+  return (
+    normalized.includes("column") &&
+    (
+      normalized.includes("reviewed_at") ||
+      normalized.includes("user_review_status")
+    )
+  );
 }
 
 function isMissingReviewMetadataColumnError(message?: string | null) {
@@ -173,7 +179,10 @@ export async function POST(
       pathPrefix: [params.id, "customer-review"],
       visibility: "public",
     },
-  );
+  ).catch((photoError) => {
+    console.error("[Customer review submit] Failed to upload optional review photos:", photoError);
+    return [];
+  });
   const recommend = payload.recommend !== false;
 
   if (!rating || !Number.isFinite(rating)) {
@@ -323,14 +332,18 @@ export async function POST(
     .eq("id", bookingRow.id)
     .eq("customer_id", verified.profile.id);
 
-  if (bookingUpdateError && isMissingReviewedAtColumnError(bookingUpdateError.message)) {
-    const fallbackWrite = await verified.adminClient
-      .from("bookings")
-      .update(shouldMoveToReviewed ? { booking_status: "reviewed" } : {})
-      .eq("id", bookingRow.id)
-      .eq("customer_id", verified.profile.id);
+  if (bookingUpdateError && isMissingBookingReviewStatusColumnError(bookingUpdateError.message)) {
+    if (shouldMoveToReviewed) {
+      const fallbackWrite = await verified.adminClient
+        .from("bookings")
+        .update({ booking_status: "reviewed" })
+        .eq("id", bookingRow.id)
+        .eq("customer_id", verified.profile.id);
 
-    bookingUpdateError = fallbackWrite.error;
+      bookingUpdateError = fallbackWrite.error;
+    } else {
+      bookingUpdateError = null;
+    }
   }
 
   if (bookingUpdateError) {
@@ -346,14 +359,22 @@ export async function POST(
     notification_type: "review_submitted",
     title: "New customer review",
     body: `${verified.profile.full_name?.trim() || "A customer"} reviewed your ${bookingRow.service_label} booking.`,
+  }).then(({ error }) => {
+    if (error) {
+      console.error("[Customer review submit] Failed to create provider notification:", error);
+    }
   });
 
-  await sendPushNotificationToUser(bookingRow.provider_id, {
-    title: "New customer review",
-    body: `${verified.profile.full_name?.trim() || "A customer"} reviewed your ${bookingRow.service_label} booking.`,
-    bookingId: bookingRow.id,
-    path: `/provider/reviews`,
-  });
+  try {
+    await sendPushNotificationToUser(bookingRow.provider_id, {
+      title: "New customer review",
+      body: `${verified.profile.full_name?.trim() || "A customer"} reviewed your ${bookingRow.service_label} booking.`,
+      bookingId: bookingRow.id,
+      path: `/provider/reviews`,
+    });
+  } catch (pushError) {
+    console.error("[Customer review submit] Failed to send provider push notification:", pushError);
+  }
 
   return NextResponse.json({ success: true });
 }
