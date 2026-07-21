@@ -229,7 +229,6 @@ export async function POST(
         kyc_verified: isVerified,
         reviewed_at: now,
         last_reviewed_at: now,
-        updated_at: now,
       });
 
       await verified.adminClient.from("notifications").insert({
@@ -275,7 +274,6 @@ export async function POST(
         kyc_verified: false,
         reviewed_at: null,
         last_reviewed_at: now,
-        updated_at: now,
       });
 
       return NextResponse.json({ ok: true }, { headers: corsHeaders });
@@ -313,7 +311,6 @@ export async function POST(
       kyc_verified: false,
       reviewed_at: null,
       last_reviewed_at: now,
-      updated_at: now,
     });
 
     return NextResponse.json({ ok: true, value: storedPath }, { headers: corsHeaders });

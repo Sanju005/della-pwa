@@ -129,7 +129,7 @@ export async function GET(
       .maybeSingle(),
     verified.adminClient
       .from("provider_verifications")
-      .select("id, provider_id, phone_verified, email_verified, identity_verified, kyc_verified, background_check_verified, identity_document_type, identity_front_image_url, identity_back_image_url, created_at, updated_at")
+      .select("id, provider_id, phone_verified, email_verified, identity_verified, kyc_verified, background_check_verified, identity_document_type, identity_front_image_url, identity_back_image_url, created_at")
       .or(`provider_id.eq.${id},id.eq.${id}`)
       .limit(1)
       .maybeSingle(),
