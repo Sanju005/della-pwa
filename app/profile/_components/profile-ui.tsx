@@ -3534,18 +3534,18 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
         />
       </SectionCard>
 
-      <section className="mt-4 rounded-[24px] border border-[#ebe2f8] bg-white p-4 shadow-[0_14px_30px_rgba(106,69,160,0.07)]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[15px] font-bold text-[#24193a]">Report an Issue</p>
-            <p className="mt-1 text-[13px] leading-6 text-[#6d6480]">
+      <section className="mt-3 rounded-[18px] border border-[#ebe2f8] bg-white px-3 py-3 shadow-[0_10px_22px_rgba(106,69,160,0.06)]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-[#24193a]">Report an Issue</p>
+            <p className="mt-0.5 text-[11px] leading-5 text-[#6d6480]">
               Send this task details to admin and describe the issue you are facing.
             </p>
           </div>
           <button
             type="button"
             onClick={handleReportIssue}
-            className="inline-flex shrink-0 items-center justify-center rounded-[14px] bg-[#fff1f2] px-4 py-2 text-[13px] font-bold text-[#dc2626]"
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-[12px] bg-[#fff1f2] px-3 text-[12px] font-bold text-[#dc2626]"
           >
             Report
           </button>
