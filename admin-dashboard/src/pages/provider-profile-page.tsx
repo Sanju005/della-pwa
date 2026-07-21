@@ -35,7 +35,7 @@ import {
   updateProviderProfile,
   uploadProviderIdentityDocument,
 } from "../lib/admin-providers";
-import type { ProviderDetailRecord } from "../types";
+import type { ProviderDetailRecord, ProviderIdentityDocument } from "../types";
 
 const tabs = [
   "Overview",
@@ -229,6 +229,49 @@ export function ProviderProfilePage() {
     });
   }
 
+  function isPassportDocument(documentType?: string) {
+    return documentType?.toLowerCase().includes("passport") ?? false;
+  }
+
+  function buildOptimisticIdentityDocument(
+    side: "front" | "back",
+    previewUrl: string,
+    fileName: string,
+    documentType?: string,
+  ): ProviderIdentityDocument {
+    const passport = isPassportDocument(documentType);
+
+    return {
+      id: `identity-${side}`,
+      label:
+        side === "front"
+          ? passport
+            ? "Passport Main Page"
+            : "IC Front"
+          : passport
+            ? "Passport Supporting Page"
+            : "IC Back",
+      fileName: fileName || (passport ? `passport-${side}` : `ic-${side}`),
+      previewUrl,
+    };
+  }
+
+  function updateIdentityDocumentStatus(
+    documents: ProviderDetailRecord["documents"],
+    nextStatus: string,
+    nextCount: number,
+  ) {
+    return documents.map((document) =>
+      document.label === "Identity Verification"
+        ? {
+            ...document,
+            status: nextStatus,
+            note: nextCount > 0 ? `${nextCount} document image${nextCount > 1 ? "s" : ""} submitted` : undefined,
+          }
+        : document,
+    );
+  }
+
   if (loading && !provider) {
     return (
       <div className="grid min-h-[40vh] place-items-center">
@@ -419,7 +462,33 @@ export function ProviderProfilePage() {
       return;
     }
 
-    await reloadProviderDetails();
+    const optimisticDocument = buildOptimisticIdentityDocument(
+      side,
+      dataUrl,
+      file.name,
+      detail.identityDocumentType,
+    );
+    setProvider((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const otherDocuments = (current.identityDocuments ?? []).filter(
+        (document) => document.id !== `identity-${side}`,
+      );
+      const nextDocuments =
+        side === "front"
+          ? [optimisticDocument, ...otherDocuments]
+          : [...otherDocuments, optimisticDocument];
+
+      return {
+        ...current,
+        identityVerificationStatus: "Processing",
+        kycStatus: "Pending",
+        documents: updateIdentityDocumentStatus(current.documents, "Processing", nextDocuments.length),
+        identityDocuments: nextDocuments,
+      };
+    });
     flash(`${side === "front" ? "Front" : "Back"} identity image uploaded. Status changed to pending review.`);
   }
 
@@ -446,7 +515,24 @@ export function ProviderProfilePage() {
       return;
     }
 
-    await reloadProviderDetails();
+    setProvider((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextDocuments = (current.identityDocuments ?? []).filter(
+        (document) => document.id !== `identity-${side}`,
+      );
+      const nextStatus = nextDocuments.length ? "Processing" : "Pending";
+
+      return {
+        ...current,
+        identityVerificationStatus: nextStatus,
+        kycStatus: "Pending",
+        documents: updateIdentityDocumentStatus(current.documents, nextStatus, nextDocuments.length),
+        identityDocuments: nextDocuments,
+      };
+    });
     flash(`${side === "front" ? "Front" : "Back"} identity image deleted. Status changed to pending review.`);
   }
 
