@@ -1,5 +1,6 @@
 import { CalendarDays, CheckCircle2, CircleDollarSign, Clock3, FileText, Image as ImageIcon, MapPin, Star, User } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { SurfaceCard, InfoRow, MiniStatus } from "../components/user-detail-ui";
 import { getBookingDetailWithFallback } from "../lib/admin-bookings";
@@ -53,54 +54,18 @@ function MediaGrid({
   );
 }
 
-export function BookingDetailPage() {
-  const { bookingId = "" } = useParams();
-  const [booking, setBooking] = useState<DashboardBooking | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadBooking() {
-      setLoading(true);
-      const detail = await getBookingDetailWithFallback(bookingId);
-
-      if (!active) {
-        return;
-      }
-
-      setBooking(detail);
-      setLoading(false);
-    }
-
-    void loadBooking();
-
-    return () => {
-      active = false;
-    };
-  }, [bookingId]);
-
-  if (loading) {
-    return (
-      <div className="grid min-h-[40vh] place-items-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
-      </div>
-    );
-  }
-
-  if (!booking) {
-    return (
-      <SurfaceCard title="Task Details">
-        <p className="text-sm text-slate-500">Booking record was not found.</p>
-      </SurfaceCard>
-    );
-  }
-
+export function BookingTaskDetails({
+  booking,
+  action,
+}: {
+  booking: DashboardBooking;
+  action?: ReactNode;
+}) {
   return (
     <div className="space-y-4">
       <SurfaceCard
         title="Task Details"
-        action={<Link to="/tasks-bookings" className="text-sm font-semibold text-[#b4236b]">Back to tasks</Link>}
+        action={action}
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4 rounded-2xl bg-[#fff8fb] px-4 py-4">
@@ -211,5 +176,56 @@ export function BookingDetailPage() {
         </div>
       </SurfaceCard>
     </div>
+  );
+}
+
+export function BookingDetailPage() {
+  const { bookingId = "" } = useParams();
+  const [booking, setBooking] = useState<DashboardBooking | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBooking() {
+      setLoading(true);
+      const detail = await getBookingDetailWithFallback(bookingId);
+
+      if (!active) {
+        return;
+      }
+
+      setBooking(detail);
+      setLoading(false);
+    }
+
+    void loadBooking();
+
+    return () => {
+      active = false;
+    };
+  }, [bookingId]);
+
+  if (loading) {
+    return (
+      <div className="grid min-h-[40vh] place-items-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <SurfaceCard title="Task Details">
+        <p className="text-sm text-slate-500">Booking record was not found.</p>
+      </SurfaceCard>
+    );
+  }
+
+  return (
+    <BookingTaskDetails
+      booking={booking}
+      action={<Link to="/tasks-bookings" className="text-sm font-semibold text-[#b4236b]">Back to tasks</Link>}
+    />
   );
 }

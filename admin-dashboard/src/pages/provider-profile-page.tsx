@@ -23,9 +23,10 @@ import {
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { InfoRow, MetricTile, MiniStatus, PillBadge, SurfaceCard, TableShell } from "../components/user-detail-ui";
+import { BookingTaskDetails } from "./booking-detail-page";
+import { getBookingDetailWithFallback } from "../lib/admin-bookings";
 import {
   deleteProviderIdentityDocument,
   getProviderProfileWithFallback,
@@ -37,6 +38,7 @@ import {
   uploadProviderIdentityDocument,
 } from "../lib/admin-providers";
 import type { ProviderDetailRecord, ProviderIdentityDocument } from "../types";
+import type { DashboardBooking } from "../types";
 
 const tabs = [
   "Overview",
@@ -149,6 +151,9 @@ export function ProviderProfilePage() {
   const [identityDocumentSaving, setIdentityDocumentSaving] = useState("");
   const [receivingPaymentId, setReceivingPaymentId] = useState("");
   const [receivedAmounts, setReceivedAmounts] = useState<Record<string, string>>({});
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [selectedTask, setSelectedTask] = useState<DashboardBooking | null>(null);
+  const [selectedTaskLoading, setSelectedTaskLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -165,6 +170,9 @@ export function ProviderProfilePage() {
     setMessage(null);
     setLoading(true);
     setProvider(null);
+    setSelectedTaskId("");
+    setSelectedTask(null);
+    setSelectedTaskLoading(false);
     setForm({
       name: "",
       email: "",
@@ -202,6 +210,36 @@ export function ProviderProfilePage() {
       active = false;
     };
   }, [providerId]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!selectedTaskId) {
+      setSelectedTask(null);
+      setSelectedTaskLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    async function loadSelectedTask() {
+      setSelectedTaskLoading(true);
+      const detail = await getBookingDetailWithFallback(selectedTaskId);
+
+      if (!active) {
+        return;
+      }
+
+      setSelectedTask(detail);
+      setSelectedTaskLoading(false);
+    }
+
+    void loadSelectedTask();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedTaskId]);
 
   function flash(nextMessage: string) {
     setMessage(nextMessage);
@@ -290,6 +328,18 @@ export function ProviderProfilePage() {
   }
 
   const detail = provider;
+  const allTaskRows = [
+    ...detail.completedTaskRows,
+    ...detail.upcomingTaskRows.map((task) => ({
+      id: task.id,
+      rawId: task.rawId,
+      service: task.service,
+      customer: task.customer,
+      date: task.schedule,
+      amount: task.amount,
+      status: task.status,
+    })),
+  ];
 
   async function handleSaveProfile() {
     if (saving) {
@@ -1052,44 +1102,74 @@ export function ProviderProfilePage() {
       {activeTab === "Overview" ? renderOverview() : null}
       {activeTab === "Tasks"
         ? (
-            <TableShell title="All Tasks">
-              <table className="min-w-full text-left text-[13px]">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400">
-                    <th className="pb-3 font-semibold">Task ID</th>
-                    <th className="pb-3 font-semibold">Service</th>
-                    <th className="pb-3 font-semibold">Customer</th>
-                    <th className="pb-3 font-semibold">Date</th>
-                    <th className="pb-3 font-semibold">Amount</th>
-                    <th className="pb-3 font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...detail.completedTaskRows, ...detail.upcomingTaskRows.map((task) => ({
-                    id: task.id,
-                    rawId: task.rawId,
-                    service: task.service,
-                    customer: task.customer,
-                    date: task.schedule,
-                    amount: task.amount,
-                    status: task.status,
-                  }))].map((task) => (
-                    <tr key={task.rawId ?? task.id} className="border-b border-slate-50">
-                      <td className="py-3 font-semibold text-emerald-700">
-                        <Link to={`/tasks-bookings/${task.rawId ?? task.id}`} className="hover:underline">
-                          {task.id}
-                        </Link>
-                      </td>
-                      <td className="py-3">{task.service}</td>
-                      <td className="py-3">{task.customer}</td>
-                      <td className="py-3 text-slate-500">{task.date}</td>
-                      <td className="py-3">{task.amount}</td>
-                      <td className="py-3"><MiniStatus status={task.status} /></td>
+            <div className="space-y-4">
+              <TableShell title="All Tasks">
+                <table className="min-w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400">
+                      <th className="pb-3 font-semibold">Task ID</th>
+                      <th className="pb-3 font-semibold">Service</th>
+                      <th className="pb-3 font-semibold">Customer</th>
+                      <th className="pb-3 font-semibold">Date</th>
+                      <th className="pb-3 font-semibold">Amount</th>
+                      <th className="pb-3 font-semibold">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableShell>
+                  </thead>
+                  <tbody>
+                    {allTaskRows.map((task) => {
+                      const taskKey = task.rawId ?? task.id;
+                      const selected = selectedTaskId === taskKey;
+
+                      return (
+                        <tr
+                          key={taskKey}
+                          onClick={() => setSelectedTaskId(taskKey)}
+                          className={`cursor-pointer border-b border-slate-50 transition hover:bg-emerald-50/50 ${
+                            selected ? "bg-emerald-50/70" : ""
+                          }`}
+                        >
+                          <td className="py-3 font-semibold text-emerald-700">
+                            <button type="button" className="font-semibold hover:underline">
+                              {task.id}
+                            </button>
+                          </td>
+                          <td className="py-3">{task.service}</td>
+                          <td className="py-3">{task.customer}</td>
+                          <td className="py-3 text-slate-500">{task.date}</td>
+                          <td className="py-3">{task.amount}</td>
+                          <td className="py-3"><MiniStatus status={task.status} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </TableShell>
+
+              {selectedTaskLoading ? (
+                <SurfaceCard title="Task Details">
+                  <div className="grid min-h-[12rem] place-items-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
+                  </div>
+                </SurfaceCard>
+              ) : selectedTask ? (
+                <BookingTaskDetails
+                  booking={selectedTask}
+                  action={
+                    <Link to={`/tasks-bookings/${selectedTask.rawId ?? selectedTask.id}`} className="text-sm font-semibold text-[#b4236b]">
+                      Open full page
+                    </Link>
+                  }
+                />
+              ) : selectedTaskId ? (
+                <SurfaceCard title="Task Details">
+                  <p className="text-sm text-slate-500">Booking record was not found.</p>
+                </SurfaceCard>
+              ) : (
+                <SurfaceCard title="Task Details">
+                  <p className="text-sm text-slate-500">Click any task row above to see the full task path, timings, images, payments, and reviews.</p>
+                </SurfaceCard>
+              )}
+            </div>
           )
         : null}
       {activeTab === "Payments & Withdrawals"
