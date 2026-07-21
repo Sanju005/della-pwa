@@ -1372,15 +1372,23 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const debugProfile = debugPayload?.stored?.providerProfile ?? null;
   const debugVerification = debugPayload?.stored?.providerVerification ?? null;
   const debugServices = debugPayload?.stored?.providerServices ?? null;
-  const liveProfile =
-    initialLiveProfile ??
-    (debugProfile
+  const liveProfile = initialLiveProfile
+    ? {
+        ...initialLiveProfile,
+        provider_services: initialLiveProfile.provider_services?.length
+          ? initialLiveProfile.provider_services
+          : debugServices,
+        provider_verifications: debugVerification
+          ? [debugVerification]
+          : initialLiveProfile.provider_verifications,
+      }
+    : debugProfile
       ? {
           ...debugProfile,
           provider_services: debugServices,
           provider_verifications: debugVerification ? [debugVerification] : null,
         }
-      : null);
+      : null;
   const effectiveLiveAccount = liveAccount ?? debugPayload?.stored?.profile ?? null;
   const effectiveRegistrationSnapshot = registrationSnapshot ?? debugRegistrationSnapshot;
 
