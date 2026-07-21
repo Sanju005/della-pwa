@@ -69,6 +69,10 @@ export type DashboardBooking = {
   totalAmount?: string;
   description?: string;
   completionImages?: string[];
+  paymentBreakdown?: Array<{
+    description: string;
+    amount: string;
+  }>;
   location?: string;
   bookingMode?: string;
   customerNote?: string;

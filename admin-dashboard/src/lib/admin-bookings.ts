@@ -73,6 +73,46 @@ type ReviewDetailRow = {
   created_at?: string | null;
 };
 
+type PaymentAdjustmentDetails = {
+  baseAmount: number;
+  finalAmount: number;
+  additionalCharge?: number;
+  chargeDescription?: string;
+  note: string;
+  rows?: Array<{ description?: string; amount?: number }>;
+};
+
+function parsePaymentAdjustmentNote(note: string | null | undefined): PaymentAdjustmentDetails | null {
+  const trimmed = note?.trim() ?? "";
+  const prefixes = ["PAYMENT_BREAKDOWN::", "PAYMENT_DETAILS::"];
+  const prefix = prefixes.find((item) => trimmed.startsWith(item));
+
+  if (!prefix) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed.slice(prefix.length)) as PaymentAdjustmentDetails;
+
+    if (
+      typeof parsed.baseAmount !== "number" ||
+      typeof parsed.finalAmount !== "number" ||
+      typeof parsed.note !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      ...parsed,
+      rows: Array.isArray(parsed.rows)
+        ? parsed.rows.filter((row) => typeof row.description === "string" && typeof row.amount === "number")
+        : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 function relationItem<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
@@ -250,11 +290,33 @@ async function mapBookingRow(
 ): Promise<DashboardBooking> {
   const providerProfile = relationItem(row.provider_profiles);
   const providerService = relationItem(row.provider_services);
-  const fixedAmount = Number(row.booking_price ?? row.quoted_amount ?? row.total_amount ?? 0);
-  const additionalAmount = Array.isArray(row.additional_charges)
+  const paymentAdjustment = parsePaymentAdjustmentNote(row.provider_response_note);
+  const fixedAmount = Number(paymentAdjustment?.baseAmount ?? row.booking_price ?? row.quoted_amount ?? row.total_amount ?? 0);
+  const additionalAmount = typeof paymentAdjustment?.additionalCharge === "number"
+    ? paymentAdjustment.additionalCharge
+    : Array.isArray(row.additional_charges)
     ? row.additional_charges.reduce((sum, item) => sum + Number(item?.amount ?? 0), 0)
     : 0;
-  const totalAmount = Number(row.final_amount ?? row.total_amount ?? fixedAmount + additionalAmount);
+  const totalAmount = Number(paymentAdjustment?.finalAmount ?? row.final_amount ?? row.total_amount ?? fixedAmount + additionalAmount);
+  const paymentBreakdown = (paymentAdjustment?.rows?.length
+    ? paymentAdjustment.rows
+    : [
+        { description: "Booking Price", amount: fixedAmount },
+        ...(additionalAmount > 0
+          ? [{ description: paymentAdjustment?.chargeDescription || "Additional Charges", amount: additionalAmount }]
+          : []),
+      ]
+  ).map((item) => ({
+    description: item.description?.trim() || "Payment item",
+    amount: formatCurrency(Number(item.amount ?? 0)),
+  }));
+  const cleanProviderNote = paymentAdjustment?.note?.trim() || row.provider_response_note?.trim() || "";
+  const cleanDescription =
+    paymentAdjustment?.chargeDescription?.trim() ||
+    (Array.isArray(row.additional_charges)
+      ? row.additional_charges.map((item) => item?.description?.trim()).find(Boolean)
+      : "") ||
+    "";
   const completionImages = await Promise.all(
     (Array.isArray(row.work_finished_images) ? row.work_finished_images : []).map((image) =>
       resolveCompletionImageUrl(image),
@@ -288,12 +350,13 @@ async function mapBookingRow(
     fixedAmount: formatCurrency(fixedAmount),
     additionalAmount: formatCurrency(additionalAmount),
     totalAmount: formatCurrency(totalAmount),
-    description: row.provider_response_note?.trim() || "",
+    description: cleanDescription,
+    paymentBreakdown,
     completionImages: completionImages.filter(Boolean),
     location: row.location_text?.trim() || "No location stored.",
     bookingMode: formatStatus(row.booking_mode),
     customerNote: row.customer_note?.trim() || "",
-    providerNote: row.provider_response_note?.trim() || "",
+    providerNote: cleanProviderNote,
     declineReason: row.decline_reason?.trim() || "",
     hourlyRate: formatCurrency(row.hourly_rate ?? 0),
     dailyRate: formatCurrency(row.daily_rate ?? 0),

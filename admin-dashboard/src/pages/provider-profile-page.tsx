@@ -597,7 +597,8 @@ export function ProviderProfilePage() {
   function renderOverview() {
     return (
       <>
-        <section className="grid gap-4 xl:grid-cols-[1.03fr_0.95fr_0.78fr_1fr]">
+        <section className="grid gap-4 xl:grid-cols-2">
+          <div className="space-y-4">
             <SurfaceCard
               title="Personal Details"
               action={
@@ -677,6 +678,34 @@ export function ProviderProfilePage() {
             ) : null}
           </SurfaceCard>
 
+            <SurfaceCard title="Provider Status">
+              <div className="grid gap-4 text-sm sm:grid-cols-2">
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+                  <span className="text-slate-500">Account Status</span>
+                  <MiniStatus status={detail.status} />
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+                  <span className="text-slate-500">Approval Status</span>
+                  <MiniStatus status={detail.approvalStatus} />
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+                  <span className="text-slate-500">Background Check</span>
+                  <MiniStatus status={detail.backgroundCheck} />
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+                  <span className="text-slate-500">KYC Status</span>
+                  <MiniStatus status={detail.kycStatus} />
+                </div>
+                <SummaryMetric label="Member Since" value={detail.memberSince} />
+                <SummaryMetric label="Last Login" value={detail.lastLogin} />
+                <SummaryMetric label="Device" value={detail.device} />
+                <SummaryMetric label="Completed Jobs" value={detail.completedJobs} />
+                <SummaryMetric label="Cancellation Rate" value={detail.cancellationRate} />
+                <SummaryMetric label="Response Rate" value={detail.responseRate} />
+              </div>
+            </SurfaceCard>
+          </div>
+
           <div className="space-y-4">
             <SurfaceCard
               title="Service Areas"
@@ -711,56 +740,7 @@ export function ProviderProfilePage() {
                 <SummaryMetric label="Repeat Customers" value={detail.repeatCustomers} />
               </div>
             </SurfaceCard>
-          </div>
 
-          <div className="space-y-4">
-            <SurfaceCard title="Provider Status" className="h-full">
-              <div className="space-y-4 text-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Account Status</span>
-                  <MiniStatus status={detail.status} />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Approval Status</span>
-                  <MiniStatus status={detail.approvalStatus} />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Background Check</span>
-                  <MiniStatus status={detail.backgroundCheck} />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">KYC Status</span>
-                  <MiniStatus status={detail.kycStatus} />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Member Since</span>
-                  <span className="font-medium text-slate-900">{detail.memberSince}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Last Login</span>
-                  <span className="font-medium text-slate-900">{detail.lastLogin}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Device</span>
-                  <span className="font-medium text-slate-900">{detail.device}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Completed Jobs</span>
-                  <span className="font-medium text-slate-900">{detail.completedJobs}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Cancellation Rate</span>
-                  <span className="font-medium text-slate-900">{detail.cancellationRate}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Response Rate</span>
-                  <span className="font-medium text-slate-900">{detail.responseRate}</span>
-                </div>
-              </div>
-            </SurfaceCard>
-          </div>
-
-          <div className="space-y-4">
             <SurfaceCard title="About Provider">
               {editing ? (
                 <textarea
@@ -815,7 +795,7 @@ export function ProviderProfilePage() {
           </div>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-3">
+        <section className="grid gap-4 xl:grid-cols-2">
           <SurfaceCard title="Availability">
             <div className="grid gap-4 sm:grid-cols-2">
               <SummaryMetric label="Working Days" value={detail.workingDays} />
@@ -837,7 +817,7 @@ export function ProviderProfilePage() {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard title="Activity Log">
+          <SurfaceCard title="Activity Log" className="xl:col-span-2">
             <div className="space-y-4">
               {detail.activityLog.map((item) => (
                 <div key={item.id} className="rounded-2xl bg-slate-50 px-4 py-3">
@@ -850,7 +830,7 @@ export function ProviderProfilePage() {
           </SurfaceCard>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-3">
+        <section className="grid gap-4 xl:grid-cols-2">
           <TableShell title="Completed Tasks" action={<button className="text-xs font-semibold text-emerald-700">View all</button>}>
             <table className="min-w-full text-left text-[13px]">
               <thead>

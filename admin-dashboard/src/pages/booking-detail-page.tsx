@@ -94,8 +94,31 @@ export function BookingTaskDetails({
           <div className="rounded-2xl bg-[#fff8fb] px-4 py-4">
             <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Description</p>
             <p className="mt-2 text-sm leading-6 text-slate-700">
-              {booking.description || "No additional description provided."}
+              {booking.description || "No additional charge description provided."}
             </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#fff8fb] px-4 py-4">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Payment Breakdown</p>
+            {booking.paymentBreakdown?.length ? (
+              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-100 bg-white">
+                {booking.paymentBreakdown.map((item, index) => (
+                  <div
+                    key={`${item.description}-${index}`}
+                    className="flex items-center justify-between gap-4 border-b border-slate-50 px-4 py-3 last:border-b-0"
+                  >
+                    <span className="text-sm font-medium text-slate-700">{item.description}</span>
+                    <span className="shrink-0 text-sm font-bold text-slate-950">{item.amount}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between gap-4 bg-[#fcf7ff] px-4 py-3">
+                  <span className="text-sm font-bold text-[#8E5EB5]">Total Amount</span>
+                  <span className="shrink-0 text-sm font-black text-[#8E5EB5]">{booking.totalAmount ?? booking.amount}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">No payment breakdown stored.</p>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
