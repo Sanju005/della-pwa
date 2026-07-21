@@ -3725,7 +3725,13 @@ export function BookingReviewScreen({ booking }: BookingReviewProps) {
       <div className="rounded-[24px] border border-[#ebe2f8] bg-white p-5 text-center shadow-[0_16px_34px_rgba(106,69,160,0.08)]">
         <div className="mx-auto flex w-fit flex-col items-center">
           <div className="rounded-[20px] border border-[#f1e7fb] bg-[#fffdfd] p-1">
-            <BookingThumb kind={booking.thumbnail} imageSrc={booking.imageSrc} service={booking.service} />
+            <BookingThumb
+              kind={booking.thumbnail}
+              imageSrc={booking.imageSrc}
+              avatarSrc={booking.providerAvatarUrl}
+              service={booking.service}
+              providerName={booking.provider}
+            />
           </div>
           <p className="mt-4 text-[14px] font-bold text-[#1f1630]">
             How was your experience with
