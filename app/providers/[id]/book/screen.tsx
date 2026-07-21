@@ -428,74 +428,56 @@ export function BookingFormScreen({
                   </span>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-2 rounded-[16px] bg-[#FAF7FD] px-3 py-3">
-                  <div
-                    className={`flex min-w-0 items-center gap-2 rounded-[12px] border px-2.5 py-2 ${
-                      detail.identityVerified
-                        ? "border-[#CBE8D2] bg-[#F2FBF5]"
-                        : "border-[#FDE2B7] bg-[#FFF8EE]"
-                    }`}
-                  >
-                    <span
-                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        detail.identityVerified
-                          ? "bg-[#E7F8EC] text-[#16A34A]"
-                          : "bg-[#FFF3E0] text-[#F59E0B]"
-                      }`}
-                    >
-                      <IdCard className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p
-                        className={`text-[11px] font-semibold leading-4 ${
-                          detail.identityVerified ? "text-[#138A36]" : "text-[#D97706]"
-                        }`}
-                      >
-                        {detail.identityVerified ? "IC Verified" : "IC Pending"}
-                      </p>
-                    </div>
-                    <BadgeCheck
-                      className={`ml-auto h-4 w-4 shrink-0 ${
-                        detail.identityVerified
-                          ? "fill-[#16A34A] text-[#16A34A]"
-                          : "fill-[#F59E0B] text-[#F59E0B]"
-                      }`}
-                    />
-                  </div>
-                  <div
-                    className={`flex min-w-0 items-center gap-2 rounded-[12px] border px-2.5 py-2 ${
-                      detail.phoneVerified
-                        ? "border-[#CBE8D2] bg-[#F2FBF5]"
-                        : "border-[#FDE2B7] bg-[#FFF8EE]"
-                    }`}
-                  >
-                    <span
-                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        detail.phoneVerified
-                          ? "bg-[#E7F8EC] text-[#16A34A]"
-                          : "bg-[#FFF3E0] text-[#F59E0B]"
-                      }`}
-                    >
-                      <Phone className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p
-                        className={`text-[11px] font-semibold leading-4 ${
-                          detail.phoneVerified ? "text-[#138A36]" : "text-[#D97706]"
-                        }`}
-                      >
-                        {detail.phoneVerified ? "Phone Verified" : "Phone Pending"}
-                      </p>
-                    </div>
-                    <BadgeCheck
-                      className={`ml-auto h-4 w-4 shrink-0 ${
-                        detail.phoneVerified
-                          ? "fill-[#16A34A] text-[#16A34A]"
-                          : "fill-[#F59E0B] text-[#F59E0B]"
-                      }`}
-                    />
-                  </div>
-                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 rounded-[16px] bg-[#FAF7FD] px-3 py-3">
+              <div
+                className={`flex min-w-0 items-center justify-center gap-2 rounded-[12px] border px-2.5 py-2.5 text-center ${
+                  detail.identityVerified
+                    ? "border-[#CBE8D2] bg-[#F2FBF5]"
+                    : "border-[#FDE2B7] bg-[#FFF8EE]"
+                }`}
+              >
+                <span
+                  className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                    detail.identityVerified
+                      ? "bg-[#E7F8EC] text-[#16A34A]"
+                      : "bg-[#FFF3E0] text-[#F59E0B]"
+                  }`}
+                >
+                  <IdCard className="h-3.5 w-3.5" />
+                </span>
+                <span
+                  className={`whitespace-nowrap text-[11px] font-bold leading-4 ${
+                    detail.identityVerified ? "text-[#138A36]" : "text-[#D97706]"
+                  }`}
+                >
+                  {detail.identityVerified ? "IC Verified" : "IC Pending"}
+                </span>
+              </div>
+              <div
+                className={`flex min-w-0 items-center justify-center gap-2 rounded-[12px] border px-2.5 py-2.5 text-center ${
+                  detail.phoneVerified
+                    ? "border-[#CBE8D2] bg-[#F2FBF5]"
+                    : "border-[#FDE2B7] bg-[#FFF8EE]"
+                }`}
+              >
+                <span
+                  className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                    detail.phoneVerified
+                      ? "bg-[#E7F8EC] text-[#16A34A]"
+                      : "bg-[#FFF3E0] text-[#F59E0B]"
+                  }`}
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                </span>
+                <span
+                  className={`whitespace-nowrap text-[11px] font-bold leading-4 ${
+                    detail.phoneVerified ? "text-[#138A36]" : "text-[#D97706]"
+                  }`}
+                >
+                  {detail.phoneVerified ? "Mobile Verified" : "Mobile Pending"}
+                </span>
               </div>
             </div>
           </section>
