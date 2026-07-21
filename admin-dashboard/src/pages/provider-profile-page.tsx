@@ -373,7 +373,11 @@ export function ProviderProfilePage() {
     }
 
     setVerifyingIdentity(true);
-    const result = await setProviderIdentityVerified(detail.providerId, verified);
+    const result = await setProviderIdentityVerified(
+      detail.providerId,
+      verified,
+      detail.identityDocumentType,
+    );
     setVerifyingIdentity(false);
 
     if (result.error) {
@@ -381,23 +385,7 @@ export function ProviderProfilePage() {
       return;
     }
 
-    setProvider((current) =>
-      current
-        ? {
-            ...current,
-            kycStatus: verified ? "Verified" : "Pending",
-            identityVerificationStatus: verified ? "Verified" : current.identityDocuments?.length ? "Processing" : "Pending",
-            documents: current.documents.map((document) =>
-              document.label === "Identity Verification"
-                ? {
-                    ...document,
-                    status: verified ? "Verified" : current.identityDocuments?.length ? "Processing" : "Pending",
-                  }
-                : document,
-            ),
-          }
-        : current,
-    );
+    await reloadProviderDetails();
     flash(verified ? "Identity documents verified." : "Identity status changed back to pending.");
   }
 

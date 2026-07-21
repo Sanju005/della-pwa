@@ -15,6 +15,7 @@ const ALLOWED_ADMIN_ROLES = new Set([
 ]);
 
 type IdentitySide = "front" | "back";
+type IdentityAction = "upload" | "delete" | "verify";
 
 function buildCorsHeaders(origin: string | null) {
   const allowedOrigin =
@@ -108,6 +109,16 @@ function defaultIdentityFileName(side: IdentitySide, documentType: string | null
   return `${prefix}-${side}.jpg`;
 }
 
+function normalizeDocumentType(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase() ?? "";
+
+  if (normalized.includes("passport")) {
+    return "passport";
+  }
+
+  return "ic";
+}
+
 async function findVerificationRow(adminClient: ReturnType<typeof getAdminClient>, providerId: string) {
   if (!adminClient) {
     return null;
@@ -188,20 +199,50 @@ export async function POST(
   try {
     const { id: providerId } = await params;
     const payload = (await request.json()) as {
-      action?: "upload" | "delete";
+      action?: IdentityAction;
       side?: IdentitySide;
       dataUrl?: string;
       fileName?: string;
       documentType?: string;
+      verified?: boolean;
     };
     const action = payload.action;
     const side = payload.side;
 
-    if (action !== "upload" && action !== "delete") {
+    if (action !== "upload" && action !== "delete" && action !== "verify") {
       return NextResponse.json(
         { error: "Unsupported identity document action." },
         { status: 400, headers: corsHeaders },
       );
+    }
+
+    const existing = await findVerificationRow(verified.adminClient, providerId);
+    const now = new Date().toISOString();
+    const documentType = normalizeDocumentType(payload.documentType || existing?.identity_document_type);
+
+    if (action === "verify") {
+      const isVerified = Boolean(payload.verified);
+
+      await saveVerificationPayload(verified.adminClient, providerId, {
+        identity_document_type: documentType,
+        identity_verified: isVerified,
+        kyc_verified: isVerified,
+        reviewed_at: now,
+        last_reviewed_at: now,
+        updated_at: now,
+      });
+
+      await verified.adminClient.from("notifications").insert({
+        user_id: providerId,
+        booking_id: null,
+        notification_type: isVerified ? "identity_verified" : "identity_review_pending",
+        title: isVerified ? "IC / Passport verified" : "Identity review updated",
+        body: isVerified
+          ? "Admin has approved your IC / Passport verification."
+          : "Admin changed your IC / Passport verification back to pending review.",
+      });
+
+      return NextResponse.json({ ok: true }, { headers: corsHeaders });
     }
 
     if (side !== "front" && side !== "back") {
@@ -211,19 +252,24 @@ export async function POST(
       );
     }
 
-    const existing = await findVerificationRow(verified.adminClient, providerId);
     const column = sideColumn(side);
-    const now = new Date().toISOString();
-    const documentType = payload.documentType?.trim() || existing?.identity_document_type || "ic";
 
     if (action === "delete") {
       const existingValue = existing?.[column]?.trim() ?? "";
 
       if (isStoredPath(existingValue)) {
-        await verified.adminClient.storage.from("identity-documents").remove([existingValue]);
+        const removed = await verified.adminClient.storage.from("identity-documents").remove([existingValue]);
+
+        if (removed.error) {
+          return NextResponse.json(
+            { error: removed.error.message || "Unable to delete identity image." },
+            { status: 500, headers: corsHeaders },
+          );
+        }
       }
 
       await saveVerificationPayload(verified.adminClient, providerId, {
+        identity_document_type: documentType,
         [column]: null,
         identity_verified: false,
         kyc_verified: false,
@@ -253,6 +299,12 @@ export async function POST(
       upsert: true,
       visibility: "private",
     });
+
+    const existingValue = existing?.[column]?.trim() ?? "";
+
+    if (isStoredPath(existingValue) && existingValue !== storedPath) {
+      await verified.adminClient.storage.from("identity-documents").remove([existingValue]);
+    }
 
     await saveVerificationPayload(verified.adminClient, providerId, {
       identity_document_type: documentType,

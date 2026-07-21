@@ -1715,78 +1715,17 @@ export async function setProviderVisibility(providerId: string, active: boolean)
   return { error: null };
 }
 
-export async function setProviderIdentityVerified(providerId: string, verified: boolean) {
-  if (!supabase) {
-    return { error: "Supabase is not configured." };
-  }
-
-  const now = new Date().toISOString();
-  const payload = {
-    identity_verified: verified,
-    kyc_verified: verified,
-    reviewed_at: now,
-    last_reviewed_at: now,
-    updated_at: now,
-  };
-
-  const { data: existingRow, error: readError } = await supabase
-    .from("provider_verifications")
-    .select("id, provider_id")
-    .or(`provider_id.eq.${providerId},id.eq.${providerId}`)
-    .limit(1)
-    .maybeSingle();
-
-  if (readError) {
-    return { error: readError.message || "Unable to load identity verification record." };
-  }
-
-  if (existingRow) {
-    const identifierColumn = existingRow.provider_id ? "provider_id" : "id";
-    const identifierValue = existingRow.provider_id ?? existingRow.id;
-
-    const { error } = await supabase
-      .from("provider_verifications")
-      .update(payload)
-      .eq(identifierColumn, identifierValue);
-
-    if (error) {
-      return { error: error.message || "Unable to update identity verification." };
-    }
-  } else {
-    const { error } = await supabase.from("provider_verifications").insert({
-      provider_id: providerId,
-      ...payload,
-      created_at: now,
-    });
-
-    if (error) {
-      return { error: error.message || "Unable to create identity verification record." };
-    }
-  }
-
-  await supabase.from("notifications").insert({
-    user_id: providerId,
-    booking_id: null,
-    notification_type: verified ? "identity_verified" : "identity_review_pending",
-    title: verified ? "Identity verified" : "Identity review updated",
-    body: verified
-      ? "Admin has approved your identity verification documents."
-      : "Admin changed your identity verification status back to pending review.",
-  });
-
-  return { error: null };
-}
-
 type IdentityDocumentSide = "front" | "back";
 
 async function postProviderIdentityDocumentAction(
   providerId: string,
   payload: {
-    action: "upload" | "delete";
-    side: IdentityDocumentSide;
+    action: "upload" | "delete" | "verify";
+    side?: IdentityDocumentSide;
     dataUrl?: string;
     fileName?: string;
     documentType?: string;
+    verified?: boolean;
   },
 ) {
   if (!supabase) {
@@ -1823,6 +1762,18 @@ async function postProviderIdentityDocumentAction(
         error instanceof Error ? error.message : "Unable to update identity document.",
     };
   }
+}
+
+export async function setProviderIdentityVerified(
+  providerId: string,
+  verified: boolean,
+  documentType?: string,
+) {
+  return postProviderIdentityDocumentAction(providerId, {
+    action: "verify",
+    verified,
+    documentType,
+  });
 }
 
 export async function uploadProviderIdentityDocument(
