@@ -69,6 +69,37 @@ export type DashboardBooking = {
   totalAmount?: string;
   description?: string;
   completionImages?: string[];
+  location?: string;
+  bookingMode?: string;
+  customerNote?: string;
+  providerNote?: string;
+  declineReason?: string;
+  hourlyRate?: string;
+  dailyRate?: string;
+  durationHours?: string;
+  taskPath?: Array<{
+    key: string;
+    label: string;
+    value: string;
+    done: boolean;
+  }>;
+  paymentProofImages?: string[];
+  companyPaymentProofUrl?: string;
+  companyPaymentProofName?: string;
+  customerReview?: {
+    rating: string;
+    comment: string;
+    date: string;
+    photos: string[];
+    tags: string[];
+    recommend: string;
+  };
+  providerReview?: {
+    rating: string;
+    comment: string;
+    date: string;
+    photos: string[];
+  };
 };
 
 export type PaymentRow = {
@@ -262,6 +293,7 @@ export type ProviderMediaItem = {
 
 export type ProviderTaskRow = {
   id: string;
+  rawId?: string;
   service: string;
   customer: string;
   date: string;
@@ -271,6 +303,7 @@ export type ProviderTaskRow = {
 
 export type ProviderUpcomingTaskRow = {
   id: string;
+  rawId?: string;
   service: string;
   customer: string;
   schedule: string;

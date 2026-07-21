@@ -1006,6 +1006,7 @@ function buildTaskRows(liveRows: LiveBookingRow[], customerNames: Map<string, st
       const service = relationItem(row.provider_services);
       return {
         id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
+        rawId: row.id,
         service: humanizeService(service?.service_type),
         customer: customerNames.get(row.customer_id ?? "") || "Customer",
         date: formatDate(row.scheduled_date),
@@ -1021,6 +1022,7 @@ function buildTaskRows(liveRows: LiveBookingRow[], customerNames: Map<string, st
       const service = relationItem(row.provider_services);
       return {
         id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
+        rawId: row.id,
         service: humanizeService(service?.service_type),
         customer: customerNames.get(row.customer_id ?? "") || "Customer",
         schedule: formatSchedule(row.scheduled_date, row.scheduled_start_time),

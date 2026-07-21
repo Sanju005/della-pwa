@@ -23,6 +23,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import { InfoRow, MetricTile, MiniStatus, PillBadge, SurfaceCard, TableShell } from "../components/user-detail-ui";
 import {
@@ -808,7 +809,11 @@ export function ProviderProfilePage() {
               <tbody>
                 {detail.completedTaskRows.map((task) => (
                   <tr key={task.id} className="border-b border-slate-50">
-                    <td className="py-3 font-semibold text-emerald-700">{task.id}</td>
+                    <td className="py-3 font-semibold text-emerald-700">
+                      <Link to={`/tasks-bookings/${task.rawId ?? task.id}`} className="hover:underline">
+                        {task.id}
+                      </Link>
+                    </td>
                     <td className="py-3">{task.service}</td>
                     <td className="py-3">{task.customer}</td>
                     <td className="py-3 text-slate-500">{task.date}</td>
@@ -835,7 +840,11 @@ export function ProviderProfilePage() {
               <tbody>
                 {detail.upcomingTaskRows.map((task) => (
                   <tr key={task.id} className="border-b border-slate-50">
-                    <td className="py-3 font-semibold text-emerald-700">{task.id}</td>
+                    <td className="py-3 font-semibold text-emerald-700">
+                      <Link to={`/tasks-bookings/${task.rawId ?? task.id}`} className="hover:underline">
+                        {task.id}
+                      </Link>
+                    </td>
                     <td className="py-3">{task.service}</td>
                     <td className="py-3">{task.customer}</td>
                     <td className="py-3 text-slate-500">{task.schedule}</td>
@@ -1042,17 +1051,45 @@ export function ProviderProfilePage() {
 
       {activeTab === "Overview" ? renderOverview() : null}
       {activeTab === "Tasks"
-        ? renderSimpleRows(
-            "All Tasks",
-            ["Task ID", "Service", "Customer", "Date", "Amount", "Status"],
-            [...detail.completedTaskRows, ...detail.upcomingTaskRows.map((task) => ({
-              id: task.id,
-              service: task.service,
-              customer: task.customer,
-              date: task.schedule,
-              amount: task.amount,
-              status: task.status,
-            }))].map((task) => [task.id, task.service, task.customer, task.date, task.amount, task.status])
+        ? (
+            <TableShell title="All Tasks">
+              <table className="min-w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400">
+                    <th className="pb-3 font-semibold">Task ID</th>
+                    <th className="pb-3 font-semibold">Service</th>
+                    <th className="pb-3 font-semibold">Customer</th>
+                    <th className="pb-3 font-semibold">Date</th>
+                    <th className="pb-3 font-semibold">Amount</th>
+                    <th className="pb-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...detail.completedTaskRows, ...detail.upcomingTaskRows.map((task) => ({
+                    id: task.id,
+                    rawId: task.rawId,
+                    service: task.service,
+                    customer: task.customer,
+                    date: task.schedule,
+                    amount: task.amount,
+                    status: task.status,
+                  }))].map((task) => (
+                    <tr key={task.rawId ?? task.id} className="border-b border-slate-50">
+                      <td className="py-3 font-semibold text-emerald-700">
+                        <Link to={`/tasks-bookings/${task.rawId ?? task.id}`} className="hover:underline">
+                          {task.id}
+                        </Link>
+                      </td>
+                      <td className="py-3">{task.service}</td>
+                      <td className="py-3">{task.customer}</td>
+                      <td className="py-3 text-slate-500">{task.date}</td>
+                      <td className="py-3">{task.amount}</td>
+                      <td className="py-3"><MiniStatus status={task.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableShell>
           )
         : null}
       {activeTab === "Payments & Withdrawals"
