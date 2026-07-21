@@ -1777,6 +1777,82 @@ export async function setProviderIdentityVerified(providerId: string, verified: 
   return { error: null };
 }
 
+type IdentityDocumentSide = "front" | "back";
+
+async function postProviderIdentityDocumentAction(
+  providerId: string,
+  payload: {
+    action: "upload" | "delete";
+    side: IdentityDocumentSide;
+    dataUrl?: string;
+    fileName?: string;
+    documentType?: string;
+  },
+) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return { error: "Admin session is required." };
+  }
+
+  try {
+    const response = await fetch(`${APP_BASE_URL}/api/admin/provider-identity-documents/${providerId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const result = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      return { error: result.error || "Unable to update identity document." };
+    }
+
+    return { error: null };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to update identity document.",
+    };
+  }
+}
+
+export async function uploadProviderIdentityDocument(
+  providerId: string,
+  side: IdentityDocumentSide,
+  dataUrl: string,
+  fileName: string,
+  documentType?: string,
+) {
+  return postProviderIdentityDocumentAction(providerId, {
+    action: "upload",
+    side,
+    dataUrl,
+    fileName,
+    documentType,
+  });
+}
+
+export async function deleteProviderIdentityDocument(
+  providerId: string,
+  side: IdentityDocumentSide,
+  documentType?: string,
+) {
+  return postProviderIdentityDocumentAction(providerId, {
+    action: "delete",
+    side,
+    documentType,
+  });
+}
+
 export async function markCompanyPaymentReceived(
   submissionId: string,
   receivedAmount: number,

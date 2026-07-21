@@ -18,6 +18,7 @@ import {
   Star,
   TimerReset,
   Trash2,
+  Upload,
   UserCircle2,
   Wallet,
 } from "lucide-react";
@@ -25,12 +26,14 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { InfoRow, MetricTile, MiniStatus, PillBadge, SurfaceCard, TableShell } from "../components/user-detail-ui";
 import {
+  deleteProviderIdentityDocument,
   getProviderProfileWithFallback,
   markCompanyPaymentReceived,
   setProviderIdentityVerified,
   setProviderSuspended,
   setProviderVisibility,
   updateProviderProfile,
+  uploadProviderIdentityDocument,
 } from "../lib/admin-providers";
 import type { ProviderDetailRecord } from "../types";
 
@@ -142,6 +145,7 @@ export function ProviderProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [verifyingIdentity, setVerifyingIdentity] = useState(false);
+  const [identityDocumentSaving, setIdentityDocumentSaving] = useState("");
   const [receivingPaymentId, setReceivingPaymentId] = useState("");
   const [receivedAmounts, setReceivedAmounts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
@@ -200,6 +204,29 @@ export function ProviderProfilePage() {
 
   function flash(nextMessage: string) {
     setMessage(nextMessage);
+  }
+
+  async function reloadProviderDetails() {
+    const payload = await getProviderProfileWithFallback(providerId);
+    setProvider(payload.detail);
+    if (payload.detail) {
+      setForm({
+        name: payload.detail.name,
+        email: payload.detail.email,
+        phone: payload.detail.phone,
+        serviceArea: payload.detail.serviceArea,
+        about: payload.detail.about,
+      });
+    }
+  }
+
+  function fileToDataUrl(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error ?? new Error("Unable to read selected file."));
+      reader.readAsDataURL(file);
+    });
   }
 
   if (loading && !provider) {
@@ -372,6 +399,67 @@ export function ProviderProfilePage() {
         : current,
     );
     flash(verified ? "Identity documents verified." : "Identity status changed back to pending.");
+  }
+
+  async function handleIdentityDocumentUpload(side: "front" | "back", file?: File | null) {
+    if (!file || identityDocumentSaving) {
+      return;
+    }
+
+    setIdentityDocumentSaving(`upload-${side}`);
+    let dataUrl = "";
+
+    try {
+      dataUrl = await fileToDataUrl(file);
+    } catch (error) {
+      setIdentityDocumentSaving("");
+      flash(error instanceof Error ? error.message : "Unable to read selected file.");
+      return;
+    }
+
+    const result = await uploadProviderIdentityDocument(
+      detail.providerId,
+      side,
+      dataUrl,
+      file.name,
+      detail.identityDocumentType,
+    );
+    setIdentityDocumentSaving("");
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    await reloadProviderDetails();
+    flash(`${side === "front" ? "Front" : "Back"} identity image uploaded. Status changed to pending review.`);
+  }
+
+  async function handleIdentityDocumentDelete(side: "front" | "back") {
+    if (identityDocumentSaving) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete the ${side} identity image?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setIdentityDocumentSaving(`delete-${side}`);
+    const result = await deleteProviderIdentityDocument(
+      detail.providerId,
+      side,
+      detail.identityDocumentType,
+    );
+    setIdentityDocumentSaving("");
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    await reloadProviderDetails();
+    flash(`${side === "front" ? "Front" : "Back"} identity image deleted. Status changed to pending review.`);
   }
 
   function renderOverview() {
@@ -1020,13 +1108,14 @@ export function ProviderProfilePage() {
               ))}
             </div>
           </div>
-          {detail.identityDocuments?.length ? (
-            <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-950">Identity Review</h3>
                   <p className="mt-1 text-[12px] text-slate-500">
-                    {detail.identityDocumentType} submitted {detail.identitySubmittedAt ? `on ${detail.identitySubmittedAt}` : "for review"}.
+                    {detail.identityDocuments?.length
+                      ? `${detail.identityDocumentType} submitted ${detail.identitySubmittedAt ? `on ${detail.identitySubmittedAt}` : "for review"}.`
+                      : "No identity image is currently stored for this provider."}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -1045,34 +1134,82 @@ export function ProviderProfilePage() {
                   </button>
                 </div>
               </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {detail.identityDocuments.map((document) => (
-                  <a
-                    key={document.id}
-                    href={document.previewUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
+              <div className="mt-4 flex flex-wrap gap-3">
+                {(["front", "back"] as const).map((side) => (
+                  <label
+                    key={side}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700"
                   >
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
-                      {isPdfAsset(document.previewUrl) ? (
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
-                          <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
-                          <span className="text-[12px] font-semibold">{document.fileName}</span>
-                        </div>
-                      ) : (
-                        <img src={document.previewUrl} alt={document.label} className="h-full w-full object-cover" />
-                      )}
-                    </div>
-                    <div className="mt-3">
-                      <p className="text-sm font-semibold text-slate-900">{document.label}</p>
-                      <p className="mt-1 text-[12px] text-slate-500">{document.fileName}</p>
-                    </div>
-                  </a>
+                    <Upload className="size-3.5" />
+                    {identityDocumentSaving === `upload-${side}`
+                      ? "Uploading..."
+                      : `Upload ${side === "front" ? "Front" : "Back"}`}
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      disabled={Boolean(identityDocumentSaving)}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        event.target.value = "";
+                        void handleIdentityDocumentUpload(side, file);
+                      }}
+                    />
+                  </label>
                 ))}
               </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {detail.identityDocuments?.length ? (
+                  detail.identityDocuments.map((document) => {
+                    const side = document.id.includes("back") ? "back" : "front";
+
+                    return (
+                      <div
+                        key={document.id}
+                        className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3"
+                      >
+                        <a
+                          href={document.previewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block transition hover:opacity-90"
+                        >
+                          <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                            {isPdfAsset(document.previewUrl) ? (
+                              <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
+                                <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                                <span className="text-[12px] font-semibold">{document.fileName}</span>
+                              </div>
+                            ) : (
+                              <img src={document.previewUrl} alt={document.label} className="h-full w-full object-cover" />
+                            )}
+                          </div>
+                        </a>
+                        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{document.label}</p>
+                            <p className="mt-1 text-[12px] text-slate-500">{document.fileName}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleIdentityDocumentDelete(side)}
+                            disabled={Boolean(identityDocumentSaving)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+                          >
+                            <Trash2 className="size-3.5" />
+                            {identityDocumentSaving === `delete-${side}` ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500 md:col-span-2">
+                    Upload front and back identity images to start review.
+                  </div>
+                )}
+              </div>
             </div>
-          ) : null}
           {detail.profileImageUrl ? (
             <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
               <h3 className="text-sm font-bold text-slate-950">Profile Photo</h3>
