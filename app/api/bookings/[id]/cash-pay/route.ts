@@ -137,6 +137,14 @@ export async function POST(
   }
 
   const bookingRow = booking as BookingRow;
+  if (bookingRow.booking_status !== "final_payment_sent") {
+    return NextResponse.json(
+      { error: "Cash payment can only be confirmed after the provider sends the final amount." },
+      { status: 400 },
+    );
+  }
+
+  const timestamp = new Date().toISOString();
   const storedProofDataUrl = payload.proofDataUrl?.trim()
     ? await uploadStoredMedia(verified.adminClient, {
         bucket: "payment-proofs",
@@ -148,15 +156,6 @@ export async function POST(
         visibility: "private",
       })
     : "";
-
-  if (bookingRow.booking_status !== "final_payment_sent") {
-    return NextResponse.json(
-      { error: "Cash payment can only be confirmed after the provider sends the final amount." },
-      { status: 400 },
-    );
-  }
-
-  const timestamp = new Date().toISOString();
 
   const paymentPayload = {
     booking_id: bookingRow.id,
@@ -176,15 +175,30 @@ export async function POST(
     customer_payment_proof_mime_type: payload.proofMimeType?.trim() || null,
   };
 
-  const { error: paymentError } = await verified.adminClient
+  const { data: updatedPayments, error: updatePaymentError } = await verified.adminClient
     .from("payments")
-    .upsert(paymentPayload, { onConflict: "booking_id" });
+    .update(paymentPayload)
+    .eq("booking_id", bookingRow.id)
+    .select("id");
 
-  if (paymentError) {
+  if (updatePaymentError) {
     return NextResponse.json(
-      { error: paymentError.message || "Unable to confirm cash payment." },
+      { error: updatePaymentError.message || "Unable to confirm cash payment." },
       { status: 500 },
     );
+  }
+
+  if (!updatedPayments || updatedPayments.length === 0) {
+    const { error: insertPaymentError } = await verified.adminClient
+      .from("payments")
+      .insert(paymentPayload);
+
+    if (insertPaymentError) {
+      return NextResponse.json(
+        { error: insertPaymentError.message || "Unable to confirm cash payment." },
+        { status: 500 },
+      );
+    }
   }
 
   const { error: bookingUpdateError } = await verified.adminClient

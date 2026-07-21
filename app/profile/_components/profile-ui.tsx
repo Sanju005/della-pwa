@@ -198,28 +198,28 @@ function StepTimelineCard({
   const current = state === "current";
 
   return (
-    <div className="relative flex gap-4">
-      <div className="flex w-14 flex-col items-center">
+    <div className="relative flex gap-3 sm:gap-4">
+      <div className="flex w-10 shrink-0 flex-col items-center sm:w-14">
         <span
-          className={`inline-flex h-12 w-12 items-center justify-center rounded-full border-4 text-lg font-black ${
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-full border-4 text-base font-black sm:h-12 sm:w-12 sm:text-lg ${
             done || current
               ? "border-[#8E5EB5] bg-[#8E5EB5] text-white"
               : "border-[#e5e7eb] bg-white text-[#94a3b8]"
           }`}
         >
-          {done ? <CheckCircleIcon className="h-6 w-6" /> : number}
+            {done ? <CheckCircleIcon className="h-5 w-5 sm:h-6 sm:w-6" /> : number}
         </span>
         <span className={`mt-2 h-full min-h-16 w-[2px] ${done || current ? "bg-[#8E5EB5]" : "bg-[#e5e7eb]"}`} />
       </div>
       <div
-        className={`flex-1 rounded-[24px] border p-5 shadow-[0_16px_34px_rgba(106,69,160,0.08)] ${
+        className={`min-w-0 flex-1 rounded-[22px] border p-4 shadow-[0_16px_34px_rgba(106,69,160,0.08)] sm:rounded-[24px] sm:p-5 ${
           current
             ? "border-[#dcc7f7] bg-[linear-gradient(180deg,#fcf7ff_0%,#fffefe_100%)]"
             : "border-[#ebe2f8] bg-white"
         }`}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
             <h3 className="text-[1.1rem] font-bold tracking-[-0.04em] text-[#1f1630]">
               {number}. {title}
             </h3>
@@ -244,7 +244,7 @@ function StepTimelineCard({
             ) : null}
           </div>
           <span
-            className={`inline-flex items-center rounded-full px-4 py-2 text-[12px] font-bold ${
+            className={`inline-flex shrink-0 items-center rounded-full px-3 py-2 text-[11px] font-bold sm:px-4 sm:text-[12px] ${
               done
                 ? "bg-[#eef9f0] text-[#16a34a]"
                 : current
@@ -277,10 +277,10 @@ function PaymentProofPreview({
   }
 
   return (
-    <div className="mt-4 rounded-[18px] border border-[#ebe2f8] bg-[#fcfaff] p-4">
+    <div className="mt-4 min-w-0 overflow-hidden rounded-[18px] border border-[#ebe2f8] bg-[#fcfaff] p-3 sm:p-4">
       <p className="text-[13px] font-semibold text-[#111827]">{title}</p>
       {isPdfProof(mimeType, fileName) ? (
-        <div className="mt-3 rounded-[14px] border border-dashed border-[#d9c7ef] bg-white px-4 py-4 text-[13px] text-[#6d6480]">
+        <div className="mt-3 break-words rounded-[14px] border border-dashed border-[#d9c7ef] bg-white px-4 py-4 text-[13px] text-[#6d6480]">
           PDF proof attached: {fileName || "Payment proof.pdf"}
         </div>
       ) : (
@@ -291,7 +291,7 @@ function PaymentProofPreview({
         />
       )}
       {fileName ? (
-        <p className="mt-2 text-[12px] text-[#6d6480]">{fileName}</p>
+        <p className="mt-2 break-all text-[12px] text-[#6d6480]">{fileName}</p>
       ) : null}
     </div>
   );
@@ -3303,27 +3303,27 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
               </div>
             </div>
           ) : null}
-          <div className="rounded-[20px] border border-[#ebe2f8] bg-white p-4">
+          <div className="min-w-0 rounded-[20px] border border-[#ebe2f8] bg-white p-3 sm:p-4">
             <p className="text-[15px] font-black text-[#8E5EB5]">Payment Summary</p>
             <div className="mt-4 space-y-3 text-[14px] text-[#24193a]">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center justify-between gap-3">
                 <span>Fixed Amount</span>
-                <span className="font-semibold">RM {booking.baseAmount ?? booking.paymentAmount ?? 0}</span>
+                <span className="shrink-0 font-semibold">RM {booking.baseAmount ?? booking.paymentAmount ?? 0}</span>
               </div>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center justify-between gap-3">
                 <span>Additional Amount</span>
-                <span className="font-semibold">RM {booking.additionalCharge ?? 0}</span>
+                <span className="shrink-0 font-semibold">RM {booking.additionalCharge ?? 0}</span>
               </div>
-              <div className="rounded-[16px] bg-[#faf6ff] px-4 py-3">
+              <div className="min-w-0 rounded-[16px] bg-[#faf6ff] px-3 py-3 sm:px-4">
                 <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#8E5EB5]">Description</p>
                 <p className="mt-2 text-[13px] leading-6 text-[#4c4561]">
                   {booking.additionalChargeDescription || booking.paymentNote || "No additional description provided."}
                 </p>
               </div>
               <div className="border-t border-dashed border-[#ddd4ea] pt-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center justify-between gap-3">
                   <span className="text-[1rem] font-black text-[#8E5EB5]">Total Amount</span>
-                  <span className="text-[1.6rem] font-black text-[#8E5EB5]">RM {booking.paymentAmount ?? 0}</span>
+                  <span className="shrink-0 text-[1.25rem] font-black text-[#8E5EB5] sm:text-[1.6rem]">RM {booking.paymentAmount ?? 0}</span>
                 </div>
               </div>
             </div>
@@ -3337,9 +3337,9 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
                 >
                   {paymentLoading ? "Paying..." : "Pay by Cash"}
                 </button>
-                <label className="flex cursor-pointer items-center justify-between rounded-[16px] border border-[#d9c7ef] bg-white px-4 py-4 text-[14px] font-semibold text-[#8E5EB5]">
-                  <span>Attach images or take photo</span>
-                  <span className="text-[12px] text-[#7f7692]">JPG, PNG, GIF, WebP, PDF</span>
+                <label className="flex cursor-pointer flex-col items-start gap-1 rounded-[16px] border border-[#d9c7ef] bg-white px-4 py-4 text-[14px] font-semibold text-[#8E5EB5] sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <span className="leading-5">Attach images or take photo</span>
+                  <span className="text-[11px] leading-4 text-[#7f7692] sm:text-[12px]">JPG, PNG, GIF, WebP, PDF</span>
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,application/pdf,image/jpeg,image/png,image/gif,image/webp"
