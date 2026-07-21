@@ -6026,8 +6026,8 @@ export function ProfileScreen() {
           <VerificationStatusCard
             href="/provider/profile/identity-verification"
             icon={<IdCard className="h-6 w-6" />}
-            title="Identity"
-            subtitle="ID check"
+            title="IC / Passport"
+            subtitle={data.identityVerified ? "IC / Passport verified" : "Identity document check"}
             verified={data.identityVerified}
             status={data.identityVerificationStatus}
           />
@@ -6426,7 +6426,11 @@ export function IdentityVerificationScreen() {
       }
 
       if (isIdentityLocked) {
-        state.setError("Your identity verification is under review right now.");
+        state.setError(
+          data.identityVerified
+            ? "Your IC / Passport is already verified."
+            : "Your identity verification is under review right now.",
+        );
         return;
       }
 
@@ -6479,7 +6483,11 @@ export function IdentityVerificationScreen() {
 
   const openSourcePicker = (side: "front" | "back") => {
     if (isIdentityLocked) {
-      state.setError("Your identity verification is under review right now.");
+      state.setError(
+        data.identityVerified
+          ? "Your IC / Passport is already verified."
+          : "Your identity verification is under review right now.",
+      );
       return;
     }
 
@@ -6507,14 +6515,22 @@ export function IdentityVerificationScreen() {
 
         <header className="pt-2">
           <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
-            Identity Verification
+            IC / Passport Verification
           </h1>
           <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
-            {identityStatus === "processing"
-              ? "Your IC / passport is under review. Verification usually takes up to 24 hours."
-              : "Upload your IC or passport images for identity verification."}
+            {data.identityVerified
+              ? "Your IC / Passport is verified."
+              : identityStatus === "processing"
+                ? "Your IC / passport is under review. Verification usually takes up to 24 hours."
+                : "Upload your IC or passport images for identity verification."}
           </p>
         </header>
+
+        {data.identityVerified ? (
+          <section className="rounded-[18px] border border-[#bbf7d0] bg-[#ecfdf3] px-4 py-3 text-[13px] font-semibold text-[#15803d]">
+            IC / Passport verified. No further action is needed.
+          </section>
+        ) : null}
 
         {identityStatus === "processing" ? (
           <section className="rounded-[18px] border border-[#c7d2fe] bg-[#eef2ff] px-4 py-3 text-[13px] font-semibold text-[#4338ca]">
