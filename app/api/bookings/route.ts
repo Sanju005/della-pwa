@@ -888,18 +888,24 @@ async function loadProviderDirectory(
     ])
   );
 
-  return new Map(
-    ((profiles ?? []) as ProviderIdentityRow[]).map((row) => [
+  const providerEntries = await Promise.all(
+    ((profiles ?? []) as ProviderIdentityRow[]).map(async (row) => [
       row.id,
       {
         name:
           row.full_name?.trim() ||
           marketingNameById.get(row.id) ||
           "DELLA Provider",
-        avatarUrl: row.avatar_url?.trim() || "",
+        avatarUrl: await resolveStoredMediaUrl(adminClient, {
+          bucket: "profile-images",
+          value: row.avatar_url,
+          visibility: "public",
+        }),
       },
-    ])
+    ] as const)
   );
+
+  return new Map(providerEntries);
 }
 
 export async function GET(request: Request) {
