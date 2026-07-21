@@ -110,6 +110,12 @@ function SummaryMetric({
   );
 }
 
+function getFirstProviderTaskId(detail?: ProviderDetailRecord | null) {
+  const firstCompleted = detail?.completedTaskRows[0];
+  const firstUpcoming = detail?.upcomingTaskRows[0];
+  return firstCompleted?.rawId ?? firstCompleted?.id ?? firstUpcoming?.rawId ?? firstUpcoming?.id ?? "";
+}
+
 function renderSimpleRows(title: string, headers: string[], rows: string[][]) {
   return (
     <TableShell title={title}>
@@ -190,6 +196,7 @@ export function ProviderProfilePage() {
         }
 
         setProvider(payload.detail);
+        setSelectedTaskId(getFirstProviderTaskId(payload.detail));
         setForm({
           name: payload.detail?.name ?? "",
           email: payload.detail?.email ?? "",
@@ -1086,7 +1093,12 @@ export function ProviderProfilePage() {
             <button
               key={tab}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                if (tab === "Tasks" && !selectedTaskId) {
+                  setSelectedTaskId(getFirstProviderTaskId(detail));
+                }
+              }}
               className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
                 activeTab === tab
                   ? "border-b-2 border-emerald-500 text-emerald-700"
@@ -1113,6 +1125,7 @@ export function ProviderProfilePage() {
                       <th className="pb-3 font-semibold">Date</th>
                       <th className="pb-3 font-semibold">Amount</th>
                       <th className="pb-3 font-semibold">Status</th>
+                      <th className="pb-3 font-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1138,6 +1151,18 @@ export function ProviderProfilePage() {
                           <td className="py-3 text-slate-500">{task.date}</td>
                           <td className="py-3">{task.amount}</td>
                           <td className="py-3"><MiniStatus status={task.status} /></td>
+                          <td className="py-3">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedTaskId(taskKey);
+                              }}
+                              className="rounded-full bg-emerald-50 px-3 py-1.5 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
+                            >
+                              View details
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
