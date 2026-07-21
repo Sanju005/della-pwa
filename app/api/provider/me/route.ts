@@ -390,8 +390,7 @@ async function fetchProviderSnapshot(
       identity_document_type,
       identity_front_image_url,
       identity_back_image_url,
-      created_at,
-      updated_at
+      created_at
     `)
     .or(`provider_id.eq.${providerId},id.eq.${providerId}`)
     .limit(1);

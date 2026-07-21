@@ -231,6 +231,20 @@ export async function POST(
         last_reviewed_at: now,
       });
 
+      const authUser = await verified.adminClient.auth.admin.getUserById(providerId);
+      const metadata =
+        authUser.data?.user?.user_metadata && typeof authUser.data.user.user_metadata === "object"
+          ? authUser.data.user.user_metadata
+          : {};
+
+      await verified.adminClient.auth.admin.updateUserById(providerId, {
+        user_metadata: {
+          ...metadata,
+          identity_verification_status: isVerified ? "verified" : "processing",
+          identity_document_type: documentType,
+        },
+      });
+
       await verified.adminClient.from("notifications").insert({
         user_id: providerId,
         booking_id: null,

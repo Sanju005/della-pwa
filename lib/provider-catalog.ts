@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseServiceKey, getSupabaseUrl } from "./supabase-env";
+import { resolveStoredMediaUrl } from "./server-media-storage";
 import {
   buildProviderPortraitSrc,
   serviceOrder,
@@ -200,14 +201,23 @@ const providerCatalogSelectBase = `
   )
 `;
 
-function buildServicePortfolio(serviceRow: ProviderCatalogServiceRow) {
+async function buildServicePortfolio(
+  supabase: NonNullable<ReturnType<typeof buildSupabaseAdminClient>>,
+  serviceRow: ProviderCatalogServiceRow,
+) {
   const imageUrls = serviceRow.image_data_urls?.map((item) => item?.trim()).filter(Boolean) ?? [];
   const captions = serviceRow.image_captions ?? [];
 
-  return imageUrls.map((src, index) => ({
-    src,
-    caption: captions[index]?.trim() || `Work ${index + 1}`,
-  }));
+  return Promise.all(
+    imageUrls.map(async (src, index) => ({
+      src: await resolveStoredMediaUrl(supabase, {
+        bucket: "provider-work-images",
+        value: src,
+        visibility: "public",
+      }),
+      caption: captions[index]?.trim() || `Work ${index + 1}`,
+    })),
+  );
 }
 
 async function fetchProviderProfileMediaMap(
@@ -229,17 +239,22 @@ async function fetchProviderProfileMediaMap(
     return new Map<string, ProviderProfileMedia>();
   }
 
-  return new Map(
+  const entries = await Promise.all(
     (data as ProviderProfileMediaRow[])
-      .map((row) => [
+      .map(async (row) => [
         row.id,
         {
-          avatarUrl: row.avatar_url?.trim() || "",
+          avatarUrl: await resolveStoredMediaUrl(supabase, {
+            bucket: "profile-images",
+            value: row.avatar_url,
+            visibility: "public",
+          }),
           fullName: row.full_name?.trim() || "",
         },
-      ] as const)
-      .filter(([, profile]) => Boolean(profile.avatarUrl) || Boolean(profile.fullName)),
+      ] as const),
   );
+
+  return new Map(entries.filter(([, profile]) => Boolean(profile.avatarUrl) || Boolean(profile.fullName)));
 }
 
 export const getProviderCatalog = cache(
@@ -278,25 +293,25 @@ export const getProviderCatalog = cache(
       rows.map((row) => row.id),
     );
 
-    const realListings = rows
-      .flatMap((row, rowIndex) =>
-        (row.provider_services ?? []).flatMap((serviceRow) => {
-          if (!isProviderCategoryKey(serviceRow.service_type)) {
-            return [];
-          }
+    const realListings = (
+      await Promise.all(
+        rows.map(async (row, rowIndex) => {
+          const serviceListings: Array<ProviderListing | null> = await Promise.all((row.provider_services ?? []).map(async (serviceRow) => {
+            if (!isProviderCategoryKey(serviceRow.service_type)) {
+              return null;
+            }
 
-          if (serviceKey && serviceRow.service_type !== serviceKey) {
-            return [];
-          }
+            if (serviceKey && serviceRow.service_type !== serviceKey) {
+              return null;
+            }
 
-          const verificationRow = Array.isArray(row.provider_verifications)
-            ? row.provider_verifications[0]
-            : row.provider_verifications;
+            const verificationRow = Array.isArray(row.provider_verifications)
+              ? row.provider_verifications[0]
+              : row.provider_verifications;
 
-          const profileMedia = profileMediaMap.get(row.id);
+            const profileMedia = profileMediaMap.get(row.id);
 
-          return [
-            {
+            const listing: ProviderListing = {
               id: row.id,
               name: row.marketing_name ?? "DELLA Provider",
               providerName: profileMedia?.fullName || undefined,
@@ -326,24 +341,25 @@ export const getProviderCatalog = cache(
                 row.approval_status === "approved" &&
                 Boolean(verificationRow?.email_verified),
               phoneVerified:
-                row.approval_status === "approved" &&
-                Boolean(verificationRow?.email_verified) &&
                 Boolean(verificationRow?.phone_verified),
               identityVerified:
-                row.approval_status === "approved" &&
-                Boolean(verificationRow?.email_verified) &&
                 Boolean(verificationRow?.identity_verified),
               profileImageUrl:
                 profileMedia?.avatarUrl ||
                 buildProviderPortraitSrc({
                   name: row.marketing_name ?? "DELLA Provider",
                   serviceKey: serviceRow.service_type,
-                }),
-              portfolioImages: buildServicePortfolio(serviceRow),
-            } satisfies ProviderListing,
-          ];
+              }),
+              portfolioImages: await buildServicePortfolio(supabase, serviceRow),
+            };
+
+            return listing;
+          }));
+
+          return serviceListings.filter((listing): listing is ProviderListing => Boolean(listing));
         })
-      );
+      )
+    ).flat();
 
     if (!serviceKey) {
       return {

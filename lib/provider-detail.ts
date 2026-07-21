@@ -747,13 +747,15 @@ export const getProviderDetail = cache(
       const availabilityLabel = availabilityWithConflicts.some((slot) => slot.state === "available")
         ? "Available"
         : "Unavailable";
-      const registrationGallery = collectRegistrationGallery(
-        registration,
-        registrationServiceLabel(scopedMatch.serviceKey),
-      );
+      const registrationGallery = scopedMatch.portfolioImages.length
+        ? []
+        : collectRegistrationGallery(
+            registration,
+            registrationServiceLabel(scopedMatch.serviceKey),
+          );
 
       return buildDetailFromListing(scopedMatch, {
-        profileImage: registration?.data.basicProfile.avatarDataUrl || null,
+        profileImage: null,
         gallery: registrationGallery,
         customerReviews,
         availability: availabilityWithConflicts,
@@ -801,13 +803,15 @@ export const getProviderDetail = cache(
     const availabilityLabel = availabilityWithConflicts.some((slot) => slot.state === "available")
       ? "Available"
       : "Unavailable";
-    const registrationGallery = collectRegistrationGallery(
-      registration,
-      registrationServiceLabel(fallbackMatch.serviceKey),
-    );
+    const registrationGallery = fallbackMatch.portfolioImages.length
+      ? []
+      : collectRegistrationGallery(
+          registration,
+          registrationServiceLabel(fallbackMatch.serviceKey),
+        );
 
     return buildDetailFromListing(fallbackMatch, {
-      profileImage: registration?.data.basicProfile.avatarDataUrl || null,
+      profileImage: null,
       gallery: registrationGallery,
       customerReviews,
       availability: availabilityWithConflicts,
