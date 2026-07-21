@@ -3337,9 +3337,8 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
                 >
                   {paymentLoading ? "Paying..." : "Pay by Cash"}
                 </button>
-                <label className="flex cursor-pointer flex-col items-start gap-1 rounded-[16px] border border-[#d9c7ef] bg-white px-4 py-4 text-[14px] font-semibold text-[#8E5EB5] sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                  <span className="leading-5">Attach images or take photo</span>
-                  <span className="text-[11px] leading-4 text-[#7f7692] sm:text-[12px]">JPG, PNG, GIF, WebP, PDF</span>
+                <label className="inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-[16px] border border-dashed border-[#cdb3eb] bg-[#fcfaff] text-[14px] font-extrabold text-[#8E5EB5]">
+                  Upload Payment Proof
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,application/pdf,image/jpeg,image/png,image/gif,image/webp"
@@ -3347,14 +3346,19 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
                     onChange={(event) => void handlePaymentProofChange(event)}
                   />
                 </label>
-                {paymentProofDataUrl ? (
-                  <PaymentProofPreview
-                    title="New Payment Proof"
-                    dataUrl={paymentProofDataUrl}
-                    fileName={paymentProofFileName}
-                    mimeType={paymentProofMimeType}
-                  />
-                ) : null}
+                <div className="mt-3 grid grid-cols-4 gap-3">
+                  <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[12px] border border-[#e7dcf7] bg-white px-2 text-center text-[20px] font-semibold text-[#8E5EB5]">
+                    {paymentProofDataUrl ? (
+                      isPdfProof(paymentProofMimeType, paymentProofFileName) ? (
+                        <span className="text-[12px] font-extrabold">PDF</span>
+                      ) : (
+                        <img src={paymentProofDataUrl} alt={paymentProofFileName || "Payment proof"} className="h-full w-full object-cover" />
+                      )
+                    ) : (
+                      "+"
+                    )}
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>

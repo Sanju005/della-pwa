@@ -12,7 +12,6 @@ import {
   Image as ImageIcon,
   MapPin,
   MessageCircleMore,
-  Plus,
   Wallet,
 } from "lucide-react";
 
@@ -108,36 +107,30 @@ function CompletionProofGrid({
   }
 
   return (
-    <div className="mt-4">
+    <div className="mt-3">
       <p className="text-[13px] font-extrabold text-[#1f1630]">
         Completion Images ({images.length})
       </p>
-      <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="mt-3 grid grid-cols-3 gap-3">
         {images.map((image, index) => (
           <div
             key={`${bookingId}-completion-proof-${index}`}
-            className="relative aspect-[0.88] overflow-hidden rounded-[22px] bg-white p-3 shadow-[0_16px_34px_rgba(86,38,135,0.08)]"
+            className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[12px] border border-[#e7dcf7] bg-white text-center text-[20px] font-semibold text-[#8E5EB5]"
           >
-            <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[18px] border-2 border-dashed border-[#ff5ab8] bg-[#fffdfd]">
-              {isPdfWorkProof(image) ? (
-                <div className="flex flex-col items-center justify-center gap-3 px-3 text-center text-[#e83e9a]">
-                  <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
-                  <ImageIcon className="h-8 w-8" />
-                  <span className="text-[11px] font-semibold leading-4">Proof file {index + 1}</span>
-                </div>
-              ) : (
-                <img
-                  src={image}
-                  alt={`Completion proof ${index + 1}`}
-                  className="h-full w-full object-cover"
-                />
-              )}
-            </div>
+            {isPdfWorkProof(image) ? (
+              <span className="text-[12px] font-extrabold">PDF</span>
+            ) : (
+              <img
+                src={image}
+                alt={`Completion proof ${index + 1}`}
+                className="h-full w-full object-cover"
+              />
+            )}
             {onRemove ? (
               <button
                 type="button"
                 onClick={() => onRemove(index)}
-                className="absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#1f1630]/70 text-[12px] font-black text-white"
+                className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#1f1630]/70 text-[12px] font-black text-white"
                 aria-label={`Remove completion proof ${index + 1}`}
               >
                 x
@@ -651,19 +644,24 @@ function ProviderReviewModal({
         </label>
 
         <div className="mt-5">
-          <label className="inline-flex h-12 w-full cursor-pointer items-center justify-center rounded-[14px] border border-dashed border-[#cdb3eb] bg-[#fcfaff] text-[13px] font-extrabold text-[#8E5EB5]">
+          <label className="inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-[16px] border border-dashed border-[#cdb3eb] bg-[#fcfaff] text-[14px] font-extrabold text-[#8E5EB5]">
             Add Review Photos
             <input type="file" accept={IMAGE_UPLOAD_ACCEPT} multiple className="hidden" onChange={(event) => void handleReviewPhotoChange(event)} />
           </label>
-          {photos.length > 0 ? (
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              {photos.map((photo, index) => (
-                <div key={`provider-review-photo-${index}`} className="aspect-square overflow-hidden rounded-[10px] border border-[#e7dff2]">
+          <div className="mt-3 grid grid-cols-4 gap-3">
+            {(photos.length > 0 ? photos : ["+", "+", "+", "+"]).map((photo, index) => (
+              <div
+                key={`provider-review-photo-${index}`}
+                className="flex aspect-square items-center justify-center overflow-hidden rounded-[12px] border border-[#e7dcf7] bg-white px-2 text-center text-[20px] font-semibold text-[#8E5EB5]"
+              >
+                {photo.startsWith("data:image/") ? (
                   <img src={photo} alt={`Review photo ${index + 1}`} className="h-full w-full object-cover" />
-                </div>
-              ))}
-            </div>
-          ) : null}
+                ) : (
+                  photo
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="mt-5 flex gap-3">
@@ -969,21 +967,16 @@ function BookingDetails({
               />
             </label>
             <div className="mt-6">
-              <div className="w-full max-w-full overflow-hidden rounded-[28px] border border-[#f2e8fb] bg-[radial-gradient(circle_at_top_left,rgba(255,230,242,0.9),transparent_18%),radial-gradient(circle_at_top_right,rgba(241,234,255,0.8),transparent_20%),linear-gradient(180deg,#ffffff_0%,#fffdfd_100%)] p-4 shadow-[0_18px_44px_rgba(86,38,135,0.07)] sm:p-5">
-                <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-                  <span className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95),rgba(248,214,233,0.95))] text-[#e83e9a] shadow-[0_12px_26px_rgba(232,62,154,0.12)]">
-                    <ImageIcon className="h-8 w-8" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-black tracking-[-0.03em] text-[#1f1630] sm:text-[15px]">
-                      Completion Images
-                    </p>
-                    <p className="mt-1 text-[12px] leading-6 text-[#7d84a0] sm:text-[13px]">
-                      Add up to 3 proof files. Gallery: JPG, JPEG, PNG, GIF, WEBP, TIFF, JFIF, PDF. Camera: image only.
-                    </p>
-                  </div>
-                </div>
-
+              <div className="w-full max-w-full overflow-hidden rounded-[20px] border border-[#ebe2f8] bg-white p-4">
+                <p className="text-[15px] font-black text-[#1f1630]">Add Job Photos</p>
+                <p className="mt-1 text-[12px] text-[#7f7692]">Upload up to 3 completion proof photos.</p>
+                <button
+                  type="button"
+                  onClick={() => workFinishedInputRef.current?.click()}
+                  className="mt-4 inline-flex h-14 w-full cursor-pointer items-center justify-center rounded-[16px] border border-dashed border-[#cdb3eb] bg-[#fcfaff] text-[14px] font-extrabold text-[#8E5EB5]"
+                >
+                  Upload Job Photos
+                </button>
                 <CompletionProofGrid
                   bookingId={booking.id}
                   images={workFinishedImages}
@@ -991,43 +984,34 @@ function BookingDetails({
                     setWorkFinishedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))
                   }
                 />
-                <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="mt-3 grid grid-cols-3 gap-3">
                   {Array.from({ length: Math.max(0, WORK_FINISHED_IMAGE_MAX_COUNT - workFinishedImages.length) }).map((_, index) => (
                     <button
                       key={`${booking.id}-work-image-slot-${index}`}
                       type="button"
                       onClick={() => workFinishedInputRef.current?.click()}
-                      className="aspect-[0.88] rounded-[22px] bg-white p-3 shadow-[0_16px_34px_rgba(86,38,135,0.08)]"
+                      className="flex aspect-square items-center justify-center rounded-[12px] border border-[#e7dcf7] bg-white px-2 text-center text-[20px] font-semibold text-[#8E5EB5]"
                     >
-                      <span className="flex h-full w-full flex-col items-center justify-center rounded-[18px] border-2 border-dashed border-[#ff5ab8] bg-[#fffdfd] text-[#e83e9a]">
-                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.95),rgba(248,214,233,0.95))] shadow-[0_10px_22px_rgba(232,62,154,0.12)]">
-                          <Plus className="h-6 w-6" />
-                        </span>
-                        <ImageIcon className="mt-4 h-9 w-9" />
-                      </span>
+                      +
                     </button>
                   ))}
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-3 text-[#1f1630]">
+                <div className="mt-4 grid grid-cols-2 gap-3 text-[#1f1630]">
                   <button
                     type="button"
                     onClick={() => workFinishedInputRef.current?.click()}
-                    className="inline-flex min-w-0 items-center justify-center gap-2 rounded-[18px] px-2 py-2.5 text-center"
+                    className="inline-flex min-w-0 items-center justify-center gap-2 rounded-[16px] border border-[#e7dcf7] bg-[#fcfaff] px-2 py-3 text-center text-[#8E5EB5]"
                   >
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#f4edff_0%,#f8f1ff_100%)] text-[#8E5EB5] shadow-[0_10px_24px_rgba(142,94,181,0.08)]">
-                      <ImageIcon className="h-6 w-6" />
-                    </span>
+                    <ImageIcon className="h-5 w-5 shrink-0" />
                     <span className="min-w-0 text-[12px] font-bold leading-5 sm:text-[13px]">Choose from gallery</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => workFinishedCameraInputRef.current?.click()}
-                    className="inline-flex min-w-0 items-center justify-center gap-2 rounded-[18px] px-2 py-2.5 text-center"
+                    className="inline-flex min-w-0 items-center justify-center gap-2 rounded-[16px] border border-[#e7dcf7] bg-[#fcfaff] px-2 py-3 text-center text-[#8E5EB5]"
                   >
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#f4edff_0%,#f8f1ff_100%)] text-[#8E5EB5] shadow-[0_10px_24px_rgba(142,94,181,0.08)]">
-                      <Camera className="h-6 w-6" />
-                    </span>
+                    <Camera className="h-5 w-5 shrink-0" />
                     <span className="min-w-0 text-[12px] font-bold leading-5 sm:text-[13px]">Take a photo</span>
                   </button>
                 </div>
