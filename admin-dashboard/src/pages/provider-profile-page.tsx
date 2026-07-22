@@ -16,7 +16,6 @@ import {
   Phone,
   ShieldCheck,
   Star,
-  TimerReset,
   Trash2,
   Upload,
   UserCircle2,
@@ -45,11 +44,11 @@ const tabs = [
   "Tasks",
   "Payments & Withdrawals",
   "Reviews",
-  "Profile & Documents",
-  "Service Areas",
+  "Documents & Verification",
 ] as const;
 
 type TabKey = (typeof tabs)[number];
+type TaskStatusFilter = "all" | "completed" | "upcoming" | "canceled";
 
 const metricIcons = [
   <BriefcaseBusiness className="size-5" />,
@@ -173,12 +172,6 @@ function SummaryMetric({
   );
 }
 
-function getFirstProviderTaskId(detail?: ProviderDetailRecord | null) {
-  const firstCompleted = detail?.completedTaskRows[0];
-  const firstUpcoming = detail?.upcomingTaskRows[0];
-  return firstCompleted?.rawId ?? firstCompleted?.id ?? firstUpcoming?.rawId ?? firstUpcoming?.id ?? "";
-}
-
 function renderSimpleRows(title: string, headers: string[], rows: string[][]) {
   return (
     <TableShell title={title}>
@@ -223,6 +216,9 @@ export function ProviderProfilePage() {
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedTask, setSelectedTask] = useState<DashboardBooking | null>(null);
   const [selectedTaskLoading, setSelectedTaskLoading] = useState(false);
+  const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>("all");
+  const [taskDateFrom, setTaskDateFrom] = useState("");
+  const [taskDateTo, setTaskDateTo] = useState("");
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -248,6 +244,9 @@ export function ProviderProfilePage() {
     setSelectedTaskId("");
     setSelectedTask(null);
     setSelectedTaskLoading(false);
+    setTaskStatusFilter("all");
+    setTaskDateFrom("");
+    setTaskDateTo("");
     setForm({
       name: "",
       email: "",
@@ -271,7 +270,6 @@ export function ProviderProfilePage() {
         }
 
         setProvider(payload.detail);
-        setSelectedTaskId(getFirstProviderTaskId(payload.detail));
         setForm({
           name: payload.detail?.name ?? "",
           email: payload.detail?.email ?? "",
@@ -434,6 +432,42 @@ export function ProviderProfilePage() {
       status: task.status,
     })),
   ];
+  const taskFilterOptions: { value: TaskStatusFilter; label: string }[] = [
+    { value: "all", label: "All Tasks" },
+    { value: "completed", label: "Completed" },
+    { value: "upcoming", label: "Upcoming" },
+    { value: "canceled", label: "Canceled" },
+  ];
+  const filteredTaskRows = allTaskRows.filter((task) => {
+    const normalizedStatus = task.status.toLowerCase();
+    const statusMatches =
+      taskStatusFilter === "all" ||
+      (taskStatusFilter === "completed" && (normalizedStatus.includes("completed") || normalizedStatus.includes("reviewed"))) ||
+      (taskStatusFilter === "upcoming" &&
+        (normalizedStatus.includes("pending") ||
+          normalizedStatus.includes("upcoming") ||
+          normalizedStatus.includes("scheduled") ||
+          normalizedStatus.includes("accepted"))) ||
+      (taskStatusFilter === "canceled" && (normalizedStatus.includes("cancel") || normalizedStatus.includes("declined")));
+
+    if (!statusMatches) {
+      return false;
+    }
+
+    const taskTimestamp = Date.parse(task.date);
+    const fromTimestamp = taskDateFrom ? Date.parse(taskDateFrom) : Number.NaN;
+    const toTimestamp = taskDateTo ? Date.parse(`${taskDateTo}T23:59:59`) : Number.NaN;
+
+    if (!Number.isNaN(fromTimestamp) && !Number.isNaN(taskTimestamp) && taskTimestamp < fromTimestamp) {
+      return false;
+    }
+
+    if (!Number.isNaN(toTimestamp) && !Number.isNaN(taskTimestamp) && taskTimestamp > toTimestamp) {
+      return false;
+    }
+
+    return true;
+  });
 
   async function handleSaveProfile() {
     if (saving) {
@@ -867,32 +901,6 @@ export function ProviderProfilePage() {
             ) : null}
           </SurfaceCard>
 
-            <SurfaceCard title="Provider Status">
-              <div className="grid gap-4 text-sm sm:grid-cols-2">
-                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
-                  <span className="text-slate-500">Account Status</span>
-                  <MiniStatus status={detail.status} />
-                </div>
-                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
-                  <span className="text-slate-500">Approval Status</span>
-                  <MiniStatus status={detail.approvalStatus} />
-                </div>
-                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
-                  <span className="text-slate-500">Background Check</span>
-                  <MiniStatus status={detail.backgroundCheck} />
-                </div>
-                <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
-                  <span className="text-slate-500">KYC Status</span>
-                  <MiniStatus status={detail.kycStatus} />
-                </div>
-                <SummaryMetric label="Member Since" value={detail.memberSince} />
-                <SummaryMetric label="Last Login" value={detail.lastLogin} />
-                <SummaryMetric label="Device" value={detail.device} />
-                <SummaryMetric label="Completed Jobs" value={detail.completedJobs} />
-                <SummaryMetric label="Cancellation Rate" value={detail.cancellationRate} />
-                <SummaryMetric label="Response Rate" value={detail.responseRate} />
-              </div>
-            </SurfaceCard>
           </div>
 
           <div className="space-y-4">
@@ -921,24 +929,20 @@ export function ProviderProfilePage() {
               </div>
             </SurfaceCard>
 
-            <SurfaceCard title="Quick Summary">
+            <SurfaceCard title="Service Details & Images">
               <div className="grid gap-4 sm:grid-cols-2">
-                <SummaryMetric label="Average Rating" value={detail.averageRating} />
-                <SummaryMetric label="Total Reviews" value={detail.totalReviews} />
-                <SummaryMetric label="On-time Rate" value={detail.onTimeRate} />
-                <SummaryMetric label="Repeat Customers" value={detail.repeatCustomers} />
+                <SummaryMetric label="Service Type" value={detail.serviceType} />
+                <SummaryMetric label="Service Area" value={detail.serviceArea} />
               </div>
-            </SurfaceCard>
 
-            <SurfaceCard title="About Provider">
               {editing ? (
                 <textarea
                   value={form.about}
                   onChange={(event) => setForm((current) => ({ ...current, about: event.target.value }))}
-                  className="min-h-[132px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                  className="mt-5 min-h-[132px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
                 />
               ) : (
-                <p className="text-sm leading-7 text-slate-600">{detail.about}</p>
+                <p className="mt-5 text-sm leading-7 text-slate-600">{detail.about}</p>
               )}
 
               <div className="mt-8">
@@ -956,29 +960,29 @@ export function ProviderProfilePage() {
               </div>
 
               <div className="mt-8">
-                <div className="flex items-center justify-between gap-3">
-                  <h4 className="text-base font-bold text-slate-950">Documents</h4>
-                  <button className="text-xs font-semibold text-emerald-700">View all</button>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {detail.documents.map((document) => (
-                    <div key={document.id} className="flex items-center justify-between gap-3 text-sm">
-                      <div className="flex items-center gap-3 text-slate-700">
-                        <FileText className="size-4 text-slate-400" />
-                        <div>
-                          <span>{document.label}</span>
-                          {document.note ? (
-                            <p className="mt-1 text-[11px] text-slate-400">{document.note}</p>
-                          ) : null}
+                <h4 className="text-base font-bold text-slate-950">Work Images</h4>
+                {detail.workGallery?.length ? (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    {detail.workGallery.slice(0, 4).map((item) => (
+                      <a
+                        key={item.id}
+                        href={item.previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
+                      >
+                        <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                          <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-emerald-700">
-                        <CheckCircle2 className="size-4" />
-                        <span className="text-xs font-semibold">{document.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        <p className="mt-3 text-sm font-semibold text-slate-900">{item.label}</p>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
+                    No work images are stored yet.
+                  </p>
+                )}
               </div>
             </SurfaceCard>
           </div>
@@ -991,110 +995,6 @@ export function ProviderProfilePage() {
               <SummaryMetric label="Working Hours" value={detail.workingHours} />
             </div>
           </SurfaceCard>
-
-          <SurfaceCard title="Recent Actions">
-            <div className="space-y-3">
-              {detail.recentActions.map((action) => (
-                <div key={action.id} className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <TimerReset className="size-4 text-slate-400" />
-                    <span>{action.label}</span>
-                  </div>
-                  <span className="text-[12px] text-slate-400">{action.time}</span>
-                </div>
-              ))}
-            </div>
-          </SurfaceCard>
-
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-2">
-          <TableShell title="Completed Tasks" action={<button className="text-xs font-semibold text-emerald-700">View all</button>}>
-            <table className="min-w-full text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400">
-                  <th className="pb-3 font-semibold">Task ID</th>
-                  <th className="pb-3 font-semibold">Service</th>
-                  <th className="pb-3 font-semibold">Customer</th>
-                  <th className="pb-3 font-semibold">Date</th>
-                  <th className="pb-3 font-semibold">Amount</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.completedTaskRows.map((task) => (
-                  <tr key={task.id} className="border-b border-slate-50">
-                    <td className="py-3 font-semibold text-emerald-700">
-                      <Link to={`/tasks-bookings/${task.rawId ?? task.id}`} className="hover:underline">
-                        {task.id}
-                      </Link>
-                    </td>
-                    <td className="py-3">{task.service}</td>
-                    <td className="py-3">{task.customer}</td>
-                    <td className="py-3 text-slate-500">{task.date}</td>
-                    <td className="py-3">{task.amount}</td>
-                    <td className="py-3"><MiniStatus status={task.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableShell>
-
-          <TableShell title="Upcoming Tasks" action={<button className="text-xs font-semibold text-emerald-700">View all</button>}>
-            <table className="min-w-full text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400">
-                  <th className="pb-3 font-semibold">Task ID</th>
-                  <th className="pb-3 font-semibold">Service</th>
-                  <th className="pb-3 font-semibold">Customer</th>
-                  <th className="pb-3 font-semibold">Date & Time</th>
-                  <th className="pb-3 font-semibold">Amount</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.upcomingTaskRows.map((task) => (
-                  <tr key={task.id} className="border-b border-slate-50">
-                    <td className="py-3 font-semibold text-emerald-700">
-                      <Link to={`/tasks-bookings/${task.rawId ?? task.id}`} className="hover:underline">
-                        {task.id}
-                      </Link>
-                    </td>
-                    <td className="py-3">{task.service}</td>
-                    <td className="py-3">{task.customer}</td>
-                    <td className="py-3 text-slate-500">{task.schedule}</td>
-                    <td className="py-3">{task.amount}</td>
-                    <td className="py-3"><MiniStatus status={task.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableShell>
-
-          <TableShell title="Payments & Withdrawals" action={<button className="text-xs font-semibold text-emerald-700">View all</button>}>
-            <table className="min-w-full text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400">
-                  <th className="pb-3 font-semibold">ID</th>
-                  <th className="pb-3 font-semibold">Type</th>
-                  <th className="pb-3 font-semibold">Amount</th>
-                  <th className="pb-3 font-semibold">Date</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.payoutRows.map((row) => (
-                  <tr key={row.id} className="border-b border-slate-50">
-                    <td className="py-3 font-semibold text-slate-700">{row.id}</td>
-                    <td className="py-3">{row.type}</td>
-                    <td className="py-3">{row.amount}</td>
-                    <td className="py-3 text-slate-500">{row.date}</td>
-                    <td className="py-3"><MiniStatus status={row.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableShell>
         </section>
       </>
     );
@@ -1251,12 +1151,7 @@ export function ProviderProfilePage() {
             <button
               key={tab}
               type="button"
-              onClick={() => {
-                setActiveTab(tab);
-                if (tab === "Tasks" && !selectedTaskId) {
-                  setSelectedTaskId(getFirstProviderTaskId(detail));
-                }
-              }}
+              onClick={() => setActiveTab(tab)}
               className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
                 activeTab === tab
                   ? "border-b-2 border-emerald-500 text-emerald-700"
@@ -1274,6 +1169,53 @@ export function ProviderProfilePage() {
         ? (
             <div className="space-y-4">
               <TableShell title="All Tasks">
+                <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl bg-slate-50 p-3">
+                  <div className="flex flex-wrap gap-2">
+                    {taskFilterOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setTaskStatusFilter(option.value)}
+                        className={`rounded-full px-3 py-2 text-xs font-bold transition ${
+                          taskStatusFilter === option.value
+                            ? "bg-emerald-600 text-white"
+                            : "bg-white text-slate-600 ring-1 ring-slate-200 hover:text-slate-950"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="text-[12px] font-semibold text-slate-500">
+                    From
+                    <input
+                      type="date"
+                      value={taskDateFrom}
+                      onChange={(event) => setTaskDateFrom(event.target.value)}
+                      className="mt-1 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none"
+                    />
+                  </label>
+                  <label className="text-[12px] font-semibold text-slate-500">
+                    To
+                    <input
+                      type="date"
+                      value={taskDateTo}
+                      onChange={(event) => setTaskDateTo(event.target.value)}
+                      className="mt-1 block rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTaskStatusFilter("all");
+                      setTaskDateFrom("");
+                      setTaskDateTo("");
+                    }}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-950"
+                  >
+                    Reset
+                  </button>
+                </div>
                 <table className="min-w-full text-left text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400">
@@ -1287,7 +1229,7 @@ export function ProviderProfilePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {allTaskRows.map((task) => {
+                    {filteredTaskRows.length ? filteredTaskRows.map((task) => {
                       const taskKey = task.rawId ?? task.id;
                       const selected = selectedTaskId === taskKey;
 
@@ -1323,7 +1265,13 @@ export function ProviderProfilePage() {
                           </td>
                         </tr>
                       );
-                    })}
+                    }) : (
+                      <tr>
+                        <td colSpan={7} className="py-5 text-center text-sm text-slate-500">
+                          No tasks match this filter.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </TableShell>
@@ -1466,8 +1414,30 @@ export function ProviderProfilePage() {
             </div>
           )
         : null}
-      {activeTab === "Profile & Documents" ? (
-        <SurfaceCard title="Profile & Documents">
+      {activeTab === "Documents & Verification" ? (
+        <SurfaceCard
+          title="Documents & Verification"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleIdentityVerification(true)}
+                disabled={saving || verifyingIdentity}
+                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+              >
+                Approve Provider
+              </button>
+              <button
+                type="button"
+                onClick={handleDeactivate}
+                disabled={saving}
+                className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+              >
+                Disable Provider
+              </button>
+            </div>
+          }
+        >
           <div className="grid gap-4 xl:grid-cols-2">
             <div className="space-y-4">
               <InfoRow label="Provider Name" value={detail.name} icon={<UserCircle2 className="size-4" />} />
@@ -1476,19 +1446,31 @@ export function ProviderProfilePage() {
               <InfoRow label="Phone" value={detail.phone} icon={<Phone className="size-4" />} />
             </div>
             <div className="space-y-3">
-              {detail.documents.map((document) => (
-                <div key={document.id} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="flex items-center gap-3 text-sm text-slate-700">
-                    <FileText className="size-4 text-slate-400" />
-                    <div>
-                      <span>{document.label}</span>
-                      {document.note ? (
-                        <p className="mt-1 text-[11px] text-slate-400">{document.note}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <MiniStatus status={document.status} />
-                </div>
+              {[
+                ["IC / Passport verified", detail.identityVerificationStatus === "Verified"],
+                ["Background checked", detail.backgroundCheck === "Verified"],
+                ["Phone verified", detail.documents.some((document) => document.label.toLowerCase().includes("phone") && document.status.toLowerCase().includes("verified"))],
+                ["Email verified", true],
+                ["T-shirt given", false],
+              ].map(([label, checked]) => (
+                <label
+                  key={String(label)}
+                  className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-700"
+                >
+                  <span>{label}</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(checked)}
+                    onChange={() => {
+                      if (label === "IC / Passport verified") {
+                        void handleIdentityVerification(!checked);
+                        return;
+                      }
+                      flash(`${label} checkbox UI is ready. Backend column wiring can be added once the Supabase field is confirmed.`);
+                    }}
+                    className="size-5 accent-emerald-600"
+                  />
+                </label>
               ))}
             </div>
           </div>
@@ -1662,27 +1644,6 @@ export function ProviderProfilePage() {
               </div>
             </div>
           ) : null}
-        </SurfaceCard>
-      ) : null}
-      {activeTab === "Service Areas" ? (
-        <SurfaceCard title="Service Areas">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {detail.serviceAreas.map((area) => (
-              <div key={area.id} className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2">
-                    <MapPin className="size-4 text-slate-400" />
-                    {area.label}
-                  </span>
-                  {area.tag ? (
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                      {area.tag}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
         </SurfaceCard>
       ) : null}
     </div>

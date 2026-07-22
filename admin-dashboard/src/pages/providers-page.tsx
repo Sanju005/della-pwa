@@ -32,14 +32,6 @@ export function ProvidersPage() {
     };
   }, []);
 
-  if (loading && rows.length === 0) {
-    return (
-      <div className="grid min-h-[40vh] place-items-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
-      </div>
-    );
-  }
-
   const categoryOptions = useMemo(() => {
     return [
       "All Categories",
@@ -68,6 +60,14 @@ export function ProvidersPage() {
       return new Date(right.registeredAt || 0).getTime() - new Date(left.registeredAt || 0).getTime();
     });
   }, [category, rows, sortMode]);
+
+  if (loading && rows.length === 0) {
+    return (
+      <div className="grid min-h-[40vh] place-items-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
+      </div>
+    );
+  }
 
   return (
     <ResourcePage
