@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { startTransition, useDeferredValue, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { TableColumn } from "../types";
 import { StatusBadge } from "./status-badge";
 
@@ -10,6 +11,8 @@ type DataTableProps<T extends Record<string, unknown>> = {
   description: string;
   searchPlaceholder?: string;
   statusKey?: keyof T;
+  hiddenStatusOptions?: string[];
+  extraControls?: ReactNode;
 };
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -19,6 +22,8 @@ export function DataTable<T extends Record<string, unknown>>({
   description,
   searchPlaceholder = "Search records...",
   statusKey,
+  hiddenStatusOptions = [],
+  extraControls,
 }: DataTableProps<T>) {
   const [query, setQuery] = useState("");
   const [activeStatus, setActiveStatus] = useState("All");
@@ -38,8 +43,9 @@ export function DataTable<T extends Record<string, unknown>>({
       }
     });
 
-    return [...values];
-  }, [rows, statusKey]);
+    const hidden = new Set(hiddenStatusOptions.map((option) => option.toLowerCase()));
+    return [...values].filter((value) => value === "All" || !hidden.has(value.toLowerCase()));
+  }, [hiddenStatusOptions, rows, statusKey]);
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -94,6 +100,7 @@ export function DataTable<T extends Record<string, unknown>>({
               </button>
             ))}
           </div>
+          {extraControls ? <div className="flex flex-wrap gap-2">{extraControls}</div> : null}
         </div>
       </div>
 

@@ -262,8 +262,10 @@ type LiveCompanyPaymentSubmissionRow = {
 
 type LiveReviewRow = {
   id: string;
+  booking_id?: string | null;
   rating?: number | null;
   comment?: string | null;
+  photos?: string[] | null;
   created_at?: string | null;
   customer_id?: string | null;
   provider_id?: string | null;
@@ -919,7 +921,49 @@ async function fetchProviderAdminDebugPayload(providerId: string) {
   return (await response.json()) as ProviderAdminDebugPayload;
 }
 
-function mapProviderRow(liveProfile: ProviderProfileRow, liveAccount: ProviderAccountRow | null): ProviderRow {
+async function fetchLatestTaskDatesByProvider(providerIds: string[]) {
+  if (!supabase || providerIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("provider_id, scheduled_date, scheduled_start_time, created_at")
+    .in("provider_id", providerIds)
+    .order("scheduled_date", { ascending: false })
+    .limit(500);
+
+  if (error || !data) {
+    return new Map<string, string>();
+  }
+
+  const latest = new Map<string, string>();
+
+  (data as Array<{ provider_id?: string | null; scheduled_date?: string | null; scheduled_start_time?: string | null; created_at?: string | null }>).forEach((row) => {
+    const providerId = row.provider_id?.trim();
+    const timestamp = row.scheduled_date
+      ? `${row.scheduled_date}T${row.scheduled_start_time || "00:00"}`
+      : row.created_at ?? "";
+
+    if (!providerId || !timestamp) {
+      return;
+    }
+
+    const current = latest.get(providerId);
+
+    if (!current || new Date(timestamp).getTime() > new Date(current).getTime()) {
+      latest.set(providerId, timestamp);
+    }
+  });
+
+  return latest;
+}
+
+function mapProviderRow(
+  liveProfile: ProviderProfileRow,
+  liveAccount: ProviderAccountRow | null,
+  latestTaskDates: Map<string, string> = new Map(),
+): ProviderRow {
   const mockRow = findMockProviderRowByIdOrName(
     liveProfile.id,
     liveProfile.marketing_name ?? liveAccount?.full_name,
@@ -938,6 +982,8 @@ function mapProviderRow(liveProfile: ProviderProfileRow, liveAccount: ProviderAc
     status: formatStatus(liveAccount?.status ?? (liveProfile.is_visible === false ? "paused" : "active")),
     zone: buildProviderAreaLabel(liveProfile) || mockRow?.zone || "Malaysia",
     verification: formatStatus(liveProfile.approval_status) || mockRow?.verification || "Pending",
+    registeredAt: liveAccount?.created_at ?? "",
+    latestTaskAt: latestTaskDates.get(liveProfile.id) ?? "",
   };
 }
 
@@ -1016,7 +1062,26 @@ async function tryFetchProviderReviews(providerId: string) {
 
   const { data, error } = await supabase
     .from("reviews")
-    .select("id, rating, comment, created_at, provider_id")
+    .select("id, booking_id, rating, comment, photos, created_at, customer_id, provider_id")
+    .eq("provider_id", providerId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as LiveReviewRow[];
+}
+
+async function tryFetchProviderGivenReviews(providerId: string) {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("provider_customer_reviews")
+    .select("id, booking_id, rating, comment, photos, created_at, customer_id, provider_id")
     .eq("provider_id", providerId)
     .order("created_at", { ascending: false })
     .limit(30);
@@ -1126,6 +1191,7 @@ type AdminMediaBucket =
   | "provider-work-images"
   | "job-completion-images"
   | "payment-proofs"
+  | "review-images"
   | "certificates"
   | "identity-documents";
 
@@ -1295,14 +1361,31 @@ async function buildCommissionRowsFromPayments(
   );
 }
 
-function buildReviewRows(liveReviews: LiveReviewRow[], customerNames: Map<string, string>): UserReviewItem[] {
-  return liveReviews.slice(0, 7).map((row) => ({
-    id: row.id,
-    provider: customerNames.get(row.customer_id ?? "") || "Customer Review",
-    rating: Math.max(1, Math.min(5, Math.round(row.rating ?? 5))),
-    review: row.comment?.trim() || "Shared feedback",
-    date: formatDate(row.created_at),
-  }));
+async function buildReviewRows(
+  liveReviews: LiveReviewRow[],
+  customerNames: Map<string, string>,
+  direction: "received" | "given",
+): Promise<UserReviewItem[]> {
+  return Promise.all(
+    liveReviews.slice(0, 12).map(async (row) => {
+      const photos = await Promise.all(
+        (Array.isArray(row.photos) ? row.photos : []).map((photo) =>
+          resolveAdminMediaUrl("review-images", photo, "public"),
+        ),
+      );
+
+      return {
+        id: row.id,
+        provider: customerNames.get(row.customer_id ?? "") || "Customer",
+        rating: Math.max(1, Math.min(5, Math.round(row.rating ?? 5))),
+        review: row.comment?.trim() || "Shared feedback",
+        date: formatDate(row.created_at),
+        taskId: row.booking_id ? `#${row.booking_id.slice(0, 8).toUpperCase()}` : "-",
+        photos: photos.filter(Boolean),
+        direction,
+      };
+    }),
+  );
 }
 
 function buildMetrics(
@@ -1350,7 +1433,8 @@ export async function listProvidersWithFallback() {
   }
 
   const liveAccounts = await Promise.all(liveProfiles.map((profile) => fetchProviderAccountById(profile.id)));
-  const liveRows = liveProfiles.map((profile, index) => mapProviderRow(profile, liveAccounts[index] ?? null));
+  const latestTaskDates = await fetchLatestTaskDatesByProvider(liveProfiles.map((profile) => profile.id));
+  const liveRows = liveProfiles.map((profile, index) => mapProviderRow(profile, liveAccounts[index] ?? null, latestTaskDates));
   const seen = new Set(liveRows.flatMap((row) => [row.id.trim().toLowerCase(), row.provider.trim().toLowerCase()]));
   const mockRemainder = mockProviders.filter(
     (row) => !seen.has(row.id.trim().toLowerCase()) && !seen.has(row.provider.trim().toLowerCase())
@@ -1452,9 +1536,11 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const livePayments = await tryFetchProviderPayments(providerId);
   const liveCompanyPaymentSubmissions = await tryFetchProviderCompanyPaymentSubmissions(providerId);
   const liveReviews = await tryFetchProviderReviews(providerId);
+  const liveGivenReviews = await tryFetchProviderGivenReviews(providerId);
   const customerNames = await fetchProfileNameMap([
     ...(liveTasks?.map((row) => row.customer_id) ?? []),
     ...(liveReviews?.map((row) => row.customer_id) ?? []),
+    ...(liveGivenReviews?.map((row) => row.customer_id) ?? []),
   ]);
   const taskRows = liveTasks?.length ? buildTaskRows(liveTasks, customerNames) : null;
   const payoutRows = livePayments?.length ? buildPayoutRows(livePayments) : fallback.payoutRows;
@@ -1540,11 +1626,15 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     effectiveRegistrationSnapshot?.data?.basicProfile?.emergencyContactNumber?.trim() ||
     effectiveRegistrationSnapshot?.data?.basicProfile?.emergencyContact?.trim() ||
     fallback.emergencyContact;
-  const reviewRows = liveReviews?.length
-    ? buildReviewRows(liveReviews, customerNames)
+  const reviewsReceived = liveReviews?.length
+    ? await buildReviewRows(liveReviews, customerNames, "received")
     : getMockProviderReviews(fallback.name).length
       ? getMockProviderReviews(fallback.name)
       : [];
+  const reviewsGiven = liveGivenReviews?.length
+    ? await buildReviewRows(liveGivenReviews, customerNames, "given")
+    : [];
+  const reviewRows = reviewsReceived;
   const metrics = buildMetrics(
     fallback.metrics,
     liveTasks,
@@ -1676,9 +1766,11 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     upcomingTaskRows: taskRows?.upcomingTaskRows.length ? taskRows.upcomingTaskRows : fallback.upcomingTaskRows,
     payoutRows,
     commissionRows,
+    providerReviewsReceived: reviewRows,
+    providerReviewsGiven: reviewsGiven,
   };
 
-  if (reviewRows.length) {
+  if (reviewRows.length || reviewsGiven.length) {
     detail.reviewsCount = String(reviewRows.length);
   }
 

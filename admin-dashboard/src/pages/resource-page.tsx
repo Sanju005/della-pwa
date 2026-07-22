@@ -1,4 +1,5 @@
 import { DataTable } from "../components/data-table";
+import type { ReactNode } from "react";
 import type { TableColumn } from "../types";
 
 type ResourcePageProps<T extends Record<string, unknown>> = {
@@ -7,6 +8,8 @@ type ResourcePageProps<T extends Record<string, unknown>> = {
   rows: T[];
   columns: TableColumn<T>[];
   statusKey?: keyof T;
+  hiddenStatusOptions?: string[];
+  extraControls?: ReactNode;
   searchPlaceholder: string;
   stats: Array<{
     label: string;
@@ -21,6 +24,8 @@ export function ResourcePage<T extends Record<string, unknown>>({
   rows,
   columns,
   statusKey,
+  hiddenStatusOptions,
+  extraControls,
   searchPlaceholder,
   stats,
 }: ResourcePageProps<T>) {
@@ -49,6 +54,8 @@ export function ResourcePage<T extends Record<string, unknown>>({
         rows={rows}
         columns={columns}
         statusKey={statusKey}
+        hiddenStatusOptions={hiddenStatusOptions}
+        extraControls={extraControls}
         searchPlaceholder={searchPlaceholder}
       />
     </div>

@@ -141,6 +141,8 @@ export type ProviderRow = {
   status: string;
   zone: string;
   verification: string;
+  registeredAt?: string;
+  latestTaskAt?: string;
 };
 
 export type ReviewRow = {
@@ -213,6 +215,9 @@ export type UserReviewItem = {
   rating: number;
   review: string;
   date: string;
+  taskId?: string;
+  photos?: string[];
+  direction?: "received" | "given";
 };
 
 export type UserMetric = {
@@ -392,6 +397,8 @@ export type ProviderDetailRecord = {
   upcomingTaskRows: ProviderUpcomingTaskRow[];
   payoutRows: ProviderPayoutRow[];
   commissionRows?: ProviderCommissionRow[];
+  providerReviewsReceived?: UserReviewItem[];
+  providerReviewsGiven?: UserReviewItem[];
   recentActions: UserActionItem[];
   activityLog: UserTimelineItem[];
 };

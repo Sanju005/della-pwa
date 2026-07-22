@@ -47,7 +47,6 @@ const tabs = [
   "Reviews",
   "Profile & Documents",
   "Service Areas",
-  "Activity Log",
 ] as const;
 
 type TabKey = (typeof tabs)[number];
@@ -93,6 +92,70 @@ function initials(name: string) {
 function isPdfAsset(value?: string) {
   const normalized = (value ?? "").toLowerCase();
   return normalized.startsWith("data:application/pdf") || normalized.includes(".pdf");
+}
+
+function ReviewSlideSection({
+  title,
+  empty,
+  rows,
+}: {
+  title: string;
+  empty: string;
+  rows: NonNullable<ProviderDetailRecord["providerReviewsReceived"]>;
+}) {
+  return (
+    <SurfaceCard title={title}>
+      {rows.length ? (
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {rows.map((review) => (
+            <article
+              key={`${title}-${review.id}`}
+              className="min-w-[320px] max-w-[420px] rounded-[22px] border border-slate-100 bg-[#fff8fb] p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    Task {review.taskId || "-"}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-950">{review.provider}</p>
+                </div>
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-[12px] font-bold text-amber-700">
+                  {review.rating}.0
+                </span>
+              </div>
+              <p className="mt-3 min-h-[72px] text-sm leading-6 text-slate-700">{review.review}</p>
+              <p className="mt-3 text-[12px] text-slate-400">{review.date}</p>
+              {review.photos?.length ? (
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {review.photos.slice(0, 3).map((photo, index) => (
+                    <a
+                      key={`${review.id}-photo-${index}`}
+                      href={photo}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                    >
+                      {isPdfAsset(photo) ? (
+                        <div className="grid h-full place-items-center text-[11px] font-bold text-violet-700">PDF</div>
+                      ) : (
+                        <img src={photo} alt={`Review photo ${index + 1}`} className="h-full w-full object-cover" />
+                      )}
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-[12px] text-slate-400">
+                  No review images
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-500">{empty}</p>
+      )}
+    </SurfaceCard>
+  );
 }
 
 function SummaryMetric({
@@ -943,17 +1006,6 @@ export function ProviderProfilePage() {
             </div>
           </SurfaceCard>
 
-          <SurfaceCard title="Activity Log" className="xl:col-span-2">
-            <div className="space-y-4">
-              {detail.activityLog.map((item) => (
-                <div key={item.id} className="rounded-2xl bg-slate-50 px-4 py-3">
-                  <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                  <p className="mt-1 text-[13px] text-slate-500">{item.note}</p>
-                  <p className="mt-2 text-[12px] text-slate-400">{item.time}</p>
-                </div>
-              ))}
-            </div>
-          </SurfaceCard>
         </section>
 
         <section className="grid gap-4 xl:grid-cols-2">
@@ -1393,15 +1445,25 @@ export function ProviderProfilePage() {
           )
         : null}
       {activeTab === "Reviews"
-        ? renderSimpleRows(
-            "Reviews",
-            ["Metric", "Value"],
-            [
-              ["Average Rating", detail.averageRating],
-              ["Total Reviews", detail.totalReviews],
-              ["On-time Rate", detail.onTimeRate],
-              ["Repeat Customers", detail.repeatCustomers],
-            ]
+        ? (
+            <div className="space-y-4">
+              <section className="grid gap-4 md:grid-cols-4">
+                <SurfaceCard title="Average Rating"><SummaryMetric label="Rating" value={detail.averageRating} /></SurfaceCard>
+                <SurfaceCard title="Received"><SummaryMetric label="Customer Reviews" value={String((detail.providerReviewsReceived ?? []).length)} /></SurfaceCard>
+                <SurfaceCard title="Given"><SummaryMetric label="Provider Reviews" value={String((detail.providerReviewsGiven ?? []).length)} /></SurfaceCard>
+                <SurfaceCard title="Repeat Customers"><SummaryMetric label="Rate" value={detail.repeatCustomers} /></SurfaceCard>
+              </section>
+              <ReviewSlideSection
+                title="Reviews Provider Received"
+                empty="No customer reviews received yet."
+                rows={detail.providerReviewsReceived ?? []}
+              />
+              <ReviewSlideSection
+                title="Reviews Provider Gave"
+                empty="No provider-to-customer reviews submitted yet."
+                rows={detail.providerReviewsGiven ?? []}
+              />
+            </div>
           )
         : null}
       {activeTab === "Profile & Documents" ? (
@@ -1618,19 +1680,6 @@ export function ProviderProfilePage() {
                     </span>
                   ) : null}
                 </div>
-              </div>
-            ))}
-          </div>
-        </SurfaceCard>
-      ) : null}
-      {activeTab === "Activity Log" ? (
-        <SurfaceCard title="Activity Log">
-          <div className="space-y-4">
-            {detail.activityLog.map((item) => (
-              <div key={item.id} className="rounded-2xl bg-slate-50 px-4 py-4">
-                <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                <p className="mt-1 text-[13px] text-slate-500">{item.note}</p>
-                <p className="mt-2 text-[12px] text-slate-400">{item.time}</p>
               </div>
             ))}
           </div>
