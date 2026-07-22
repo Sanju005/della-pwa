@@ -100,6 +100,39 @@ type ProviderAccountRow = {
   emergency_contact_number?: string | null;
 };
 
+function isMissingColumnError(message?: string | null) {
+  const normalized = message?.toLowerCase() ?? "";
+  return normalized.includes("column") || normalized.includes("schema cache");
+}
+
+function cleanEditableValue(value?: string) {
+  const trimmed = value?.trim() ?? "";
+  return trimmed && trimmed.toLowerCase() !== "not provided" ? trimmed : undefined;
+}
+
+function normalizeDateInput(value?: string) {
+  const cleaned = cleanEditableValue(value)?.replace(/\s*\([^)]*\)\s*$/, "");
+
+  if (!cleaned) {
+    return undefined;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+    return cleaned;
+  }
+
+  const parsed = new Date(cleaned);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return cleaned;
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 type ProviderRegistrationSnapshot = {
   id: string;
   created_at?: string | null;
@@ -1659,6 +1692,12 @@ export async function updateProviderProfile(
     email?: string;
     phone?: string;
     status?: string;
+    emergency_contact?: string;
+    date_of_birth?: string;
+    gender?: string;
+    language?: string;
+    national_id?: string;
+    address?: string;
     marketing_name?: string;
     service_location?: string;
     bio?: string;
@@ -1674,15 +1713,25 @@ export async function updateProviderProfile(
       email: updates.email,
       phone: updates.phone,
       status: updates.status,
-    }).filter(([, value]) => typeof value === "string" && value.trim() !== "")
+      emergency_contact: updates.emergency_contact,
+      emergency_contact_number: updates.emergency_contact,
+    }).map(([key, value]) => [key, cleanEditableValue(value)])
+      .filter(([, value]) => typeof value === "string" && value.trim() !== "")
   );
 
   const providerPayload = Object.fromEntries(
     Object.entries({
       marketing_name: updates.marketing_name,
       service_location: updates.service_location,
+      date_of_birth: normalizeDateInput(updates.date_of_birth),
+      sex: updates.gender,
+      languages: updates.language,
+      national_id: updates.national_id,
+      residential_address: updates.address,
+      formatted_address: updates.address,
       bio: updates.bio,
-    }).filter(([, value]) => typeof value === "string" && value.trim() !== "")
+    }).map(([key, value]) => [key, cleanEditableValue(value)])
+      .filter(([, value]) => typeof value === "string" && value.trim() !== "")
   );
 
   if (Object.keys(profilePayload).length) {
@@ -1694,7 +1743,25 @@ export async function updateProviderProfile(
 
   if (Object.keys(providerPayload).length) {
     const { error } = await supabase.from("provider_profiles").update(providerPayload).eq("id", providerId);
-    if (error) {
+    if (error && isMissingColumnError(error.message)) {
+      const safeProviderPayload = Object.fromEntries(
+        Object.entries({
+          marketing_name: updates.marketing_name,
+          service_location: updates.service_location,
+          date_of_birth: normalizeDateInput(updates.date_of_birth),
+          sex: updates.gender,
+          residential_address: updates.address,
+          formatted_address: updates.address,
+          bio: updates.bio,
+        }).map(([key, value]) => [key, cleanEditableValue(value)])
+          .filter(([, value]) => typeof value === "string" && value.trim() !== "")
+      );
+      const fallback = await supabase.from("provider_profiles").update(safeProviderPayload).eq("id", providerId);
+
+      if (fallback.error) {
+        return { error: fallback.error.message || "Unable to update provider listing." };
+      }
+    } else if (error) {
       return { error: error.message || "Unable to update provider listing." };
     }
   }

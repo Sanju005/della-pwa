@@ -165,6 +165,12 @@ export function ProviderProfilePage() {
     name: "",
     email: "",
     phone: "",
+    dob: "",
+    gender: "",
+    language: "",
+    nationalId: "",
+    emergencyContact: "",
+    address: "",
     serviceArea: "",
     about: "",
   });
@@ -183,6 +189,12 @@ export function ProviderProfilePage() {
       name: "",
       email: "",
       phone: "",
+      dob: "",
+      gender: "",
+      language: "",
+      nationalId: "",
+      emergencyContact: "",
+      address: "",
       serviceArea: "",
       about: "",
     });
@@ -201,6 +213,12 @@ export function ProviderProfilePage() {
           name: payload.detail?.name ?? "",
           email: payload.detail?.email ?? "",
           phone: payload.detail?.phone ?? "",
+          dob: payload.detail?.dob ?? "",
+          gender: payload.detail?.gender ?? "",
+          language: payload.detail?.language ?? "",
+          nationalId: payload.detail?.nationalId ?? "",
+          emergencyContact: payload.detail?.emergencyContact ?? "",
+          address: payload.detail?.address ?? "",
           serviceArea: payload.detail?.serviceArea ?? "",
           about: payload.detail?.about ?? "",
         });
@@ -260,6 +278,12 @@ export function ProviderProfilePage() {
         name: payload.detail.name,
         email: payload.detail.email,
         phone: payload.detail.phone,
+        dob: payload.detail.dob,
+        gender: payload.detail.gender,
+        language: payload.detail.language,
+        nationalId: payload.detail.nationalId,
+        emergencyContact: payload.detail.emergencyContact,
+        address: payload.detail.address,
         serviceArea: payload.detail.serviceArea,
         about: payload.detail.about,
       });
@@ -358,6 +382,12 @@ export function ProviderProfilePage() {
       full_name: form.name,
       email: form.email,
       phone: form.phone,
+      date_of_birth: form.dob,
+      gender: form.gender,
+      language: form.language,
+      national_id: form.nationalId,
+      emergency_contact: form.emergencyContact,
+      address: form.address,
       marketing_name: form.name,
       service_location: form.serviceArea,
       bio: form.about,
@@ -376,6 +406,12 @@ export function ProviderProfilePage() {
             name: form.name,
             email: form.email,
             phone: form.phone,
+            dob: form.dob,
+            gender: form.gender,
+            language: form.language,
+            nationalId: form.nationalId,
+            emergencyContact: form.emergencyContact,
+            address: form.address,
             serviceArea: form.serviceArea,
             about: form.about,
           }
@@ -657,12 +693,102 @@ export function ProviderProfilePage() {
                 }
                 icon={<Phone className="size-4" />}
               />
-              <InfoRow label="Date of Birth" value={detail.dob} icon={<CalendarDays className="size-4" />} />
-              <InfoRow label="Gender" value={detail.gender} icon={<ShieldCheck className="size-4" />} />
-              <InfoRow label="Language" value={detail.language} icon={<Languages className="size-4" />} />
-              <InfoRow label="NRIC / ID Number" value={detail.nationalId} icon={<FileBadge2 className="size-4" />} />
-              <InfoRow label="Emergency Contact" value={detail.emergencyContact} icon={<Phone className="size-4" />} />
-              <InfoRow label="Address" value={<span className="whitespace-pre-line">{detail.address}</span>} icon={<MapPin className="size-4" />} />
+              <InfoRow
+                label="Date of Birth"
+                value={
+                  editing ? (
+                    <input
+                      value={form.dob}
+                      onChange={(event) => setForm((current) => ({ ...current, dob: event.target.value }))}
+                      placeholder="YYYY-MM-DD or 6 Jul 1966"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    />
+                  ) : (
+                    detail.dob
+                  )
+                }
+                icon={<CalendarDays className="size-4" />}
+              />
+              <InfoRow
+                label="Gender"
+                value={
+                  editing ? (
+                    <select
+                      value={form.gender}
+                      onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value }))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    >
+                      <option value="">Not provided</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  ) : (
+                    detail.gender
+                  )
+                }
+                icon={<ShieldCheck className="size-4" />}
+              />
+              <InfoRow
+                label="Language"
+                value={
+                  editing ? (
+                    <input
+                      value={form.language}
+                      onChange={(event) => setForm((current) => ({ ...current, language: event.target.value }))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    />
+                  ) : (
+                    detail.language
+                  )
+                }
+                icon={<Languages className="size-4" />}
+              />
+              <InfoRow
+                label="NRIC / ID Number"
+                value={
+                  editing ? (
+                    <input
+                      value={form.nationalId}
+                      onChange={(event) => setForm((current) => ({ ...current, nationalId: event.target.value }))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    />
+                  ) : (
+                    detail.nationalId
+                  )
+                }
+                icon={<FileBadge2 className="size-4" />}
+              />
+              <InfoRow
+                label="Emergency Contact"
+                value={
+                  editing ? (
+                    <input
+                      value={form.emergencyContact}
+                      onChange={(event) => setForm((current) => ({ ...current, emergencyContact: event.target.value }))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    />
+                  ) : (
+                    detail.emergencyContact
+                  )
+                }
+                icon={<Phone className="size-4" />}
+              />
+              <InfoRow
+                label="Address"
+                value={
+                  editing ? (
+                    <textarea
+                      value={form.address}
+                      onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+                      className="min-h-[96px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                    />
+                  ) : (
+                    <span className="whitespace-pre-line">{detail.address}</span>
+                  )
+                }
+                icon={<MapPin className="size-4" />}
+              />
             </div>
             {editing ? (
               <div className="mt-4 flex justify-end">
