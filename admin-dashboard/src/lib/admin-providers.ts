@@ -1895,6 +1895,7 @@ async function postProviderIdentityDocumentAction(
     fileName?: string;
     documentType?: string;
     verified?: boolean;
+    note?: string;
   },
 ) {
   if (!supabase) {
@@ -1937,11 +1938,13 @@ export async function setProviderIdentityVerified(
   providerId: string,
   verified: boolean,
   documentType?: string,
+  note?: string,
 ) {
   return postProviderIdentityDocumentAction(providerId, {
     action: "verify",
     verified,
     documentType,
+    note,
   });
 }
 
@@ -1970,6 +1973,79 @@ export async function deleteProviderIdentityDocument(
     action: "delete",
     side,
     documentType,
+  });
+}
+
+type ProviderMediaKind = "profile" | "work" | "certificate";
+
+async function postProviderMediaAction(
+  providerId: string,
+  payload: {
+    action: "upload" | "delete";
+    kind: ProviderMediaKind;
+    dataUrl?: string;
+    fileName?: string;
+    mediaId?: string;
+  },
+) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return { error: "Admin session is required." };
+  }
+
+  try {
+    const response = await fetch(`${APP_BASE_URL}/api/admin/provider-media/${providerId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const result = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      return { error: result.error || "Unable to update provider media." };
+    }
+
+    return { error: null };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to update provider media.",
+    };
+  }
+}
+
+export async function uploadProviderMedia(
+  providerId: string,
+  kind: ProviderMediaKind,
+  dataUrl: string,
+  fileName: string,
+) {
+  return postProviderMediaAction(providerId, {
+    action: "upload",
+    kind,
+    dataUrl,
+    fileName,
+  });
+}
+
+export async function deleteProviderMedia(
+  providerId: string,
+  kind: ProviderMediaKind,
+  mediaId?: string,
+) {
+  return postProviderMediaAction(providerId, {
+    action: "delete",
+    kind,
+    mediaId,
   });
 }
 

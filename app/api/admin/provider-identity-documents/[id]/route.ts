@@ -205,6 +205,7 @@ export async function POST(
       fileName?: string;
       documentType?: string;
       verified?: boolean;
+      note?: string;
     };
     const action = payload.action;
     const side = payload.side;
@@ -242,6 +243,8 @@ export async function POST(
           ...metadata,
           identity_verification_status: isVerified ? "verified" : "processing",
           identity_document_type: documentType,
+          admin_approval_note: payload.note?.trim() || metadata.admin_approval_note,
+          admin_approval_note_updated_at: payload.note?.trim() ? now : metadata.admin_approval_note_updated_at,
         },
       });
 

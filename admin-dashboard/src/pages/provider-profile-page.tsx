@@ -28,6 +28,7 @@ import { BookingTaskDetails } from "./booking-detail-page";
 import { getBookingDetailWithFallback } from "../lib/admin-bookings";
 import {
   deleteProviderIdentityDocument,
+  deleteProviderMedia,
   getProviderProfileWithFallback,
   markCompanyPaymentReceived,
   setProviderIdentityVerified,
@@ -35,6 +36,7 @@ import {
   setProviderVisibility,
   updateProviderProfile,
   uploadProviderIdentityDocument,
+  uploadProviderMedia,
 } from "../lib/admin-providers";
 import type { ProviderDetailRecord, ProviderIdentityDocument } from "../types";
 import type { DashboardBooking } from "../types";
@@ -211,6 +213,7 @@ export function ProviderProfilePage() {
   const [saving, setSaving] = useState(false);
   const [verifyingIdentity, setVerifyingIdentity] = useState(false);
   const [identityDocumentSaving, setIdentityDocumentSaving] = useState("");
+  const [mediaSaving, setMediaSaving] = useState("");
   const [receivingPaymentId, setReceivingPaymentId] = useState("");
   const [receivedAmounts, setReceivedAmounts] = useState<Record<string, string>>({});
   const [selectedTaskId, setSelectedTaskId] = useState("");
@@ -219,6 +222,14 @@ export function ProviderProfilePage() {
   const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>("all");
   const [taskDateFrom, setTaskDateFrom] = useState("");
   const [taskDateTo, setTaskDateTo] = useState("");
+  const [approvalNote, setApprovalNote] = useState("");
+  const [checklist, setChecklist] = useState({
+    identity: false,
+    background: false,
+    phone: false,
+    email: false,
+    tshirt: false,
+  });
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -247,6 +258,14 @@ export function ProviderProfilePage() {
     setTaskStatusFilter("all");
     setTaskDateFrom("");
     setTaskDateTo("");
+    setApprovalNote("");
+    setChecklist({
+      identity: false,
+      background: false,
+      phone: false,
+      email: false,
+      tshirt: false,
+    });
     setForm({
       name: "",
       email: "",
@@ -270,6 +289,18 @@ export function ProviderProfilePage() {
         }
 
         setProvider(payload.detail);
+        setChecklist({
+          identity: payload.detail?.identityVerificationStatus === "Verified",
+          background: payload.detail?.backgroundCheck === "Verified",
+          phone:
+            payload.detail?.documents.some(
+              (document) =>
+                document.label.toLowerCase().includes("phone") &&
+                document.status.toLowerCase().includes("verified"),
+            ) ?? false,
+          email: true,
+          tshirt: false,
+        });
         setForm({
           name: payload.detail?.name ?? "",
           email: payload.detail?.email ?? "",
@@ -335,6 +366,18 @@ export function ProviderProfilePage() {
     const payload = await getProviderProfileWithFallback(providerId);
     setProvider(payload.detail);
     if (payload.detail) {
+      setChecklist((current) => ({
+        ...current,
+        identity: payload.detail?.identityVerificationStatus === "Verified",
+        background: payload.detail?.backgroundCheck === "Verified",
+        phone:
+          payload.detail?.documents.some(
+            (document) =>
+              document.label.toLowerCase().includes("phone") &&
+              document.status.toLowerCase().includes("verified"),
+          ) ?? current.phone,
+        email: current.email,
+      }));
       setForm({
         name: payload.detail.name,
         email: payload.detail.email,
@@ -611,6 +654,7 @@ export function ProviderProfilePage() {
       detail.providerId,
       verified,
       detail.identityDocumentType,
+      verified ? approvalNote.trim() || undefined : undefined,
     );
     setVerifyingIdentity(false);
 
@@ -621,6 +665,87 @@ export function ProviderProfilePage() {
 
     await reloadProviderDetails();
     flash(verified ? "Identity documents verified." : "Identity status changed back to pending.");
+  }
+
+  async function handleApproveProvider() {
+    if (!approvalNote.trim()) {
+      flash("Please add an admin note before approving this provider.");
+      return;
+    }
+
+    await handleIdentityVerification(true);
+    setChecklist((current) => ({ ...current, identity: true }));
+    flash("Provider approval saved with admin note.");
+  }
+
+  async function handleProviderMediaUpload(kind: "profile" | "work" | "certificate", file?: File | null) {
+    if (!file || mediaSaving) {
+      return;
+    }
+
+    setMediaSaving(`upload-${kind}`);
+    let dataUrl = "";
+
+    try {
+      dataUrl = await fileToDataUrl(file);
+    } catch (error) {
+      setMediaSaving("");
+      flash(error instanceof Error ? error.message : "Unable to read selected file.");
+      return;
+    }
+
+    const result = await uploadProviderMedia(detail.providerId, kind, dataUrl, file.name);
+    setMediaSaving("");
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    await reloadProviderDetails();
+    flash(
+      kind === "profile"
+        ? "Profile photo uploaded. The app will show the new photo."
+        : kind === "work"
+          ? "Service image uploaded. The app will show the new service image."
+          : "Certificate uploaded.",
+    );
+  }
+
+  async function handleProviderMediaDelete(kind: "profile" | "work" | "certificate", mediaId?: string) {
+    if (mediaSaving) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      kind === "profile"
+        ? "Delete this profile photo?"
+        : kind === "work"
+          ? "Delete this service image?"
+          : "Delete this certificate?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setMediaSaving(`delete-${kind}-${mediaId ?? "profile"}`);
+    const result = await deleteProviderMedia(detail.providerId, kind, mediaId);
+    setMediaSaving("");
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    await reloadProviderDetails();
+    flash(
+      kind === "profile"
+        ? "Profile photo deleted. The app will no longer show it."
+        : kind === "work"
+          ? "Service image deleted. The app has been updated."
+          : "Certificate deleted.",
+    );
   }
 
   async function handleIdentityDocumentUpload(side: "front" | "back", file?: File | null) {
@@ -1415,29 +1540,7 @@ export function ProviderProfilePage() {
           )
         : null}
       {activeTab === "Documents & Verification" ? (
-        <SurfaceCard
-          title="Documents & Verification"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void handleIdentityVerification(true)}
-                disabled={saving || verifyingIdentity}
-                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
-              >
-                Approve Provider
-              </button>
-              <button
-                type="button"
-                onClick={handleDeactivate}
-                disabled={saving}
-                className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
-              >
-                Disable Provider
-              </button>
-            </div>
-          }
-        >
+        <SurfaceCard title="Documents & Verification">
           <div className="grid gap-4 xl:grid-cols-2">
             <div className="space-y-4">
               <InfoRow label="Provider Name" value={detail.name} icon={<UserCircle2 className="size-4" />} />
@@ -1446,31 +1549,19 @@ export function ProviderProfilePage() {
               <InfoRow label="Phone" value={detail.phone} icon={<Phone className="size-4" />} />
             </div>
             <div className="space-y-3">
-              {[
-                ["IC / Passport verified", detail.identityVerificationStatus === "Verified"],
-                ["Background checked", detail.backgroundCheck === "Verified"],
-                ["Phone verified", detail.documents.some((document) => document.label.toLowerCase().includes("phone") && document.status.toLowerCase().includes("verified"))],
-                ["Email verified", true],
-                ["T-shirt given", false],
-              ].map(([label, checked]) => (
-                <label
-                  key={String(label)}
-                  className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-700"
-                >
-                  <span>{label}</span>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(checked)}
-                    onChange={() => {
-                      if (label === "IC / Passport verified") {
-                        void handleIdentityVerification(!checked);
-                        return;
-                      }
-                      flash(`${label} checkbox UI is ready. Backend column wiring can be added once the Supabase field is confirmed.`);
-                    }}
-                    className="size-5 accent-emerald-600"
-                  />
-                </label>
+              {detail.documents.map((document) => (
+                <div key={document.id} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4">
+                  <div className="flex items-center gap-3 text-sm text-slate-700">
+                    <FileText className="size-4 text-slate-400" />
+                    <div>
+                      <span>{document.label}</span>
+                      {document.note ? (
+                        <p className="mt-1 text-[11px] text-slate-400">{document.note}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <MiniStatus status={document.status} />
+                </div>
               ))}
             </div>
           </div>
@@ -1576,74 +1667,218 @@ export function ProviderProfilePage() {
                 )}
               </div>
             </div>
-          {detail.profileImageUrl ? (
-            <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-950">Profile Photo</h3>
-              <a
-                href={detail.profileImageUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 block max-w-[220px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3"
-              >
-                <img src={detail.profileImageUrl} alt={`${detail.name} profile`} className="aspect-square w-full rounded-[16px] object-cover" />
-              </a>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700">
+                <Upload className="size-3.5" />
+                {mediaSaving === "upload-profile" ? "Uploading..." : "Upload New"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={Boolean(mediaSaving)}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    event.target.value = "";
+                    void handleProviderMediaUpload("profile", file);
+                  }}
+                />
+              </label>
             </div>
-          ) : null}
-          {detail.workGallery?.length ? (
-            <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
-              <h3 className="text-sm font-bold text-slate-950">Work Images</h3>
+            {detail.profileImageUrl ? (
+              <div className="mt-4 max-w-[240px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3">
+                <a href={detail.profileImageUrl} target="_blank" rel="noreferrer" className="block">
+                  <img src={detail.profileImageUrl} alt={`${detail.name} profile`} className="aspect-square w-full rounded-[16px] object-cover" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void handleProviderMediaDelete("profile")}
+                  disabled={Boolean(mediaSaving)}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+                >
+                  <Trash2 className="size-3.5" />
+                  {mediaSaving === "delete-profile-profile" ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            ) : (
+              <p className="mt-4 rounded-[20px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+                No profile photo is currently stored.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-slate-950">Service Images</h3>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700">
+                <Upload className="size-3.5" />
+                {mediaSaving === "upload-work" ? "Uploading..." : "Upload Image"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={Boolean(mediaSaving)}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    event.target.value = "";
+                    void handleProviderMediaUpload("work", file);
+                  }}
+                />
+              </label>
+            </div>
+            {detail.workGallery?.length ? (
               <div className="mt-4 grid gap-4 md:grid-cols-3">
                 {detail.workGallery.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.previewUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
-                  >
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
-                      <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                  <div key={item.id} className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3">
+                    <a href={item.previewUrl} target="_blank" rel="noreferrer" className="block transition hover:opacity-90">
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                        <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                      </div>
+                    </a>
+                    <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                        <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleProviderMediaDelete("work", item.id)}
+                        disabled={Boolean(mediaSaving)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+                      >
+                        <Trash2 className="size-3.5" />
+                        {mediaSaving === `delete-work-${item.id}` ? "Deleting..." : "Delete"}
+                      </button>
                     </div>
-                    <div className="mt-3">
-                      <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                      <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
-                    </div>
-                  </a>
+                  </div>
                 ))}
               </div>
-            </div>
-          ) : null}
-          {detail.certificates?.length ? (
-            <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+            ) : (
+              <p className="mt-4 rounded-[20px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+                No service images are currently stored.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-950">Certificates</h3>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700">
+                <Upload className="size-3.5" />
+                {mediaSaving === "upload-certificate" ? "Uploading..." : "Upload Certificate"}
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  disabled={Boolean(mediaSaving)}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    event.target.value = "";
+                    void handleProviderMediaUpload("certificate", file);
+                  }}
+                />
+              </label>
+            </div>
+            {detail.certificates?.length ? (
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {detail.certificates.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.previewUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
-                  >
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
-                      {isPdfAsset(item.previewUrl) ? (
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
-                          <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
-                          <span className="text-[12px] font-semibold">{item.fileName}</span>
-                        </div>
-                      ) : (
-                        <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
-                      )}
+                  <div key={item.id} className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3">
+                    <a href={item.previewUrl} target="_blank" rel="noreferrer" className="block transition hover:opacity-90">
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                        {isPdfAsset(item.previewUrl) ? (
+                          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
+                            <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                            <span className="text-[12px] font-semibold">{item.fileName}</span>
+                          </div>
+                        ) : (
+                          <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                        )}
+                      </div>
+                    </a>
+                    <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                        <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleProviderMediaDelete("certificate", item.id)}
+                        disabled={Boolean(mediaSaving)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+                      >
+                        <Trash2 className="size-3.5" />
+                        {mediaSaving === `delete-certificate-${item.id}` ? "Deleting..." : "Delete"}
+                      </button>
                     </div>
-                    <div className="mt-3">
-                      <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                      <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
-                    </div>
-                  </a>
+                  </div>
                 ))}
               </div>
+            ) : (
+              <p className="mt-4 rounded-[20px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+                No certificates are currently stored.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-6 rounded-[24px] border border-slate-200 bg-white p-4">
+            <h3 className="text-sm font-bold text-slate-950">Approval Checklist</h3>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {([
+                ["identity", "IC / Passport verified"],
+                ["background", "Background checked"],
+                ["phone", "Phone verified"],
+                ["email", "Email verified"],
+                ["tshirt", "T-shirt given"],
+              ] as Array<[keyof typeof checklist, string]>).map(([key, label]) => (
+                <label
+                  key={key}
+                  className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-700"
+                >
+                  <span>{label}</span>
+                  <input
+                    type="checkbox"
+                    checked={checklist[key as keyof typeof checklist]}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setChecklist((current) => ({ ...current, [key]: checked }));
+                      if (key === "identity") {
+                        void handleIdentityVerification(checked);
+                      }
+                    }}
+                    className="size-5 accent-emerald-600"
+                  />
+                </label>
+              ))}
             </div>
-          ) : null}
+            <label className="mt-4 block text-sm font-semibold text-slate-700">
+              Admin approval note
+              <textarea
+                value={approvalNote}
+                onChange={(event) => setApprovalNote(event.target.value)}
+                placeholder="Add a note before approving this provider..."
+                className="mt-2 min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-emerald-300"
+              />
+            </label>
+            <div className="mt-4 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => void handleApproveProvider()}
+                disabled={saving || verifyingIdentity}
+                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                Approve Provider
+              </button>
+              <button
+                type="button"
+                onClick={handleDeactivate}
+                disabled={saving}
+                className="rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 disabled:opacity-60"
+              >
+                Disable Provider
+              </button>
+            </div>
+          </div>
         </SurfaceCard>
       ) : null}
     </div>
