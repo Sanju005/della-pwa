@@ -241,9 +241,11 @@ export async function resolveStoredMediaUrlList(
   values: string[] | null | undefined,
   visibility: "public" | "private" = "public",
 ) {
-  const items = (values ?? []).map((item) => item.trim()).filter(Boolean);
+  const items = (Array.isArray(values) ? values : [])
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
 
-  return Promise.all(
+  const resolved = await Promise.all(
     items.map((item) =>
       resolveStoredMediaUrl(adminClient, {
         bucket,
@@ -252,4 +254,6 @@ export async function resolveStoredMediaUrlList(
       }),
     ),
   );
+
+  return resolved.filter(Boolean);
 }

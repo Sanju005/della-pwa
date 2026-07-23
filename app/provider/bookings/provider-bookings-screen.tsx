@@ -292,10 +292,10 @@ function TimelineCard({
   const current = state === "current";
 
   return (
-    <div className="relative flex gap-4">
-      <div className="flex w-14 flex-col items-center">
+    <div className="relative flex flex-col items-center gap-2">
+      <div className="flex w-full flex-col items-center">
         <span
-          className={`inline-flex h-12 w-12 items-center justify-center rounded-full border-4 text-lg font-black ${
+          className={`inline-flex h-8 w-8 items-center justify-center rounded-full border-[3px] text-xs font-black ${
             done || current
               ? "border-[#8E5EB5] bg-[#8E5EB5] text-white"
               : "border-[#d1d5db] bg-white text-[#94a3b8]"
@@ -303,9 +303,9 @@ function TimelineCard({
         >
           {done ? "OK" : number}
         </span>
-        <span className={`mt-2 h-full min-h-16 w-[2px] ${done || current ? "bg-[#8E5EB5]" : "bg-[#e5e7eb]"}`} />
+        <span className={`mt-1.5 h-4 w-[2px] ${done || current ? "bg-[#8E5EB5]" : "bg-[#e5e7eb]"}`} />
       </div>
-      <div className="min-w-0 flex-1 rounded-[24px] border border-[#eee5f7] bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
+      <div className="w-full min-w-0 rounded-[24px] border border-[#eee5f7] bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h3 className="text-[0.95rem] font-bold tracking-[-0.035em] text-[#0f172a]">

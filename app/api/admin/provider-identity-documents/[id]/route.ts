@@ -206,6 +206,7 @@ export async function POST(
       documentType?: string;
       verified?: boolean;
       note?: string;
+      approveProvider?: boolean;
     };
     const action = payload.action;
     const side = payload.side;
@@ -247,6 +248,21 @@ export async function POST(
           admin_approval_note_updated_at: payload.note?.trim() ? now : metadata.admin_approval_note_updated_at,
         },
       });
+
+      if (isVerified && payload.approveProvider) {
+        await verified.adminClient
+          .from("provider_profiles")
+          .update({
+            approval_status: "approved",
+            is_visible: true,
+          })
+          .eq("id", providerId);
+
+        await verified.adminClient
+          .from("profiles")
+          .update({ status: "active" })
+          .eq("id", providerId);
+      }
 
       await verified.adminClient.from("notifications").insert({
         user_id: providerId,

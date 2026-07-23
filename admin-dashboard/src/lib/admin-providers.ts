@@ -1896,6 +1896,7 @@ async function postProviderIdentityDocumentAction(
     documentType?: string;
     verified?: boolean;
     note?: string;
+    approveProvider?: boolean;
   },
 ) {
   if (!supabase) {
@@ -1939,12 +1940,14 @@ export async function setProviderIdentityVerified(
   verified: boolean,
   documentType?: string,
   note?: string,
+  approveProvider?: boolean,
 ) {
   return postProviderIdentityDocumentAction(providerId, {
     action: "verify",
     verified,
     documentType,
     note,
+    approveProvider,
   });
 }
 

@@ -22,7 +22,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { InfoRow, MetricTile, MiniStatus, PillBadge, SurfaceCard, TableShell } from "../components/user-detail-ui";
 import { BookingTaskDetails } from "./booking-detail-page";
 import { getBookingDetailWithFallback } from "../lib/admin-bookings";
@@ -205,7 +205,6 @@ function renderSimpleRows(title: string, headers: string[], rows: string[][]) {
 
 export function ProviderProfilePage() {
   const { providerId = "" } = useParams();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>("Overview");
   const [message, setMessage] = useState<string | null>(null);
   const [provider, setProvider] = useState<ProviderDetailRecord | null>(null);
@@ -463,6 +462,11 @@ export function ProviderProfilePage() {
   }
 
   const detail = provider;
+  const isProviderApproved =
+    detail.approvalStatus === "Approved" &&
+    detail.identityVerificationStatus === "Verified" &&
+    detail.status !== "Paused" &&
+    detail.status !== "Suspended";
   const allTaskRows = [
     ...detail.completedTaskRows,
     ...detail.upcomingTaskRows.map((task) => ({
@@ -587,8 +591,9 @@ export function ProviderProfilePage() {
       return;
     }
 
-    const confirmed = window.confirm("Deactivate this provider?");
-    if (!confirmed) {
+    const typed = window.prompt('Type "DISABLE" to disable this provider.');
+    if (typed !== "DISABLE") {
+      flash("Provider was not disabled. You must type DISABLE to confirm.");
       return;
     }
 
@@ -602,10 +607,7 @@ export function ProviderProfilePage() {
     }
 
     setProvider((current) => (current ? { ...current, status: "Paused" } : current));
-    flash("Provider deactivated.");
-    window.setTimeout(() => {
-      navigate("/service-providers");
-    }, 500);
+    flash("Provider disabled.");
   }
 
   async function handleMarkCompanyPaymentReceived(submissionId: string) {
@@ -654,7 +656,6 @@ export function ProviderProfilePage() {
       detail.providerId,
       verified,
       detail.identityDocumentType,
-      verified ? approvalNote.trim() || undefined : undefined,
     );
     setVerifyingIdentity(false);
 
@@ -673,9 +674,29 @@ export function ProviderProfilePage() {
       return;
     }
 
-    await handleIdentityVerification(true);
+    if (isProviderApproved) {
+      flash("Provider is already approved.");
+      return;
+    }
+
+    setVerifyingIdentity(true);
+    const result = await setProviderIdentityVerified(
+      detail.providerId,
+      true,
+      detail.identityDocumentType,
+      approvalNote.trim(),
+      true,
+    );
+    setVerifyingIdentity(false);
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    await reloadProviderDetails();
     setChecklist((current) => ({ ...current, identity: true }));
-    flash("Provider approval saved with admin note.");
+    flash("Provider approved. App verification and visibility were updated.");
   }
 
   async function handleProviderMediaUpload(kind: "profile" | "work" | "certificate", file?: File | null) {
@@ -1087,14 +1108,14 @@ export function ProviderProfilePage() {
               <div className="mt-8">
                 <h4 className="text-base font-bold text-slate-950">Work Images</h4>
                 {detail.workGallery?.length ? (
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
                     {detail.workGallery.slice(0, 4).map((item) => (
                       <a
                         key={item.id}
                         href={item.previewUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="block overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200"
+                        className="block min-w-[260px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200 sm:min-w-[320px]"
                       >
                         <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
                           <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
@@ -1728,9 +1749,9 @@ export function ProviderProfilePage() {
               </label>
             </div>
             {detail.workGallery?.length ? (
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
                 {detail.workGallery.map((item) => (
-                  <div key={item.id} className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3">
+                  <div key={item.id} className="min-w-[280px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 sm:min-w-[360px]">
                     <a href={item.previewUrl} target="_blank" rel="noreferrer" className="block transition hover:opacity-90">
                       <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
                         <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
@@ -1864,18 +1885,18 @@ export function ProviderProfilePage() {
               <button
                 type="button"
                 onClick={() => void handleApproveProvider()}
-                disabled={saving || verifyingIdentity}
-                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                disabled={saving || verifyingIdentity || isProviderApproved}
+                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
               >
-                Approve Provider
+                {isProviderApproved ? "Approved" : "Approve Provider"}
               </button>
               <button
                 type="button"
                 onClick={handleDeactivate}
-                disabled={saving}
-                className="rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-semibold text-rose-600 disabled:opacity-60"
+                disabled={saving || !isProviderApproved}
+                className="px-2 py-2 text-xs font-semibold text-rose-600 underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
               >
-                Disable Provider
+                Disable provider
               </button>
             </div>
           </div>

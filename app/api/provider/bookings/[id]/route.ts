@@ -225,8 +225,19 @@ async function ensurePaymentRequest(
   ) {
     writeResult = await adminClient
       .from("payments")
-      .update(paymentPayload)
+      .update(
+        isUnknownPaymentColumnError(writeResult.error.message)
+          ? fallbackPaymentPayload
+          : paymentPayload,
+      )
       .eq("booking_id", current.id);
+
+    if (writeResult.error && isUnknownPaymentColumnError(writeResult.error.message)) {
+      writeResult = await adminClient
+        .from("payments")
+        .update(fallbackPaymentPayload)
+        .eq("booking_id", current.id);
+    }
   }
 
   return { error: writeResult.error };

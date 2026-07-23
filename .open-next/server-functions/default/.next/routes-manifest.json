@@ -23,6 +23,22 @@
   },
   "dynamicRoutes": [
     {
+      "page": "/api/admin/provider-identity-documents/[id]",
+      "regex": "^/api/admin/provider\\-identity\\-documents/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/provider\\-identity\\-documents/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/admin/provider-media/[id]",
+      "regex": "^/api/admin/provider\\-media/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/provider\\-media/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/api/admin/provider-registration-debug/[id]",
       "regex": "^/api/admin/provider\\-registration\\-debug/([^/]+?)(?:/)?$",
       "routeKeys": {

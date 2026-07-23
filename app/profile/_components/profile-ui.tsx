@@ -198,21 +198,21 @@ function StepTimelineCard({
   const current = state === "current";
 
   return (
-    <div className="relative flex gap-3 sm:gap-4">
-      <div className="flex w-10 shrink-0 flex-col items-center sm:w-14">
+    <div className="relative flex flex-col items-center gap-2">
+      <div className="flex w-full shrink-0 flex-col items-center">
         <span
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-full border-4 text-base font-black sm:h-12 sm:w-12 sm:text-lg ${
+          className={`inline-flex h-8 w-8 items-center justify-center rounded-full border-[3px] text-xs font-black sm:h-9 sm:w-9 sm:text-sm ${
             done || current
               ? "border-[#8E5EB5] bg-[#8E5EB5] text-white"
               : "border-[#e5e7eb] bg-white text-[#94a3b8]"
           }`}
         >
-            {done ? <CheckCircleIcon className="h-5 w-5 sm:h-6 sm:w-6" /> : number}
+            {done ? <CheckCircleIcon className="h-4 w-4 sm:h-5 sm:w-5" /> : number}
         </span>
-        <span className={`mt-2 h-full min-h-16 w-[2px] ${done || current ? "bg-[#8E5EB5]" : "bg-[#e5e7eb]"}`} />
+        <span className={`mt-1.5 h-4 w-[2px] ${done || current ? "bg-[#8E5EB5]" : "bg-[#e5e7eb]"}`} />
       </div>
       <div
-        className={`min-w-0 flex-1 rounded-[22px] border p-4 shadow-[0_16px_34px_rgba(106,69,160,0.08)] sm:rounded-[24px] sm:p-5 ${
+        className={`w-full min-w-0 rounded-[22px] border p-4 shadow-[0_16px_34px_rgba(106,69,160,0.08)] sm:rounded-[24px] sm:p-5 ${
           current
             ? "border-[#dcc7f7] bg-[linear-gradient(180deg,#fcf7ff_0%,#fffefe_100%)]"
             : "border-[#ebe2f8] bg-white"
@@ -2608,18 +2608,18 @@ export function BookingsScreen({ bookings, initialTab = "all" }: BookingsProps) 
               Latest
             </span>
           </div>
-          <div className="mt-3 flex flex-nowrap items-center gap-1.5 overflow-hidden">
+          <div className="mt-3 grid grid-cols-4 gap-1">
             {([
               { id: "all", label: "All" },
               { id: "today", label: "Today" },
-              { id: "week", label: "This Week" },
-              { id: "custom", label: "Custom Date" },
+              { id: "week", label: "Month" },
+              { id: "custom", label: "Custom" },
             ] as const).map((option) => (
               <button
                 key={option.id}
                 type="button"
                 onClick={() => setDateFilter(option.id)}
-                className={`min-w-0 flex-1 truncate rounded-full px-2.5 py-1.5 text-[10px] font-extrabold transition ${
+                className={`min-w-0 overflow-hidden rounded-full px-1 py-1.5 text-center text-[6px] font-extrabold leading-none transition min-[390px]:text-[7px] ${
                   dateFilter === option.id
                     ? "bg-[#8E5EB5] text-white shadow-[0_12px_22px_rgba(142,94,181,0.18)]"
                     : "border border-[#e8def6] bg-white text-[#6d6480]"
@@ -2730,7 +2730,7 @@ export function BookingsScreen({ bookings, initialTab = "all" }: BookingsProps) 
 
             <Link
               href={`/profile/bookings/${booking.id}`}
-              className="mt-4 flex h-[3.45rem] w-full items-center justify-between rounded-[19px] bg-[linear-gradient(135deg,#8f40ff_0%,#702cf0_55%,#5a20c9_100%)] px-5 text-[0.95rem] font-extrabold text-white shadow-[0_16px_30px_rgba(91,33,182,0.26)]"
+              className="mt-4 flex h-[3.45rem] w-full items-center justify-between rounded-[19px] bg-[#8E5EB5] px-5 text-[0.95rem] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.26)]"
             >
               <span className="pl-1">Track Task</span>
               <ChevronRightIcon className="h-4.5 w-4.5" />
@@ -2799,9 +2799,13 @@ function BookingStatusPill({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-bold ${toneClass}`}
+      className={`inline-flex shrink-0 items-center rounded-full border font-bold ${
+        tone === "completed"
+          ? "gap-1 px-2 py-1 text-[9px]"
+          : "gap-1.5 px-2.5 py-1.5 text-[11px]"
+      } ${toneClass}`}
     >
-      {tone === "completed" ? <CheckCircleIcon className="h-3.5 w-3.5" /> : null}
+      {tone === "completed" ? <CheckCircleIcon className="h-3 w-3" /> : null}
       <span>{label}</span>
     </span>
   );
