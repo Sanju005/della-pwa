@@ -16,18 +16,18 @@ import {
 } from "@/lib/supabase-env";
 
 export const metadata: Metadata = {
-  title: "DELLA",
+  title: "Swiper",
   description: "Book trusted home and lifestyle services in one DELLA app.",
-  applicationName: "DELLA",
+  applicationName: "Swiper",
   icons: {
-    icon: "/icon.png",
-    apple: "/apple-icon.png",
-    shortcut: "/icon.png",
+    icon: "/brand/main-logo.png",
+    apple: "/brand/main-logo.png",
+    shortcut: "/brand/main-logo.png",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "DELLA",
+    title: "Swiper",
   },
   formatDetection: {
     telephone: false,
