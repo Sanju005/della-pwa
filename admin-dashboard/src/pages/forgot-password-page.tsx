@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ShieldCheck } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
-const adminResetRedirectUrl = "https://admin.dellaapp.com/reset-password";
+const adminResetRedirectUrl = "https://admin.myswiper.my/reset-password";
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -66,7 +66,7 @@ export function ForgotPasswordPage() {
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="admin@dellaapp.com"
+              placeholder="admin@myswiper.my"
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
               required
             />

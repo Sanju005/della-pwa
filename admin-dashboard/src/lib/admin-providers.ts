@@ -283,7 +283,7 @@ type ProfileNameRow = {
 
 const APP_BASE_URL =
   (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
-  "https://app.dellaapp.com";
+  "https://app.myswiper.my";
 
 const providerProfileSelectWithAddress = `
   id,

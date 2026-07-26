@@ -50,7 +50,7 @@ export function LoginPage() {
       <section className="hidden rounded-[36px] bg-[linear-gradient(135deg,#0c1f17_0%,#0f8b3d_38%,#6d28d9_100%)] p-10 text-white shadow-[0_30px_100px_rgba(12,31,23,0.25)] lg:flex lg:flex-col lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-100">
-            admin.dellaapp.com
+            admin.myswiper.my
           </p>
           <h1 className="mt-5 max-w-xl font-display text-5xl font-extrabold leading-tight">
             DELLA control room for users, providers, payments, and trust.
@@ -107,7 +107,7 @@ export function LoginPage() {
                   setEmail(event.target.value);
                   setFormError(null);
                 }}
-                placeholder="admin@dellaapp.com"
+                placeholder="admin@myswiper.my"
                 autoComplete="username"
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
                 required
@@ -154,8 +154,8 @@ export function LoginPage() {
 
           <p className="mt-6 text-sm text-slate-500">
             Main marketplace:{" "}
-            <Link to="https://app.dellaapp.com" className="font-semibold text-emerald-700">
-              app.dellaapp.com
+            <Link to="https://app.myswiper.my" className="font-semibold text-emerald-700">
+              app.myswiper.my
             </Link>
           </p>
         </div>

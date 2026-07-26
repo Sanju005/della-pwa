@@ -794,7 +794,7 @@ export function ProviderBottomNav() {
       active: pathname === "/provider/bookings" || pathname === "/provider/calendar",
     },
     {
-      href: "https://app.dellaapp.com/provider/payments?view=ledger",
+      href: "https://app.myswiper.my/provider/payments?view=ledger",
       label: "Ledger",
       icon: <Landmark className="h-5 w-5" />,
       active: isLedgerView,

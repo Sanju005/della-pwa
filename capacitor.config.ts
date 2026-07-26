@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: "DELLA",
   webDir: "out",
   server: {
-    url: "https://app.dellaapp.com",
+    url: "https://app.myswiper.my",
     cleartext: false,
     androidScheme: "https",
   },

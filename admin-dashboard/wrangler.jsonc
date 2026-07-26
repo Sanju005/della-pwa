@@ -6,7 +6,7 @@
   "workers_dev": false,
   "routes": [
     {
-      "pattern": "admin.dellaapp.com",
+      "pattern": "admin.myswiper.my",
       "custom_domain": true
     }
   ],

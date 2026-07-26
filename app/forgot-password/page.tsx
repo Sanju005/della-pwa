@@ -6,7 +6,7 @@ import { ArrowLeft, Mail, ShieldCheck } from "lucide-react";
 import { AppButton, AuthInfoPanel, MobilePage, SecureNotice } from "@/app/_components/della-ui";
 import { getSupabaseClient } from "@/lib/supabase";
 
-const userResetRedirectUrl = "https://app.dellaapp.com/reset-password";
+const userResetRedirectUrl = "https://app.myswiper.my/reset-password";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

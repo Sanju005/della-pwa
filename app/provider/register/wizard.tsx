@@ -799,7 +799,6 @@ export function ProviderRegistrationWizard() {
                 service={activeStep.service}
                 details={data.serviceDetails[activeStep.service]}
                 onUpdate={updateServiceDetail}
-                setSubmitError={setSubmitError}
                 openCropper={openCropper}
               />
             ) : null}
@@ -860,7 +859,6 @@ export function ProviderRegistrationWizard() {
               <IdentityStep
                 data={data}
                 onUpdate={updateVerification}
-                setSubmitError={setSubmitError}
                 openCropper={openCropper}
               />
             ) : null}
@@ -1230,7 +1228,6 @@ function ServiceDetailsStep({
   service,
   details,
   onUpdate,
-  setSubmitError,
   openCropper,
 }: {
   service: ProviderService;
@@ -1240,7 +1237,6 @@ function ServiceDetailsStep({
     field: keyof ProviderRegistrationData["serviceDetails"][ProviderService],
     value: string | string[]
   ) => void;
-  setSubmitError: (value: string) => void;
   openCropper: (options: {
     file: File;
     tone: CropTone;
@@ -1270,8 +1266,6 @@ function ServiceDetailsStep({
         onSelect={(index, dataUrl) => {
           const nextDataUrls = [...details.imageDataUrls];
           nextDataUrls[index] = dataUrl;
-
-          setSubmitError("");
           onUpdate(service, "imageDataUrls", nextDataUrls);
         }}
         onCaptionChange={(index, caption) => {
@@ -1279,7 +1273,6 @@ function ServiceDetailsStep({
           nextCaptions[index] = caption;
           onUpdate(service, "imageCaptions", nextCaptions);
         }}
-        setSubmitError={setSubmitError}
         openCropper={openCropper}
       />
       <AssetStrip
@@ -1290,8 +1283,6 @@ function ServiceDetailsStep({
         onSelect={(index, dataUrl) => {
           const nextDataUrls = [...details.certificateDataUrls];
           nextDataUrls[index] = dataUrl;
-
-          setSubmitError("");
           onUpdate(service, "certificateDataUrls", nextDataUrls);
         }}
         onCaptionChange={(index, caption) => {
@@ -1299,7 +1290,6 @@ function ServiceDetailsStep({
           nextCaptions[index] = caption;
           onUpdate(service, "certificateCaptions", nextCaptions);
         }}
-        setSubmitError={setSubmitError}
         openCropper={openCropper}
       />
 
@@ -1722,7 +1712,6 @@ function PreVerificationStep({
 function IdentityStep({
   data,
   onUpdate,
-  setSubmitError,
   openCropper,
 }: {
   data: ProviderRegistrationData;
@@ -1730,7 +1719,6 @@ function IdentityStep({
     field: keyof ProviderRegistrationData["verification"],
     value: string | string[]
   ) => void;
-  setSubmitError: (value: string) => void;
   openCropper: (options: {
     file: File;
     tone: CropTone;
@@ -1752,11 +1740,9 @@ function IdentityStep({
         fileName={data.verification.frontImageName}
         preview={data.verification.frontImageDataUrl}
         onSelect={(fileName, dataUrl) => {
-          setSubmitError("");
           onUpdate("frontImageName", fileName);
           onUpdate("frontImageDataUrl", dataUrl);
         }}
-        setSubmitError={setSubmitError}
         openCropper={openCropper}
       />
       <UploadCard
@@ -1764,11 +1750,9 @@ function IdentityStep({
         fileName={data.verification.backImageName}
         preview={data.verification.backImageDataUrl}
         onSelect={(fileName, dataUrl) => {
-          setSubmitError("");
           onUpdate("backImageName", fileName);
           onUpdate("backImageDataUrl", dataUrl);
         }}
-        setSubmitError={setSubmitError}
         openCropper={openCropper}
       />
     </div>
@@ -2255,7 +2239,6 @@ function AssetStrip({
   tone,
   onSelect,
   onCaptionChange,
-  setSubmitError,
   openCropper,
 }: {
   label: string;
@@ -2264,7 +2247,6 @@ function AssetStrip({
   tone: "media" | "certificate";
   onSelect: (index: number, dataUrl: string) => void;
   onCaptionChange: (index: number, caption: string) => void;
-  setSubmitError: (value: string) => void;
   openCropper: (options: {
     file: File;
     tone: CropTone;
@@ -2291,7 +2273,6 @@ function AssetStrip({
             tone={tone}
             onSelect={onSelect}
             onCaptionChange={onCaptionChange}
-            setSubmitError={setSubmitError}
             openCropper={openCropper}
           />
         ))}
@@ -2307,7 +2288,6 @@ function AssetUploadSlot({
   tone,
   onSelect,
   onCaptionChange,
-  setSubmitError,
   openCropper,
 }: {
   index: number;
@@ -2316,7 +2296,6 @@ function AssetUploadSlot({
   tone: "media" | "certificate";
   onSelect: (index: number, dataUrl: string) => void;
   onCaptionChange: (index: number, caption: string) => void;
-  setSubmitError: (value: string) => void;
   openCropper: (options: {
     file: File;
     tone: CropTone;
@@ -2326,6 +2305,7 @@ function AssetUploadSlot({
   }) => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [fieldError, setFieldError] = useState("");
 
   const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -2336,7 +2316,7 @@ function AssetUploadSlot({
 
     try {
       if (tone === "media") {
-        setSubmitError("");
+        setFieldError("");
         await openCropper({
           file,
           tone: "service",
@@ -2347,13 +2327,13 @@ function AssetUploadSlot({
               onCaptionChange(index, `Work ${index + 1}`);
             }
             if (fileName) {
-              setSubmitError("");
+              setFieldError("");
             }
           },
         });
       } else {
         const prepared = await prepareCertificateUpload(file);
-        setSubmitError("");
+        setFieldError("");
         onSelect(index, prepared.dataUrl);
         if (!caption.trim()) {
           onCaptionChange(
@@ -2363,7 +2343,9 @@ function AssetUploadSlot({
         }
       }
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to process the selected file.");
+      setFieldError(
+        error instanceof Error ? error.message : "Unable to process the selected file."
+      );
     }
   };
 
@@ -2410,6 +2392,11 @@ function AssetUploadSlot({
         placeholder={tone === "media" ? "Add image caption" : "Add certificate caption"}
         className="mt-2 h-10 w-full rounded-[10px] border border-[#dfe8e2] px-3 text-[12px] text-[#111827] outline-none"
       />
+      {fieldError ? (
+        <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">
+          {fieldError}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -2591,14 +2578,12 @@ function UploadCard({
   fileName,
   preview,
   onSelect,
-  setSubmitError,
   openCropper,
 }: {
   label: string;
   fileName: string;
   preview: string;
   onSelect: (fileName: string, dataUrl: string) => void;
-  setSubmitError: (value: string) => void;
   openCropper: (options: {
     file: File;
     tone: CropTone;
@@ -2609,6 +2594,7 @@ function UploadCard({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [fieldError, setFieldError] = useState("");
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -2618,25 +2604,28 @@ function UploadCard({
     }
 
     if (!file.type.startsWith("image/")) {
-      setSubmitError("Please choose a JPG or PNG image.");
+      setFieldError("Please choose a JPG or PNG image.");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setSubmitError("Each upload must be 5MB or smaller.");
+      setFieldError("Each upload must be 5MB or smaller.");
       return;
     }
 
+    setFieldError("");
     void openCropper({
       file,
       tone: "document",
       maxSizeBytes: CERTIFICATE_UPLOAD_MAX_BYTES,
       onApply: (dataUrl, nextFileName) => {
-        setSubmitError("");
+        setFieldError("");
         onSelect(nextFileName, dataUrl);
       },
     }).catch((error) => {
-      setSubmitError(error instanceof Error ? error.message : "Unable to crop this document image.");
+      setFieldError(
+        error instanceof Error ? error.message : "Unable to crop this document image."
+      );
     });
   };
 
@@ -2700,6 +2689,11 @@ function UploadCard({
       {fileName ? (
         <p className="mt-2 truncate text-[12px] font-semibold text-[#111827]">
           {fileName}
+        </p>
+      ) : null}
+      {fieldError ? (
+        <p className="mt-2 text-[12px] font-semibold text-[#dc2626]">
+          {fieldError}
         </p>
       ) : null}
     </div>

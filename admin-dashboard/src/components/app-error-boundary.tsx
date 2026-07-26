@@ -42,7 +42,7 @@ export class AppErrorBoundary extends Component<
           </h1>
           <p className="mt-4 text-sm leading-7 text-slate-500">
             Try a hard refresh with Ctrl+F5. If it still fails, clear site data for
-            <span className="font-semibold text-slate-700"> admin.dellaapp.com</span> and try again.
+            <span className="font-semibold text-slate-700"> admin.myswiper.my</span> and try again.
           </p>
           {this.state.message ? (
             <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">

@@ -5768,7 +5768,7 @@ function buildReferralCode(firstName: string, lastName: string, phoneNumber: str
 }
 
 function buildReferralLink(referralCode: string) {
-  return `https://app.dellaapp.com/invite/${referralCode}`;
+  return `https://app.myswiper.my/invite/${referralCode}`;
 }
 
 function SettingIcon({

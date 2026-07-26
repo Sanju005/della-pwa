@@ -19,11 +19,11 @@ type IdentityAction = "upload" | "delete" | "verify";
 
 function buildCorsHeaders(origin: string | null) {
   const allowedOrigin =
-    origin === "https://admin.dellaapp.com" ||
+    origin === "https://admin.myswiper.my" ||
     origin === "http://localhost:5173" ||
     origin === "http://127.0.0.1:5173"
       ? origin
-      : "https://admin.dellaapp.com";
+      : "https://admin.myswiper.my";
 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,

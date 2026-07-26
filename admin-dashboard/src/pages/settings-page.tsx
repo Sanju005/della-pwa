@@ -24,7 +24,7 @@ const settingsGroups = [
     icon: Globe2,
     items: [
       "Deploy this app separately to Cloudflare Workers.",
-      "Map the Worker to admin.dellaapp.com after deploy.",
+      "Map the Worker to admin.myswiper.my after deploy.",
       "Reuse the same Supabase project but keep frontend code isolated.",
     ],
   },
