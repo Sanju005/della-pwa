@@ -1,69 +1,63 @@
-"use client";
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { Plus_Jakarta_Sans } from "next/font/google";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { AppEntryPage } from "@/app/_components/app-entry-page";
+import { Header } from "@/components/marketing/Header";
+import { Hero } from "@/components/marketing/Hero";
 
-import { getFreshSupabaseSession, getSupabaseClient } from "@/lib/supabase";
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
 
-function isProviderRole(role: string | null | undefined) {
-  return role === "provider" || role === "service_provider";
+function isMarketingHost(host: string) {
+  return host.startsWith("myswiper.my") || host.startsWith("www.myswiper.my");
 }
 
-export default function AppEntryPage() {
-  const router = useRouter();
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    let active = true;
+export async function generateMetadata(): Promise<Metadata> {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "";
 
-    async function routeUser() {
-      const supabase = getSupabaseClient();
-
-      if (!supabase) {
-        router.replace("/login");
-        return;
-      }
-
-      const session = await getFreshSupabaseSession(supabase);
-
-      if (!active) {
-        return;
-      }
-
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      if (!active) {
-        return;
-      }
-
-      if (isProviderRole(profile?.role)) {
-        router.replace("/provider/dashboard");
-        return;
-      }
-
-      router.replace("/home");
-    }
-
-    void routeUser();
-
-    return () => {
-      active = false;
+  if (!isMarketingHost(host)) {
+    return {
+      title: "Swiper",
     };
-  }, [router]);
+  }
+
+  return {
+    title: "Swiper | Find Trusted Local Services Near You",
+    description:
+      "Find trusted chefs, maids, drivers, plumbers, technicians and other local professionals near you at reasonable rates with Swiper.",
+    alternates: {
+      canonical: "https://myswiper.my",
+    },
+    openGraph: {
+      url: "https://myswiper.my",
+      title: "Swiper | Find Trusted Local Services Near You",
+      description:
+        "Find trusted chefs, maids, drivers, plumbers, technicians and other local professionals near you at reasonable rates with Swiper.",
+    },
+  };
+}
+
+export default async function RootPage() {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "";
+
+  if (!isMarketingHost(host)) {
+    return <AppEntryPage />;
+  }
 
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center bg-[#fbf8ff] px-6">
-      <div className="rounded-[24px] bg-white px-6 py-5 text-center shadow-[0_18px_40px_rgba(67,35,104,0.08)] ring-1 ring-[#f0e8fa]">
-        <p className="text-[15px] font-semibold text-[#625877]">Opening Swiper...</p>
-      </div>
+    <main
+      className={`${plusJakartaSans.className} min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,rgba(210,189,248,0.18),transparent_32%),linear-gradient(180deg,#ffffff_0%,#fdfbff_54%,#faf7ff_100%)] text-[#11153D]`}
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-[radial-gradient(circle_at_18%_24%,rgba(224,208,255,0.52),rgba(255,255,255,0)_33%),radial-gradient(circle_at_77%_20%,rgba(229,216,255,0.40),rgba(255,255,255,0)_28%)]" />
+      <Header />
+      <Hero />
     </main>
   );
 }
