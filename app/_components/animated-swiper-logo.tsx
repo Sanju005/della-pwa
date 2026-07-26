@@ -26,22 +26,6 @@ export function AnimatedSwiperLogo({ className = "" }: AnimatedSwiperLogoProps) 
             priority
             className="h-full w-full object-contain"
           />
-          <motion.span
-            aria-hidden="true"
-            className="pointer-events-none absolute left-[57%] top-[17%] h-[8%] w-[9%] rounded-full bg-[linear-gradient(180deg,#7b45d8_0%,#4d1f91_100%)] shadow-[0_0_0_0.5px_rgba(82,31,146,0.55)]"
-            style={{ transformOrigin: "center top" }}
-            animate={{
-              scaleY: [0.08, 1, 0.08, 1, 0.08],
-              opacity: [0, 1, 0, 1, 0],
-            }}
-            transition={{
-              duration: 3.2,
-              repeat: Number.POSITIVE_INFINITY,
-              times: [0, 0.08, 0.16, 0.26, 0.34],
-              ease: "easeInOut",
-              repeatDelay: 1.8,
-            }}
-          />
         </motion.div>
 
         <div className="overflow-hidden">
@@ -49,14 +33,39 @@ export function AnimatedSwiperLogo({ className = "" }: AnimatedSwiperLogoProps) 
             initial={{ opacity: 0, x: -22 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.65, delay: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="flex items-center"
+            className="relative flex items-center"
           >
-            <Image
-              src={textLogo}
-              alt="Swiper"
-              priority
-              className="h-auto w-[154px] object-contain"
-            />
+            <motion.div
+              animate={{
+                y: [0, -1.5, 0],
+                opacity: [1, 0.94, 1],
+              }}
+              transition={{
+                duration: 2.6,
+                repeat: Number.POSITIVE_INFINITY,
+                ease: "easeInOut",
+                repeatDelay: 0.5,
+              }}
+              className="relative"
+            >
+              <Image
+                src={textLogo}
+                alt="Swiper"
+                priority
+                className="h-auto w-[154px] object-contain"
+              />
+              <motion.span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 left-[-18%] w-[22%] bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.72)_50%,rgba(255,255,255,0)_100%)] mix-blend-screen"
+                animate={{ x: ["0%", "560%"] }}
+                transition={{
+                  duration: 1.8,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "easeInOut",
+                  repeatDelay: 1.4,
+                }}
+              />
+            </motion.div>
           </motion.div>
         </div>
       </div>
