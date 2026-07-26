@@ -24,6 +24,7 @@
     "@opennextjs/cloudflare": "^1.8.0",
     "@supabase/supabase-js": "^2.106.2",
     "firebase": "^12.14.0",
+    "framer-motion": "^12.42.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.17.0",
     "next": "16.2.6",

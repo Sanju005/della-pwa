@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import swiperLogo from "../../Logo/Swiper.png";
 import {
   Check,
   Eye,
@@ -14,6 +13,7 @@ import {
   MoveRight,
   UserPlus,
 } from "lucide-react";
+import { AnimatedSwiperLogo } from "@/app/_components/animated-swiper-logo";
 import { getSupabaseClient } from "@/lib/supabase";
 import { requestNotificationPermission, saveFCMToken } from "@/lib/notifications";
 
@@ -146,12 +146,7 @@ export default function LoginPage() {
 
         <section className="relative z-10 w-full rounded-[32px] bg-white/94 px-5 py-7 shadow-[0_24px_60px_rgba(67,35,104,0.12)] ring-1 ring-[#f0e8fa] backdrop-blur">
           <div className="flex flex-col items-center text-center">
-            <Image
-              src={swiperLogo}
-              alt="Swiper"
-              priority
-              className="h-auto w-[210px]"
-            />
+            <AnimatedSwiperLogo />
             <h1 className="mt-2 text-[2rem] font-extrabold tracking-[-0.05em] text-[#1f1830]">
               Welcome back!
             </h1>
