@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
 import '../../../core/routing/app_routes.dart';
+import '../../../previews/widget_preview_helpers.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
@@ -13,10 +15,7 @@ import '../../../widgets/swiper_search_bar.dart';
 import '../../../widgets/swiper_section_card.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
-  const CustomerHomeScreen({
-    super.key,
-    required this.repository,
-  });
+  const CustomerHomeScreen({super.key, required this.repository});
 
   final DemoRepository repository;
 
@@ -60,20 +59,23 @@ class CustomerHomeScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.lg),
                 SwiperSectionCard(
                   title: 'Browse services',
-                  subtitle: 'Tap into the Swiper categories we will later connect to live data.',
+                  subtitle:
+                      'Tap into the Swiper categories we will later connect to live data.',
                   child: GridView.builder(
                     itemCount: categories.length,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: AppSpacing.sm,
-                      mainAxisSpacing: AppSpacing.sm,
-                      childAspectRatio: 0.9,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: AppSpacing.sm,
+                          mainAxisSpacing: AppSpacing.sm,
+                          childAspectRatio: 0.9,
+                        ),
                     itemBuilder: (context, index) => ServiceCategoryChip(
                       category: categories[index],
-                      onTap: () => Navigator.of(context).pushNamed(AppRoutes.providers),
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRoutes.providers),
                     ),
                   ),
                 ),
@@ -91,29 +93,31 @@ class CustomerHomeScreen extends StatelessWidget {
                     children: [
                       Text(
                         'Tonight\'s pick',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: Colors.white70,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelLarge?.copyWith(color: Colors.white70),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         'Book a chef in under two minutes',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: Colors.white),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         'This card is UI-only for now, but it matches the future booking flow shape.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white70,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       SwiperButton(
                         label: 'View provider list',
                         isSecondary: true,
-                        onPressed: () => Navigator.of(context).pushNamed(AppRoutes.providers),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).pushNamed(AppRoutes.providers),
                       ),
                     ],
                   ),
@@ -122,12 +126,15 @@ class CustomerHomeScreen extends StatelessWidget {
                 SwiperSectionCard(
                   title: 'Featured provider',
                   trailing: TextButton(
-                    onPressed: () => Navigator.of(context).pushNamed(AppRoutes.providers),
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed(AppRoutes.providers),
                     child: const Text('See all'),
                   ),
                   child: ProviderCard(
                     provider: featuredProvider,
-                    onTap: () => Navigator.of(context).pushNamed(AppRoutes.providerProfile),
+                    onTap: () => Navigator.of(
+                      context,
+                    ).pushNamed(AppRoutes.providerProfile),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -138,7 +145,9 @@ class CustomerHomeScreen extends StatelessWidget {
                       SwiperButton(
                         label: 'Open booking overview',
                         icon: const Icon(Icons.calendar_today_rounded),
-                        onPressed: () => Navigator.of(context).pushNamed(AppRoutes.bookingOverview),
+                        onPressed: () => Navigator.of(
+                          context,
+                        ).pushNamed(AppRoutes.bookingOverview),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       SwiperButton(
@@ -148,7 +157,8 @@ class CustomerHomeScreen extends StatelessWidget {
                           SwiperBottomSheet.show<void>(
                             context,
                             title: 'Need help choosing?',
-                            subtitle: 'This is the shared bottom-sheet style for future actions.',
+                            subtitle:
+                                'This is the shared bottom-sheet style for future actions.',
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,4 +197,13 @@ class CustomerHomeScreen extends StatelessWidget {
       ],
     );
   }
+}
+
+@Preview(
+  name: 'Customer Home',
+  size: Size(430, 932),
+  wrapper: previewScreenSurface,
+)
+Widget customerHomeScreenPreview() {
+  return CustomerHomeScreen(repository: DemoRepository());
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widget_previews.dart';
 
+import '../previews/widget_preview_helpers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 
@@ -56,10 +58,30 @@ class SwiperButton extends StatelessWidget {
 
     return ElevatedButton(
       onPressed: isLoading ? null : onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-      ),
+      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
       child: child,
     );
   }
+}
+
+@Preview(name: 'Primary', size: Size(320, 120), wrapper: previewSurface)
+Widget swiperButtonPrimaryPreview() {
+  return SwiperButton(
+    label: 'Book chef now',
+    icon: const Icon(Icons.restaurant_menu_rounded),
+    onPressed: () {},
+  );
+}
+
+@Preview(
+  name: 'Loading Secondary',
+  size: Size(320, 120),
+  wrapper: previewSurface,
+)
+Widget swiperButtonSecondaryPreview() {
+  return const SwiperButton(
+    label: 'Checking availability',
+    isSecondary: true,
+    isLoading: true,
+  );
 }
