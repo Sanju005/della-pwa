@@ -3708,12 +3708,12 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js": {
+    ".open-next/server-functions/default/.next/server/app/images/mock/chef-daniel.jpg/route_client-reference-manifest.js": {
       "bytes": 356,
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/images/mock/chef-daniel.jpg/route_client-reference-manifest.js": {
+    ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js": {
       "bytes": 356,
       "imports": [],
       "format": "cjs"
@@ -3743,6 +3743,11 @@
       "imports": [],
       "format": "cjs"
     },
+    ".open-next/server-functions/default/.next/server/app/api/auth/register/customer/route_client-reference-manifest.js": {
+      "bytes": 355,
+      "imports": [],
+      "format": "cjs"
+    },
     ".open-next/server-functions/default/.next/server/app/api/bookings/[id]/complete/route_client-reference-manifest.js": {
       "bytes": 355,
       "imports": [],
@@ -3754,11 +3759,6 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/api/bookings/[id]/cash-pay/route_client-reference-manifest.js": {
-      "bytes": 355,
-      "imports": [],
-      "format": "cjs"
-    },
-    ".open-next/server-functions/default/.next/server/app/api/auth/register/customer/route_client-reference-manifest.js": {
       "bytes": 355,
       "imports": [],
       "format": "cjs"
@@ -3783,6 +3783,16 @@
       "imports": [],
       "format": "cjs"
     },
+    ".open-next/server-functions/default/.next/server/app/api/profile/favorites/route_client-reference-manifest.js": {
+      "bytes": 344,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/api/profile/addresses/route_client-reference-manifest.js": {
+      "bytes": 344,
+      "imports": [],
+      "format": "cjs"
+    },
     ".open-next/server-functions/default/.next/server/app/api/provider/services/route_client-reference-manifest.js": {
       "bytes": 344,
       "imports": [],
@@ -3803,23 +3813,8 @@
       "imports": [],
       "format": "cjs"
     },
-    ".open-next/server-functions/default/.next/server/app/api/profile/addresses/route_client-reference-manifest.js": {
-      "bytes": 344,
-      "imports": [],
-      "format": "cjs"
-    },
-    ".open-next/server-functions/default/.next/server/app/api/profile/favorites/route_client-reference-manifest.js": {
-      "bytes": 344,
-      "imports": [],
-      "format": "cjs"
-    },
     ".open-next/server-functions/default/.next/server/app/manifest.webmanifest/route_client-reference-manifest.js": {
       "bytes": 340,
-      "imports": [],
-      "format": "cjs"
-    },
-    ".open-next/server-functions/default/.next/server/app/api/provider/reviews/route_client-reference-manifest.js": {
-      "bytes": 342,
       "imports": [],
       "format": "cjs"
     },
@@ -3829,6 +3824,11 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/api/profile/messages/route_client-reference-manifest.js": {
+      "bytes": 342,
+      "imports": [],
+      "format": "cjs"
+    },
+    ".open-next/server-functions/default/.next/server/app/api/provider/reviews/route_client-reference-manifest.js": {
       "bytes": 342,
       "imports": [],
       "format": "cjs"
@@ -3977,14 +3977,14 @@
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\images\\mock\\chef-hikaru.jpg\\route_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\images\\mock\\chef-banner.png\\route_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-daniel.jpg/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\images\\mock\\chef-daniel.jpg\\route_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\images\\mock\\chef-banner.png\\route_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/images/mock/chef-sofia.jpg/route_client-reference-manifest.js",
@@ -4012,6 +4012,11 @@
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\provider\\bookings\\[id]\\route_client-reference-manifest.js"
         },
         {
+          "path": ".open-next/server-functions/default/.next/server/app/api/auth/register/customer/route_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\auth\\register\\customer\\route_client-reference-manifest.js"
+        },
+        {
           "path": ".open-next/server-functions/default/.next/server/app/api/bookings/[id]/complete/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\bookings\\[id]\\complete\\route_client-reference-manifest.js"
@@ -4025,11 +4030,6 @@
           "path": ".open-next/server-functions/default/.next/server/app/api/bookings/[id]/cash-pay/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\bookings\\[id]\\cash-pay\\route_client-reference-manifest.js"
-        },
-        {
-          "path": ".open-next/server-functions/default/.next/server/app/api/auth/register/customer/route_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\auth\\register\\customer\\route_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/api/provider/availability/route_client-reference-manifest.js",
@@ -4052,6 +4052,16 @@
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\notifications\\[id]\\route_client-reference-manifest.js"
         },
         {
+          "path": ".open-next/server-functions/default/.next/server/app/api/profile/favorites/route_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\profile\\favorites\\route_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/api/profile/addresses/route_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\profile\\addresses\\route_client-reference-manifest.js"
+        },
+        {
           "path": ".open-next/server-functions/default/.next/server/app/api/provider/services/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\provider\\services\\route_client-reference-manifest.js"
@@ -4072,24 +4082,9 @@
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\provider\\bookings\\route_client-reference-manifest.js"
         },
         {
-          "path": ".open-next/server-functions/default/.next/server/app/api/profile/addresses/route_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\profile\\addresses\\route_client-reference-manifest.js"
-        },
-        {
-          "path": ".open-next/server-functions/default/.next/server/app/api/profile/favorites/route_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\profile\\favorites\\route_client-reference-manifest.js"
-        },
-        {
           "path": ".open-next/server-functions/default/.next/server/app/manifest.webmanifest/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\manifest.webmanifest\\route_client-reference-manifest.js"
-        },
-        {
-          "path": ".open-next/server-functions/default/.next/server/app/api/provider/reviews/route_client-reference-manifest.js",
-          "kind": "require-call",
-          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\provider\\reviews\\route_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/api/profile/payments/route_client-reference-manifest.js",
@@ -4100,6 +4095,11 @@
           "path": ".open-next/server-functions/default/.next/server/app/api/profile/messages/route_client-reference-manifest.js",
           "kind": "require-call",
           "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\profile\\messages\\route_client-reference-manifest.js"
+        },
+        {
+          "path": ".open-next/server-functions/default/.next/server/app/api/provider/reviews/route_client-reference-manifest.js",
+          "kind": "require-call",
+          "original": "D:\\della-pwa\\.open-next\\server-functions\\default\\.next\\server\\app\\api\\provider\\reviews\\route_client-reference-manifest.js"
         },
         {
           "path": ".open-next/server-functions/default/.next/server/app/api/location/reverse/route_client-reference-manifest.js",
@@ -6201,7 +6201,7 @@
       "format": "cjs"
     },
     ".open-next/server-functions/default/.next/server/app/api/auth/register/customer/route.js": {
-      "bytes": 14738,
+      "bytes": 14819,
       "imports": [
         {
           "path": ".open-next/server-functions/default/node_modules/next/dist/shared/lib/router/utils/app-paths.js",
@@ -16328,10 +16328,10 @@
         ".open-next/server-functions/default/.next/server/app/images/mock/chef-hikaru.jpg/route_client-reference-manifest.js": {
           "bytesInOutput": 532
         },
-        ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js": {
+        ".open-next/server-functions/default/.next/server/app/images/mock/chef-daniel.jpg/route_client-reference-manifest.js": {
           "bytesInOutput": 532
         },
-        ".open-next/server-functions/default/.next/server/app/images/mock/chef-daniel.jpg/route_client-reference-manifest.js": {
+        ".open-next/server-functions/default/.next/server/app/images/mock/chef-banner.png/route_client-reference-manifest.js": {
           "bytesInOutput": 532
         },
         ".open-next/server-functions/default/.next/server/app/images/mock/chef-sofia.jpg/route_client-reference-manifest.js": {
@@ -16349,6 +16349,9 @@
         ".open-next/server-functions/default/.next/server/app/api/provider/bookings/[id]/route_client-reference-manifest.js": {
           "bytesInOutput": 530
         },
+        ".open-next/server-functions/default/.next/server/app/api/auth/register/customer/route_client-reference-manifest.js": {
+          "bytesInOutput": 530
+        },
         ".open-next/server-functions/default/.next/server/app/api/bookings/[id]/complete/route_client-reference-manifest.js": {
           "bytesInOutput": 530
         },
@@ -16356,9 +16359,6 @@
           "bytesInOutput": 530
         },
         ".open-next/server-functions/default/.next/server/app/api/bookings/[id]/cash-pay/route_client-reference-manifest.js": {
-          "bytesInOutput": 530
-        },
-        ".open-next/server-functions/default/.next/server/app/api/auth/register/customer/route_client-reference-manifest.js": {
           "bytesInOutput": 530
         },
         ".open-next/server-functions/default/.next/server/app/api/provider/availability/route_client-reference-manifest.js": {
@@ -16373,6 +16373,12 @@
         ".open-next/server-functions/default/.next/server/app/api/notifications/[id]/route_client-reference-manifest.js": {
           "bytesInOutput": 517
         },
+        ".open-next/server-functions/default/.next/server/app/api/profile/favorites/route_client-reference-manifest.js": {
+          "bytesInOutput": 514
+        },
+        ".open-next/server-functions/default/.next/server/app/api/profile/addresses/route_client-reference-manifest.js": {
+          "bytesInOutput": 514
+        },
         ".open-next/server-functions/default/.next/server/app/api/provider/services/route_client-reference-manifest.js": {
           "bytesInOutput": 514
         },
@@ -16385,22 +16391,16 @@
         ".open-next/server-functions/default/.next/server/app/api/provider/bookings/route_client-reference-manifest.js": {
           "bytesInOutput": 514
         },
-        ".open-next/server-functions/default/.next/server/app/api/profile/addresses/route_client-reference-manifest.js": {
-          "bytesInOutput": 514
-        },
-        ".open-next/server-functions/default/.next/server/app/api/profile/favorites/route_client-reference-manifest.js": {
-          "bytesInOutput": 514
-        },
         ".open-next/server-functions/default/.next/server/app/manifest.webmanifest/route_client-reference-manifest.js": {
           "bytesInOutput": 509
-        },
-        ".open-next/server-functions/default/.next/server/app/api/provider/reviews/route_client-reference-manifest.js": {
-          "bytesInOutput": 511
         },
         ".open-next/server-functions/default/.next/server/app/api/profile/payments/route_client-reference-manifest.js": {
           "bytesInOutput": 511
         },
         ".open-next/server-functions/default/.next/server/app/api/profile/messages/route_client-reference-manifest.js": {
+          "bytesInOutput": 511
+        },
+        ".open-next/server-functions/default/.next/server/app/api/provider/reviews/route_client-reference-manifest.js": {
           "bytesInOutput": 511
         },
         ".open-next/server-functions/default/.next/server/app/api/location/reverse/route_client-reference-manifest.js": {
@@ -16656,7 +16656,7 @@
           "bytesInOutput": 10344
         },
         ".open-next/server-functions/default/.next/server/app/api/auth/register/customer/route.js": {
-          "bytesInOutput": 15171
+          "bytesInOutput": 15254
         },
         ".open-next/server-functions/default/.next/server/app/api/bookings/[id]/cash-pay/route.js": {
           "bytesInOutput": 18701
@@ -17073,7 +17073,7 @@
           "bytesInOutput": 97738
         }
       },
-      "bytes": 7630935
+      "bytes": 7631018
     }
   }
 }
