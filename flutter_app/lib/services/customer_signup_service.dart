@@ -99,9 +99,14 @@ class CustomerSignupService {
       body: jsonEncode(payload.toJson()),
     );
 
-    final body = response.body.isEmpty
-        ? null
-        : jsonDecode(response.body) as Object?;
+    Object? body;
+    if (response.body.isNotEmpty) {
+      try {
+        body = jsonDecode(response.body) as Object?;
+      } catch (_) {
+        body = null;
+      }
+    }
 
     if (response.statusCode >= 200 &&
         response.statusCode < 300 &&
@@ -114,6 +119,8 @@ class CustomerSignupService {
       throw Exception(body['error'] as String);
     }
 
-    throw Exception('Unable to create your account.');
+    throw Exception(
+      'Unable to create your account. Signup API returned ${response.statusCode}.',
+    );
   }
 }

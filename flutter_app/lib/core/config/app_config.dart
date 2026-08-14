@@ -15,11 +15,20 @@ class AppConfig {
     }
 
     final origin = currentAppOrigin();
-    if (origin != null && origin.isNotEmpty) {
+    if (origin != null &&
+        origin.isNotEmpty &&
+        !_isLocalhostOrigin(origin)) {
       return origin;
     }
 
     return 'https://app.dellaapp.com';
+  }
+
+  static bool _isLocalhostOrigin(String origin) {
+    final normalized = origin.toLowerCase();
+    return normalized.contains('localhost') ||
+        normalized.contains('127.0.0.1') ||
+        normalized.contains('0.0.0.0');
   }
 
   static const String supabaseUrl = String.fromEnvironment(
