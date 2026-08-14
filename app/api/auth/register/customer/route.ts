@@ -30,6 +30,30 @@ type CustomerSignupPayload = {
   country?: string;
 };
 
+function getCorsOrigin(request: Request) {
+  const origin = request.headers.get("origin") ?? "";
+
+  if (
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:")
+  ) {
+    return origin;
+  }
+
+  return "https://app.dellaapp.com";
+}
+
+function withCors(request: Request, response: NextResponse) {
+  const origin = getCorsOrigin(request);
+
+  response.headers.set("Access-Control-Allow-Origin", origin);
+  response.headers.set("Vary", "Origin");
+  response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+
+  return response;
+}
+
 function toSignupErrorMessage(errorMessage?: string) {
   const normalizedMessage = errorMessage?.trim().toLowerCase() ?? "";
 
@@ -78,6 +102,10 @@ function buildAddressLine1(unitNumber: string, addressLine1: string) {
   return [unitNumber.trim(), addressLine1.trim()].filter(Boolean).join(", ");
 }
 
+export async function OPTIONS(request: Request) {
+  return withCors(request, new NextResponse(null, { status: 204 }));
+}
+
 export async function POST(request: Request) {
   const payload = (await request.json()) as CustomerSignupPayload;
 
@@ -116,32 +144,44 @@ export async function POST(request: Request) {
     !city ||
     !state
   ) {
-    return NextResponse.json(
-      { error: "Please fill in all required fields." },
-      { status: 400 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "Please fill in all required fields." },
+        { status: 400 }
+      )
     );
   }
 
   if (password !== confirmPassword) {
-    return NextResponse.json(
-      { error: "Passwords do not match." },
-      { status: 400 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "Passwords do not match." },
+        { status: 400 }
+      )
     );
   }
 
   if (password.length < 8) {
-    return NextResponse.json(
-      { error: "Password must be at least 8 characters long." },
-      { status: 400 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "Password must be at least 8 characters long." },
+        { status: 400 }
+      )
     );
   }
 
   const adminClient = getAdminSupabaseClient();
 
   if (!adminClient) {
-    return NextResponse.json(
-      { error: "Supabase is not configured yet." },
-      { status: 500 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "Supabase is not configured yet." },
+        { status: 500 }
+      )
     );
   }
 
@@ -164,16 +204,22 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    return NextResponse.json(
-      { error: toSignupErrorMessage(error.message) },
-      { status: 400 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: toSignupErrorMessage(error.message) },
+        { status: 400 }
+      )
     );
   }
 
   if (!data.user) {
-    return NextResponse.json(
-      { error: "Unable to create your account." },
-      { status: 500 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "Unable to create your account." },
+        { status: 500 }
+      )
     );
   }
 
@@ -186,9 +232,12 @@ export async function POST(request: Request) {
     );
 
     if (confirmError) {
-      return NextResponse.json(
-        { error: "Account created, but email confirmation setup failed." },
-        { status: 500 }
+      return withCors(
+        request,
+        NextResponse.json(
+          { error: "Account created, but email confirmation setup failed." },
+          { status: 500 }
+        )
       );
     }
   }
@@ -208,20 +257,26 @@ export async function POST(request: Request) {
 
   const { error: profileError } = await adminClient
     .from("profiles")
-    .upsert({
-      id: data.user.id,
-      full_name: fullName,
-      email,
-      role: "customer",
-      phone: normalizedPhone,
-      avatar_url: storedAvatarUrl || null,
-      status: "active",
-    }, { onConflict: "id" });
+    .upsert(
+      {
+        id: data.user.id,
+        full_name: fullName,
+        email,
+        role: "customer",
+        phone: normalizedPhone,
+        avatar_url: storedAvatarUrl || null,
+        status: "active",
+      },
+      { onConflict: "id" }
+    );
 
   if (profileError) {
-    return NextResponse.json(
-      { error: "Account created, but profile setup failed." },
-      { status: 500 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "Account created, but profile setup failed." },
+        { status: 500 }
+      )
     );
   }
 
@@ -244,9 +299,12 @@ export async function POST(request: Request) {
     );
 
   if (customerProfileError) {
-    return NextResponse.json(
-      { error: "Account created, but customer profile setup failed." },
-      { status: 500 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "Account created, but customer profile setup failed." },
+        { status: 500 }
+      )
     );
   }
 
@@ -263,15 +321,21 @@ export async function POST(request: Request) {
   });
 
   if (addressError) {
-    return NextResponse.json(
-      { error: "Account created, but address setup failed." },
-      { status: 500 }
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "Account created, but address setup failed." },
+        { status: 500 }
+      )
     );
   }
 
-  return NextResponse.json({
-    success: true,
-    email,
-    requiresEmailVerification: false,
-  });
+  return withCors(
+    request,
+    NextResponse.json({
+      success: true,
+      email,
+      requiresEmailVerification: false,
+    })
+  );
 }
