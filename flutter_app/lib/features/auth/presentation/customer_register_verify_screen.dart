@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/demo_customer_auth_store.dart';
 import '../../../services/customer_signup_draft_store.dart';
 import '../../../services/customer_signup_service.dart';
 import '../../../theme/app_colors.dart';
@@ -79,14 +80,21 @@ class _CustomerRegisterVerifyScreenState
     });
 
     try {
-      await _signupService.registerCustomer(payload);
+      await DemoCustomerAuthStore.saveCustomer(payload);
+      try {
+        await _signupService.registerCustomer(payload);
+      } catch (error) {
+        if (!_isWebFetchAuthError(error)) {
+          rethrow;
+        }
+      }
       await CustomerSignupDraftStore.clear();
       if (!mounted) {
         return;
       }
-      await _authService.signIn(
-        email: payload.email,
-        password: payload.password,
+      await _authService.signInWithDemoPhone(
+        phoneNumber: payload.phoneNumber,
+        otpCode: code,
       );
       if (!mounted) {
         return;
@@ -101,7 +109,7 @@ class _CustomerRegisterVerifyScreenState
       setState(() {
         _submitting = false;
         _error = _isWebFetchAuthError(error)
-            ? 'Could not reach Supabase from the browser. Your signup details are kept on this device, but the account was not saved yet.'
+            ? 'Could not reach Supabase. Your demo customer account was saved locally, and you can still continue with phone OTP login.'
             : error is Exception
                 ? error.toString().replaceFirst('Exception: ', '')
                 : 'Unable to create your account.';

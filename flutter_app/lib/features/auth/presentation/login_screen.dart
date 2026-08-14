@@ -25,14 +25,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _otpController = TextEditingController();
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
+  final _otpFocusNode = FocusNode();
 
   bool _rememberMe = true;
   bool _isSubmitting = false;
   bool _isCheckingSession = true;
   bool _showValidation = false;
   String? _errorMessage;
+  bool _usePhoneOtp = true;
 
   @override
   void initState() {
@@ -44,9 +49,35 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _phoneController.dispose();
+    _otpController.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _phoneFocusNode.dispose();
+    _otpFocusNode.dispose();
     super.dispose();
+  }
+
+  String? _validatePhone(String? value) {
+    final phone = value?.trim() ?? '';
+    if (phone.isEmpty) {
+      return 'Phone number is required.';
+    }
+    if (phone.replaceAll(RegExp(r'\D'), '').length < 9) {
+      return 'Enter a valid phone number.';
+    }
+    return null;
+  }
+
+  String? _validateOtp(String? value) {
+    final otp = value?.trim() ?? '';
+    if (otp.isEmpty) {
+      return 'OTP code is required.';
+    }
+    if (otp.length != 6) {
+      return 'Enter the 6-digit OTP code.';
+    }
+    return null;
   }
 
   String? _validateEmail(String? value) {
@@ -121,9 +152,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final email = _emailController.text.trim().toLowerCase();
-    final password = _passwordController.text;
-
     setState(() {
       _isSubmitting = true;
     });
@@ -133,7 +161,15 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     try {
-      final role = await _authService.signIn(email: email, password: password);
+      final role = _usePhoneOtp
+          ? await _authService.signInWithDemoPhone(
+              phoneNumber: _phoneController.text.trim(),
+              otpCode: _otpController.text.trim(),
+            )
+          : await _authService.signIn(
+              email: _emailController.text.trim().toLowerCase(),
+              password: _passwordController.text,
+            );
       if (!mounted) {
         return;
       }
@@ -152,7 +188,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       final message = error is AuthException && error.message.isNotEmpty
           ? error.message
-          : 'Unable to sign in. Check your email and password and try again.';
+          : error is Exception
+              ? error.toString().replaceFirst('Exception: ', '')
+              : 'Unable to sign in. Check your details and try again.';
       setState(() {
         _isSubmitting = false;
         _errorMessage = message;
@@ -236,67 +274,136 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: theme.textTheme.bodyMedium,
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    SwiperTextField(
-                      label: 'Email',
-                      hintText: 'Enter your email',
-                      controller: _emailController,
-                      prefixIcon: const Icon(Icons.mail_outline_rounded),
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      focusNode: _emailFocusNode,
-                      autofillHints: const [
-                        AutofillHints.username,
-                        AutofillHints.email,
-                      ],
-                      onChanged: (_) {
-                        if (_errorMessage != null) {
-                          setState(() => _errorMessage = null);
-                        }
-                      },
-                      onSubmitted: (_) {
-                        FocusScope.of(context).requestFocus(_passwordFocusNode);
-                      },
-                      validator: _validateEmail,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Password',
-                            style: theme.textTheme.labelLarge,
-                          ),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment<bool>(
+                          value: true,
+                          label: Text('Phone OTP'),
+                          icon: Icon(Icons.sms_outlined),
                         ),
-                        TextButton(
-                          onPressed: () => _showDemoMessage(
-                            'Forgot password is not connected in Flutter yet.',
-                          ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            padding: EdgeInsets.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            minimumSize: const Size(0, 0),
-                          ),
-                          child: const Text('Forgot password?'),
+                        ButtonSegment<bool>(
+                          value: false,
+                          label: Text('Email'),
+                          icon: Icon(Icons.mail_outline_rounded),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    SwiperPasswordField(
-                      label: 'Password',
-                      hintText: 'Enter your password',
-                      controller: _passwordController,
-                      focusNode: _passwordFocusNode,
-                      textInputAction: TextInputAction.done,
-                      autofillHints: const [AutofillHints.password],
-                      onChanged: (_) {
-                        if (_errorMessage != null) {
-                          setState(() => _errorMessage = null);
-                        }
+                      selected: {_usePhoneOtp},
+                      onSelectionChanged: (selection) {
+                        setState(() {
+                          _usePhoneOtp = selection.first;
+                          _errorMessage = null;
+                        });
                       },
-                      onSubmitted: (_) => _submit(),
-                      validator: _validatePassword,
                     ),
+                    const SizedBox(height: AppSpacing.lg),
+                    if (_usePhoneOtp) ...[
+                      SwiperTextField(
+                        label: 'Phone Number',
+                        hintText: 'Enter your phone number',
+                        controller: _phoneController,
+                        prefixIcon: const Icon(Icons.call_outlined),
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.next,
+                        focusNode: _phoneFocusNode,
+                        onChanged: (_) {
+                          if (_errorMessage != null) {
+                            setState(() => _errorMessage = null);
+                          }
+                        },
+                        onSubmitted: (_) {
+                          FocusScope.of(context).requestFocus(_otpFocusNode);
+                        },
+                        validator: (value) =>
+                            _usePhoneOtp ? _validatePhone(value) : null,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      SwiperTextField(
+                        label: 'Demo OTP',
+                        hintText: 'Enter 123456',
+                        controller: _otpController,
+                        prefixIcon: const Icon(Icons.password_rounded),
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.done,
+                        focusNode: _otpFocusNode,
+                        onChanged: (_) {
+                          if (_errorMessage != null) {
+                            setState(() => _errorMessage = null);
+                          }
+                        },
+                        onSubmitted: (_) => _submit(),
+                        validator: (value) =>
+                            _usePhoneOtp ? _validateOtp(value) : null,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'Use demo OTP 123456. This signs in with the phone number used during customer signup.',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ] else ...[
+                      SwiperTextField(
+                        label: 'Email',
+                        hintText: 'Enter your email',
+                        controller: _emailController,
+                        prefixIcon: const Icon(Icons.mail_outline_rounded),
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        focusNode: _emailFocusNode,
+                        autofillHints: const [
+                          AutofillHints.username,
+                          AutofillHints.email,
+                        ],
+                        onChanged: (_) {
+                          if (_errorMessage != null) {
+                            setState(() => _errorMessage = null);
+                          }
+                        },
+                        onSubmitted: (_) {
+                          FocusScope.of(context).requestFocus(_passwordFocusNode);
+                        },
+                        validator: (value) =>
+                            _usePhoneOtp ? null : _validateEmail(value),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Password',
+                              style: theme.textTheme.labelLarge,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => _showDemoMessage(
+                              'Forgot password is not connected in Flutter yet.',
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              padding: EdgeInsets.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              minimumSize: const Size(0, 0),
+                            ),
+                            child: const Text('Forgot password?'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      SwiperPasswordField(
+                        label: 'Password',
+                        hintText: 'Enter your password',
+                        controller: _passwordController,
+                        focusNode: _passwordFocusNode,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.password],
+                        onChanged: (_) {
+                          if (_errorMessage != null) {
+                            setState(() => _errorMessage = null);
+                          }
+                        },
+                        onSubmitted: (_) => _submit(),
+                        validator: (value) =>
+                            _usePhoneOtp ? null : _validatePassword(value),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.md),
                     InkWell(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
