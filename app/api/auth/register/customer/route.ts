@@ -40,6 +40,10 @@ function getCorsOrigin(request: Request) {
     return origin;
   }
 
+  if (origin === "https://app.myswiper.my") {
+    return origin;
+  }
+
   return "https://app.myswiper.my";
 }
 
@@ -50,7 +54,8 @@ function withCors(request: Request, response: NextResponse) {
   response.headers.set("Vary", "Origin");
   response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   response.headers.set("Access-Control-Allow-Headers", "Content-Type");
- 
+  response.headers.set("X-Debug-Cors", "customer-route-v2");
+
   return response;
 }
 
