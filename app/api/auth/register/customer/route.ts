@@ -40,7 +40,7 @@ function getCorsOrigin(request: Request) {
     return origin;
   }
 
-  return "https://app.dellaapp.com";
+  return "https://app.myswiper.my";
 }
 
 function withCors(request: Request, response: NextResponse) {
