@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/customer_signup_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
@@ -16,13 +18,17 @@ class CustomerRegisterVerifyScreen extends StatefulWidget {
 
 class _CustomerRegisterVerifyScreenState
     extends State<CustomerRegisterVerifyScreen> {
+  final _authService = const AuthService();
   final _controllers = List.generate(
     6,
     (_) => TextEditingController(),
     growable: false,
   );
   final _focusNodes = List.generate(6, (_) => FocusNode(), growable: false);
+  final _signupService = const CustomerSignupService();
+
   String? _error;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -35,7 +41,16 @@ class _CustomerRegisterVerifyScreenState
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<Object?, Object?>?;
+    if (args == null) {
+      setState(
+        () => _error = 'Signup details were not found. Please try again.',
+      );
+      return;
+    }
+
     final code = _controllers.map((controller) => controller.text).join();
     if (code.length < 6) {
       setState(() => _error = 'Enter the full 6-digit OTP code.');
@@ -45,23 +60,75 @@ class _CustomerRegisterVerifyScreenState
       setState(() => _error = 'Use demo OTP `123456` for this Flutter flow.');
       return;
     }
-    Navigator.of(
-      context,
-    ).pushReplacementNamed(AppRoutes.registerCustomerSuccess);
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    final payload = CustomerSignupPayload(
+      firstName: (args['firstName'] as String?) ?? '',
+      lastName: (args['lastName'] as String?) ?? '',
+      dateOfBirth: (args['dateOfBirth'] as String?) ?? '',
+      sex: (args['sex'] as String?) ?? '',
+      email: (args['email'] as String?) ?? '',
+      phoneNumber: (args['phoneNumber'] as String?) ?? '',
+      emergencyContactNumber: (args['emergencyContactNumber'] as String?) ?? '',
+      password: (args['password'] as String?) ?? '',
+      confirmPassword: (args['confirmPassword'] as String?) ?? '',
+      addressLabel: (args['addressLabel'] as String?) ?? 'Address 1',
+      addressLine1: (args['addressLine1'] as String?) ?? '',
+      addressLine2: (args['addressLine2'] as String?) ?? '',
+      postcode: (args['postcode'] as String?) ?? '',
+      city: (args['city'] as String?) ?? '',
+      state: (args['state'] as String?) ?? '',
+      country: (args['country'] as String?) ?? 'Malaysia',
+    );
+
+    try {
+      await _signupService.registerCustomer(payload);
+      if (!mounted) {
+        return;
+      }
+      await _authService.signIn(
+        email: payload.email,
+        password: payload.password,
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(AppRoutes.customerShell, (route) => false);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _submitting = false;
+        _error = error is Exception
+            ? error.toString().replaceFirst('Exception: ', '')
+            : 'Unable to create your account.';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<Object?, Object?>?;
-    final phone = args?['phone'] as String? ?? '+60 12-345 6789';
+    final phone = args?['phoneNumber'] as String? ?? '12-345 6789';
 
     return AuthFlowScaffold(
       hero: const AuthCircleHero(icon: Icons.verified_user_outlined),
       title: 'Verify Your Account',
       subtitle: 'We have sent a 6-digit OTP code to your phone number',
       showBack: true,
-      bottom: SwiperButton(label: 'Verify & Continue', onPressed: _submit),
+      bottom: SwiperButton(
+        label: _submitting ? 'Creating account...' : 'Verify & Continue',
+        isLoading: _submitting,
+        onPressed: _submitting ? null : _submit,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -78,7 +145,10 @@ class _CustomerRegisterVerifyScreenState
               children: [
                 const Icon(Icons.call_outlined, color: AppColors.primary),
                 const SizedBox(width: AppSpacing.sm),
-                Text(phone, style: Theme.of(context).textTheme.bodyLarge),
+                Text(
+                  '+60 $phone',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
               ],
             ),
           ),
@@ -119,13 +189,27 @@ class _CustomerRegisterVerifyScreenState
             'Demo OTP: 123456',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'This step now creates a real customer account and signs in immediately.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           if (_error != null) ...[
             const SizedBox(height: AppSpacing.md),
-            Text(
-              _error!,
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(color: AppColors.error),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Text(
+                _error!,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: AppColors.error),
+              ),
             ),
           ],
         ],

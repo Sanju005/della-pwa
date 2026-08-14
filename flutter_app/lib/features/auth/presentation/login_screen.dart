@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
+import '../../../services/auth_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
@@ -19,20 +21,24 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _authService = const AuthService();
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'demo@myswiper.my');
-  final _passwordController = TextEditingController(text: 'password123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
 
   bool _rememberMe = true;
   bool _isSubmitting = false;
+  bool _isCheckingSession = true;
   bool _showValidation = false;
   String? _errorMessage;
 
-  static const _customerEmail = 'demo@myswiper.my';
-  static const _providerEmail = 'provider@myswiper.my';
-  static const _demoPassword = 'password123';
+  @override
+  void initState() {
+    super.initState();
+    _restoreSession();
+  }
 
   @override
   void dispose() {
@@ -75,9 +81,33 @@ class _LoginScreenState extends State<LoginScreen> {
     return AppRoutes.customerShell;
   }
 
-  bool _isProviderEmail(String email) {
-    final normalized = email.trim().toLowerCase();
-    return normalized == _providerEmail || normalized.contains('provider');
+  Future<void> _restoreSession() async {
+    try {
+      final role = await _authService.getCurrentUserRole();
+      if (!mounted) {
+        return;
+      }
+
+      if (role != null) {
+        final routeName = _authService.isProviderRole(role)
+            ? AppRoutes.providerShell
+            : _nextCustomerRoute(context);
+        Navigator.of(context).pushReplacementNamed(routeName);
+        return;
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isCheckingSession = false;
+    });
   }
 
   Future<void> _submit() async {
@@ -93,36 +123,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
-    final validEmail = email == _customerEmail || email == _providerEmail;
 
     setState(() {
       _isSubmitting = true;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-
     if (!mounted) {
       return;
     }
 
-    if (!validEmail || password != _demoPassword) {
+    try {
+      final role = await _authService.signIn(email: email, password: password);
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _isSubmitting = false;
-        _errorMessage =
-            'Unable to sign in. Check your email and password and try again.';
       });
-      return;
+
+      final routeName = _authService.isProviderRole(role)
+          ? AppRoutes.providerShell
+          : _nextCustomerRoute(context);
+      Navigator.of(context).pushReplacementNamed(routeName);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final message = error is AuthException && error.message.isNotEmpty
+          ? error.message
+          : 'Unable to sign in. Check your email and password and try again.';
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = message;
+      });
     }
-
-    setState(() {
-      _isSubmitting = false;
-    });
-
-    final routeName = _isProviderEmail(email)
-        ? AppRoutes.providerShell
-        : _nextCustomerRoute(context);
-
-    Navigator.of(context).pushReplacementNamed(routeName);
   }
 
   void _showDemoMessage(String message) {
@@ -135,6 +170,12 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (_isCheckingSession) {
+      return const Scaffold(
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
+      );
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -370,14 +411,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               'Support is not connected in Flutter yet.',
                             ),
                             child: const Text('Contact support'),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          Text(
-                            'Demo accounts: $_customerEmail or $_providerEmail',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 12,
-                            ),
                           ),
                         ],
                       ),

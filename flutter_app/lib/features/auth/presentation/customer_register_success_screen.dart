@@ -56,10 +56,10 @@ class CustomerRegisterSuccessScreen extends StatelessWidget {
       title: 'Account Created!',
       subtitle: 'You can now search and book trusted services near you.',
       bottom: SwiperButton(
-        label: 'Go to Home',
+        label: 'Back to Login',
         onPressed: () => Navigator.of(
           context,
-        ).pushNamedAndRemoveUntil(AppRoutes.customerShell, (route) => false),
+        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false),
       ),
       child: Column(
         children: items.map((item) {
