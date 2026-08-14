@@ -57,6 +57,12 @@ class _CustomerRegisterVerifyScreenState
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<Object?, Object?>?;
     if (args == null) {
+      if (kIsWeb) {
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.customerShell, (route) => false);
+        return;
+      }
       setState(
         () => _error = 'Signup details were not found. Please try again.',
       );
@@ -140,6 +146,7 @@ class _CustomerRegisterVerifyScreenState
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<Object?, Object?>?;
     final phone = args?['phoneNumber'] as String? ?? '12-345 6789';
+    final missingSignupDetails = args == null;
 
     return AuthFlowScaffold(
       hero: const AuthCircleHero(icon: Icons.verified_user_outlined),
@@ -225,6 +232,13 @@ class _CustomerRegisterVerifyScreenState
             'This step now creates a real customer account and signs in immediately.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          if (missingSignupDetails && kIsWeb) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'This page was opened without signup form data. In web demo mode, continuing will open the customer app.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
           if (_error != null) ...[
             const SizedBox(height: AppSpacing.md),
             Container(
