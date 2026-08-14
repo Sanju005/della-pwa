@@ -21,7 +21,7 @@ class AppConfig {
       return origin;
     }
 
-    return 'https://app.dellaapp.com';
+    return 'https://app.myswiper.my';
   }
 
   static bool _isLocalhostOrigin(String origin) {
