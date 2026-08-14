@@ -12,26 +12,39 @@ class CustomerRecordService {
     CustomerSignupPayload payload, {
     String? authUserId,
   }) async {
+    if ((authUserId ?? '').isEmpty) {
+      throw Exception('Customer auth user was not created yet.');
+    }
+
     await _client.from('customer_profiles').upsert({
-      'auth_user_id': authUserId,
+      'id': authUserId,
       'first_name': payload.firstName,
       'last_name': payload.lastName,
       'date_of_birth': payload.dateOfBirth,
       'sex': payload.sex,
-      'email': payload.email.trim().toLowerCase(),
+      'city': payload.city,
+      'region': payload.state,
+      'state': payload.state,
+      'country': payload.country,
       'phone_number': normalizePhoneNumber(payload.phoneNumber),
+      'country_code': '+60',
       'emergency_contact_number': normalizePhoneNumber(
         payload.emergencyContactNumber,
       ),
-      'address_label': payload.addressLabel,
+      'verified': false,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'id');
+
+    await _client.from('addresses').upsert({
+      'user_id': authUserId,
+      'label': payload.addressLabel,
       'address_line_1': payload.addressLine1,
-      'address_line_2': payload.addressLine2,
-      'postcode': payload.postcode,
+      'address_line_2': payload.addressLine2.isEmpty ? null : payload.addressLine2,
       'city': payload.city,
       'state': payload.state,
+      'postcode': payload.postcode,
       'country': payload.country,
-      'role': 'customer',
-      'source': 'flutter_app',
-    }, onConflict: 'phone_number');
+      'is_default': true,
+    }, onConflict: 'user_id,label');
   }
 }

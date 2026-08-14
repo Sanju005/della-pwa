@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
 import '../../../services/auth_service.dart';
-import '../../../services/customer_record_service.dart';
 import '../../../services/demo_customer_auth_store.dart';
 import '../../../services/customer_signup_draft_store.dart';
 import '../../../services/customer_signup_service.dart';
@@ -30,7 +29,6 @@ class _CustomerRegisterVerifyScreenState
   );
   final _focusNodes = List.generate(6, (_) => FocusNode(), growable: false);
   final _signupService = const CustomerSignupService();
-  final _customerRecordService = const CustomerRecordService();
 
   String? _error;
   bool _submitting = false;
@@ -83,7 +81,6 @@ class _CustomerRegisterVerifyScreenState
 
     try {
       await DemoCustomerAuthStore.saveCustomer(payload);
-      await _customerRecordService.upsertCustomerProfile(payload);
       await _signupService.registerCustomer(payload);
       await CustomerSignupDraftStore.clear();
       if (!mounted) {
