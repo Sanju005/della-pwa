@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
-import '../../../models/provider_summary.dart';
-import '../../../services/provider_directory_store.dart';
-import '../../../services/provider_record_service.dart';
+import '../../../services/auth_service.dart';
+import '../../../services/provider_registration_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
@@ -54,36 +53,48 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   );
   final _serviceRateController = TextEditingController(text: '95');
   final _serviceExperienceController = TextEditingController(text: '4');
-  final _specialtiesController = TextEditingController(
-    text: 'Malay Cuisine, Family Events',
-  );
-  final _frontDocController = TextEditingController(text: 'ic-front.jpg');
-  final _backDocController = TextEditingController(text: 'ic-back.jpg');
+  final _specialtiesController = TextEditingController();
+  final _frontDocController = TextEditingController();
+  final _backDocController = TextEditingController();
   final _phoneOtpControllers = List.generate(
     6,
     (_) => TextEditingController(),
     growable: false,
   );
-  final _providerRecordService = const ProviderRecordService();
+  final _providerRegistrationService = const ProviderRegistrationService();
+  final _authService = const AuthService();
 
   _ProviderStep _step = _ProviderStep.basic;
+  int _serviceDetailIndex = 0;
   String _gender = 'Female';
-  String _documentType = 'Malaysian IC';
-  String _timePreset = 'Morning';
+  String _documentType = 'IC / Passport / Driving License';
+  String _timePreset = '9 AM - 9 PM';
   double _radiusKm = 12;
   bool _submitting = false;
   final List<String> _selectedServices = [];
-  final Set<String> _availabilityDays = {'Mon', 'Tue', 'Wed', 'Thu', 'Fri'};
+  final Set<String> _availabilityDays = {
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+  };
+  final Map<String, String> _serviceRateByService = {};
+  final Map<String, String> _serviceExperienceByService = {};
+  final Map<String, String> _serviceSpecialtiesByService = {};
   String? _submitError;
+  ProviderRegistrationResult? _registrationResult;
 
   static const _services = [
     'Chef',
     'Maid',
     'Driver',
     'Tutor',
+    'Cleaner',
     'Babysitter',
     'Plumber',
     'Electrician',
+    'Other',
   ];
 
   @override
@@ -144,7 +155,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
       case _ProviderStep.services:
         return 'Select Services';
       case _ProviderStep.serviceDetail:
-        return '${_selectedServices.isEmpty ? 'Service' : _selectedServices.first} Service';
+        return '${_currentServiceName()} Service';
       case _ProviderStep.availability:
         return 'Availability';
       case _ProviderStep.location:
@@ -167,7 +178,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
       case _ProviderStep.basic:
         return 'Add your profile, contact, and login details';
       case _ProviderStep.preVerification:
-        return 'Review activation and continue to your service setup';
+        return 'Your email will be activated automatically after registration';
       case _ProviderStep.services:
         return 'Select one or more services you provide';
       case _ProviderStep.serviceDetail:
@@ -211,9 +222,6 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     }
     if (_step == _ProviderStep.review || _step == _ProviderStep.identity) {
       setState(() => _submitting = true);
-      await Future<void>.delayed(const Duration(milliseconds: 700));
-      if (!mounted) return;
-      setState(() => _submitting = false);
     }
     if (_step == _ProviderStep.verification) {
       final code = _phoneOtpControllers
@@ -225,36 +233,32 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
       }
     }
     if (_step == _ProviderStep.review) {
-      await _providerRecordService.upsertProviderProfile(
-        _buildProviderRecordPayload(identityVerified: false),
-      );
-      await ProviderDirectoryStore.saveProvider(
-        _buildProviderSummary(identityVerified: false),
-      );
+      await _submitProviderRegistration();
+      return;
     }
     if (_step == _ProviderStep.identity) {
-      await _providerRecordService.upsertProviderProfile(
-        _buildProviderRecordPayload(identityVerified: true),
-      );
-      await ProviderDirectoryStore.saveProvider(
-        _buildProviderSummary(identityVerified: true),
-      );
+      await _submitProviderIdentityVerification();
+      return;
+    }
+
+    if (_step == _ProviderStep.services) {
+      _serviceDetailIndex = 0;
+      _loadServiceDetail(_currentServiceName());
+    }
+
+    if (_step == _ProviderStep.serviceDetail) {
+      _saveCurrentServiceDetail();
+      if (_serviceDetailIndex < _selectedServices.length - 1) {
+        setState(() {
+          _serviceDetailIndex += 1;
+          _loadServiceDetail(_currentServiceName());
+        });
+        return;
+      }
     }
 
     setState(() {
-      _step = switch (_step) {
-        _ProviderStep.basic => _ProviderStep.preVerification,
-        _ProviderStep.preVerification => _ProviderStep.services,
-        _ProviderStep.services => _ProviderStep.serviceDetail,
-        _ProviderStep.serviceDetail => _ProviderStep.availability,
-        _ProviderStep.availability => _ProviderStep.location,
-        _ProviderStep.location => _ProviderStep.review,
-        _ProviderStep.review => _ProviderStep.submitted,
-        _ProviderStep.submitted => _ProviderStep.verification,
-        _ProviderStep.verification => _ProviderStep.identity,
-        _ProviderStep.identity => _ProviderStep.success,
-        _ProviderStep.success => _ProviderStep.success,
-      };
+      _step = _nextStep(_step);
     });
   }
 
@@ -263,21 +267,56 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
       Navigator.of(context).maybePop();
       return;
     }
+
+    if (_step == _ProviderStep.serviceDetail && _serviceDetailIndex > 0) {
+      _saveCurrentServiceDetail();
+      setState(() {
+        _serviceDetailIndex -= 1;
+        _loadServiceDetail(_currentServiceName());
+      });
+      return;
+    }
+
+    if (_step == _ProviderStep.availability && _selectedServices.isNotEmpty) {
+      _serviceDetailIndex = _selectedServices.length - 1;
+      _loadServiceDetail(_currentServiceName());
+    }
+
     setState(() {
-      _step = switch (_step) {
-        _ProviderStep.preVerification => _ProviderStep.basic,
-        _ProviderStep.services => _ProviderStep.preVerification,
-        _ProviderStep.serviceDetail => _ProviderStep.services,
-        _ProviderStep.availability => _ProviderStep.serviceDetail,
-        _ProviderStep.location => _ProviderStep.availability,
-        _ProviderStep.review => _ProviderStep.location,
-        _ProviderStep.submitted => _ProviderStep.review,
-        _ProviderStep.verification => _ProviderStep.submitted,
-        _ProviderStep.identity => _ProviderStep.verification,
-        _ProviderStep.success => _ProviderStep.identity,
-        _ProviderStep.basic => _ProviderStep.basic,
-      };
+      _step = _previousStep(_step);
     });
+  }
+
+  _ProviderStep _nextStep(_ProviderStep step) {
+    return switch (step) {
+      _ProviderStep.basic => _ProviderStep.preVerification,
+      _ProviderStep.preVerification => _ProviderStep.services,
+      _ProviderStep.services => _ProviderStep.serviceDetail,
+      _ProviderStep.serviceDetail => _ProviderStep.availability,
+      _ProviderStep.availability => _ProviderStep.location,
+      _ProviderStep.location => _ProviderStep.review,
+      _ProviderStep.review => _ProviderStep.submitted,
+      _ProviderStep.submitted => _ProviderStep.verification,
+      _ProviderStep.verification => _ProviderStep.identity,
+      _ProviderStep.identity => _ProviderStep.success,
+      _ProviderStep.success => _ProviderStep.success,
+    };
+  }
+
+  _ProviderStep _previousStep(_ProviderStep step) {
+    return switch (step) {
+      _ProviderStep.preVerification => _ProviderStep.basic,
+      _ProviderStep.services => _ProviderStep.preVerification,
+      _ProviderStep.serviceDetail => _ProviderStep.services,
+      _ProviderStep.availability => _ProviderStep.serviceDetail,
+      _ProviderStep.location => _ProviderStep.availability,
+      _ProviderStep.review => _ProviderStep.location,
+      _ProviderStep.submitted => _ProviderStep.review,
+      _ProviderStep.verification => _ProviderStep.submitted,
+      _ProviderStep.identity => _ProviderStep.verification,
+      _ProviderStep.success => _ProviderStep.identity,
+      _ProviderStep.basic => _ProviderStep.basic,
+    };
   }
 
   bool _passwordStrong(String value) {
@@ -286,59 +325,6 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         RegExp(r'[a-z]').hasMatch(value) &&
         RegExp(r'\d').hasMatch(value) &&
         RegExp(r'[^\w\s]').hasMatch(value);
-  }
-
-  List<String> _specialtiesList() {
-    return _specialtiesController.text
-        .split(',')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
-  }
-
-  ProviderRecordPayload _buildProviderRecordPayload({
-    required bool identityVerified,
-  }) {
-    final primaryService = _selectedServices.isEmpty
-        ? 'Service Provider'
-        : _selectedServices.first;
-    final specialties = _specialtiesList();
-    return ProviderRecordPayload(
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      marketingName: _marketingNameController.text.trim(),
-      dateOfBirth: _dobController.text.trim(),
-      gender: _gender,
-      email: _emailController.text.trim(),
-      phoneNumber: _phoneController.text.trim(),
-      emergencyContactNumber: _emergencyController.text.trim(),
-      addressLine1: _address1Controller.text.trim(),
-      addressLine2: _address2Controller.text.trim(),
-      postcode: _postcodeController.text.trim(),
-      city: _cityController.text.trim(),
-      state: _stateController.text.trim(),
-      country: _countryController.text.trim(),
-      serviceArea: _areaLabelController.text.trim(),
-      serviceRadiusKm: _radiusKm,
-      services: _selectedServices.isEmpty
-          ? [primaryService]
-          : List.of(_selectedServices),
-      specialties: specialties.isEmpty ? [primaryService] : specialties,
-      hourlyRate: int.tryParse(_serviceRateController.text.trim()) ?? 0,
-      yearsExperience:
-          int.tryParse(_serviceExperienceController.text.trim()) ?? 0,
-      availabilityDays: _availabilityDays.toList(),
-      timePreset: _timePreset,
-      phoneVerified: true,
-      identityVerified: identityVerified,
-      status: identityVerified ? 'verified' : 'pending_verification',
-    );
-  }
-
-  ProviderSummary _buildProviderSummary({required bool identityVerified}) {
-    return _buildProviderRecordPayload(
-      identityVerified: identityVerified,
-    ).toProviderSummary();
   }
 
   String? _required(String? value, String label) {
@@ -522,9 +508,25 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           onSelected: (value) {
             setState(() {
               if (value) {
-                _selectedServices.add(service);
+                if (!_selectedServices.contains(service)) {
+                  _selectedServices.add(service);
+                }
+                _serviceRateByService.putIfAbsent(service, () => '95');
+                _serviceExperienceByService.putIfAbsent(service, () => '4');
+                _serviceSpecialtiesByService.putIfAbsent(
+                  service,
+                  () => _specialtiesController.text.trim(),
+                );
               } else {
                 _selectedServices.remove(service);
+                _serviceRateByService.remove(service);
+                _serviceExperienceByService.remove(service);
+                _serviceSpecialtiesByService.remove(service);
+                if (_serviceDetailIndex >= _selectedServices.length) {
+                  _serviceDetailIndex = _selectedServices.isEmpty
+                      ? 0
+                      : _selectedServices.length - 1;
+                }
               }
             });
           },
@@ -543,9 +545,9 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         return _InfoPanel(
           title: 'Verify Your Email',
           lines: const [
-            'Your personal details have been saved successfully.',
-            'In the web flow, the next step continues to service setup before the final provider verification.',
-            'This Flutter flow follows the same order while provider backend setup is still being completed.',
+            'Your provider account will be created in Supabase with email already confirmed.',
+            'Continue to complete your listing details before phone and identity verification.',
+            'This Flutter screen now uses the same backend registration route as the React app.',
           ],
         );
       case _ProviderStep.services:
@@ -575,14 +577,29 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
               controller: _specialtiesController,
               prefixIcon: const Icon(Icons.auto_awesome_outlined),
             ),
+            const SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Service ${_serviceDetailIndex + 1} of ${_selectedServices.length}',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
           ],
         );
       case _ProviderStep.availability:
-        final days = const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        final days = const [
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+          'Sunday',
+        ];
         final presets = const [
-          'Morning',
-          'Afternoon',
-          'Evening',
+          '24 Hours',
+          '9 AM - 9 PM',
           'Custom Time',
         ];
         return Column(
@@ -672,6 +689,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             'Services: ${_selectedServices.join(', ')}',
             'Availability: ${_availabilityDays.join(', ')} - $_timePreset',
             'Location: ${_areaLabelController.text} / ${_radiusKm.round()} KM',
+            if (_registrationResult != null)
+              'Registration status: ${_registrationResult!.status}',
           ],
         );
       case _ProviderStep.submitted:
@@ -736,7 +755,12 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           children: [
             DropdownButtonFormField<String>(
               initialValue: _documentType,
-              items: const ['Malaysian IC', 'Passport']
+              items: const [
+                'IC / Passport / Driving License',
+                'Passport',
+                'Driving License',
+                'National ID',
+              ]
                   .map(
                     (item) => DropdownMenuItem(value: item, child: Text(item)),
                   )
@@ -774,6 +798,214 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           ],
         );
     }
+  }
+
+  String _currentServiceName() {
+    if (_selectedServices.isEmpty) {
+      return 'Service';
+    }
+
+    final safeIndex =
+        _serviceDetailIndex.clamp(0, _selectedServices.length - 1) as int;
+    return _selectedServices[safeIndex];
+  }
+
+  void _saveCurrentServiceDetail() {
+    if (_selectedServices.isEmpty) {
+      return;
+    }
+
+    final service = _currentServiceName();
+    _serviceRateByService[service] = _serviceRateController.text.trim();
+    _serviceExperienceByService[service] =
+        _serviceExperienceController.text.trim();
+    _serviceSpecialtiesByService[service] = _specialtiesController.text.trim();
+  }
+
+  void _loadServiceDetail(String service) {
+    _serviceRateController.text = _serviceRateByService[service] ?? '95';
+    _serviceExperienceController.text =
+        _serviceExperienceByService[service] ?? '4';
+    _specialtiesController.text = _serviceSpecialtiesByService[service] ?? '';
+  }
+
+  Future<void> _submitProviderRegistration() async {
+    _saveCurrentServiceDetail();
+
+    try {
+      final result = await _providerRegistrationService.registerProvider(
+        _buildRegistrationPayload(),
+      );
+      final role = await _authService.signIn(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (!_authService.isProviderRole(role)) {
+        throw Exception('Provider account was created, but sign-in failed.');
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _registrationResult = result;
+        _step = _ProviderStep.submitted;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _submitError = error is Exception
+            ? error.toString().replaceFirst('Exception: ', '')
+            : 'Unable to submit registration.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  Future<void> _submitProviderIdentityVerification() async {
+    final phoneOtp = _phoneOtpControllers
+        .map((controller) => controller.text.trim())
+        .toList(growable: false);
+
+    try {
+      await _providerRegistrationService.submitIdentityVerification({
+        'phoneVerified': phoneOtp.join() == '123456',
+        'identityVerified': false,
+        'identityVerificationStatus':
+            _frontDocController.text.trim().isNotEmpty &&
+                    _backDocController.text.trim().isNotEmpty
+                ? 'processing'
+                : 'pending',
+        'identityDocumentType':
+            _documentType.toLowerCase().contains('passport') ? 'passport' : 'ic',
+        'identityFrontImageUrl': '',
+        'identityBackImageUrl': '',
+      });
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _step = _ProviderStep.success);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _submitError = error is Exception
+            ? error.toString().replaceFirst('Exception: ', '')
+            : 'Unable to submit verification.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  Map<String, dynamic> _buildRegistrationPayload() {
+    final serviceDetails = <String, Map<String, dynamic>>{};
+
+    for (final service in _services) {
+      final specialties = (_serviceSpecialtiesByService[service] ?? '')
+          .split(',')
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+
+      serviceDetails[service] = {
+        'yearsExperience': _serviceExperienceByService[service] ?? '',
+        'specialties': specialties,
+        'imageCaptions': ['', '', ''],
+        'imageDataUrls': ['', '', ''],
+        'certificateCaptions': ['', '', ''],
+        'certificateDataUrls': ['', '', ''],
+        'hourlyRate': _serviceRateByService[service] ?? '',
+        'dailyRate': '',
+      };
+    }
+
+    return {
+      'basicProfile': {
+        'firstName': _firstNameController.text.trim(),
+        'lastName': _lastNameController.text.trim(),
+        'sex': _gender,
+        'profileImageName': '',
+        'avatarDataUrl': '',
+        'marketingName': _marketingNameController.text.trim(),
+        'dateOfBirth': _toIsoDate(_dobController.text.trim()),
+        'unitNumber': '',
+        'addressLine1': _address1Controller.text.trim(),
+        'addressLine2': _address2Controller.text.trim(),
+        'postcode': _postcodeController.text.trim(),
+        'city': _cityController.text.trim(),
+        'state': _stateController.text.trim(),
+        'country': _countryController.text.trim(),
+        'serviceLocation': _areaLabelController.text.trim(),
+        'serviceRadius': _radiusKm.round(),
+        'emergencyContact': _emergencyController.text.trim(),
+        'emergencyContactNumber': _emergencyController.text.trim(),
+      },
+      'account': {
+        'email': _emailController.text.trim(),
+        'phoneCountryCode': '+60',
+        'phoneNumber': _phoneController.text.trim(),
+        'password': _passwordController.text,
+        'confirmPassword': _confirmPasswordController.text,
+      },
+      'selectedServices': List<String>.from(_selectedServices),
+      'serviceDetails': serviceDetails,
+      'availability': {
+        'days': _availabilityDays.toList(),
+        'timePreset': _timePreset,
+        'startTime': '09:00 AM',
+        'endTime': '09:00 PM',
+      },
+      'providerLocation': {
+        'radius': _radiusKm.round(),
+        'areaLabel': _areaLabelController.text.trim(),
+        'latitude': 3.139,
+        'longitude': 101.6869,
+        'formattedAddress': '',
+        'road': '',
+        'suburb': '',
+        'city': _cityController.text.trim(),
+        'state': _stateController.text.trim(),
+        'postcode': _postcodeController.text.trim(),
+        'country': _countryController.text.trim(),
+        'houseNumber': '',
+      },
+      'verification': {
+        'phoneOtp': const ['', '', '', '', '', ''],
+        'emailOtp': const ['', '', '', '', '', ''],
+        'documentType': '',
+        'frontImageName': '',
+        'frontImageDataUrl': '',
+        'backImageName': '',
+        'backImageDataUrl': '',
+      },
+    };
+  }
+
+  String _toIsoDate(String value) {
+    final parts = value.split('/');
+    if (parts.length != 3) {
+      return value;
+    }
+
+    final day = parts[0].padLeft(2, '0');
+    final month = parts[1].padLeft(2, '0');
+    final year = parts[2];
+    return '$year-$month-$day';
   }
 
   @override
