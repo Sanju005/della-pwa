@@ -1,8 +1,4 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
-import '../core/config/app_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CustomerSignupPayload {
   const CustomerSignupPayload({
@@ -66,26 +62,39 @@ class CustomerSignupPayload {
 class CustomerSignupService {
   const CustomerSignupService();
 
-  Future<void> registerCustomer(CustomerSignupPayload payload) async {
-    final uri = Uri.parse('${AppConfig.appBaseUrl}/api/auth/register/customer');
-    final response = await http.post(
-      uri,
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode(payload.toJson()),
-    );
+  SupabaseClient get _client => Supabase.instance.client;
 
-    final dynamic body = response.body.isEmpty
-        ? null
-        : jsonDecode(response.body);
-    if (response.statusCode >= 200 &&
-        response.statusCode < 300 &&
-        body is Map<String, dynamic> &&
-        body['success'] == true) {
-      return;
+  Future<void> registerCustomer(CustomerSignupPayload payload) async {
+    if (payload.password != payload.confirmPassword) {
+      throw Exception('Passwords do not match.');
     }
 
-    if (body is Map<String, dynamic> && body['error'] is String) {
-      throw Exception(body['error'] as String);
+    final response = await _client.auth.signUp(
+      email: payload.email,
+      password: payload.password,
+      data: payload.toJson(),
+    );
+
+    final user = response.user;
+    if (user == null) {
+      throw Exception('Unable to create your account.');
+    }
+
+    await _client.from('profiles').upsert({
+      'id': user.id,
+      'email': payload.email,
+      'first_name': payload.firstName,
+      'last_name': payload.lastName,
+      'phone_number': payload.phoneNumber,
+      'role': 'customer',
+    });
+
+    if (response.session != null) {
+      await _client.auth.signOut();
+    }
+
+    if (response.user != null) {
+      return;
     }
 
     throw Exception('Unable to create your account.');

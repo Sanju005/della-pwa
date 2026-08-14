@@ -155,27 +155,36 @@ class _CustomerRegisterVerifyScreenState
           const SizedBox(height: AppSpacing.xl),
           Text('Enter OTP Code', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(6, (index) {
-              return SizedBox(
-                width: 46,
-                child: TextField(
-                  controller: _controllers[index],
-                  focusNode: _focusNodes[index],
-                  textAlign: TextAlign.center,
-                  maxLength: 1,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(counterText: ''),
-                  onChanged: (value) {
-                    setState(() => _error = null);
-                    if (value.isNotEmpty && index < 5) {
-                      _focusNodes[index + 1].requestFocus();
-                    }
-                  },
-                ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = AppSpacing.xs;
+              final fieldWidth =
+                  ((constraints.maxWidth - (spacing * 5)) / 6).clamp(40.0, 52.0)
+                      as double;
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(6, (index) {
+                  return SizedBox(
+                    width: fieldWidth,
+                    child: TextField(
+                      controller: _controllers[index],
+                      focusNode: _focusNodes[index],
+                      textAlign: TextAlign.center,
+                      maxLength: 1,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(counterText: ''),
+                      onChanged: (value) {
+                        setState(() => _error = null);
+                        if (value.isNotEmpty && index < 5) {
+                          _focusNodes[index + 1].requestFocus();
+                        }
+                      },
+                    ),
+                  );
+                }),
               );
-            }),
+            },
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
