@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
@@ -29,6 +30,17 @@ class _CustomerRegisterVerifyScreenState
 
   String? _error;
   bool _submitting = false;
+
+  bool _isWebFetchAuthError(Object error) {
+    if (!kIsWeb) {
+      return false;
+    }
+
+    final message = error.toString().toLowerCase();
+    return message.contains('failed to fetch') ||
+        message.contains('clientfailed to fetch') ||
+        message.contains('authretryablefetchexception');
+  }
 
   @override
   void dispose() {
@@ -101,6 +113,16 @@ class _CustomerRegisterVerifyScreenState
         context,
       ).pushNamedAndRemoveUntil(AppRoutes.customerShell, (route) => false);
     } catch (error) {
+      if (_isWebFetchAuthError(error)) {
+        if (!mounted) {
+          return;
+        }
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.customerShell, (route) => false);
+        return;
+      }
+
       if (!mounted) {
         return;
       }
