@@ -4,7 +4,7 @@ import 'package:flutter/widget_previews.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../previews/widget_preview_helpers.dart';
 import '../../../repositories/demo_repository.dart';
-import '../../../services/demo_customer_auth_store.dart';
+import '../../../services/current_customer_service.dart';
 import '../../../services/provider_marketplace_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
@@ -23,23 +23,11 @@ class CustomerHomeScreen extends StatelessWidget {
 
   final DemoRepository repository;
   static const _marketplaceService = ProviderMarketplaceService();
+  static const _currentCustomerService = CurrentCustomerService();
 
   @override
   Widget build(BuildContext context) {
     final categories = repository.getCustomerCategories();
-    final customer = DemoCustomerAuthStore.currentCustomer();
-    final firstName =
-        (customer?['firstName'] as String?)?.trim().isNotEmpty == true
-        ? (customer!['firstName'] as String).trim()
-        : 'Customer';
-    final lastName =
-        (customer?['lastName'] as String?)?.trim().isNotEmpty == true
-        ? (customer!['lastName'] as String).trim()
-        : '';
-    final fullName = '$firstName $lastName'.trim();
-    final subtitle = customer != null
-        ? 'Welcome back. Your account is connected to your live customer profile.'
-        : 'Find trusted help near you with a native Flutter UI foundation.';
 
     return CustomScrollView(
       slivers: [
@@ -49,26 +37,38 @@ class CustomerHomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Hello, $firstName',
-                            style: Theme.of(context).textTheme.headlineMedium,
+                FutureBuilder(
+                  future: _currentCustomerService.fetchCurrentCustomerProfile(),
+                  builder: (context, snapshot) {
+                    final customer = snapshot.data;
+                    final firstName = customer?.firstName ?? 'Customer';
+                    final fullName = customer?.fullName ?? 'Customer';
+                    final subtitle = customer != null
+                        ? 'Welcome back. Your account is connected to your live customer profile.'
+                        : 'Find trusted help near you with a native Flutter UI foundation.';
+
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Hello, $firstName',
+                                style: Theme.of(context).textTheme.headlineMedium,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                subtitle,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            subtitle,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                    ProfileAvatar(name: fullName),
-                  ],
+                        ),
+                        ProfileAvatar(name: fullName),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 const SwiperSearchBar(),
