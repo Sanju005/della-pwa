@@ -84,20 +84,14 @@ class _CustomerRegisterVerifyScreenState
     try {
       await DemoCustomerAuthStore.saveCustomer(payload);
       await _customerRecordService.upsertCustomerProfile(payload);
-      try {
-        await _signupService.registerCustomer(payload);
-      } catch (error) {
-        if (!_isWebFetchAuthError(error)) {
-          rethrow;
-        }
-      }
+      await _signupService.registerCustomer(payload);
       await CustomerSignupDraftStore.clear();
       if (!mounted) {
         return;
       }
-      await _authService.signInWithDemoPhone(
-        phoneNumber: payload.phoneNumber,
-        otpCode: code,
+      await _authService.signIn(
+        email: payload.email.trim().toLowerCase(),
+        password: payload.password,
       );
       if (!mounted) {
         return;
@@ -112,7 +106,7 @@ class _CustomerRegisterVerifyScreenState
       setState(() {
         _submitting = false;
         _error = _isWebFetchAuthError(error)
-            ? 'Could not reach Supabase. Your demo customer account was saved locally, and you can still continue with phone OTP login.'
+            ? 'Could not complete Supabase signup. Check your Supabase Auth email confirmation or SMTP settings, then try again.'
             : error is Exception
                 ? error.toString().replaceFirst('Exception: ', '')
                 : 'Unable to create your account.';

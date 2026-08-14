@@ -8,28 +8,28 @@ class AuthService {
   SupabaseClient get _client => Supabase.instance.client;
 
   Future<String?> getCurrentUserRole() async {
+    final user = _client.auth.currentUser;
+    if (user != null) {
+      final result = await _client
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (result != null) {
+        final role = result['role'];
+        if (role is String) {
+          return role;
+        }
+      }
+    }
+
     final demoRole = DemoCustomerAuthStore.currentRole();
     if (demoRole != null) {
       return demoRole;
     }
 
-    final user = _client.auth.currentUser;
-    if (user == null) {
-      return null;
-    }
-
-    final result = await _client
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle();
-
-    if (result == null) {
-      return null;
-    }
-
-    final role = result['role'];
-    return role is String ? role : null;
+    return null;
   }
 
   Future<String?> signIn({

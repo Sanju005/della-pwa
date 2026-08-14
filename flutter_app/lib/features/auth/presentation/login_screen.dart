@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isCheckingSession = true;
   bool _showValidation = false;
   String? _errorMessage;
-  bool _usePhoneOtp = true;
+  bool _usePhoneOtp = false;
 
   @override
   void initState() {

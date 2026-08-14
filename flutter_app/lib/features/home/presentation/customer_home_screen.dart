@@ -5,8 +5,11 @@ import '../../../core/routing/app_routes.dart';
 import '../../../previews/widget_preview_helpers.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/demo_customer_auth_store.dart';
+import '../../../services/provider_marketplace_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
+import '../../../widgets/empty_state.dart';
+import '../../../widgets/loading_state.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../../widgets/provider_card.dart';
 import '../../../widgets/service_category_chip.dart';
@@ -19,11 +22,11 @@ class CustomerHomeScreen extends StatelessWidget {
   const CustomerHomeScreen({super.key, required this.repository});
 
   final DemoRepository repository;
+  static const _marketplaceService = ProviderMarketplaceService();
 
   @override
   Widget build(BuildContext context) {
     final categories = repository.getCustomerCategories();
-    final featuredProvider = repository.getFeaturedProvider();
     final bookings = repository.getBookings();
     final customer = DemoCustomerAuthStore.currentCustomer();
     final firstName =
@@ -137,19 +140,57 @@ class CustomerHomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                SwiperSectionCard(
-                  title: 'Featured provider',
-                  trailing: TextButton(
-                    onPressed: () =>
-                        Navigator.of(context).pushNamed(AppRoutes.providers),
-                    child: const Text('See all'),
-                  ),
-                  child: ProviderCard(
-                    provider: featuredProvider,
-                    onTap: () => Navigator.of(
-                      context,
-                    ).pushNamed(AppRoutes.providerProfile),
-                  ),
+                FutureBuilder(
+                  future: _marketplaceService.fetchVisibleProviders(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                        child: LoadingState(label: 'Loading featured provider...'),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                        child: EmptyState(
+                          title: 'Unable to load featured provider',
+                          subtitle: snapshot.error.toString(),
+                          icon: Icons.error_outline_rounded,
+                        ),
+                      );
+                    }
+
+                    final providers = snapshot.data ?? const [];
+                    if (providers.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.only(bottom: AppSpacing.lg),
+                        child: EmptyState(
+                          title: 'No providers yet',
+                          subtitle:
+                              'Visible provider profiles have not been published in Supabase yet.',
+                          icon: Icons.storefront_outlined,
+                        ),
+                      );
+                    }
+
+                    final featuredProvider = providers.first;
+                    return SwiperSectionCard(
+                      title: 'Featured provider',
+                      trailing: TextButton(
+                        onPressed: () =>
+                            Navigator.of(context).pushNamed(AppRoutes.providers),
+                        child: const Text('See all'),
+                      ),
+                      child: ProviderCard(
+                        provider: featuredProvider,
+                        onTap: () => Navigator.of(context).pushNamed(
+                          AppRoutes.providerProfile,
+                          arguments: featuredProvider,
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 SwiperSectionCard(
