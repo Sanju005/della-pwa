@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
+import '../../../services/customer_signup_draft_store.dart';
+import '../../../services/customer_signup_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
@@ -149,33 +151,34 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
     }
 
     setState(() => _submitting = true);
-    final arguments = {
-      'firstName': _firstNameController.text.trim(),
-      'lastName': _lastNameController.text.trim(),
-      'dateOfBirth': _dobController.text.trim(),
-      'sex': _sex,
-      'email': _emailController.text.trim(),
-      'phoneNumber': _phoneController.text.trim(),
-      'emergencyContactNumber': _emergencyController.text.trim(),
-      'password': _passwordController.text,
-      'confirmPassword': _confirmPasswordController.text,
-      'addressLabel': _addressLabelController.text.trim(),
-      'addressLine1': _addressLine1Controller.text.trim(),
-      'addressLine2': _addressLine2Controller.text.trim(),
-      'postcode': _postcodeController.text.trim(),
-      'city': _cityController.text.trim(),
-      'state': _stateName,
-      'country': _countryController.text.trim(),
-    };
+    final payload = CustomerSignupPayload(
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      dateOfBirth: _dobController.text.trim(),
+      sex: _sex,
+      email: _emailController.text.trim(),
+      phoneNumber: _phoneController.text.trim(),
+      emergencyContactNumber: _emergencyController.text.trim(),
+      password: _passwordController.text,
+      confirmPassword: _confirmPasswordController.text,
+      addressLabel: _addressLabelController.text.trim(),
+      addressLine1: _addressLine1Controller.text.trim(),
+      addressLine2: _addressLine2Controller.text.trim(),
+      postcode: _postcodeController.text.trim(),
+      city: _cityController.text.trim(),
+      state: _stateName,
+      country: _countryController.text.trim(),
+    );
 
     Future<void>.delayed(const Duration(milliseconds: 250), () {
       if (!mounted) {
         return;
       }
+      CustomerSignupDraftStore.save(payload);
       setState(() => _submitting = false);
       Navigator.of(
         context,
-      ).pushNamed(AppRoutes.registerCustomerVerify, arguments: arguments);
+      ).pushNamed(AppRoutes.registerCustomerVerify, arguments: payload.toJson());
     });
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/customer_signup_draft_store.dart';
 import '../../../services/customer_signup_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
@@ -54,15 +55,8 @@ class _CustomerRegisterVerifyScreenState
   }
 
   Future<void> _submit() async {
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<Object?, Object?>?;
-    if (args == null) {
-      if (kIsWeb) {
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil(AppRoutes.customerShell, (route) => false);
-        return;
-      }
+    final payload = _resolvePayload();
+    if (payload == null) {
       setState(
         () => _error = 'Signup details were not found. Please try again.',
       );
@@ -84,27 +78,9 @@ class _CustomerRegisterVerifyScreenState
       _error = null;
     });
 
-    final payload = CustomerSignupPayload(
-      firstName: (args['firstName'] as String?) ?? '',
-      lastName: (args['lastName'] as String?) ?? '',
-      dateOfBirth: (args['dateOfBirth'] as String?) ?? '',
-      sex: (args['sex'] as String?) ?? '',
-      email: (args['email'] as String?) ?? '',
-      phoneNumber: (args['phoneNumber'] as String?) ?? '',
-      emergencyContactNumber: (args['emergencyContactNumber'] as String?) ?? '',
-      password: (args['password'] as String?) ?? '',
-      confirmPassword: (args['confirmPassword'] as String?) ?? '',
-      addressLabel: (args['addressLabel'] as String?) ?? 'Address 1',
-      addressLine1: (args['addressLine1'] as String?) ?? '',
-      addressLine2: (args['addressLine2'] as String?) ?? '',
-      postcode: (args['postcode'] as String?) ?? '',
-      city: (args['city'] as String?) ?? '',
-      state: (args['state'] as String?) ?? '',
-      country: (args['country'] as String?) ?? 'Malaysia',
-    );
-
     try {
       await _signupService.registerCustomer(payload);
+      await CustomerSignupDraftStore.clear();
       if (!mounted) {
         return;
       }
@@ -119,34 +95,44 @@ class _CustomerRegisterVerifyScreenState
         context,
       ).pushNamedAndRemoveUntil(AppRoutes.customerShell, (route) => false);
     } catch (error) {
-      if (_isWebFetchAuthError(error)) {
-        if (!mounted) {
-          return;
-        }
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil(AppRoutes.customerShell, (route) => false);
-        return;
-      }
-
       if (!mounted) {
         return;
       }
       setState(() {
         _submitting = false;
-        _error = error is Exception
-            ? error.toString().replaceFirst('Exception: ', '')
-            : 'Unable to create your account.';
+        _error = _isWebFetchAuthError(error)
+            ? 'Could not reach Supabase from the browser. Your signup details are kept on this device, but the account was not saved yet.'
+            : error is Exception
+                ? error.toString().replaceFirst('Exception: ', '')
+                : 'Unable to create your account.';
       });
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  CustomerSignupPayload? _resolvePayload() {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<Object?, Object?>?;
-    final phone = args?['phoneNumber'] as String? ?? '12-345 6789';
-    final missingSignupDetails = args == null;
+    if (args != null) {
+      final normalized = <String, dynamic>{};
+      for (final entry in args.entries) {
+        final key = entry.key;
+        if (key is String) {
+          normalized[key] = entry.value;
+        }
+      }
+      final payload = CustomerSignupPayload.fromJson(normalized);
+      CustomerSignupDraftStore.save(payload);
+      return payload;
+    }
+
+    return CustomerSignupDraftStore.load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final payload = _resolvePayload();
+    final phone = payload?.phoneNumber ?? '12-345 6789';
+    final missingSignupDetails = payload == null;
 
     return AuthFlowScaffold(
       hero: const AuthCircleHero(icon: Icons.verified_user_outlined),
@@ -235,7 +221,7 @@ class _CustomerRegisterVerifyScreenState
           if (missingSignupDetails && kIsWeb) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'This page was opened without signup form data. In web demo mode, continuing will open the customer app.',
+              'This page was opened without signup form data. Please return to registration and submit the form again.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],

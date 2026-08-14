@@ -37,6 +37,27 @@ class CustomerSignupPayload {
   final String state;
   final String country;
 
+  factory CustomerSignupPayload.fromJson(Map<String, dynamic> json) {
+    return CustomerSignupPayload(
+      firstName: json['firstName'] as String? ?? '',
+      lastName: json['lastName'] as String? ?? '',
+      dateOfBirth: json['dateOfBirth'] as String? ?? '',
+      sex: json['sex'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      phoneNumber: json['phoneNumber'] as String? ?? '',
+      emergencyContactNumber: json['emergencyContactNumber'] as String? ?? '',
+      password: json['password'] as String? ?? '',
+      confirmPassword: json['confirmPassword'] as String? ?? '',
+      addressLabel: json['addressLabel'] as String? ?? 'Address 1',
+      addressLine1: json['addressLine1'] as String? ?? '',
+      addressLine2: json['addressLine2'] as String? ?? '',
+      postcode: json['postcode'] as String? ?? '',
+      city: json['city'] as String? ?? '',
+      state: json['state'] as String? ?? '',
+      country: json['country'] as String? ?? 'Malaysia',
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'firstName': firstName,
