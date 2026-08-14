@@ -12,6 +12,12 @@ class SwiperTextField extends StatelessWidget {
     this.controller,
     this.keyboardType,
     this.maxLines = 1,
+    this.textInputAction,
+    this.focusNode,
+    this.onChanged,
+    this.onSubmitted,
+    this.validator,
+    this.autofillHints,
   });
 
   final String label;
@@ -20,13 +26,25 @@ class SwiperTextField extends StatelessWidget {
   final TextEditingController? controller;
   final TextInputType? keyboardType;
   final int maxLines;
+  final TextInputAction? textInputAction;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final FormFieldValidator<String>? validator;
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      textInputAction: textInputAction,
+      onChanged: onChanged,
+      onFieldSubmitted: onSubmitted,
+      validator: validator,
+      autofillHints: autofillHints,
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
