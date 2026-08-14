@@ -1,6 +1,8 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
 
-import 'customer_record_service.dart';
+import 'package:http/http.dart' as http;
+
+import '../core/config/app_config.dart';
 
 class CustomerSignupPayload {
   const CustomerSignupPayload({
@@ -85,42 +87,31 @@ class CustomerSignupPayload {
 class CustomerSignupService {
   const CustomerSignupService();
 
-  SupabaseClient get _client => Supabase.instance.client;
-  CustomerRecordService get _recordService => const CustomerRecordService();
-
   Future<void> registerCustomer(CustomerSignupPayload payload) async {
     if (payload.password != payload.confirmPassword) {
       throw Exception('Passwords do not match.');
     }
 
-    final response = await _client.auth.signUp(
-      email: payload.email,
-      password: payload.password,
-      data: payload.toJson(),
+    final uri = Uri.parse('${AppConfig.appBaseUrl}/api/auth/register/customer');
+    final response = await http.post(
+      uri,
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode(payload.toJson()),
     );
 
-    final user = response.user;
-    if (user == null) {
-      throw Exception('Unable to create your account.');
-    }
+    final body = response.body.isEmpty
+        ? null
+        : jsonDecode(response.body) as Object?;
 
-    await _recordService.upsertCustomerProfile(payload, authUserId: user.id);
-
-    await _client.from('profiles').upsert({
-      'id': user.id,
-      'email': payload.email,
-      'first_name': payload.firstName,
-      'last_name': payload.lastName,
-      'phone_number': payload.phoneNumber,
-      'role': 'customer',
-    });
-
-    if (response.session != null) {
-      await _client.auth.signOut();
-    }
-
-    if (response.user != null) {
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300 &&
+        body is Map<String, dynamic> &&
+        body['success'] == true) {
       return;
+    }
+
+    if (body is Map<String, dynamic> && body['error'] is String) {
+      throw Exception(body['error'] as String);
     }
 
     throw Exception('Unable to create your account.');

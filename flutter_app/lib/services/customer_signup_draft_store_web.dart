@@ -1,11 +1,11 @@
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
 
-String? read(String key) => html.window.sessionStorage[key];
+String? read(String key) => web.window.sessionStorage.getItem(key);
 
 void write(String key, String value) {
-  html.window.sessionStorage[key] = value;
+  web.window.sessionStorage.setItem(key, value);
 }
 
 void remove(String key) {
-  html.window.sessionStorage.remove(key);
+  web.window.sessionStorage.removeItem(key);
 }

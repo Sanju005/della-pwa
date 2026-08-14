@@ -27,19 +27,18 @@ class CustomerHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final categories = repository.getCustomerCategories();
-    final bookings = repository.getBookings();
     final customer = DemoCustomerAuthStore.currentCustomer();
     final firstName =
         (customer?['firstName'] as String?)?.trim().isNotEmpty == true
         ? (customer!['firstName'] as String).trim()
-        : 'Sarah';
+        : 'Customer';
     final lastName =
         (customer?['lastName'] as String?)?.trim().isNotEmpty == true
         ? (customer!['lastName'] as String).trim()
-        : 'Lim';
+        : '';
     final fullName = '$firstName $lastName'.trim();
     final subtitle = customer != null
-        ? 'Welcome back. Your account is signed in with your phone verification flow.'
+        ? 'Welcome back. Your account is connected to your live customer profile.'
         : 'Find trusted help near you with a native Flutter UI foundation.';
 
     return CustomScrollView(
@@ -123,7 +122,7 @@ class CustomerHomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        'This card is UI-only for now, but it matches the future booking flow shape.',
+                        'Browse live providers and continue into your booking flow.',
                         style: Theme.of(
                           context,
                         ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
@@ -237,11 +236,14 @@ class CustomerHomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 SwiperSectionCard(
-                  title: 'Upcoming booking',
-                  subtitle: 'Current mock booking card style',
-                  child: Text(
-                    '${bookings.first.title} with ${bookings.first.providerName}',
-                    style: Theme.of(context).textTheme.bodyLarge,
+                  title: 'Your bookings',
+                  subtitle: 'Open the overview to see upcoming and past bookings from Supabase.',
+                  child: SwiperButton(
+                    label: 'View bookings',
+                    icon: const Icon(Icons.event_note_rounded),
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).pushNamed(AppRoutes.bookingOverview),
                   ),
                 ),
                 const SizedBox(height: 120),

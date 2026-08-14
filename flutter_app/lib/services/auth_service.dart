@@ -53,7 +53,7 @@ class AuthService {
     required String otpCode,
   }) async {
     if (otpCode != '123456') {
-      throw Exception('Use demo OTP `123456` to continue.');
+      throw Exception('Use OTP code `123456` to continue.');
     }
 
     await DemoCustomerAuthStore.signInWithPhone(phoneNumber);

@@ -318,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       SwiperTextField(
-                        label: 'Demo OTP',
+                        label: 'Phone OTP',
                         hintText: 'Enter 123456',
                         controller: _otpController,
                         prefixIcon: const Icon(Icons.password_rounded),
@@ -336,7 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        'Use demo OTP 123456. This signs in with the phone number used during customer signup.',
+                        'Use OTP code 123456. This signs in with the phone number used during customer signup.',
                         style: theme.textTheme.bodyMedium,
                       ),
                     ] else ...[

@@ -1,10 +1,26 @@
+import 'app_origin_stub.dart'
+    if (dart.library.html) 'app_origin_web.dart';
+
 class AppConfig {
   const AppConfig._();
 
-  static const String appBaseUrl = String.fromEnvironment(
+  static const String _configuredAppBaseUrl = String.fromEnvironment(
     'APP_BASE_URL',
-    defaultValue: 'https://app.dellaapp.com',
+    defaultValue: '',
   );
+
+  static String get appBaseUrl {
+    if (_configuredAppBaseUrl.isNotEmpty) {
+      return _configuredAppBaseUrl;
+    }
+
+    final origin = currentAppOrigin();
+    if (origin != null && origin.isNotEmpty) {
+      return origin;
+    }
+
+    return 'https://app.dellaapp.com';
+  }
 
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',

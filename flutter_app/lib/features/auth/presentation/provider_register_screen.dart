@@ -220,7 +220,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           .map((controller) => controller.text)
           .join();
       if (code != '123456') {
-        setState(() => _submitError = 'Use demo OTP `123456` to continue.');
+        setState(() => _submitError = 'Use OTP code `123456` to continue.');
         return;
       }
     }
@@ -545,7 +545,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           lines: const [
             'Your personal details have been saved successfully.',
             'In the web flow, the next step continues to service setup before the final provider verification.',
-            'This Flutter demo follows the same order without backend calls.',
+            'This Flutter flow follows the same order while provider backend setup is still being completed.',
           ],
         );
       case _ProviderStep.services:
@@ -728,7 +728,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
               }),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text('Demo OTP: 123456', style: theme.textTheme.bodyMedium),
+            Text('Use OTP code: 123456', style: theme.textTheme.bodyMedium),
           ],
         );
       case _ProviderStep.identity:
@@ -770,7 +770,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           lines: [
             'Your verification details are saved successfully.',
             'Selected services: ${_selectedServices.join(', ')}',
-            'You can continue into the provider workspace in this Flutter demo.',
+            'You can continue into the provider workspace now.',
           ],
         );
     }

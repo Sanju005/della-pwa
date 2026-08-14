@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/demo_customer_auth_store.dart';
@@ -70,7 +71,7 @@ class _CustomerRegisterVerifyScreenState
       return;
     }
     if (code != '123456') {
-      setState(() => _error = 'Use demo OTP `123456` for this Flutter flow.');
+      setState(() => _error = 'Use OTP code `123456` to continue.');
       return;
     }
 
@@ -103,7 +104,7 @@ class _CustomerRegisterVerifyScreenState
       setState(() {
         _submitting = false;
         _error = _isWebFetchAuthError(error)
-            ? 'Could not complete Supabase signup. Check your Supabase Auth email confirmation or SMTP settings, then try again.'
+            ? 'Could not reach the signup API from the browser. The app is trying `${AppConfig.appBaseUrl}/api/auth/register/customer`. If you are running on localhost, start the backend too or set `APP_BASE_URL` to a reachable API origin.'
             : error is Exception
                 ? error.toString().replaceFirst('Exception: ', '')
                 : 'Unable to create your account.';
@@ -176,14 +177,14 @@ class _CustomerRegisterVerifyScreenState
             builder: (context, constraints) {
               const spacing = AppSpacing.xs;
               final fieldWidth =
-                  ((constraints.maxWidth - (spacing * 5)) / 6).clamp(40.0, 52.0)
-                      as double;
+                  (constraints.maxWidth - (spacing * 5)) / 6;
+              final clampedFieldWidth = fieldWidth.clamp(40.0, 52.0);
 
               return Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(6, (index) {
                   return SizedBox(
-                    width: fieldWidth,
+                    width: clampedFieldWidth,
                     child: TextField(
                       controller: _controllers[index],
                       focusNode: _focusNodes[index],
@@ -212,7 +213,7 @@ class _CustomerRegisterVerifyScreenState
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Demo OTP: 123456',
+            'Use OTP code: 123456',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: AppSpacing.sm),
