@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/routing/app_routes.dart';
+import '../../../models/provider_summary.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/profile_avatar.dart';
@@ -19,7 +21,10 @@ class ProviderProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = repository.getFeaturedProvider();
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final provider = args is ProviderSummary
+        ? args
+        : repository.getFeaturedProvider();
 
     return Scaffold(
       appBar: const SwiperAppBar(
@@ -40,7 +45,7 @@ class ProviderProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const ProfileAvatar(name: 'Nur Aisyah', radius: 34),
+                ProfileAvatar(name: provider.name, radius: 34),
                 const SizedBox(height: AppSpacing.md),
                 Text(provider.description, style: Theme.of(context).textTheme.bodyLarge),
                 const SizedBox(height: AppSpacing.md),
@@ -94,7 +99,8 @@ class ProviderProfileScreen extends StatelessWidget {
           SwiperButton(
             label: 'Continue to booking demo',
             icon: const Icon(Icons.arrow_forward_rounded),
-            onPressed: () => Navigator.of(context).pushNamed('/booking-overview'),
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppRoutes.bookingOverview),
           ),
         ],
       ),

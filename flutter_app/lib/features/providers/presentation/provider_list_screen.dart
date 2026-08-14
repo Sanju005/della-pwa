@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/provider_card.dart';
@@ -27,7 +28,9 @@ class ProviderListScreen extends StatelessWidget {
         padding: AppSpacing.screenPadding,
         itemBuilder: (context, index) => ProviderCard(
           provider: providers[index],
-          onTap: () => Navigator.of(context).pushNamed('/provider-profile'),
+          onTap: () => Navigator.of(
+            context,
+          ).pushNamed(AppRoutes.providerProfile, arguments: providers[index]),
         ),
         separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
         itemCount: providers.length,

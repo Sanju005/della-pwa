@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
+import '../../../models/provider_summary.dart';
+import '../../../services/provider_directory_store.dart';
+import '../../../services/provider_record_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
@@ -61,6 +64,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     (_) => TextEditingController(),
     growable: false,
   );
+  final _providerRecordService = const ProviderRecordService();
 
   _ProviderStep _step = _ProviderStep.basic;
   String _gender = 'Female';
@@ -220,6 +224,22 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         return;
       }
     }
+    if (_step == _ProviderStep.review) {
+      await _providerRecordService.upsertProviderProfile(
+        _buildProviderRecordPayload(identityVerified: false),
+      );
+      await ProviderDirectoryStore.saveProvider(
+        _buildProviderSummary(identityVerified: false),
+      );
+    }
+    if (_step == _ProviderStep.identity) {
+      await _providerRecordService.upsertProviderProfile(
+        _buildProviderRecordPayload(identityVerified: true),
+      );
+      await ProviderDirectoryStore.saveProvider(
+        _buildProviderSummary(identityVerified: true),
+      );
+    }
 
     setState(() {
       _step = switch (_step) {
@@ -266,6 +286,59 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         RegExp(r'[a-z]').hasMatch(value) &&
         RegExp(r'\d').hasMatch(value) &&
         RegExp(r'[^\w\s]').hasMatch(value);
+  }
+
+  List<String> _specialtiesList() {
+    return _specialtiesController.text
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
+  ProviderRecordPayload _buildProviderRecordPayload({
+    required bool identityVerified,
+  }) {
+    final primaryService = _selectedServices.isEmpty
+        ? 'Service Provider'
+        : _selectedServices.first;
+    final specialties = _specialtiesList();
+    return ProviderRecordPayload(
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      marketingName: _marketingNameController.text.trim(),
+      dateOfBirth: _dobController.text.trim(),
+      gender: _gender,
+      email: _emailController.text.trim(),
+      phoneNumber: _phoneController.text.trim(),
+      emergencyContactNumber: _emergencyController.text.trim(),
+      addressLine1: _address1Controller.text.trim(),
+      addressLine2: _address2Controller.text.trim(),
+      postcode: _postcodeController.text.trim(),
+      city: _cityController.text.trim(),
+      state: _stateController.text.trim(),
+      country: _countryController.text.trim(),
+      serviceArea: _areaLabelController.text.trim(),
+      serviceRadiusKm: _radiusKm,
+      services: _selectedServices.isEmpty
+          ? [primaryService]
+          : List.of(_selectedServices),
+      specialties: specialties.isEmpty ? [primaryService] : specialties,
+      hourlyRate: int.tryParse(_serviceRateController.text.trim()) ?? 0,
+      yearsExperience:
+          int.tryParse(_serviceExperienceController.text.trim()) ?? 0,
+      availabilityDays: _availabilityDays.toList(),
+      timePreset: _timePreset,
+      phoneVerified: true,
+      identityVerified: identityVerified,
+      status: identityVerified ? 'verified' : 'pending_verification',
+    );
+  }
+
+  ProviderSummary _buildProviderSummary({required bool identityVerified}) {
+    return _buildProviderRecordPayload(
+      identityVerified: identityVerified,
+    ).toProviderSummary();
   }
 
   String? _required(String? value, String label) {

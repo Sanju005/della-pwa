@@ -4,6 +4,7 @@ import 'package:flutter/widget_previews.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../previews/widget_preview_helpers.dart';
 import '../../../repositories/demo_repository.dart';
+import '../../../services/demo_customer_auth_store.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/profile_avatar.dart';
@@ -24,6 +25,19 @@ class CustomerHomeScreen extends StatelessWidget {
     final categories = repository.getCustomerCategories();
     final featuredProvider = repository.getFeaturedProvider();
     final bookings = repository.getBookings();
+    final customer = DemoCustomerAuthStore.currentCustomer();
+    final firstName =
+        (customer?['firstName'] as String?)?.trim().isNotEmpty == true
+        ? (customer!['firstName'] as String).trim()
+        : 'Sarah';
+    final lastName =
+        (customer?['lastName'] as String?)?.trim().isNotEmpty == true
+        ? (customer!['lastName'] as String).trim()
+        : 'Lim';
+    final fullName = '$firstName $lastName'.trim();
+    final subtitle = customer != null
+        ? 'Welcome back. Your account is signed in with your phone verification flow.'
+        : 'Find trusted help near you with a native Flutter UI foundation.';
 
     return CustomScrollView(
       slivers: [
@@ -40,18 +54,18 @@ class CustomerHomeScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Hello, Sarah',
+                            'Hello, $firstName',
                             style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'Find trusted help near you with a native Flutter UI foundation.',
+                            subtitle,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
                       ),
                     ),
-                    const ProfileAvatar(name: 'Sarah Lim'),
+                    ProfileAvatar(name: fullName),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),

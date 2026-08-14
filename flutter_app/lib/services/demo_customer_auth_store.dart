@@ -132,6 +132,24 @@ class DemoCustomerAuthStore {
     return role is String ? role : null;
   }
 
+  static Map<String, dynamic>? currentCustomer() {
+    _ensureLoaded();
+    final sessionPhone = _session?['phoneNumber'];
+    if (sessionPhone is! String || sessionPhone.isEmpty) {
+      return null;
+    }
+
+    final normalizedPhone = normalizePhone(sessionPhone);
+    for (final customer in _customers) {
+      if (normalizePhone('${customer['phoneNumber'] ?? ''}') ==
+          normalizedPhone) {
+        return customer;
+      }
+    }
+
+    return null;
+  }
+
   static Future<void> clearSession() async {
     _ensureLoaded();
     _session = null;

@@ -4,6 +4,7 @@ import '../models/notification_item.dart';
 import '../models/provider_summary.dart';
 import '../models/service_category.dart';
 import '../services/demo_data_service.dart';
+import '../services/provider_directory_store.dart';
 
 class DemoRepository {
   DemoRepository({DemoDataService service = const DemoDataService()})
@@ -13,9 +14,9 @@ class DemoRepository {
 
   List<ServiceCategory> getCustomerCategories() => _service.customerCategories();
 
-  List<ProviderSummary> getProviders() => _service.providers();
+  List<ProviderSummary> getProviders() => ProviderDirectoryStore.getProviders();
 
-  ProviderSummary getFeaturedProvider() => _service.providers().first;
+  ProviderSummary getFeaturedProvider() => getProviders().first;
 
   List<BookingItem> getBookings() => _service.bookings();
 

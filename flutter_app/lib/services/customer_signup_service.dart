@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'customer_record_service.dart';
+
 class CustomerSignupPayload {
   const CustomerSignupPayload({
     required this.firstName,
@@ -84,6 +86,7 @@ class CustomerSignupService {
   const CustomerSignupService();
 
   SupabaseClient get _client => Supabase.instance.client;
+  CustomerRecordService get _recordService => const CustomerRecordService();
 
   Future<void> registerCustomer(CustomerSignupPayload payload) async {
     if (payload.password != payload.confirmPassword) {
@@ -100,6 +103,8 @@ class CustomerSignupService {
     if (user == null) {
       throw Exception('Unable to create your account.');
     }
+
+    await _recordService.upsertCustomerProfile(payload, authUserId: user.id);
 
     await _client.from('profiles').upsert({
       'id': user.id,
