@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/customer_register_screen.dart';
+import '../../features/auth/presentation/customer_register_success_screen.dart';
+import '../../features/auth/presentation/customer_register_verify_screen.dart';
+import '../../features/auth/presentation/provider_register_screen.dart';
+import '../../features/auth/presentation/signup_entry_screen.dart';
 import '../../features/booking/presentation/booking_overview_screen.dart';
 import '../../features/home/presentation/customer_shell_screen.dart';
 import '../../features/provider_app/presentation/provider_shell_screen.dart';
@@ -19,6 +24,31 @@ class AppRouter {
       case AppRoutes.login:
         return MaterialPageRoute<void>(
           builder: (_) => LoginScreen(repository: _repository),
+          settings: settings,
+        );
+      case AppRoutes.signupEntry:
+        return MaterialPageRoute<void>(
+          builder: (_) => const SignupEntryScreen(),
+          settings: settings,
+        );
+      case AppRoutes.registerCustomer:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerRegisterScreen(),
+          settings: settings,
+        );
+      case AppRoutes.registerCustomerVerify:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerRegisterVerifyScreen(),
+          settings: settings,
+        );
+      case AppRoutes.registerCustomerSuccess:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerRegisterSuccessScreen(),
+          settings: settings,
+        );
+      case AppRoutes.registerProvider:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderRegisterScreen(),
           settings: settings,
         );
       case AppRoutes.customerShell:

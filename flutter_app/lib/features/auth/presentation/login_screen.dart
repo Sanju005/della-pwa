@@ -347,9 +347,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     OutlinedButton.icon(
-                      onPressed: () => _showDemoMessage(
-                        'Create account is not connected in Flutter yet.',
-                      ),
+                      onPressed: () => Navigator.of(
+                        context,
+                      ).pushNamed(AppRoutes.signupEntry),
                       icon: const Icon(Icons.person_add_alt_1_rounded),
                       label: const Text('Create account'),
                     ),
