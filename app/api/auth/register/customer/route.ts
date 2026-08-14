@@ -50,8 +50,7 @@ function withCors(request: Request, response: NextResponse) {
   response.headers.set("Vary", "Origin");
   response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   response.headers.set("Access-Control-Allow-Headers", "Content-Type");
-  response.headers.set("X-Debug-Cors", "customer-route-v1");
-
+ 
   return response;
 }
 
