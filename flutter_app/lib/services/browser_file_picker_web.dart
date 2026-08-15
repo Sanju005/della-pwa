@@ -44,7 +44,7 @@ Future<List<PickedBrowserFile>> _pickFiles({
     input.removeEventListener('cancel', cancelHandler);
   }
 
-  changeHandler = ((web.Event _) async {
+  changeHandler = ((web.Event _) {
     final selected = input.files;
     if (selected == null || selected.length == 0) {
       cleanUp();
@@ -54,27 +54,36 @@ Future<List<PickedBrowserFile>> _pickFiles({
       return;
     }
 
-    final files = <PickedBrowserFile>[];
-    for (var index = 0; index < selected.length; index++) {
-      final file = selected.item(index);
-      if (file == null) {
-        continue;
+    unawaited(() async {
+      try {
+        final files = <PickedBrowserFile>[];
+        for (var index = 0; index < selected.length; index++) {
+          final file = selected.item(index);
+          if (file == null) {
+            continue;
+          }
+
+          final dataUrl = await _readAsDataUrl(file);
+          files.add(
+            PickedBrowserFile(
+              name: file.name,
+              mimeType: file.type,
+              dataUrl: dataUrl,
+            ),
+          );
+        }
+
+        cleanUp();
+        if (!completer.isCompleted) {
+          completer.complete(files);
+        }
+      } catch (error, stackTrace) {
+        cleanUp();
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
       }
-
-      final dataUrl = await _readAsDataUrl(file);
-      files.add(
-        PickedBrowserFile(
-          name: file.name,
-          mimeType: file.type,
-          dataUrl: dataUrl,
-        ),
-      );
-    }
-
-    cleanUp();
-    if (!completer.isCompleted) {
-      completer.complete(files);
-    }
+    }());
   }).toJS;
 
   cancelHandler = ((web.Event _) {
