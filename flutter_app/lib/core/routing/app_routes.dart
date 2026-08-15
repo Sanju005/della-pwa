@@ -10,6 +10,7 @@ class AppRoutes {
   static const customerShell = '/customer';
   static const providers = '/providers';
   static const providerProfile = '/provider-profile';
+  static const providerBooking = '/provider-booking';
   static const bookingOverview = '/booking-overview';
   static const providerShell = '/provider-workspace';
 }

@@ -6,6 +6,63 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
 
+class ProviderAvailabilitySlot {
+  const ProviderAvailabilitySlot({
+    required this.isoDate,
+    required this.dayLabel,
+    required this.dateLabel,
+    required this.startTimeLabel,
+    required this.endTimeLabel,
+    required this.timeLabel,
+    required this.state,
+  });
+
+  final String isoDate;
+  final String dayLabel;
+  final String dateLabel;
+  final String startTimeLabel;
+  final String endTimeLabel;
+  final String timeLabel;
+  final String state;
+
+  bool get isAvailable => state.toLowerCase() == 'available';
+
+  factory ProviderAvailabilitySlot.fromJson(Map<String, dynamic> json) {
+    final startTimeLabel = json['startTimeLabel'] as String? ?? '';
+    final endTimeLabel = json['endTimeLabel'] as String? ?? '';
+
+    return ProviderAvailabilitySlot(
+      isoDate: json['isoDate'] as String? ?? '',
+      dayLabel: json['dayLabel'] as String? ?? '',
+      dateLabel: json['dateLabel'] as String? ?? '',
+      startTimeLabel: startTimeLabel,
+      endTimeLabel: endTimeLabel,
+      timeLabel: json['timeLabel'] as String? ??
+          [startTimeLabel, endTimeLabel]
+              .where((item) => item.trim().isNotEmpty)
+              .join(' - '),
+      state: json['state'] as String? ?? '',
+    );
+  }
+}
+
+class ProviderBookedTimeRange {
+  const ProviderBookedTimeRange({
+    required this.startTimeLabel,
+    required this.endTimeLabel,
+  });
+
+  final String startTimeLabel;
+  final String endTimeLabel;
+
+  factory ProviderBookedTimeRange.fromJson(Map<String, dynamic> json) {
+    return ProviderBookedTimeRange(
+      startTimeLabel: json['startTimeLabel'] as String? ?? '',
+      endTimeLabel: json['endTimeLabel'] as String? ?? '',
+    );
+  }
+}
+
 class ProviderDetailModel {
   const ProviderDetailModel({
     required this.id,
@@ -29,6 +86,9 @@ class ProviderDetailModel {
     required this.verified,
     required this.customerReviews,
     required this.hasUploadedGallery,
+    required this.availabilityLabel,
+    required this.availability,
+    required this.bookedTimeRangesByDate,
   });
 
   final String id;
@@ -52,8 +112,40 @@ class ProviderDetailModel {
   final bool verified;
   final List<Map<String, dynamic>> customerReviews;
   final bool hasUploadedGallery;
+  final String availabilityLabel;
+  final List<ProviderAvailabilitySlot> availability;
+  final Map<String, List<ProviderBookedTimeRange>> bookedTimeRangesByDate;
 
   factory ProviderDetailModel.fromJson(Map<String, dynamic> json) {
+    final availability =
+        (json['availability'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) => item.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ),
+            )
+            .map(ProviderAvailabilitySlot.fromJson)
+            .toList();
+
+    final bookedTimeRangesByDate = <String, List<ProviderBookedTimeRange>>{};
+    final bookedRangesJson = json['bookedTimeRangesByDate'];
+    if (bookedRangesJson is Map) {
+      for (final entry in bookedRangesJson.entries) {
+        final dateKey = entry.key.toString();
+        final ranges = (entry.value as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) => item.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ),
+            )
+            .map(ProviderBookedTimeRange.fromJson)
+            .toList();
+        bookedTimeRangesByDate[dateKey] = ranges;
+      }
+    }
+
     return ProviderDetailModel(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? 'Provider',
@@ -90,6 +182,9 @@ class ProviderDetailModel {
               .toList() ??
           const [],
       hasUploadedGallery: json['hasUploadedGallery'] as bool? ?? false,
+      availabilityLabel: json['availabilityLabel'] as String? ?? '',
+      availability: availability,
+      bookedTimeRangesByDate: bookedTimeRangesByDate,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../models/provider_summary.dart';
 import '../../../repositories/demo_repository.dart';
@@ -40,38 +41,27 @@ class ProviderProfileScreen extends StatelessWidget {
                 AppSpacing.md,
                 AppSpacing.md,
               ),
-              child: FutureBuilder<ProviderDetailModel>(
-                future: _detailService.fetchProviderDetail(
-                  id: provider.id,
-                  service: provider.serviceKey,
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x14111720),
+                      blurRadius: 20,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
                 ),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return Container(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x14111720),
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: SwiperButton(
-                      label: 'Book Now',
-                      icon: const Icon(Icons.calendar_month_rounded),
-                      onPressed: () => Navigator.of(context).pushNamed(
-                        AppRoutes.bookingOverview,
-                      ),
-                    ),
-                  );
-                },
+                child: SwiperButton(
+                  label: 'Book Now',
+                  icon: const Icon(Icons.calendar_month_rounded),
+                  onPressed: () => Navigator.of(context).pushNamed(
+                    AppRoutes.providerBooking,
+                    arguments: provider,
+                  ),
+                ),
               ),
             ),
       body: provider == null
@@ -111,7 +101,7 @@ class ProviderProfileScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(22),
                           child: detail.profileImage.trim().isNotEmpty
                               ? Image.network(
-                                  detail.profileImage,
+                                  _resolveImageUrl(detail.profileImage),
                                   width: 118,
                                   height: 162,
                                   fit: BoxFit.cover,
@@ -494,6 +484,20 @@ class ProviderProfileScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _resolveImageUrl(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) {
+      return '';
+    }
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    if (value.startsWith('/')) {
+      return '${AppConfig.appBaseUrl}$value';
+    }
+    return '${AppConfig.appBaseUrl}/$value';
   }
 
   Widget _miniStatus({
