@@ -31,6 +31,49 @@ class ProviderProfileScreen extends StatelessWidget {
         subtitle: 'Live provider details',
         showBack: true,
       ),
+      bottomNavigationBar: provider == null
+          ? null
+          : SafeArea(
+              minimum: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.xs,
+                AppSpacing.md,
+                AppSpacing.md,
+              ),
+              child: FutureBuilder<ProviderDetailModel>(
+                future: _detailService.fetchProviderDetail(
+                  id: provider.id,
+                  service: provider.serviceKey,
+                ),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Container(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x14111720),
+                          blurRadius: 20,
+                          offset: Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: SwiperButton(
+                      label: 'Book Now',
+                      icon: const Icon(Icons.calendar_month_rounded),
+                      onPressed: () => Navigator.of(context).pushNamed(
+                        AppRoutes.bookingOverview,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
       body: provider == null
           ? const EmptyState(
               title: 'No provider selected',
@@ -338,100 +381,97 @@ class ProviderProfileScreen extends StatelessWidget {
                                   'This provider has not received a customer review yet.',
                               icon: Icons.reviews_outlined,
                             )
-                          : Column(
-                              children: detail.customerReviews
-                                  .map(
-                                    (review) => Container(
-                                      margin: const EdgeInsets.only(
-                                        bottom: AppSpacing.sm,
+                          : SizedBox(
+                              height: 170,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: detail.customerReviews.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(width: AppSpacing.sm),
+                                itemBuilder: (context, index) {
+                                  final review = detail.customerReviews[index];
+                                  return Container(
+                                    width: 260,
+                                    padding: const EdgeInsets.all(
+                                      AppSpacing.sm,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFBFCFB),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: const Color(0xFFE7ECE7),
                                       ),
-                                      padding: const EdgeInsets.all(
-                                        AppSpacing.sm,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFBFCFB),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: const Color(0xFFE7ECE7),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  review['customerName']
-                                                          ?.toString() ??
-                                                      'Customer',
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .titleSmall
-                                                      ?.copyWith(
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                      ),
-                                                ),
-                                              ),
-                                              Text(
-                                                review['postedLabel']
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                review['customerName']
                                                         ?.toString() ??
-                                                    'Recently',
+                                                    'Customer',
                                                 style: Theme.of(context)
                                                     .textTheme
-                                                    .labelSmall
+                                                    .titleSmall
                                                     ?.copyWith(
-                                                      color: AppColors
-                                                          .textSecondary,
+                                                      fontWeight:
+                                                          FontWeight.w700,
                                                     ),
                                               ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              const Icon(
-                                                Icons.star_rounded,
-                                                size: 14,
-                                                color: Color(0xFFF59E0B),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                (review['rating'] as num?)
-                                                        ?.toStringAsFixed(1) ??
-                                                    '5.0',
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .labelMedium,
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            review['comment']?.toString() ??
-                                                '',
+                                            ),
+                                            Text(
+                                              review['postedLabel']
+                                                      ?.toString() ??
+                                                  'Recently',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(
+                                                    color: AppColors
+                                                        .textSecondary,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.star_rounded,
+                                              size: 14,
+                                              color: Color(0xFFF59E0B),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              (review['rating'] as num?)
+                                                      ?.toStringAsFixed(1) ??
+                                                  '5.0',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelMedium,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Expanded(
+                                          child: Text(
+                                            review['comment']?.toString() ?? '',
                                             style: Theme.of(context)
                                                 .textTheme
                                                 .bodySmall,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
-                                  )
-                                  .toList(),
+                                  );
+                                },
+                              ),
                             ),
                     ),
-                    const SizedBox(height: AppSpacing.xl),
-                    SwiperButton(
-                      label: 'Book Now',
-                      icon: const Icon(Icons.calendar_month_rounded),
-                      onPressed: () => Navigator.of(context).pushNamed(
-                        AppRoutes.bookingOverview,
-                      ),
-                    ),
-                    const SizedBox(height: 100),
+                    const SizedBox(height: 120),
                   ],
                 );
               },
