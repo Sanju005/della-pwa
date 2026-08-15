@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 import 'demo_customer_auth_store.dart';
 
@@ -23,11 +24,19 @@ class CurrentCustomerService {
     final user = _client.auth.currentUser;
 
     if (user != null) {
-      final customerRow = await _client
-          .from('customer_profiles')
-          .select('first_name, last_name')
-          .eq('id', user.id)
-          .maybeSingle();
+      Map<String, dynamic>? customerRow;
+      try {
+        customerRow = await _client
+            .from('customer_profiles')
+            .select('first_name, last_name')
+            .eq('id', user.id)
+            .maybeSingle();
+      } catch (error, stackTrace) {
+        if (kDebugMode) {
+          debugPrint('Current customer profile query failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      }
 
       final firstName =
           customerRow?['first_name']?.toString().trim() ?? '';

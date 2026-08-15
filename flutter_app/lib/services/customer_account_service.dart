@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CustomerAddressSummary {
@@ -258,19 +259,9 @@ class CustomerAccountService {
     );
   }
 
-  Future<CustomerAccountOverview?> fetchOverview() async {
-    final user = _client.auth.currentUser;
-    if (user == null) {
-      return null;
-    }
-
-    final results = await Future.wait([
-      _client
-          .from('profiles')
-          .select('full_name, email, phone, avatar_url')
-          .eq('id', user.id)
-          .maybeSingle(),
-      _client
+  Future<Map<String, dynamic>?> _fetchCustomerProfileRow(String userId) async {
+    try {
+      return await _client
           .from('customer_profiles')
           .select('''
             first_name,
@@ -287,8 +278,55 @@ class CustomerAccountService {
             verified,
             completion
           ''')
+          .eq('id', userId)
+          .maybeSingle();
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Customer profile full query failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+
+      try {
+        return await _client
+            .from('customer_profiles')
+            .select('''
+              first_name,
+              last_name,
+              date_of_birth,
+              sex,
+              phone_number,
+              country_code,
+              emergency_contact_number,
+              city,
+              region,
+              state,
+              country
+            ''')
+            .eq('id', userId)
+            .maybeSingle();
+      } catch (fallbackError, fallbackStackTrace) {
+        if (kDebugMode) {
+          debugPrint('Customer profile fallback query failed: $fallbackError');
+          debugPrintStack(stackTrace: fallbackStackTrace);
+        }
+        return null;
+      }
+    }
+  }
+
+  Future<CustomerAccountOverview?> fetchOverview() async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      return null;
+    }
+
+    final results = await Future.wait([
+      _client
+          .from('profiles')
+          .select('full_name, email, phone, avatar_url')
           .eq('id', user.id)
           .maybeSingle(),
+      _fetchCustomerProfileRow(user.id),
       _client
           .from('addresses')
           .select('label, address_line_1, address_line_2, city, state, postcode, country, is_default')

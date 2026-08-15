@@ -81,6 +81,7 @@ class BookingCard extends StatelessWidget {
 )
 Widget bookingCardPreview() {
   const booking = BookingItem(
+    id: 'preview-booking',
     title: 'Chef visit',
     providerName: 'Nur Aisyah',
     schedule: 'Wed, 12 Aug • 7:00 PM',

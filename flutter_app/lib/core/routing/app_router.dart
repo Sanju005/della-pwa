@@ -5,6 +5,7 @@ import '../../features/auth/presentation/customer_register_screen.dart';
 import '../../features/auth/presentation/customer_register_success_screen.dart';
 import '../../features/auth/presentation/customer_register_verify_screen.dart';
 import '../../features/auth/presentation/provider_register_screen.dart';
+import '../../features/booking/presentation/booking_detail_screen.dart';
 import '../../features/auth/presentation/signup_entry_screen.dart';
 import '../../features/booking/presentation/booking_overview_screen.dart';
 import '../../features/booking/presentation/provider_booking_screen.dart';
@@ -70,6 +71,11 @@ class AppRouter {
       case AppRoutes.bookingOverview:
         return MaterialPageRoute<void>(
           builder: (_) => BookingOverviewScreen(repository: _repository),
+          settings: settings,
+        );
+      case AppRoutes.bookingDetail:
+        return MaterialPageRoute<void>(
+          builder: (_) => const BookingDetailScreen(),
           settings: settings,
         );
       case AppRoutes.providerBooking:

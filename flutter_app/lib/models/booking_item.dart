@@ -1,5 +1,6 @@
 class BookingItem {
   const BookingItem({
+    required this.id,
     required this.title,
     required this.providerName,
     required this.schedule,
@@ -11,6 +12,7 @@ class BookingItem {
     this.createdAt,
   });
 
+  final String id;
   final String title;
   final String providerName;
   final String schedule;

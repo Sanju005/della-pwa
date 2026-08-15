@@ -12,5 +12,6 @@ class AppRoutes {
   static const providerProfile = '/provider-profile';
   static const providerBooking = '/provider-booking';
   static const bookingOverview = '/booking-overview';
+  static const bookingDetail = '/booking-detail';
   static const providerShell = '/provider-workspace';
 }

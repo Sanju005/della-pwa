@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/booking_overview_service.dart';
 import '../../../theme/app_colors.dart';
@@ -356,12 +357,9 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
               label: 'Track Task',
               icon: const Icon(Icons.arrow_forward_rounded),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Current status: ${booking.status}',
-                    ),
-                  ),
+                Navigator.of(context).pushNamed(
+                  AppRoutes.bookingDetail,
+                  arguments: booking.id,
                 );
               },
             ),
