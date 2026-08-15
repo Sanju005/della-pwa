@@ -614,12 +614,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 ),
           ),
           const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'Booking chat is not connected in Flutter yet.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           TextField(
             minLines: 3,
             maxLines: 5,
             readOnly: true,
             decoration: const InputDecoration(
-              hintText: 'Type a message about this booking',
+              hintText: 'Booking chat will appear here later.',
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -629,22 +638,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: SwiperButton(
                   label: 'Attach File',
                   isSecondary: true,
-                  onPressed: () {
-                    _showNotice(
-                      'Live booking chat is not connected yet in Flutter.',
-                    );
-                  },
+                  onPressed: null,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: SwiperButton(
                   label: 'Send',
-                  onPressed: () {
-                    _showNotice(
-                      'Live booking chat is not connected yet in Flutter.',
-                    );
-                  },
+                  onPressed: null,
                 ),
               ),
             ],
