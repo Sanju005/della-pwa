@@ -452,7 +452,10 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
       }
 
       _showSnackBar('Booking scheduled successfully.');
-      Navigator.of(context).pushReplacementNamed(AppRoutes.bookingOverview);
+      Navigator.of(context).pushReplacementNamed(
+        AppRoutes.bookingOverview,
+        arguments: const {'created': true},
+      );
     } catch (error, stackTrace) {
       if (kDebugMode) {
         debugPrint('Create booking failed: $error');

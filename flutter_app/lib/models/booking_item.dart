@@ -7,6 +7,8 @@ class BookingItem {
     required this.status,
     required this.amountLabel,
     required this.steps,
+    this.scheduledAt,
+    this.createdAt,
   });
 
   final String title;
@@ -16,4 +18,6 @@ class BookingItem {
   final String status;
   final String amountLabel;
   final List<String> steps;
+  final DateTime? scheduledAt;
+  final DateTime? createdAt;
 }

@@ -210,6 +210,8 @@ class BookingOverviewService {
         status: _formatStatus(status),
         amountLabel: _formatCurrency(amount),
         steps: steps,
+        scheduledAt: scheduledAt,
+        createdAt: DateTime.tryParse(row['created_at']?.toString() ?? ''),
       ),
       activeStepIndex: _activeIndexForStatus(status).clamp(0, steps.length - 1),
       paymentStatus: _formatStatus(payment['status']?.toString()),
