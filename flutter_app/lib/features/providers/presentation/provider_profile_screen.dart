@@ -491,7 +491,9 @@ class ProviderProfileScreen extends StatelessWidget {
     if (value.isEmpty) {
       return '';
     }
-    if (value.startsWith('http://') || value.startsWith('https://')) {
+    if (value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('data:')) {
       return value;
     }
     if (value.startsWith('/')) {

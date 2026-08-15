@@ -85,16 +85,21 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
     });
 
     try {
-      final results = await Future.wait<dynamic>([
-        _detailService.fetchProviderDetail(
-          id: provider.id,
-          service: provider.serviceKey,
-        ),
-        _accountService.fetchOverview(),
-      ]);
+      final detail = await _detailService.fetchProviderDetail(
+        id: provider.id,
+        service: provider.serviceKey,
+      );
 
-      final detail = results[0] as ProviderDetailModel;
-      final overview = results[1] as CustomerAccountOverview?;
+      CustomerAccountOverview? overview;
+      try {
+        overview = await _accountService.fetchOverview();
+      } catch (error, stackTrace) {
+        if (kDebugMode) {
+          debugPrint('Customer account overview unavailable for booking: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      }
+
       final addresses = overview?.addresses ?? const <CustomerAddressSummary>[];
       final defaultAddress = addresses.firstWhere(
         (address) => address.isDefault,
@@ -298,7 +303,9 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
     if (value.isEmpty) {
       return '';
     }
-    if (value.startsWith('http://') || value.startsWith('https://')) {
+    if (value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('data:')) {
       return value;
     }
     if (value.startsWith('/')) {
