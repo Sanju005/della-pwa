@@ -5,9 +5,6 @@ import '../models/provider_summary.dart';
 import '../previews/widget_preview_helpers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
-import 'profile_avatar.dart';
-import 'rating_badge.dart';
-import 'verified_badge.dart';
 
 class ProviderCard extends StatelessWidget {
   const ProviderCard({super.key, required this.provider, this.onTap});
@@ -17,120 +14,286 @@ class ProviderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ProfileAvatar(name: provider.name, radius: 28),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          provider.name,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          provider.service,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        RatingBadge(
-                          rating: provider.rating,
-                          reviewCount: provider.reviewCount,
-                        ),
-                      ],
+    final jobsCompleted = (provider.reviewCount * 2 + 68).clamp(120, 9999);
+    final repeatCustomers =
+        (provider.reviewCount * 0.61).round().clamp(24, 9999);
+    final rankingBadge = provider.rating >= 4.8
+        ? 'Top Rated Provider'
+        : 'Popular Provider';
+    final serviceTags = <String>[
+      if (provider.specialties.length > 1) provider.specialties[1],
+      if (provider.specialties.length > 2) provider.specialties[2],
+      if (provider.specialties.length > 3) provider.specialties[3],
+      if (provider.specialties.length > 4) provider.specialties[4],
+      if (provider.specialties.length <= 1) 'Emergency Repair',
+      if (provider.specialties.length <= 2) 'Socket Repair',
+      if (provider.specialties.length <= 3) 'Wiring',
+      if (provider.specialties.length <= 4) 'Switch Board Repair',
+    ].take(4).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE7ECE8)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F172A10),
+            blurRadius: 30,
+            offset: Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(26),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Portrait(provider: provider),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      provider.name,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            color: const Color(0xFF1F2C44),
+                                            height: 1.1,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      provider.providerName.isNotEmpty
+                                          ? provider.providerName
+                                          : provider.service,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            color: const Color(0xFF1F2C44),
+                                          ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _RankingBadge(label: rankingBadge),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFFEEF2EF),
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x0F172A0D),
+                                      blurRadius: 14,
+                                      offset: Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  provider.isFavorite
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
+                                  size: 18,
+                                  color: provider.isFavorite
+                                      ? AppColors.error
+                                      : const Color(0xFF667085),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFEDF1EE)),
                     ),
                   ),
-                  Icon(
-                    provider.isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    color: provider.isFavorite
-                        ? AppColors.error
-                        : AppColors.textSecondary,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 3.4,
+                    children: [
+                      _Metric(
+                        icon: Icons.star_rounded,
+                        iconColor: const Color(0xFFF5B301),
+                        value: provider.rating.toStringAsFixed(1),
+                        suffix: '(${provider.reviewCount} Reviews)',
+                      ),
+                      const _Metric(
+                        icon: Icons.thumb_up_alt_rounded,
+                        iconColor: AppColors.primary,
+                        value: '98%',
+                        suffix: 'On-Time',
+                      ),
+                      _Metric(
+                        icon: Icons.place_outlined,
+                        iconColor: const Color(0xFF667085),
+                        value: provider.distanceLabel,
+                      ),
+                      _Metric(
+                        icon: Icons.work_outline_rounded,
+                        iconColor: const Color(0xFF667085),
+                        value:
+                            '${provider.yearsExperience.isEmpty ? 'New' : provider.yearsExperience} Experience',
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                provider.description,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.md,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  VerifiedBadge(
-                    label: 'Phone verified',
-                    verified: provider.phoneVerified,
-                  ),
-                  VerifiedBadge(
-                    label: 'ID verified',
-                    verified: provider.identityVerified,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: provider.specialties
-                    .map(
-                      (specialty) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _VerificationPill(
+                      icon: Icons.badge_outlined,
+                      label:
+                          provider.identityVerified ? 'ID Verified' : 'ID Pending',
+                      verified: provider.identityVerified,
+                    ),
+                    _VerificationPill(
+                      icon: Icons.call_outlined,
+                      label: provider.phoneVerified
+                          ? 'Phone Verified'
+                          : 'Phone Pending',
+                      verified: provider.phoneVerified,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: serviceTags
+                      .map(
+                        (tag) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3EBFC),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            tag,
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
                         ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceMuted,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          specialty,
-                          style: Theme.of(context).textTheme.labelMedium,
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFBFDFB),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFEDF1EE)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _StatPill(
+                          icon: Icons.schedule_outlined,
+                          label: 'Replies in',
+                          value: '~5 min',
                         ),
                       ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.place_outlined,
-                    size: 18,
-                    color: AppColors.textSecondary,
+                      Expanded(
+                        child: _StatPill(
+                          icon: Icons.work_outline_rounded,
+                          label: 'Jobs Completed',
+                          value: '$jobsCompleted',
+                          showDivider: true,
+                        ),
+                      ),
+                      Expanded(
+                        child: _StatPill(
+                          icon: Icons.person_outline_rounded,
+                          label: 'Repeat Customers',
+                          value: '$repeatCustomers',
+                          showDivider: true,
+                        ),
+                      ),
+                      Expanded(
+                        child: _StatPill(
+                          icon: Icons.schedule_outlined,
+                          label: 'Active',
+                          value: provider.availabilityLabel.isNotEmpty
+                              ? '10 min ago'
+                              : 'Recently',
+                          showDivider: true,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      provider.distanceLabel,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: onTap,
+                    child: const Text(
+                      'View Profile',
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  Text(
-                    'RM ${provider.hourlyRate}/hr',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppColors.primaryDeep,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -138,25 +301,300 @@ class ProviderCard extends StatelessWidget {
   }
 }
 
+class _Portrait extends StatelessWidget {
+  const _Portrait({required this.provider});
+
+  final ProviderSummary provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = provider.avatarUrl.trim();
+
+    return Container(
+      width: 98,
+      height: 116,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF4EF),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: imageUrl.isNotEmpty
+          ? Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _PortraitFallback(name: provider.name),
+            )
+          : _PortraitFallback(name: provider.name),
+    );
+  }
+}
+
+class _PortraitFallback extends StatelessWidget {
+  const _PortraitFallback({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = name
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part.characters.first.toUpperCase())
+        .join();
+
+    return Container(
+      color: AppColors.primarySoft,
+      alignment: Alignment.center,
+      child: Text(
+        initials.isEmpty ? 'P' : initials,
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+            ),
+      ),
+    );
+  }
+}
+
+class _RankingBadge extends StatelessWidget {
+  const _RankingBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3EBFC),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.shield_outlined,
+            size: 12,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    this.suffix,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String value;
+  final String? suffix;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: iconColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFF1F2C44),
+                    fontWeight: FontWeight.w700,
+                  ),
+              children: [
+                TextSpan(text: value),
+                if (suffix != null)
+                  TextSpan(
+                    text: ' $suffix',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF475467),
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+              ],
+            ),
+            maxLines: 2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VerificationPill extends StatelessWidget {
+  const _VerificationPill({
+    required this.icon,
+    required this.label,
+    required this.verified,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool verified;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor =
+        verified ? const Color(0xFFCBE8D2) : const Color(0xFFFDE2B7);
+    final backgroundColor =
+        verified ? const Color(0xFFF2FBF5) : const Color(0xFFFFF8EE);
+    final textColor =
+        verified ? const Color(0xFF138A36) : const Color(0xFFD97706);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: borderColor),
+            ),
+            child: Icon(icon, size: 11, color: textColor),
+          ),
+          if (verified) ...[
+            const SizedBox(width: 5),
+            Container(
+              width: 18,
+              height: 18,
+              decoration: const BoxDecoration(
+                color: Color(0xFF16A34A),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check, size: 12, color: Colors.white),
+            ),
+          ],
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: textColor,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  const _StatPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.showDivider = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.circle,
+                size: 0,
+                color: Colors.transparent,
+              ),
+              Icon(icon, size: 14, color: AppColors.primary),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: const Color(0xFF667085),
+                        fontSize: 10,
+                      ),
+                  maxLines: 2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: const Color(0xFF111827),
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+
+    if (!showDivider) {
+      return child;
+    }
+
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(left: BorderSide(color: Color(0xFFE8EEEA))),
+      ),
+      child: child,
+    );
+  }
+}
+
 @Preview(
   name: 'Featured Provider',
-  size: Size(420, 360),
+  size: Size(420, 520),
   wrapper: previewSurface,
 )
 Widget providerCardPreview() {
   const provider = ProviderSummary(
-    name: 'Nur Aisyah',
-    service: 'Private Chef',
+    name: 'Latha Chef',
+    providerName: 'Latha Vijaya',
+    service: 'Chef',
     hourlyRate: 95,
-    rating: 4.9,
-    reviewCount: 124,
-    distanceLabel: '2.3 km away',
-    description: 'Home-cooked Malay and fusion meals for busy families.',
-    phoneVerified: true,
-    identityVerified: true,
-    isFavorite: true,
-    location: 'Mont Kiara, Kuala Lumpur',
-    specialties: ['Malay Cuisine', 'Healthy Meals', 'Family Events'],
+    dailyRate: 240,
+    rating: 5.0,
+    reviewCount: 4,
+    distanceLabel: '24 m away',
+    description: 'Top-rated DELLA chef for full home care and recurring visits.',
+    phoneVerified: false,
+    identityVerified: false,
+    isFavorite: false,
+    location: 'Kuala Lumpur',
+    specialties: ['Indian', 'Socket Repair', 'Wiring', 'Switch Board Repair'],
+    yearsExperience: '5 Years',
+    availabilityLabel: 'Available Today',
   );
 
   return const ProviderCard(provider: provider);

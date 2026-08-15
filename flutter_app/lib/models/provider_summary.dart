@@ -19,6 +19,8 @@ class ProviderSummary {
     this.yearsExperience = '',
     this.approvalStatus = '',
     this.avatarUrl = '',
+    this.workMode = '',
+    this.availabilityLabel = '',
   });
 
   final String id;
@@ -40,6 +42,8 @@ class ProviderSummary {
   final String yearsExperience;
   final String approvalStatus;
   final String avatarUrl;
+  final String workMode;
+  final String availabilityLabel;
 
   factory ProviderSummary.fromJson(Map<String, dynamic> json) {
     return ProviderSummary(
@@ -72,6 +76,8 @@ class ProviderSummary {
       yearsExperience: json['yearsExperience'] as String? ?? '',
       approvalStatus: json['approvalStatus'] as String? ?? '',
       avatarUrl: json['avatarUrl'] as String? ?? '',
+      workMode: json['workMode'] as String? ?? '',
+      availabilityLabel: json['availabilityLabel'] as String? ?? '',
     );
   }
 
@@ -110,6 +116,8 @@ class ProviderSummary {
           ? 'Approved'
           : 'Pending',
       avatarUrl: json['profileImageUrl'] as String? ?? '',
+      workMode: json['workMode'] as String? ?? '',
+      availabilityLabel: json['availabilityLabel'] as String? ?? '',
     );
   }
 
@@ -142,6 +150,8 @@ class ProviderSummary {
       'yearsExperience': yearsExperience,
       'approvalStatus': approvalStatus,
       'avatarUrl': avatarUrl,
+      'workMode': workMode,
+      'availabilityLabel': availabilityLabel,
     };
   }
 }
