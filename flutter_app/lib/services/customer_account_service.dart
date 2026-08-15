@@ -8,6 +8,8 @@ class CustomerAddressSummary {
     required this.line2,
     required this.city,
     required this.state,
+    required this.postcode,
+    required this.country,
     required this.isDefault,
   });
 
@@ -16,13 +18,16 @@ class CustomerAddressSummary {
   final String line2;
   final String city;
   final String state;
+  final String postcode;
+  final String country;
   final bool isDefault;
 
   String get formattedAddress {
     return [
       line1,
       line2,
-      [city, state].where((item) => item.isNotEmpty).join(', '),
+      [city, state, postcode].where((item) => item.isNotEmpty).join(', '),
+      country,
     ].where((item) => item.isNotEmpty).join('\n');
   }
 }
@@ -286,7 +291,7 @@ class CustomerAccountService {
           .maybeSingle(),
       _client
           .from('addresses')
-          .select('label, address_line_1, address_line_2, city, state, is_default')
+          .select('label, address_line_1, address_line_2, city, state, postcode, country, is_default')
           .eq('user_id', user.id)
           .order('is_default', ascending: false),
       _client
@@ -404,6 +409,8 @@ class CustomerAccountService {
         line2: data['address_line_2']?.toString().trim() ?? '',
         city: data['city']?.toString().trim() ?? '',
         state: data['state']?.toString().trim() ?? '',
+        postcode: data['postcode']?.toString().trim() ?? '',
+        country: data['country']?.toString().trim() ?? 'Malaysia',
         isDefault: data['is_default'] == true,
       );
     }).toList();

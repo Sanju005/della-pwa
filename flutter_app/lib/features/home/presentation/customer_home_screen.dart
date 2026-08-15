@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 
@@ -5,7 +6,11 @@ import '../../../core/routing/app_routes.dart';
 import '../../../previews/widget_preview_helpers.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/current_customer_service.dart';
+import '../../../services/current_location_service.dart';
+import '../../../services/customer_account_service.dart';
+import '../../../services/customer_address_service.dart';
 import '../../../services/provider_marketplace_service.dart';
+import '../../../services/service_location_store.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/empty_state.dart';
@@ -18,16 +23,172 @@ import '../../../widgets/swiper_button.dart';
 import '../../../widgets/swiper_search_bar.dart';
 import '../../../widgets/swiper_section_card.dart';
 
-class CustomerHomeScreen extends StatelessWidget {
+class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key, required this.repository});
 
   final DemoRepository repository;
+
+  @override
+  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+}
+
+class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   static const _marketplaceService = ProviderMarketplaceService();
   static const _currentCustomerService = CurrentCustomerService();
+  static const _addressService = CustomerAddressService();
+
+  ServiceLocationSelection? _selectedLocation;
+  bool _changingLocation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLocation = ServiceLocationStore.load();
+  }
+
+  Future<void> _chooseLocation() async {
+    List<CustomerAddressSummary> addresses = const [];
+    try {
+      addresses = await _addressService.fetchAddresses();
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Fetch saved addresses failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+
+    await SwiperBottomSheet.show<void>(
+      context,
+      title: 'Choose service location',
+      subtitle:
+          'Use a saved address or your current location before browsing providers.',
+      child: StatefulBuilder(
+        builder: (context, setSheetState) {
+          Future<void> useCurrentLocation() async {
+            setSheetState(() => _changingLocation = true);
+            try {
+              final result = await fetchCurrentLocation();
+              final selection = ServiceLocationSelection(
+                type: 'current',
+                label: 'Current location',
+                address: result.label,
+                latitude: result.latitude,
+                longitude: result.longitude,
+              );
+              await ServiceLocationStore.save(selection);
+              if (!mounted) {
+                return;
+              }
+              setState(() => _selectedLocation = selection);
+              Navigator.of(context).pop();
+            } catch (error, stackTrace) {
+              if (kDebugMode) {
+                debugPrint('Home current location failed: $error');
+                debugPrintStack(stackTrace: stackTrace);
+              }
+              if (!mounted) {
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    error is Exception
+                        ? error.toString().replaceFirst('Exception: ', '')
+                        : 'Unable to use current location.',
+                  ),
+                ),
+              );
+            } finally {
+              if (mounted) {
+                setState(() => _changingLocation = false);
+              }
+            }
+          }
+
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (addresses.isNotEmpty) ...[
+                for (final address in addresses) ...[
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () async {
+                      final selection = ServiceLocationSelection(
+                        type: 'saved',
+                        label: address.label,
+                        address: address.formattedAddress,
+                        city: address.city,
+                        state: address.state,
+                        country: address.country,
+                      );
+                      await ServiceLocationStore.save(selection);
+                      if (!mounted) {
+                        return;
+                      }
+                      setState(() => _selectedLocation = selection);
+                      Navigator.of(context).pop();
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            address.label,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(address.formattedAddress),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+              SwiperButton(
+                label: 'Use Current Location',
+                isSecondary: true,
+                isLoading: _changingLocation,
+                onPressed: useCurrentLocation,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              if (_selectedLocation != null)
+                SwiperButton(
+                  label: 'Clear selection',
+                  isSecondary: true,
+                  onPressed: () async {
+                    await ServiceLocationStore.clear();
+                    if (!mounted) {
+                      return;
+                    }
+                    setState(() => _selectedLocation = null);
+                    Navigator.of(context).pop();
+                  },
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final categories = repository.getCustomerCategories();
+    final categories = widget.repository.getCustomerCategories();
 
     return CustomScrollView(
       slivers: [
@@ -72,11 +233,27 @@ class CustomerHomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 const SwiperSearchBar(),
+                const SizedBox(height: AppSpacing.md),
+                SwiperSectionCard(
+                  title: 'Service location',
+                  subtitle: _selectedLocation == null
+                      ? 'Choose a saved address or your current location before browsing.'
+                      : _selectedLocation!.label,
+                  trailing: TextButton(
+                    onPressed: _chooseLocation,
+                    child: const Text('Change'),
+                  ),
+                  child: Text(
+                    _selectedLocation?.address.isNotEmpty == true
+                        ? _selectedLocation!.address
+                        : 'No location selected yet.',
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 SwiperSectionCard(
                   title: 'Browse services',
                   subtitle:
-                      'Tap into the Swiper categories we will later connect to live data.',
+                      'Choose a location and browse providers using your selected service area.',
                   child: GridView.builder(
                     itemCount: categories.length,
                     shrinkWrap: true,
@@ -142,7 +319,9 @@ class CustomerHomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 FutureBuilder(
-                  future: _marketplaceService.fetchVisibleProviders(),
+                  future: _marketplaceService.fetchVisibleProviders(
+                    locationSelection: _selectedLocation,
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState != ConnectionState.done) {
                       return const Padding(
@@ -169,7 +348,7 @@ class CustomerHomeScreen extends StatelessWidget {
                         child: EmptyState(
                           title: 'No providers yet',
                           subtitle:
-                              'Visible provider profiles have not been published in Supabase yet.',
+                              'No providers matched the selected service location.',
                           icon: Icons.storefront_outlined,
                         ),
                       );
@@ -239,7 +418,8 @@ class CustomerHomeScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.lg),
                 SwiperSectionCard(
                   title: 'Your bookings',
-                  subtitle: 'Open the overview to see upcoming and past bookings from Supabase.',
+                  subtitle:
+                      'Open the overview to see upcoming and past bookings from Supabase.',
                   child: SwiperButton(
                     label: 'View bookings',
                     icon: const Icon(Icons.event_note_rounded),

@@ -5,9 +5,12 @@ import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../models/provider_summary.dart';
+import '../../../services/current_location_service.dart';
 import '../../../services/customer_account_service.dart';
+import '../../../services/customer_address_service.dart';
 import '../../../services/provider_booking_service.dart';
 import '../../../services/provider_detail_service.dart';
+import '../../../services/service_location_store.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/empty_state.dart';
@@ -28,6 +31,7 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
   static const _detailService = ProviderDetailService();
   static const _bookingService = ProviderBookingService();
   static const _accountService = CustomerAccountService();
+  static const _addressService = CustomerAddressService();
 
   final _addressController = TextEditingController();
   final _accessNoteController = TextEditingController();
@@ -42,6 +46,7 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
   int _selectedHours = 1;
   bool _isLoading = true;
   bool _isSubmitting = false;
+  bool _isResolvingLocation = false;
   String? _errorMessage;
   bool _didLoad = false;
 
@@ -91,6 +96,7 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
       );
 
       CustomerAccountOverview? overview;
+      List<CustomerAddressSummary> addresses = const [];
       try {
         overview = await _accountService.fetchOverview();
       } catch (error, stackTrace) {
@@ -100,7 +106,20 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
         }
       }
 
-      final addresses = overview?.addresses ?? const <CustomerAddressSummary>[];
+      if (overview?.addresses.isNotEmpty == true) {
+        addresses = overview!.addresses;
+      } else {
+        try {
+          addresses = await _addressService.fetchAddresses();
+        } catch (error, stackTrace) {
+          if (kDebugMode) {
+            debugPrint('Saved address fetch unavailable for booking: $error');
+            debugPrintStack(stackTrace: stackTrace);
+          }
+        }
+      }
+
+      final activeLocation = ServiceLocationStore.load();
       final defaultAddress = addresses.firstWhere(
         (address) => address.isDefault,
         orElse: () => addresses.isNotEmpty
@@ -111,6 +130,8 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
                 line2: '',
                 city: '',
                 state: '',
+                postcode: '',
+                country: '',
                 isDefault: false,
               ),
       );
@@ -132,6 +153,10 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
       if (_addressController.text.trim().isEmpty &&
           defaultAddress.label.isNotEmpty) {
         _addressController.text = defaultAddress.formattedAddress;
+      } else if (_addressController.text.trim().isEmpty &&
+          activeLocation != null &&
+          activeLocation.address.trim().isNotEmpty) {
+        _addressController.text = activeLocation.address.trim();
       }
     } catch (error, stackTrace) {
       if (kDebugMode) {
@@ -456,6 +481,43 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
     );
   }
 
+  Future<void> _useCurrentLocation() async {
+    if (_isResolvingLocation) {
+      return;
+    }
+
+    setState(() {
+      _isResolvingLocation = true;
+    });
+
+    try {
+      final result = await fetchCurrentLocation();
+      if (!mounted) {
+        return;
+      }
+      _addressController.text = result.label;
+      _showSnackBar('Current location added to the address field.');
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Current location failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      if (!mounted) {
+        return;
+      }
+      final message = error is Exception
+          ? error.toString().replaceFirst('Exception: ', '')
+          : 'Unable to get your current location.';
+      _showSnackBar(message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResolvingLocation = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = _provider;
@@ -758,17 +820,8 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
                   SwiperButton(
                     label: 'Use Current Location',
                     isSecondary: true,
-                    onPressed: () {
-                      if (_defaultAddress != null) {
-                        _addressController.text =
-                            _defaultAddress!.formattedAddress;
-                        _showSnackBar('Saved address applied.');
-                      } else {
-                        _showSnackBar(
-                          'Current location is not available in this build yet.',
-                        );
-                      }
-                    },
+                    isLoading: _isResolvingLocation,
+                    onPressed: _useCurrentLocation,
                   ),
                 ],
               ),

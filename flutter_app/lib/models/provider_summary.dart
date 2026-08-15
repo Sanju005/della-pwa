@@ -22,6 +22,8 @@ class ProviderSummary {
     this.avatarUrl = '',
     this.workMode = '',
     this.availabilityLabel = '',
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
@@ -46,6 +48,8 @@ class ProviderSummary {
   final String avatarUrl;
   final String workMode;
   final String availabilityLabel;
+  final double? latitude;
+  final double? longitude;
 
   factory ProviderSummary.fromJson(Map<String, dynamic> json) {
     return ProviderSummary(
@@ -81,6 +85,8 @@ class ProviderSummary {
       avatarUrl: json['avatarUrl'] as String? ?? '',
       workMode: json['workMode'] as String? ?? '',
       availabilityLabel: json['availabilityLabel'] as String? ?? '',
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -122,6 +128,8 @@ class ProviderSummary {
       avatarUrl: json['profileImageUrl'] as String? ?? '',
       workMode: json['workMode'] as String? ?? '',
       availabilityLabel: json['availabilityLabel'] as String? ?? '',
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -157,6 +165,8 @@ class ProviderSummary {
       'avatarUrl': avatarUrl,
       'workMode': workMode,
       'availabilityLabel': availabilityLabel,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 }
