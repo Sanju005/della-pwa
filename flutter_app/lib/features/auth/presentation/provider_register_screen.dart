@@ -805,8 +805,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
       return 'Service';
     }
 
-    final safeIndex =
-        _serviceDetailIndex.clamp(0, _selectedServices.length - 1) as int;
+    final safeIndex = _serviceDetailIndex.clamp(0, _selectedServices.length - 1);
     return _selectedServices[safeIndex];
   }
 

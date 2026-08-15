@@ -61,7 +61,7 @@ class ProfileDemoScreen extends StatelessWidget {
                 label: overview.verification.verified ? 'Verified' : 'Pending',
                 tone: overview.verification.verified
                     ? SwiperStatusTone.success
-                    : SwiperStatusTone.pending,
+                    : SwiperStatusTone.warning,
               ),
               child: Row(
                 children: [
