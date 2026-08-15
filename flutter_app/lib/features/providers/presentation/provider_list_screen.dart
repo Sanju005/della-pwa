@@ -20,14 +20,21 @@ class ProviderListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final service = args is String && args.trim().isNotEmpty
+        ? args.trim().toLowerCase()
+        : null;
+
     return Scaffold(
-      appBar: const SwiperAppBar(
+      appBar: SwiperAppBar(
         title: 'Providers',
-        subtitle: 'Live provider marketplace',
+        subtitle: service == null
+            ? 'Live provider marketplace'
+            : '${service[0].toUpperCase()}${service.substring(1)} providers',
         showBack: true,
       ),
-      body: FutureBuilder(
-        future: _marketplaceService.fetchVisibleProviders(),
+      body: FutureBuilder<ProviderCatalogResult>(
+        future: _marketplaceService.fetchCatalog(service: service),
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const LoadingState(label: 'Loading providers...');
@@ -36,17 +43,19 @@ class ProviderListScreen extends StatelessWidget {
           if (snapshot.hasError) {
             return EmptyState(
               title: 'Unable to load providers',
-              subtitle: snapshot.error.toString(),
+              subtitle: 'Unable to load providers. Please try again.',
               icon: Icons.error_outline_rounded,
             );
           }
 
-          final providers = snapshot.data ?? const [];
+          final catalog = snapshot.data;
+          final providers = catalog?.listings ?? const [];
           if (providers.isEmpty) {
-            return const EmptyState(
+            return EmptyState(
               title: 'No providers available',
-              subtitle:
-                  'No visible provider profiles were returned from Supabase yet.',
+              subtitle: service == null
+                  ? 'No provider listings are available right now.'
+                  : 'No providers are available for this service right now.',
               icon: Icons.storefront_outlined,
             );
           }

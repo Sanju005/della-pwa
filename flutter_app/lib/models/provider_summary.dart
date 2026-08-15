@@ -75,6 +75,52 @@ class ProviderSummary {
     );
   }
 
+  factory ProviderSummary.fromProviderCatalogJson(Map<String, dynamic> json) {
+    final providerName = json['providerName'] as String? ?? '';
+    final serviceLabel =
+        json['serviceLabel'] as String? ??
+        json['service'] as String? ??
+        json['title'] as String? ??
+        'Service Provider';
+
+    return ProviderSummary(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'DELLA Provider',
+      providerName: providerName,
+      service: serviceLabel,
+      hourlyRate: (json['hourlyRate'] as num?)?.toInt() ?? 0,
+      dailyRate: (json['dailyRate'] as num?)?.toInt() ?? 0,
+      rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      reviewCount: (json['reviews'] as num?)?.toInt() ?? 0,
+      distanceLabel: _buildDistanceLabel((json['distanceKm'] as num?)?.toDouble()),
+      description: json['bio'] as String? ?? '',
+      phoneVerified: json['phoneVerified'] as bool? ?? false,
+      identityVerified: json['identityVerified'] as bool? ?? false,
+      isFavorite: false,
+      location: json['location'] as String? ?? 'Malaysia',
+      specialties:
+          (json['specialties'] as List?)
+              ?.map((item) => item.toString())
+              .where((item) => item.isNotEmpty)
+              .toList() ??
+          const [],
+      services: [serviceLabel],
+      yearsExperience: json['yearsExperience'] as String? ?? '',
+      approvalStatus: (json['isApproved'] as bool? ?? false)
+          ? 'Approved'
+          : 'Pending',
+      avatarUrl: json['profileImageUrl'] as String? ?? '',
+    );
+  }
+
+  static String _buildDistanceLabel(double? distanceKm) {
+    if (distanceKm == null) {
+      return 'Location unavailable';
+    }
+
+    return '${distanceKm.toStringAsFixed(distanceKm < 10 ? 1 : 0)} km away';
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

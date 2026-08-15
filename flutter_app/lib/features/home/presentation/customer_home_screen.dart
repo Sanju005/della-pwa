@@ -90,8 +90,10 @@ class CustomerHomeScreen extends StatelessWidget {
                         ),
                     itemBuilder: (context, index) => ServiceCategoryChip(
                       category: categories[index],
-                      onTap: () =>
-                          Navigator.of(context).pushNamed(AppRoutes.providers),
+                      onTap: () => Navigator.of(context).pushNamed(
+                        AppRoutes.providers,
+                        arguments: categories[index].label.toLowerCase(),
+                      ),
                     ),
                   ),
                 ),
@@ -152,9 +154,9 @@ class CustomerHomeScreen extends StatelessWidget {
                     if (snapshot.hasError) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                        child: EmptyState(
+                        child: const EmptyState(
                           title: 'Unable to load featured provider',
-                          subtitle: snapshot.error.toString(),
+                          subtitle: 'Unable to load providers. Please try again.',
                           icon: Icons.error_outline_rounded,
                         ),
                       );
