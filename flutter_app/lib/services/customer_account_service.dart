@@ -320,37 +320,39 @@ class CustomerAccountService {
       return null;
     }
 
-    final results = await Future.wait([
-      _client
-          .from('profiles')
-          .select('full_name, email, phone, avatar_url')
-          .eq('id', user.id)
-          .maybeSingle(),
-      _fetchCustomerProfileRow(user.id),
-      _client
-          .from('addresses')
-          .select('label, address_line_1, address_line_2, city, state, postcode, country, is_default')
-          .eq('user_id', user.id)
-          .order('is_default', ascending: false),
-      _client
-          .from('bookings')
-          .select('booking_status')
-          .eq('customer_id', user.id)
-          .limit(200),
-      _client
-          .from('payments')
-          .select('provider_id, service_title, amount, payment_method, status, paid_at, created_at')
-          .eq('customer_id', user.id)
-          .order('paid_at', ascending: false, nullsFirst: false)
-          .order('created_at', ascending: false, nullsFirst: false)
-          .limit(10),
-    ]);
-
-    final profileRow = results[0] as Map<String, dynamic>?;
-    final customerRow = results[1] as Map<String, dynamic>?;
-    final addressRows = results[2] as List<dynamic>? ?? const [];
-    final bookingRows = results[3] as List<dynamic>? ?? const [];
-    final paymentRows = results[4] as List<dynamic>? ?? const [];
+    final profileRow = await _client
+        .from('profiles')
+        .select('full_name, email, phone, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+    final customerRow = await _fetchCustomerProfileRow(user.id);
+    final addressRows = await _client
+            .from('addresses')
+            .select(
+              'label, address_line_1, address_line_2, city, state, postcode, country, is_default',
+            )
+            .eq('user_id', user.id)
+            .order('is_default', ascending: false)
+        as List<dynamic>? ??
+        const [];
+    final bookingRows = await _client
+            .from('bookings')
+            .select('booking_status')
+            .eq('customer_id', user.id)
+            .limit(200)
+        as List<dynamic>? ??
+        const [];
+    final paymentRows = await _client
+            .from('payments')
+            .select(
+              'provider_id, service_title, amount, payment_method, status, paid_at, created_at',
+            )
+            .eq('customer_id', user.id)
+            .order('paid_at', ascending: false, nullsFirst: false)
+            .order('created_at', ascending: false, nullsFirst: false)
+            .limit(10)
+        as List<dynamic>? ??
+        const [];
 
     final fullName = profileRow?['full_name']?.toString().trim() ?? '';
     final nameParts = fullName.isEmpty ? const <String>[] : fullName.split(RegExp(r'\s+'));

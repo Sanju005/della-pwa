@@ -70,6 +70,7 @@ class DemoDataService {
   List<BookingItem> bookings() {
     return const [
       BookingItem(
+        id: 'demo-chef-booking',
         title: 'Chef visit',
         providerName: 'Nur Aisyah',
         schedule: 'Wed, 12 Aug • 7:00 PM',
@@ -79,6 +80,7 @@ class DemoDataService {
         steps: ['Requested', 'Accepted', 'On the way', 'Completed'],
       ),
       BookingItem(
+        id: 'demo-wiring-booking',
         title: 'Wiring repair',
         providerName: 'Daniel Tan',
         schedule: 'Thu, 13 Aug • 10:30 AM',
