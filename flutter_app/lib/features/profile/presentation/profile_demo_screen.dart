@@ -221,9 +221,13 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
       return DateTime.parse(trimmed).toIso8601String().split('T').first;
     } catch (_) {
       try {
-        return MaterialLocalizations.of(
-          context,
-        ).parseCompactDate(trimmed).toIso8601String().split('T').first;
+        final parsed = MaterialLocalizations.of(context).parseCompactDate(
+          trimmed,
+        );
+        if (parsed != null) {
+          return parsed.toIso8601String().split('T').first;
+        }
+        return trimmed;
       } catch (_) {
         return trimmed;
       }
