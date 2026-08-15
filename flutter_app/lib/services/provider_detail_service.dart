@@ -1,0 +1,144 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/config/app_config.dart';
+
+class ProviderDetailModel {
+  const ProviderDetailModel({
+    required this.id,
+    required this.name,
+    required this.title,
+    required this.serviceLabel,
+    required this.serviceKey,
+    required this.profileImage,
+    required this.reviewsLabel,
+    required this.rating,
+    required this.distanceKm,
+    required this.identityVerified,
+    required this.phoneVerified,
+    required this.yearsExperience,
+    required this.jobsCompleted,
+    required this.hourlyRate,
+    required this.dailyRate,
+    required this.specialties,
+    required this.about,
+    required this.locationFull,
+    required this.verified,
+    required this.customerReviews,
+    required this.hasUploadedGallery,
+  });
+
+  final String id;
+  final String name;
+  final String title;
+  final String serviceLabel;
+  final String serviceKey;
+  final String profileImage;
+  final String reviewsLabel;
+  final double rating;
+  final double distanceKm;
+  final bool identityVerified;
+  final bool phoneVerified;
+  final String yearsExperience;
+  final int jobsCompleted;
+  final int hourlyRate;
+  final int dailyRate;
+  final List<String> specialties;
+  final String about;
+  final String locationFull;
+  final bool verified;
+  final List<Map<String, dynamic>> customerReviews;
+  final bool hasUploadedGallery;
+
+  factory ProviderDetailModel.fromJson(Map<String, dynamic> json) {
+    return ProviderDetailModel(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Provider',
+      title: json['title'] as String? ?? '',
+      serviceLabel: json['serviceLabel'] as String? ?? '',
+      serviceKey: json['serviceKey'] as String? ?? '',
+      profileImage: json['profileImage'] as String? ?? '',
+      reviewsLabel: json['reviewsLabel'] as String? ?? '',
+      rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0,
+      identityVerified: json['identityVerified'] as bool? ?? false,
+      phoneVerified: json['phoneVerified'] as bool? ?? false,
+      yearsExperience: json['yearsExperience'] as String? ?? '',
+      jobsCompleted: (json['jobsCompleted'] as num?)?.toInt() ?? 0,
+      hourlyRate: (json['hourlyRate'] as num?)?.toInt() ?? 0,
+      dailyRate: (json['dailyRate'] as num?)?.toInt() ?? 0,
+      specialties:
+          (json['specialties'] as List?)
+              ?.map((item) => item.toString())
+              .where((item) => item.isNotEmpty)
+              .toList() ??
+          const [],
+      about: json['about'] as String? ?? '',
+      locationFull: json['locationFull'] as String? ?? '',
+      verified: json['verified'] as bool? ?? false,
+      customerReviews:
+          (json['customerReviews'] as List?)
+              ?.whereType<Map>()
+              .map(
+                (item) => item.map(
+                  (key, value) => MapEntry(key.toString(), value),
+                ),
+              )
+              .toList() ??
+          const [],
+      hasUploadedGallery: json['hasUploadedGallery'] as bool? ?? false,
+    );
+  }
+}
+
+class ProviderDetailService {
+  const ProviderDetailService();
+
+  Future<ProviderDetailModel> fetchProviderDetail({
+    required String id,
+    String? service,
+  }) async {
+    final uri = Uri.parse('${AppConfig.appBaseUrl}/api/providers/$id').replace(
+      queryParameters: {
+        if (service != null && service.trim().isNotEmpty)
+          'service': service.trim().toLowerCase(),
+      },
+    );
+
+    final headers = <String, String>{'Accept': 'application/json'};
+    final accessToken = Supabase.instance.client.auth.currentSession?.accessToken;
+    if (accessToken != null && accessToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $accessToken';
+    }
+
+    final response = await http.get(uri, headers: headers);
+    final body = _decode(response.body);
+
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300 &&
+        body is Map<String, dynamic>) {
+      return ProviderDetailModel.fromJson(body);
+    }
+
+    if (kDebugMode) {
+      debugPrint('Provider detail request failed: ${response.statusCode}');
+      debugPrint(response.body);
+    }
+
+    throw Exception('Unable to load provider profile. Please try again.');
+  }
+
+  Object? _decode(String body) {
+    if (body.isEmpty) {
+      return null;
+    }
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      return null;
+    }
+  }
+}

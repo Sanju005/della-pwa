@@ -3,6 +3,7 @@ class ProviderSummary {
     this.id = '',
     required this.name,
     this.providerName = '',
+    this.serviceKey = '',
     required this.service,
     required this.hourlyRate,
     this.dailyRate = 0,
@@ -26,6 +27,7 @@ class ProviderSummary {
   final String id;
   final String name;
   final String providerName;
+  final String serviceKey;
   final String service;
   final int hourlyRate;
   final int dailyRate;
@@ -50,6 +52,7 @@ class ProviderSummary {
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       providerName: json['providerName'] as String? ?? '',
+      serviceKey: json['serviceKey'] as String? ?? '',
       service: json['service'] as String? ?? '',
       hourlyRate: (json['hourlyRate'] as num?)?.toInt() ?? 0,
       dailyRate: (json['dailyRate'] as num?)?.toInt() ?? 0,
@@ -93,6 +96,7 @@ class ProviderSummary {
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? 'DELLA Provider',
       providerName: providerName,
+      serviceKey: json['serviceKey'] as String? ?? '',
       service: serviceLabel,
       hourlyRate: (json['hourlyRate'] as num?)?.toInt() ?? 0,
       dailyRate: (json['dailyRate'] as num?)?.toInt() ?? 0,
@@ -134,6 +138,7 @@ class ProviderSummary {
       'id': id,
       'name': name,
       'providerName': providerName,
+      'serviceKey': serviceKey,
       'service': service,
       'hourlyRate': hourlyRate,
       'dailyRate': dailyRate,
