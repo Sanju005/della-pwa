@@ -36,6 +36,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   static const _marketplaceService = ProviderMarketplaceService();
   static const _currentCustomerService = CurrentCustomerService();
   static const _addressService = CustomerAddressService();
+  static const _popularSections = <({String title, String serviceKey})>[
+    (
+      title: 'Popular chef nearby you',
+      serviceKey: 'chef',
+    ),
+    (
+      title: 'Popular electrician nearby you',
+      serviceKey: 'electrician',
+    ),
+    (
+      title: 'Popular maids nearby you',
+      serviceKey: 'maid',
+    ),
+  ];
 
   ServiceLocationSelection? _selectedLocation;
   bool _changingLocation = false;
@@ -318,60 +332,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                FutureBuilder(
-                  future: _marketplaceService.fetchVisibleProviders(
+                for (final section in _popularSections) ...[
+                  _NearbyCategorySection(
+                    title: section.title,
+                    serviceKey: section.serviceKey,
                     locationSelection: _selectedLocation,
+                    marketplaceService: _marketplaceService,
                   ),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                        child: LoadingState(label: 'Loading featured provider...'),
-                      );
-                    }
-
-                    if (snapshot.hasError) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                        child: const EmptyState(
-                          title: 'Unable to load featured provider',
-                          subtitle: 'Unable to load providers. Please try again.',
-                          icon: Icons.error_outline_rounded,
-                        ),
-                      );
-                    }
-
-                    final providers = snapshot.data ?? const [];
-                    if (providers.isEmpty) {
-                      return const Padding(
-                        padding: EdgeInsets.only(bottom: AppSpacing.lg),
-                        child: EmptyState(
-                          title: 'No providers yet',
-                          subtitle:
-                              'No providers matched the selected service location.',
-                          icon: Icons.storefront_outlined,
-                        ),
-                      );
-                    }
-
-                    final featuredProvider = providers.first;
-                    return SwiperSectionCard(
-                      title: 'Featured provider',
-                      trailing: TextButton(
-                        onPressed: () =>
-                            Navigator.of(context).pushNamed(AppRoutes.providers),
-                        child: const Text('See all'),
-                      ),
-                      child: ProviderCard(
-                        provider: featuredProvider,
-                        onTap: () => Navigator.of(context).pushNamed(
-                          AppRoutes.providerProfile,
-                          arguments: featuredProvider,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 SwiperSectionCard(
                   title: 'Quick actions',
@@ -434,6 +403,224 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NearbyCategorySection extends StatelessWidget {
+  const _NearbyCategorySection({
+    required this.title,
+    required this.serviceKey,
+    required this.locationSelection,
+    required this.marketplaceService,
+  });
+
+  final String title;
+  final String serviceKey;
+  final ServiceLocationSelection? locationSelection;
+  final ProviderMarketplaceService marketplaceService;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<ProviderSummary>>(
+      future: marketplaceService.fetchVisibleProviders(
+        service: serviceKey,
+        locationSelection: locationSelection,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: LoadingState(label: 'Loading nearby providers...'),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const EmptyState(
+            title: 'Unable to load providers',
+            subtitle: 'Unable to load providers. Please try again.',
+            icon: Icons.error_outline_rounded,
+          );
+        }
+
+        final providers = snapshot.data ?? const [];
+        if (providers.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pushNamed(AppRoutes.providers, arguments: serviceKey),
+                  child: const Text('See all'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              height: 520,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: providers.length.clamp(0, 5) + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+                itemBuilder: (context, index) {
+                  if (index >= providers.length.clamp(0, 5)) {
+                    return _ShowAllProvidersCard(serviceKey: serviceKey, title: title);
+                  }
+
+                  final provider = providers[index];
+                  return SizedBox(
+                    width: 312,
+                    child: ProviderCard(
+                      provider: provider,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        AppRoutes.providerProfile,
+                        arguments: provider,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ShowAllProvidersCard extends StatelessWidget {
+  const _ShowAllProvidersCard({
+    required this.serviceKey,
+    required this.title,
+  });
+
+  final String serviceKey;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = title
+        .replaceFirst(RegExp(r'^Popular\s+', caseSensitive: false), '')
+        .replaceFirst(RegExp(r'\s+nearby you$', caseSensitive: false), '')
+        .trim();
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(26),
+      onTap: () => Navigator.of(
+        context,
+      ).pushNamed(AppRoutes.providers, arguments: serviceKey),
+      child: Container(
+        width: 280,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: const Color(0xFFDCCCF0)),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFCF8FF),
+              Color(0xFFF7EFFF),
+            ],
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0F172A10),
+              blurRadius: 24,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryDeep],
+                ),
+              ),
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              'Show All',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF162544),
+                  ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'See all $label nearby and explore more provider options.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+            ),
+            const Spacer(),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.md,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.84),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE4D7F5)),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Open full list',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primarySoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
