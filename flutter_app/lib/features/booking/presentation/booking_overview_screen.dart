@@ -274,24 +274,9 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: AppColors.primarySoft,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  booking.providerName.isNotEmpty
-                      ? booking.providerName.characters.first.toUpperCase()
-                      : 'P',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+              _BookingProviderAvatar(
+                providerName: booking.providerName,
+                providerImageUrl: booking.providerImageUrl,
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -421,5 +406,67 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
       return 'Accepted';
     }
     return status;
+  }
+}
+
+class _BookingProviderAvatar extends StatelessWidget {
+  const _BookingProviderAvatar({
+    required this.providerName,
+    required this.providerImageUrl,
+  });
+
+  final String providerName;
+  final String providerImageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = _resolveImageUrl(providerImageUrl);
+    if (imageUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: Image.network(
+          imageUrl,
+          width: 72,
+          height: 72,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _fallbackAvatar(),
+        ),
+      );
+    }
+
+    return _fallbackAvatar();
+  }
+
+  Widget _fallbackAvatar() {
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: const BoxDecoration(
+        color: AppColors.primarySoft,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        providerName.isNotEmpty ? providerName.characters.first.toUpperCase() : 'P',
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 26,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  String _resolveImageUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    if (trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('data:')) {
+      return trimmed;
+    }
+    return '';
   }
 }

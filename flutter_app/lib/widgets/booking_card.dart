@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 
+import '../core/config/app_config.dart';
 import '../models/booking_item.dart';
 import '../previews/widget_preview_helpers.dart';
 import '../theme/app_spacing.dart';
@@ -17,8 +18,8 @@ class BookingCard extends StatelessWidget {
     final tone = booking.status == 'Confirmed'
         ? SwiperStatusTone.success
         : booking.status == 'Pending'
-        ? SwiperStatusTone.warning
-        : SwiperStatusTone.info;
+            ? SwiperStatusTone.warning
+            : SwiperStatusTone.info;
 
     return Card(
       child: InkWell(
@@ -30,22 +31,31 @@ class BookingCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _BookingProviderAvatar(booking: booking),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
-                    child: Text(
-                      booking.title,
-                      style: Theme.of(context).textTheme.titleLarge,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          booking.title,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          booking.providerName,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(width: AppSpacing.sm),
                   SwiperStatusBadge(label: booking.status, tone: tone),
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
-              Text(
-                booking.providerName,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: AppSpacing.xs),
               Text(
                 booking.schedule,
                 style: Theme.of(context).textTheme.bodyMedium,
@@ -84,7 +94,8 @@ Widget bookingCardPreview() {
     id: 'preview-booking',
     title: 'Chef visit',
     providerName: 'Nur Aisyah',
-    schedule: 'Wed, 12 Aug • 7:00 PM',
+    providerImageUrl: '',
+    schedule: 'Wed, 12 Aug 7:00 PM',
     location: 'Mont Kiara Residence',
     status: 'Confirmed',
     amountLabel: 'RM 190',
@@ -92,4 +103,63 @@ Widget bookingCardPreview() {
   );
 
   return const BookingCard(booking: booking);
+}
+
+class _BookingProviderAvatar extends StatelessWidget {
+  const _BookingProviderAvatar({required this.booking});
+
+  final BookingItem booking;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = _resolveImageUrl(booking.providerImageUrl);
+    if (imageUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.network(
+          imageUrl,
+          width: 64,
+          height: 64,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _fallbackAvatar(context),
+        ),
+      );
+    }
+
+    return _fallbackAvatar(context);
+  }
+
+  Widget _fallbackAvatar(BuildContext context) {
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        booking.providerName.isNotEmpty
+            ? booking.providerName.characters.first.toUpperCase()
+            : 'P',
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+    );
+  }
+
+  String _resolveImageUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    if (trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('data:')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/')) {
+      return '${AppConfig.appBaseUrl}$trimmed';
+    }
+    return '${AppConfig.appBaseUrl}/$trimmed';
+  }
 }

@@ -249,14 +249,103 @@ class ProviderProfileScreen extends StatelessWidget {
                       context,
                       title: 'Recent Works',
                       subtitle: detail.hasUploadedGallery
-                          ? 'Provider has uploaded recent work photos'
+                          ? '${detail.gallery.length} photo${detail.gallery.length == 1 ? '' : 's'} uploaded by this provider'
                           : 'This provider has not uploaded recent work photos yet',
-                      child: const EmptyState(
-                        title: 'No recent works yet',
-                        subtitle:
-                            'Uploaded work photos will appear here after the provider adds them to their profile.',
-                        icon: Icons.image_not_supported_outlined,
-                      ),
+                      child: detail.hasUploadedGallery && detail.gallery.isNotEmpty
+                          ? SizedBox(
+                              height: 182,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: detail.gallery.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(width: AppSpacing.sm),
+                                itemBuilder: (context, index) {
+                                  final image = detail.gallery[index];
+                                  final imageSrc = _resolveImageUrl(
+                                    image['src'] ?? '',
+                                  );
+                                  return Container(
+                                    width: 140,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(18),
+                                      color: const Color(0xFFF4F4F7),
+                                      border: Border.all(
+                                        color: const Color(0xFFE6ECE7),
+                                      ),
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: Stack(
+                                      children: [
+                                        Positioned.fill(
+                                          child: imageSrc.isNotEmpty
+                                              ? Image.network(
+                                                  imageSrc,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) {
+                                                    return const Center(
+                                                      child: Icon(
+                                                        Icons
+                                                            .image_not_supported_outlined,
+                                                        color:
+                                                            AppColors.primary,
+                                                      ),
+                                                    );
+                                                  },
+                                                )
+                                              : const Center(
+                                                  child: Icon(
+                                                    Icons
+                                                        .image_not_supported_outlined,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                        ),
+                                        Positioned(
+                                          left: 0,
+                                          right: 0,
+                                          bottom: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(
+                                              AppSpacing.sm,
+                                            ),
+                                            decoration: const BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  Colors.transparent,
+                                                  Color(0xCC111827),
+                                                ],
+                                              ),
+                                            ),
+                                            child: Text(
+                                              (image['caption'] ?? '').trim().isNotEmpty
+                                                  ? image['caption']!
+                                                  : (image['alt'] ?? 'Recent work'),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          : const EmptyState(
+                              title: 'No recent works yet',
+                              subtitle:
+                                  'Uploaded work photos will appear here after the provider adds them to their profile.',
+                              icon: Icons.image_not_supported_outlined,
+                            ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     _sectionCard(

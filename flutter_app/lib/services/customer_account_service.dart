@@ -131,6 +131,32 @@ class CustomerAccountOverview {
   final CustomerVerificationSummary verification;
 }
 
+class CustomerPersonalDetailsInput {
+  const CustomerPersonalDetailsInput({
+    required this.firstName,
+    required this.lastName,
+    required this.phoneNumber,
+    required this.countryCode,
+    required this.emergencyContactNumber,
+    required this.dateOfBirth,
+    required this.sex,
+    required this.city,
+    required this.region,
+    required this.country,
+  });
+
+  final String firstName;
+  final String lastName;
+  final String phoneNumber;
+  final String countryCode;
+  final String emergencyContactNumber;
+  final String dateOfBirth;
+  final String sex;
+  final String city;
+  final String region;
+  final String country;
+}
+
 class CustomerAccountService {
   const CustomerAccountService();
 
@@ -498,5 +524,43 @@ class CustomerAccountService {
       ),
       verification: verification,
     );
+  }
+
+  Future<void> updatePersonalDetails(CustomerPersonalDetailsInput input) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw Exception('Please sign in again.');
+    }
+
+    final firstName = input.firstName.trim();
+    final lastName = input.lastName.trim();
+    final fullName = [firstName, lastName]
+        .where((item) => item.isNotEmpty)
+        .join(' ')
+        .trim();
+
+    await _client.from('profiles').upsert({
+      'id': user.id,
+      'full_name': fullName,
+      'phone': '${input.countryCode.trim()} ${input.phoneNumber.trim()}'.trim(),
+      'email': user.email,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'id');
+
+    await _client.from('customer_profiles').upsert({
+      'id': user.id,
+      'first_name': firstName,
+      'last_name': lastName,
+      'date_of_birth': input.dateOfBirth.trim().isEmpty ? null : input.dateOfBirth.trim(),
+      'sex': input.sex.trim(),
+      'phone_number': input.phoneNumber.trim(),
+      'country_code': input.countryCode.trim().isEmpty ? '+60' : input.countryCode.trim(),
+      'emergency_contact_number': input.emergencyContactNumber.trim(),
+      'city': input.city.trim(),
+      'region': input.region.trim(),
+      'state': input.region.trim(),
+      'country': input.country.trim().isEmpty ? 'Malaysia' : input.country.trim(),
+      'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'id');
   }
 }

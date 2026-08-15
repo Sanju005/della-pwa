@@ -183,6 +183,12 @@ class BookingOverviewService {
         providerName: row['provider']?.toString().trim().isNotEmpty == true
             ? row['provider'] as String
             : 'DELLA Provider',
+        providerImageUrl:
+            row['providerAvatarUrl']?.toString().trim().isNotEmpty == true
+                ? row['providerAvatarUrl'] as String
+                : (row['imageSrc']?.toString().trim().isNotEmpty == true
+                    ? row['imageSrc'] as String
+                    : ''),
         schedule: row['schedule']?.toString().trim().isNotEmpty == true
             ? row['schedule'] as String
             : 'Upcoming booking',

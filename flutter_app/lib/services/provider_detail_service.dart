@@ -86,6 +86,7 @@ class ProviderDetailModel {
     required this.verified,
     required this.customerReviews,
     required this.hasUploadedGallery,
+    required this.gallery,
     required this.availabilityLabel,
     required this.availability,
     required this.bookedTimeRangesByDate,
@@ -112,6 +113,7 @@ class ProviderDetailModel {
   final bool verified;
   final List<Map<String, dynamic>> customerReviews;
   final bool hasUploadedGallery;
+  final List<Map<String, String>> gallery;
   final String availabilityLabel;
   final List<ProviderAvailabilitySlot> availability;
   final Map<String, List<ProviderBookedTimeRange>> bookedTimeRangesByDate;
@@ -145,6 +147,24 @@ class ProviderDetailModel {
         bookedTimeRangesByDate[dateKey] = ranges;
       }
     }
+
+    final gallery =
+        (json['gallery'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) => item.map(
+                (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+              ),
+            )
+            .map(
+              (item) => <String, String>{
+                'src': item['src']?.toString() ?? '',
+                'alt': item['alt']?.toString() ?? '',
+                'caption': item['caption']?.toString() ?? '',
+              },
+            )
+            .where((item) => item['src']!.trim().isNotEmpty)
+            .toList();
 
     return ProviderDetailModel(
       id: json['id'] as String? ?? '',
@@ -182,6 +202,7 @@ class ProviderDetailModel {
               .toList() ??
           const [],
       hasUploadedGallery: json['hasUploadedGallery'] as bool? ?? false,
+      gallery: gallery,
       availabilityLabel: json['availabilityLabel'] as String? ?? '',
       availability: availability,
       bookedTimeRangesByDate: bookedTimeRangesByDate,
