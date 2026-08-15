@@ -13,5 +13,13 @@ class AppRoutes {
   static const providerBooking = '/provider-booking';
   static const bookingOverview = '/booking-overview';
   static const bookingDetail = '/booking-detail';
+  static const profileVerification = '/profile/verification';
+  static const profileVerificationEmail = '/profile/verification/email';
+  static const profileVerificationPhone = '/profile/verification/phone';
+  static const profileVerificationIdentity = '/profile/verification/identity';
+  static const profileAddresses = '/profile/addresses';
+  static const profilePayments = '/profile/payments';
+  static const profileFavorites = '/profile/favourites';
+  static const profileNotifications = '/profile/notifications';
   static const providerShell = '/provider-workspace';
 }

@@ -7,10 +7,12 @@ class CurrentCustomerProfile {
   const CurrentCustomerProfile({
     required this.firstName,
     required this.lastName,
+    required this.avatarUrl,
   });
 
   final String firstName;
   final String lastName;
+  final String avatarUrl;
 
   String get fullName => '$firstName $lastName'.trim();
 }
@@ -44,15 +46,21 @@ class CurrentCustomerService {
           customerRow?['last_name']?.toString().trim() ?? '';
 
       if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        final profileRow = await _client
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', user.id)
+            .maybeSingle();
         return CurrentCustomerProfile(
           firstName: firstName.isNotEmpty ? firstName : 'Customer',
           lastName: lastName,
+          avatarUrl: profileRow?['avatar_url']?.toString().trim() ?? '',
         );
       }
 
       final profileRow = await _client
           .from('profiles')
-          .select('full_name')
+          .select('full_name, avatar_url')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -62,6 +70,7 @@ class CurrentCustomerService {
         return CurrentCustomerProfile(
           firstName: parts.first,
           lastName: parts.length > 1 ? parts.skip(1).join(' ') : '',
+          avatarUrl: profileRow?['avatar_url']?.toString().trim() ?? '',
         );
       }
     }
@@ -77,6 +86,7 @@ class CurrentCustomerService {
     return CurrentCustomerProfile(
       firstName: firstName.isNotEmpty ? firstName : 'Customer',
       lastName: lastName,
+      avatarUrl: '',
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 
 import '../../../core/routing/app_routes.dart';
+import '../../../models/provider_summary.dart';
 import '../../../previews/widget_preview_helpers.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/current_customer_service.dart';
@@ -240,7 +241,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             ],
                           ),
                         ),
-                        ProfileAvatar(name: fullName),
+                        ProfileAvatar(
+                          name: fullName,
+                          imageUrl: customer?.avatarUrl ?? '',
+                        ),
                       ],
                     );
                   },

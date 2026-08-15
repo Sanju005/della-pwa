@@ -1,18 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/customer_account_service.dart';
 import '../../../services/customer_address_service.dart';
 import '../../../services/service_location_store.dart';
+import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
-import '../../../widgets/notification_card.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/loading_state.dart';
+import '../../../widgets/notification_card.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../../widgets/swiper_bottom_sheet.dart';
 import '../../../widgets/swiper_button.dart';
-import '../../../widgets/swiper_section_card.dart';
 import '../../../widgets/swiper_status_badge.dart';
 
 class ProfileDemoScreen extends StatefulWidget {
@@ -360,14 +361,17 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${address.label} is now your active service location.')),
+      SnackBar(
+        content: Text('${address.label} is now your active service location.'),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final notifications = widget.repository.getNotifications();
-    return FutureBuilder(
+
+    return FutureBuilder<CustomerAccountOverview?>(
       future: _overviewFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
@@ -397,210 +401,275 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
         return ListView(
           padding: AppSpacing.screenPadding,
           children: [
-            SwiperSectionCard(
-              title: displayName,
-              subtitle: 'Your signed-in customer profile',
-              trailing: SwiperStatusBadge(
-                label: overview.verification.verified ? 'Verified' : 'Pending',
-                tone: overview.verification.verified
-                    ? SwiperStatusTone.success
-                    : SwiperStatusTone.warning,
-              ),
-              child: Row(
+            _ProfileSummaryCard(
+              displayName: displayName,
+              overview: overview,
+              onEdit: () => _openEditDetailsSheet(overview),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _OverviewSectionCard(
+              title: 'Profile Completion',
+              child: Column(
                 children: [
-                  ProfileAvatar(name: displayName, radius: 28),
+                  Row(
+                    children: [
+                      const Spacer(),
+                      RichText(
+                        text: TextSpan(
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                          children: [
+                            TextSpan(
+                              text: '${overview.completion}%',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const TextSpan(text: ' Complete'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      minHeight: 8,
+                      value: (overview.completion.clamp(0, 100)) / 100,
+                      backgroundColor: const Color(0xFFE5E7EB),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            SwiperSectionCard(
-              title: 'Personal details',
-              subtitle: 'Real customer information from your signed-in account.',
-              trailing: TextButton(
-                onPressed: () => _openEditDetailsSheet(overview),
-                child: const Text('Edit details'),
+            InkWell(
+              borderRadius: BorderRadius.circular(26),
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.profileVerification,
               ),
+              child: _VerificationHubCard(
+                verified: overview.verification.verified,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _OverviewSectionCard(
+              title: 'Personal Details',
+              actionLabel: 'Edit',
               child: Column(
                 children: [
-                  _ProfileRow(
-                    label: 'Full name',
+                  _InfoActionRow(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Full Name',
                     value: displayName,
                   ),
-                  _ProfileRow(
+                  _InfoActionRow(
+                    icon: Icons.mail_outline_rounded,
                     label: 'Email',
-                    value: overview.email.isEmpty ? 'Not provided' : overview.email,
+                    value: overview.email.isEmpty ? '-' : overview.email,
                   ),
-                  _ProfileRow(
+                  _InfoActionRow(
+                    icon: Icons.phone_outlined,
                     label: 'Phone',
-                    value: overview.phoneNumber.isEmpty
-                        ? 'Not provided'
-                        : '${overview.countryCode} ${overview.phoneNumber}',
+                    value:
+                        '${overview.countryCode} ${overview.phoneNumber}'.trim(),
                   ),
-                  _ProfileRow(
-                    label: 'Emergency contact',
-                    value: overview.emergencyContactNumber.isEmpty
-                        ? 'Not provided'
-                        : overview.emergencyContactNumber,
+                  _InfoActionRow(
+                    icon: Icons.cake_outlined,
+                    label: 'Date of Birth',
+                    value: overview.dateOfBirth.isEmpty
+                        ? '-'
+                        : overview.dateOfBirth,
                   ),
-                  _ProfileRow(
-                    label: 'Date of birth',
-                    value: overview.dateOfBirth,
-                  ),
-                  _ProfileRow(
+                  _InfoActionRow(
+                    icon: Icons.wc_outlined,
                     label: 'Sex',
                     value: overview.sex.isEmpty ? '-' : overview.sex,
                   ),
-                  _ProfileRow(
+                  _InfoActionRow(
+                    icon: Icons.support_agent_outlined,
+                    label: 'Emergency Contact',
+                    value: overview.emergencyContactNumber.isEmpty
+                        ? '-'
+                        : overview.emergencyContactNumber,
+                  ),
+                  _InfoActionRow(
+                    icon: Icons.place_outlined,
                     label: 'Location',
                     value: [
                       overview.city,
                       overview.region,
                       overview.country,
                     ].where((item) => item.trim().isNotEmpty).join(', '),
+                    isLast: true,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            SwiperSectionCard(
-              title: 'Verification',
-              subtitle: 'Email, phone, and identity verification status',
+            _OverviewSectionCard(
+              title: 'Verification Details',
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Email: ${overview.verification.emailVerified ? 'Verified' : 'Pending'}',
+                  _InfoActionRow(
+                    icon: Icons.mail_outline_rounded,
+                    label: 'Email',
+                    value: overview.verification.emailVerified
+                        ? 'Verified'
+                        : 'Pending',
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Phone: ${overview.verification.phoneVerified ? 'Verified' : 'Pending'}',
+                  _InfoActionRow(
+                    icon: Icons.phone_outlined,
+                    label: 'Phone',
+                    value: overview.verification.phoneVerified
+                        ? 'Verified'
+                        : 'Pending',
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('Identity: ${overview.verification.identityStatusLabel}'),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('Profile completion: ${overview.completion}%'),
+                  _InfoActionRow(
+                    icon: Icons.badge_outlined,
+                    label: 'IC / Passport',
+                    value: overview.verification.verified
+                        ? 'Verified'
+                        : overview.verification.identityStatusLabel,
+                    isLast: true,
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            SwiperSectionCard(
-              title: 'Saved addresses',
-              subtitle: 'Use Home, Work, or any custom address across search and booking.',
-              trailing: TextButton(
-                onPressed: _openAddAddressSheet,
-                child: const Text('Add new'),
+            _OverviewSectionCard(
+              title: 'My Bookings',
+              actionLabel: 'View All',
+              onActionTap: () => Navigator.of(
+                context,
+              ).pushNamed(AppRoutes.bookingOverview),
+              child: Column(
+                children: [
+                  _InfoActionRow(
+                    icon: Icons.calendar_today_rounded,
+                    label: 'Pending Bookings',
+                    value: '${overview.bookingSummary.pending}',
+                  ),
+                  _InfoActionRow(
+                    icon: Icons.check_circle_outline_rounded,
+                    label: 'On Going Bookings',
+                    value: '${overview.bookingSummary.ongoing}',
+                  ),
+                  _InfoActionRow(
+                    icon: Icons.task_alt_rounded,
+                    label: 'Completed Bookings',
+                    value: '${overview.bookingSummary.completed}',
+                  ),
+                  _InfoActionRow(
+                    icon: Icons.cancel_outlined,
+                    label: 'Cancelled Bookings',
+                    value: '${overview.bookingSummary.cancelled}',
+                    isLast: true,
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _OverviewSectionCard(
+              title: 'Favourite Providers',
+              actionLabel: 'View All',
+              onActionTap: () => Navigator.of(
+                context,
+              ).pushNamed(AppRoutes.profileFavorites),
+              child: const _PlaceholderPanel(
+                icon: Icons.favorite_border_rounded,
+                title: 'No favourite providers saved yet.',
+                subtitle:
+                    'Providers you save in the app will appear here for quick access.',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _OverviewSectionCard(
+              title: 'Saved Address',
+              actionLabel: 'Open',
+              onActionTap: () => Navigator.of(
+                context,
+              ).pushNamed(AppRoutes.profileAddresses),
               child: overview.addresses.isEmpty
-                  ? const Text('No address saved yet.')
-                  : Column(
-                      children: [
-                        for (final address in overview.addresses) ...[
-                          Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: const Color(0xFFE7E1F4)),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        address.label,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall
-                                            ?.copyWith(fontWeight: FontWeight.w700),
-                                      ),
-                                    ),
-                                    if (address.isDefault)
-                                      const SwiperStatusBadge(
-                                        label: 'Default',
-                                        tone: SwiperStatusTone.info,
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text(address.formattedAddress),
-                                const SizedBox(height: AppSpacing.sm),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    SwiperButton(
-                                      label: 'Use for services',
-                                      isSecondary: true,
-                                      onPressed: () => _setActiveLocation(address),
-                                    ),
-                                    if (!address.isDefault)
-                                      SwiperButton(
-                                        label: 'Set default',
-                                        isSecondary: true,
-                                        onPressed: () async {
-                                          await _addressService.setDefaultAddress(
-                                            address.label,
-                                          );
-                                          _refresh();
-                                        },
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
+                  ? _SavedAddressPrompt(onOpen: _openAddAddressSheet)
+                  : _SavedAddressSection(
+                      addresses: overview.addresses,
+                      onAddNew: _openAddAddressSheet,
+                      onUseForServices: _setActiveLocation,
+                      onSetDefault: (label) async {
+                        await _addressService.setDefaultAddress(label);
+                        _refresh();
+                      },
                     ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            SwiperSectionCard(
-              title: 'Bookings summary',
-              subtitle: 'Live customer task counts from Supabase',
+            _OverviewSectionCard(
+              title: 'Payment Methods',
+              actionLabel: 'Manage',
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Pending: ${overview.bookingSummary.pending}'),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('Ongoing: ${overview.bookingSummary.ongoing}'),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('Completed: ${overview.bookingSummary.completed}'),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('Cancelled: ${overview.bookingSummary.cancelled}'),
+                children: const [
+                  _InfoActionRow(
+                    icon: Icons.payments_outlined,
+                    label: 'Primary Method',
+                    value: 'Cash',
+                  ),
+                  _InfoActionRow(
+                    icon: Icons.info_outline_rounded,
+                    label: 'Setup',
+                    value: 'Managed during booking',
+                    isLast: true,
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            SwiperSectionCard(
-              title: 'Payments',
-              subtitle: overview.paymentSummary.lastPaymentLabel,
+            _OverviewSectionCard(
+              title: 'Payment',
+              actionLabel: 'View All',
+              onActionTap: () => Navigator.of(
+                context,
+              ).pushNamed(AppRoutes.profilePayments),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Total paid: ${overview.paymentSummary.totalPaidLabel}'),
-                  if (overview.paymentSummary.recentPayments.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    for (final payment
-                        in overview.paymentSummary.recentPayments.take(3)) ...[
-                      Text('${payment.serviceTitle} • ${payment.providerName}'),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        '${payment.amountLabel} • ${payment.paymentMethod} • ${payment.statusLabel}',
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(payment.paidAtLabel),
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                  ],
+                  _InfoActionRow(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Total Paid',
+                    value: overview.paymentSummary.totalPaidLabel,
+                  ),
+                  _InfoActionRow(
+                    icon: Icons.calendar_today_outlined,
+                    label: 'Latest Payment',
+                    value: overview.paymentSummary.lastPaymentLabel,
+                    isLast: overview.paymentSummary.recentPayments.isEmpty,
+                  ),
+                  for (var index = 0;
+                      index < overview.paymentSummary.recentPayments.length;
+                      index++)
+                    _InfoActionRow(
+                      icon: Icons.receipt_long_outlined,
+                      label: overview
+                          .paymentSummary.recentPayments[index].serviceTitle,
+                      value:
+                          '${overview.paymentSummary.recentPayments[index].amountLabel} • ${overview.paymentSummary.recentPayments[index].statusLabel}',
+                      isLast: index ==
+                          overview.paymentSummary.recentPayments.length - 1,
+                    ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            SwiperSectionCard(
+            _OverviewSectionCard(
               title: 'Recent notifications',
+              actionLabel: 'Open',
+              onActionTap: () => Navigator.of(
+                context,
+              ).pushNamed(AppRoutes.profileNotifications),
               child: Column(
                 children: [
                   for (final notification in notifications) ...[
@@ -610,6 +679,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 120),
           ],
         );
       },
@@ -617,43 +687,584 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
   }
 }
 
-class _ProfileRow extends StatelessWidget {
-  const _ProfileRow({
-    required this.label,
-    required this.value,
+class _ProfileSummaryCard extends StatelessWidget {
+  const _ProfileSummaryCard({
+    required this.displayName,
+    required this.overview,
+    required this.onEdit,
   });
 
-  final String label;
-  final String value;
+  final String displayName;
+  final CustomerAccountOverview overview;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Row(
+    final location = [
+      overview.city,
+      overview.region,
+    ].where((item) => item.trim().isNotEmpty).join(', ');
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onEdit,
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE4ECE7)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A0F172A),
+                blurRadius: 26,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              ProfileAvatar(
+                name: displayName,
+                imageUrl: overview.avatarUrl,
+                radius: 36,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF111827),
+                                    ),
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.place_outlined,
+                                    size: 14,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      location.isEmpty ? 'Malaysia' : location,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                    if (overview.verification.verified) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySoft,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.verified_user_outlined,
+                              size: 14,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Phone Verified',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OverviewSectionCard extends StatelessWidget {
+  const _OverviewSectionCard({
+    required this.title,
+    this.actionLabel,
+    this.onActionTap,
+    required this.child,
+  });
+
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onActionTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE4ECE7)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A0F172A),
+            blurRadius: 26,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 118,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF111827),
+                      ),
+                ),
+              ),
+              if (actionLabel != null)
+                GestureDetector(
+                  onTap: onActionTap,
+                  child: Text(
+                    actionLabel!,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _VerificationHubCard extends StatelessWidget {
+  const _VerificationHubCard({
+    required this.verified,
+  });
+
+  final bool verified;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE6EEE8)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x140F172A),
+            blurRadius: 32,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFFC18EFF),
+                  AppColors.primary,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x338E5EB5),
+                  blurRadius: 28,
+                  offset: Offset(0, 12),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.verified_user_outlined,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Verification',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF1F1630),
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Open phone, email, and IC / passport verification',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF7B728A),
+                        height: 1.5,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: verified
+                  ? const Color(0xFFEEF9F0)
+                  : const Color(0xFFFFF7ED),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              verified ? 'Verified' : 'Pending',
+              style: TextStyle(
+                color: verified
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFFF59E0B),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: Color(0xFF98A2B3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoActionRow extends StatelessWidget {
+  const _InfoActionRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.md),
+      margin: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.md),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(
+                bottom: BorderSide(color: Color(0xFFEDF1EF)),
+              ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.textSecondary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF6F6786),
+                    color: const Color(0xFF111827),
                     fontWeight: FontWeight.w600,
                   ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(
+          Flexible(
             child: Text(
-              value.trim().isEmpty ? '-' : value,
+              value,
+              textAlign: TextAlign.right,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.primary,
                     fontWeight: FontWeight.w700,
                   ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PlaceholderPanel extends StatelessWidget {
+  const _PlaceholderPanel({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD9E2DD)),
+        color: const Color(0xFFFBFEFC),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: const BoxDecoration(
+              color: AppColors.primarySoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: AppColors.primary),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF111827),
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SavedAddressPrompt extends StatelessWidget {
+  const _SavedAddressPrompt({
+    required this.onOpen,
+  });
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD9E2DD)),
+        color: const Color(0xFFFBFEFC),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: AppColors.primarySoft,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.place_outlined, color: AppColors.primary),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Manage your saved addresses',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                const Text(
+                  'View saved addresses and add a new address for faster booking.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextButton(
+                  onPressed: onOpen,
+                  style: TextButton.styleFrom(
+                    backgroundColor: AppColors.primarySoft,
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                  ),
+                  child: const Text('Open Saved Addresses'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SavedAddressSection extends StatelessWidget {
+  const _SavedAddressSection({
+    required this.addresses,
+    required this.onAddNew,
+    required this.onUseForServices,
+    required this.onSetDefault,
+  });
+
+  final List<CustomerAddressSummary> addresses;
+  final VoidCallback onAddNew;
+  final Future<void> Function(CustomerAddressSummary address) onUseForServices;
+  final Future<void> Function(String label) onSetDefault;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = addresses.first;
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD9E2DD)),
+            color: const Color(0xFFFBFEFC),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      primary.label,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                  if (primary.isDefault)
+                    const SwiperStatusBadge(
+                      label: 'Default',
+                      tone: SwiperStatusTone.info,
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(primary.formattedAddress),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SwiperButton(
+                    label: 'Use for services',
+                    isSecondary: true,
+                    onPressed: () => onUseForServices(primary),
+                  ),
+                  if (!primary.isDefault)
+                    SwiperButton(
+                      label: 'Set default',
+                      isSecondary: true,
+                      onPressed: () => onSetDefault(primary.label),
+                    ),
+                  SwiperButton(
+                    label: 'Add new',
+                    isSecondary: true,
+                    onPressed: onAddNew,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (addresses.length > 1) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${addresses.length - 1} more saved address${addresses.length - 1 == 1 ? '' : 'es'} available',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+        ],
+      ],
     );
   }
 }

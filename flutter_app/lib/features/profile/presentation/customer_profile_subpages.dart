@@ -1,0 +1,2236 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../../core/routing/app_routes.dart';
+import '../../../models/notification_item.dart';
+import '../../../repositories/demo_repository.dart';
+import '../../../services/customer_profile_api_service.dart';
+import '../../../theme/app_colors.dart';
+import '../../../theme/app_spacing.dart';
+import '../../../widgets/empty_state.dart';
+import '../../../widgets/loading_state.dart';
+import '../../../widgets/profile_avatar.dart';
+import '../../../widgets/swiper_app_bar.dart';
+import '../../../widgets/swiper_button.dart';
+import '../../../widgets/swiper_status_badge.dart';
+
+class CustomerVerificationHubScreen extends StatelessWidget {
+  const CustomerVerificationHubScreen({super.key});
+
+  static const _service = CustomerProfileApiService();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Verification',
+        subtitle: 'Verification status for your account',
+        showBack: true,
+      ),
+      body: FutureBuilder<CustomerProfileApiModel>(
+        future: _service.fetchProfile(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const LoadingState(label: 'Loading verification...');
+          }
+          if (snapshot.hasError || snapshot.data == null) {
+            return const EmptyState(
+              title: 'Unable to load verification',
+              subtitle: 'Please try again.',
+              icon: Icons.error_outline_rounded,
+            );
+          }
+
+          final profile = snapshot.data!;
+          return ListView(
+            padding: AppSpacing.screenPadding,
+            children: [
+              _heroVerificationCard(profile: profile),
+              const SizedBox(height: AppSpacing.lg),
+              _VerificationStatusTile(
+                title: 'Email',
+                subtitle: 'Email status',
+                verified: profile.emailVerified,
+                icon: Icons.mail_outline_rounded,
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.profileVerificationEmail),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _VerificationStatusTile(
+                title: 'Phone',
+                subtitle: 'Phone status',
+                verified: profile.phoneVerified,
+                icon: Icons.phone_outlined,
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.profileVerificationPhone),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _VerificationStatusTile(
+                title: 'IC / Passport',
+                subtitle: 'Identity check',
+                verified: profile.verified,
+                status: profile.identityVerificationStatus,
+                icon: Icons.badge_outlined,
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.profileVerificationIdentity),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _heroVerificationCard({required CustomerProfileApiModel profile}) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE6EEE8)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x140F172A),
+            blurRadius: 32,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFC18EFF), AppColors.primary],
+              ),
+            ),
+            child: const Icon(
+              Icons.verified_user_outlined,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Verification',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1F1630),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  profile.verified
+                      ? 'Your account is verified.'
+                      : 'Open phone, email, and IC / passport verification',
+                  style: const TextStyle(
+                    color: Color(0xFF7B728A),
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CustomerEmailVerificationScreen extends StatefulWidget {
+  const CustomerEmailVerificationScreen({super.key});
+
+  @override
+  State<CustomerEmailVerificationScreen> createState() =>
+      _CustomerEmailVerificationScreenState();
+}
+
+class _CustomerEmailVerificationScreenState
+    extends State<CustomerEmailVerificationScreen> {
+  static const _service = CustomerProfileApiService();
+
+  final _emailController = TextEditingController();
+  String _otp = '';
+  int _countdown = 30;
+  Timer? _timer;
+  bool _saving = false;
+  String _notice = '';
+  String _error = '';
+  CustomerProfileApiModel? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final profile = await _service.fetchProfile();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _profile = profile;
+        _emailController.text = profile.email;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _startOtp() {
+      _timer?.cancel();
+      setState(() {
+        _otp = '';
+        _countdown = 30;
+        _notice = 'We sent a 6-digit code to your email.';
+      _error = '';
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _countdown <= 1) {
+        timer.cancel();
+        if (mounted) {
+          setState(() => _countdown = 0);
+        }
+        return;
+      }
+      setState(() => _countdown -= 1);
+    });
+  }
+
+  Future<void> _verify() async {
+    if (_emailController.text.trim().isEmpty || _otp.length != 6) {
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
+    try {
+      final profile = await _service.updateProfile({
+        'email': _emailController.text.trim(),
+        'emailVerified': true,
+      });
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _profile = profile;
+      });
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = _profile;
+    if (profile == null && _error.isEmpty) {
+      return const Scaffold(
+        appBar: SwiperAppBar(
+          title: 'Email Verification',
+          subtitle: 'Add your email and verify it',
+          showBack: true,
+        ),
+        body: LoadingState(label: 'Loading email verification...'),
+      );
+    }
+
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Email Verification',
+        subtitle: 'Add your email and verify it',
+        showBack: true,
+      ),
+      body: ListView(
+        padding: AppSpacing.screenPadding,
+        children: [
+          if (profile != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: _statusBadge(profile.emailVerified),
+            ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'Email Verification',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1F1630),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'Add your email address and verify it with a one-time code.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF7B728A),
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _verificationFormCard(
+            context,
+            label: 'Email Address',
+            icon: Icons.mail_outline_rounded,
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            placeholder: 'Enter email address',
+            sendLabel: 'Send Code',
+            onSend: _startOtp,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _securityCard(
+            'Your email address will be used for account verification and important updates.',
+          ),
+          if (_error.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _errorBanner(_error),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          SwiperButton(
+            label: _saving ? 'Verifying...' : 'Verify Email',
+            isLoading: _saving,
+            onPressed: _otp.length == 6 ? _verify : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _verificationFormCard(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required TextEditingController controller,
+    required TextInputType keyboardType,
+    required String placeholder,
+    required String sendLabel,
+    required VoidCallback onSend,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            decoration: InputDecoration(
+              hintText: placeholder,
+              prefixIcon: Icon(icon, color: AppColors.primary),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SwiperButton(
+            label: sendLabel,
+            isSecondary: true,
+            onPressed: controller.text.trim().isNotEmpty ? onSend : null,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Enter OTP',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _OtpSlots(
+            value: _otp,
+            onChanged: (value) => setState(() => _otp = value),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            _notice.isNotEmpty
+                ? _notice
+                : 'We sent a 6-digit code to your email.',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6F6681),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Resend code in 00:${_countdown.toString().padLeft(2, '0')}',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6F6681),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBadge(bool verified) {
+    return SwiperStatusBadge(
+      label: verified ? 'Verified' : 'Pending',
+      tone: verified ? SwiperStatusTone.success : SwiperStatusTone.warning,
+    );
+  }
+}
+
+class CustomerPhoneVerificationScreen extends StatefulWidget {
+  const CustomerPhoneVerificationScreen({super.key});
+
+  @override
+  State<CustomerPhoneVerificationScreen> createState() =>
+      _CustomerPhoneVerificationScreenState();
+}
+
+class _CustomerPhoneVerificationScreenState
+    extends State<CustomerPhoneVerificationScreen> {
+  static const _service = CustomerProfileApiService();
+
+  final _phoneController = TextEditingController();
+  String _countryCode = '+60';
+  String _otp = '';
+  int _countdown = 30;
+  Timer? _timer;
+  bool _saving = false;
+  String _notice = '';
+  String _error = '';
+  CustomerProfileApiModel? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final profile = await _service.fetchProfile();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _profile = profile;
+        _countryCode = profile.countryCode;
+        _phoneController.text = profile.phoneNumber;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _startOtp() {
+    _timer?.cancel();
+    setState(() {
+      _otp = '';
+      _countdown = 30;
+      _notice = 'We sent a 6-digit code by SMS to your phone.';
+      _error = '';
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _countdown <= 1) {
+        timer.cancel();
+        if (mounted) {
+          setState(() => _countdown = 0);
+        }
+        return;
+      }
+      setState(() => _countdown -= 1);
+    });
+  }
+
+  Future<void> _verify() async {
+    if (_phoneController.text.trim().length < 7 || _otp.length != 6) {
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
+    try {
+      final profile = await _service.updateProfile({
+        'phoneNumber': _phoneController.text.trim(),
+        'countryCode': _countryCode,
+        'phoneVerified': true,
+      });
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _profile = profile;
+      });
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = _profile;
+    if (profile == null && _error.isEmpty) {
+      return const Scaffold(
+        appBar: SwiperAppBar(
+          title: 'Phone Verification',
+          subtitle: 'Add your phone and verify it',
+          showBack: true,
+        ),
+        body: LoadingState(label: 'Loading phone verification...'),
+      );
+    }
+
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Phone Verification',
+        subtitle: 'Add your phone and verify it',
+        showBack: true,
+      ),
+      body: ListView(
+        padding: AppSpacing.screenPadding,
+        children: [
+          if (profile != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: SwiperStatusBadge(
+                label: profile.phoneVerified ? 'Verified' : 'Pending',
+                tone: profile.phoneVerified
+                    ? SwiperStatusTone.success
+                    : SwiperStatusTone.warning,
+              ),
+            ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'Phone Verification',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1F1630),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'Add your phone number and verify it with a one-time code.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF7B728A),
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: _cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Phone Number',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Container(
+                      width: 96,
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE7DEF4)),
+                      ),
+                      child: Text(
+                        _countryCode,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1F1630),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: TextField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          hintText: 'Enter phone number',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                SwiperButton(
+                  label: 'Send OTP',
+                  isSecondary: true,
+                  onPressed: _phoneController.text.trim().length >= 7
+                      ? _startOtp
+                      : null,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Enter OTP',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _OtpSlots(
+                  value: _otp,
+                  onChanged: (value) => setState(() => _otp = value),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  _notice.isNotEmpty ? _notice : 'We sent a 6-digit code by SMS.',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF6F6681)),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Resend code in 00:${_countdown.toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF6F6681)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _securityCard(
+            'Your phone number will be used for account verification and important security alerts.',
+          ),
+          if (_error.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _errorBanner(_error),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          SwiperButton(
+            label: _saving ? 'Verifying...' : 'Verify Number',
+            isLoading: _saving,
+            onPressed: _otp.length == 6 ? _verify : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CustomerIdentityVerificationScreen extends StatefulWidget {
+  const CustomerIdentityVerificationScreen({super.key});
+
+  @override
+  State<CustomerIdentityVerificationScreen> createState() =>
+      _CustomerIdentityVerificationScreenState();
+}
+
+class _CustomerIdentityVerificationScreenState
+    extends State<CustomerIdentityVerificationScreen> {
+  static const _service = CustomerProfileApiService();
+
+  bool _saving = false;
+  String _error = '';
+  CustomerProfileApiModel? _profile;
+  String _documentType = 'ic';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final profile = await _service.fetchProfile();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _profile = profile;
+        _documentType = profile.identityDocumentType ?? 'ic';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
+    try {
+      final profile = await _service.updateProfile({
+        'identityDocumentType': _documentType,
+        'identityVerificationStatus': 'processing',
+        'verified': false,
+      });
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _profile = profile;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Identity verification submitted for review.'),
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = _profile;
+    if (profile == null && _error.isEmpty) {
+      return const Scaffold(
+        appBar: SwiperAppBar(
+          title: 'Identity Verification',
+          subtitle: 'Submit IC or passport for review',
+          showBack: true,
+        ),
+        body: LoadingState(label: 'Loading identity verification...'),
+      );
+    }
+
+    final status = profile?.identityVerificationStatus ?? 'pending';
+
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Identity Verification',
+        subtitle: 'Submit IC or passport for review',
+        showBack: true,
+      ),
+      body: ListView(
+        padding: AppSpacing.screenPadding,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: SwiperStatusBadge(
+              label: _statusLabel(status),
+              tone: _statusTone(status),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'Identity Verification',
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1F1630),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const Text(
+            'Choose your document type and submit your identity review request.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF7B728A),
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: _cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Document type',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1F1630),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  initialValue: _documentType,
+                  items: const [
+                    DropdownMenuItem(value: 'ic', child: Text('IC')),
+                    DropdownMenuItem(
+                      value: 'passport',
+                      child: Text('Passport'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _documentType = value ?? 'ic');
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _documentInfoRow(
+                  'Front document image',
+                  profile?.identityFrontImageUrl.isNotEmpty == true
+                      ? 'Uploaded'
+                      : 'Not uploaded yet',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _documentInfoRow(
+                  'Back document image',
+                  profile?.identityBackImageUrl.isNotEmpty == true
+                      ? 'Uploaded'
+                      : 'Not uploaded yet',
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const Text(
+                  'This Flutter build keeps the same backend review flow. If images were uploaded from the web app, their status will appear here. You can still submit the verification review state from this screen.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6F6681),
+                    height: 1.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _securityCard(
+            'Identity verification usually takes up to 24 hours after submission.',
+          ),
+          if (_error.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _errorBanner(_error),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          SwiperButton(
+            label: _saving ? 'Submitting...' : 'Submit For Review',
+            isLoading: _saving,
+            onPressed: _submit,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _documentInfoRow(String label, String value) {
+    return Row(
+      children: [
+        const Icon(Icons.description_outlined, color: AppColors.primary),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF1F1630),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class CustomerAddressesScreen extends StatefulWidget {
+  const CustomerAddressesScreen({super.key});
+
+  @override
+  State<CustomerAddressesScreen> createState() => _CustomerAddressesScreenState();
+}
+
+class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
+  static const _service = CustomerProfileApiService();
+
+  final _labelController = TextEditingController();
+  final _unitController = TextEditingController();
+  final _line1Controller = TextEditingController();
+  final _line2Controller = TextEditingController();
+  final _postcodeController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _countryController = TextEditingController(text: 'Malaysia');
+
+  bool _showForm = false;
+  bool _saving = false;
+  String _error = '';
+  List<CustomerProfileAddressModel>? _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    _unitController.dispose();
+    _line1Controller.dispose();
+    _line2Controller.dispose();
+    _postcodeController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _countryController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final items = await _service.fetchAddresses();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _items = items;
+        _labelController.text = 'Address ${items.length + 1}';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
+    try {
+      final address = await _service.addAddress({
+        'label': _labelController.text.trim(),
+        'unitNumber': _unitController.text.trim(),
+        'addressLine1': _line1Controller.text.trim(),
+        'addressLine2': _line2Controller.text.trim(),
+        'postcode': _postcodeController.text.trim(),
+        'city': _cityController.text.trim(),
+        'state': _stateController.text.trim(),
+        'country': _countryController.text.trim(),
+        'isDefault': (_items?.isEmpty ?? true),
+      });
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _items = [...?_items, address];
+        _showForm = false;
+        _labelController.text = 'Address ${(_items?.length ?? 0) + 1}';
+        _unitController.clear();
+        _line1Controller.clear();
+        _line2Controller.clear();
+        _postcodeController.clear();
+        _cityController.clear();
+        _stateController.clear();
+        _countryController.text = 'Malaysia';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _items;
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Saved Addresses',
+        subtitle: 'Manage your saved places',
+        showBack: true,
+      ),
+      body: items == null && _error.isEmpty
+          ? const LoadingState(label: 'Loading addresses...')
+          : ListView(
+              padding: AppSpacing.screenPadding,
+              children: [
+                if (_error.isNotEmpty) _errorBanner(_error),
+                if (items != null && items.isNotEmpty)
+                  ...items.map(
+                    (address) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: _addressCard(context, address),
+                    ),
+                  ),
+                if (items != null && items.isEmpty)
+                  const EmptyState(
+                    title: 'No saved addresses yet',
+                    subtitle: 'Add your home, work, or any custom address.',
+                    icon: Icons.place_outlined,
+                  ),
+                const SizedBox(height: AppSpacing.sm),
+                OutlinedButton.icon(
+                  onPressed: () => setState(() => _showForm = !_showForm),
+                  icon: const Icon(Icons.add_rounded),
+                  label: Text(_showForm ? 'Hide Address Form' : 'Add New Address'),
+                ),
+                if (_showForm) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: _cardDecoration(),
+                    child: Column(
+                      children: [
+                        _field(_labelController, 'Address Name'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _field(_unitController, 'Unit Number'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _field(_line1Controller, 'Address Line 1'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _field(_line2Controller, 'Address Line 2'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _field(_postcodeController, 'Postcode'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _field(_cityController, 'City'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _field(_stateController, 'State'),
+                        const SizedBox(height: AppSpacing.sm),
+                        _field(_countryController, 'Country'),
+                        const SizedBox(height: AppSpacing.md),
+                        SwiperButton(
+                          label: 'Save Address',
+                          isLoading: _saving,
+                          onPressed: _save,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+    );
+  }
+
+  Widget _addressCard(
+    BuildContext context,
+    CustomerProfileAddressModel address,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: _cardDecoration(),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Color(0xFFEFF9F0),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.place_outlined, color: Color(0xFF16A34A)),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        address.label,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                    ),
+                    if (address.isDefault)
+                      const SwiperStatusBadge(
+                        label: 'Default',
+                        tone: SwiperStatusTone.success,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  address.fullAddress,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        height: 1.5,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(TextEditingController controller, String label) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(labelText: label),
+    );
+  }
+}
+
+class CustomerPaymentsScreen extends StatefulWidget {
+  const CustomerPaymentsScreen({super.key});
+
+  @override
+  State<CustomerPaymentsScreen> createState() => _CustomerPaymentsScreenState();
+}
+
+class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
+  static const _service = CustomerProfileApiService();
+
+  List<CustomerPaymentHistoryModel>? _items;
+  String _error = '';
+  String _filterMode = 'month';
+  String _selectedMonth = '';
+  String _dateFrom = '';
+  String _dateTo = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final initialFrom = now.subtract(const Duration(days: 90));
+    _selectedMonth = DateFormat('yyyy-MM').format(now);
+    _dateFrom = DateFormat('yyyy-MM-dd').format(initialFrom);
+    _dateTo = DateFormat('yyyy-MM-dd').format(now);
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final items = await _service.fetchPayments();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _items = items);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _items;
+    if (items == null && _error.isEmpty) {
+      return const Scaffold(
+        appBar: SwiperAppBar(
+          title: 'Payment',
+          subtitle: 'Customer payment history',
+          showBack: true,
+        ),
+        body: LoadingState(label: 'Loading payments...'),
+      );
+    }
+
+    final filteredPayments = _filterPayments(items ?? const []);
+    final leadPayment =
+        filteredPayments.isNotEmpty ? filteredPayments.first : (items?.isNotEmpty == true ? items!.first : null);
+    final totalPaid =
+        filteredPayments.fold<double>(0, (sum, payment) => sum + payment.amount);
+
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Payment',
+        subtitle: 'Customer payment history',
+        showBack: true,
+      ),
+      body: ListView(
+        padding: AppSpacing.screenPadding,
+        children: [
+          if (_error.isNotEmpty) _errorBanner(_error),
+          _leadPaymentCard(leadPayment),
+          const SizedBox(height: AppSpacing.md),
+          _summaryCard(leadPayment, totalPaid),
+          const SizedBox(height: AppSpacing.md),
+          _paymentMethodCard(leadPayment),
+          const SizedBox(height: AppSpacing.md),
+          _completedCard(leadPayment),
+          const SizedBox(height: AppSpacing.md),
+          _filterCard(context, items ?? const []),
+          const SizedBox(height: AppSpacing.md),
+          _transactionIdCard(leadPayment),
+          const SizedBox(height: AppSpacing.md),
+          _transactionHistoryCard(filteredPayments),
+        ],
+      ),
+    );
+  }
+
+  List<CustomerPaymentHistoryModel> _filterPayments(
+    List<CustomerPaymentHistoryModel> items,
+  ) {
+    return items.where((payment) {
+      final paidDate = DateTime.tryParse(payment.paidAt);
+      if (paidDate == null) {
+        return false;
+      }
+      if (_filterMode == 'month') {
+        return DateFormat('yyyy-MM').format(paidDate) == _selectedMonth;
+      }
+      final from = DateTime.tryParse(_dateFrom);
+      final to = DateTime.tryParse(_dateTo);
+      if (from == null || to == null) {
+        return true;
+      }
+      return !paidDate.isBefore(from) &&
+          !paidDate.isAfter(to.add(const Duration(hours: 23, minutes: 59)));
+    }).toList();
+  }
+
+  Widget _leadPaymentCard(CustomerPaymentHistoryModel? leadPayment) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: _cardDecoration(),
+      child: Row(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xFF221531),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(Icons.account_balance_wallet, color: Colors.white),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  leadPayment?.provider ?? 'Service Payment',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1F1630),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  leadPayment?.serviceTitle ?? 'Customer booking payment',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF6D6480)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  leadPayment == null
+                      ? 'No payments available'
+                      : DateFormat('d MMM yyyy, h:mm a')
+                          .format(DateTime.parse(leadPayment.paidAt)),
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF8F86A2)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryCard(
+    CustomerPaymentHistoryModel? leadPayment,
+    double totalPaid,
+  ) {
+    final amount = leadPayment?.amount ?? totalPaid;
+    return _sectionCard(
+      title: 'Payment Summary',
+      child: Column(
+        children: [
+          _summaryRow('Service Charges', 'RM${amount.toStringAsFixed(2)}'),
+          const SizedBox(height: AppSpacing.sm),
+          _summaryRow('Service Fee', 'RM0.00'),
+          const SizedBox(height: AppSpacing.sm),
+          _summaryRow('Platform Fee', 'RM0.00'),
+          const Divider(height: 24),
+          _summaryRow(
+            'Total Paid',
+            'RM${amount.toStringAsFixed(2)}',
+            emphasize: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _paymentMethodCard(CustomerPaymentHistoryModel? leadPayment) {
+    return _sectionCard(
+      title: 'Payment Method',
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE7DCF7)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: AppColors.primarySoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.wallet_outlined, color: AppColors.primary),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    leadPayment?.paymentMethod ?? 'Cash',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF24193A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Only cash is available right now',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF8F86A2)),
+                  ),
+                ],
+              ),
+            ),
+            const SwiperStatusBadge(label: 'Cash', tone: SwiperStatusTone.info),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _completedCard(CustomerPaymentHistoryModel? leadPayment) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFFBF1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD7EFDB)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: Color(0xFF22C55E),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Payment Completed',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1F4D2B),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  leadPayment == null
+                      ? 'Waiting for payment record'
+                      : 'Paid on ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.parse(leadPayment.paidAt))}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF5F7D67),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterCard(
+    BuildContext context,
+    List<CustomerPaymentHistoryModel> items,
+  ) {
+    final months = {
+      for (final payment in items)
+        if (DateTime.tryParse(payment.paidAt) != null)
+          DateFormat('yyyy-MM').format(DateTime.parse(payment.paidAt)),
+    }.toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    return _sectionCard(
+      title: 'Filter',
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => setState(() => _filterMode = 'month'),
+                  child: Text(
+                    'By Month',
+                    style: TextStyle(
+                      color: _filterMode == 'month'
+                          ? AppColors.primary
+                          : const Color(0xFF111827),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => setState(() => _filterMode = 'custom'),
+                  child: Text(
+                    'Custom Period',
+                    style: TextStyle(
+                      color: _filterMode == 'custom'
+                          ? AppColors.primary
+                          : const Color(0xFF111827),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (_filterMode == 'month')
+            DropdownButtonFormField<String>(
+              initialValue: months.contains(_selectedMonth)
+                  ? _selectedMonth
+                  : (months.isNotEmpty ? months.first : _selectedMonth),
+              items: months
+                  .map(
+                    (month) => DropdownMenuItem(
+                      value: month,
+                      child: Text(
+                        DateFormat('MMMM yyyy').format(
+                          DateTime.parse('$month-01'),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() => _selectedMonth = value ?? _selectedMonth);
+              },
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: TextEditingController(text: _dateFrom),
+                    decoration: const InputDecoration(labelText: 'From'),
+                    onChanged: (value) => _dateFrom = value,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: TextField(
+                    controller: TextEditingController(text: _dateTo),
+                    decoration: const InputDecoration(labelText: 'To'),
+                    onChanged: (value) => _dateTo = value,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _transactionIdCard(CustomerPaymentHistoryModel? leadPayment) {
+    return _sectionCard(
+      title: 'Transaction ID',
+      child: Text(
+        leadPayment?.id ?? 'No transaction available',
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF24193A),
+        ),
+      ),
+    );
+  }
+
+  Widget _transactionHistoryCard(List<CustomerPaymentHistoryModel> items) {
+    return _sectionCard(
+      title: 'Transaction History',
+      child: Column(
+        children: [
+          if (items.isEmpty)
+            const EmptyState(
+              title: 'No payment records found',
+              subtitle: 'No payment records were found for the selected period.',
+              icon: Icons.receipt_long_outlined,
+            )
+          else
+            ...items.map(
+              (payment) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEDF1EF)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  payment.serviceTitle,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  payment.serviceCategory,
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text('Provider: ${payment.provider}'),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'RM${payment.amount.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF111827),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              SwiperStatusBadge(
+                                label: payment.status == 'paid'
+                                    ? 'Paid'
+                                    : 'Refunded',
+                                tone: SwiperStatusTone.info,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Date: ${DateFormat('d MMM yyyy').format(DateTime.parse(payment.paidAt))}',
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Time: ${DateFormat('h:mm a').format(DateTime.parse(payment.paidAt))}',
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Method: ${payment.paymentMethod}'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class CustomerFavoritesScreen extends StatefulWidget {
+  const CustomerFavoritesScreen({super.key});
+
+  @override
+  State<CustomerFavoritesScreen> createState() => _CustomerFavoritesScreenState();
+}
+
+class _CustomerFavoritesScreenState extends State<CustomerFavoritesScreen> {
+  static const _service = CustomerProfileApiService();
+
+  List<CustomerFavoriteProviderModel>? _items;
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final items = await _service.fetchFavorites();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _items = items);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _removeFavorite(String providerId) async {
+    final previousItems = _items ?? const [];
+    setState(() {
+      _items = previousItems.where((item) => item.id != providerId).toList();
+      _error = '';
+    });
+    try {
+      await _service.removeFavorite(providerId);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _items = previousItems;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _items;
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Favourite Providers',
+        subtitle: 'Saved provider shortlist',
+        showBack: true,
+      ),
+      body: items == null && _error.isEmpty
+          ? const LoadingState(label: 'Loading favourites...')
+          : ListView(
+              padding: AppSpacing.screenPadding,
+              children: [
+                if (_error.isNotEmpty) _errorBanner(_error),
+                if (items != null && items.isNotEmpty)
+                  ...items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: _favoriteCard(context, item),
+                    ),
+                  ),
+                if (items != null && items.isEmpty)
+                  const EmptyState(
+                    title: 'No favourite providers left',
+                    subtitle: 'Providers you save will appear here.',
+                    icon: Icons.favorite_border_rounded,
+                  ),
+              ],
+            ),
+    );
+  }
+
+  Widget _favoriteCard(
+    BuildContext context,
+    CustomerFavoriteProviderModel item,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: _cardDecoration(),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ProfileAvatar(
+            name: item.name,
+            imageUrl: item.portraitSrc,
+            radius: 40,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.role,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => _removeFavorite(item.id),
+                      icon: const Icon(
+                        Icons.favorite_rounded,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text('Rating: ${(item.rating ?? 4.8).toStringAsFixed(1)}'),
+                const SizedBox(height: 4),
+                Text('From: ${item.priceLabel ?? 'RM200/hr'}'),
+                const SizedBox(height: AppSpacing.md),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: SwiperButton(
+                    label: 'Book Now',
+                    onPressed: () => Navigator.of(context).pushNamed(
+                      AppRoutes.providerProfile,
+                      arguments: item.toProviderSummary(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CustomerNotificationsScreen extends StatefulWidget {
+  const CustomerNotificationsScreen({
+    super.key,
+    required this.repository,
+  });
+
+  final DemoRepository repository;
+
+  @override
+  State<CustomerNotificationsScreen> createState() =>
+      _CustomerNotificationsScreenState();
+}
+
+class _CustomerNotificationsScreenState
+    extends State<CustomerNotificationsScreen> {
+  late List<NotificationItem> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = widget.repository.getNotifications();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Notifications',
+        subtitle: 'Booking and payment updates',
+        showBack: true,
+      ),
+      body: ListView(
+        padding: AppSpacing.screenPadding,
+        children: [
+          if (_items.isEmpty)
+            const EmptyState(
+              title: 'No notifications yet',
+              subtitle:
+                  'Booking updates, provider decisions, and payment alerts will show up here.',
+              icon: Icons.notifications_none_rounded,
+            )
+          else
+            ..._items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    setState(() {
+                      _items = [
+                        for (var i = 0; i < _items.length; i++)
+                          NotificationItem(
+                            title: _items[i].title,
+                            body: _items[i].body,
+                            timeLabel: _items[i].timeLabel,
+                            isUnread: i == index ? false : _items[i].isUnread,
+                          ),
+                      ];
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: item.isUnread
+                          ? const Color(0xFFFAF7FD)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: item.isUnread
+                            ? const Color(0xFFD7C1EB)
+                            : const Color(0xFFE4ECE7),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.title,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF111827),
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Text(
+                                    item.body,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      height: 1.6,
+                                      color: Color(0xFF4B5563),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (item.isUnread)
+                              Container(
+                                width: 10,
+                                height: 10,
+                                margin: const EdgeInsets.only(top: 4),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          item.timeLabel,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerificationStatusTile extends StatelessWidget {
+  const _VerificationStatusTile({
+    required this.title,
+    required this.subtitle,
+    required this.verified,
+    required this.icon,
+    required this.onTap,
+    this.status,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool verified;
+  final String? status;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = verified
+        ? 'Verified'
+        : status == 'processing'
+            ? 'Processing'
+            : status == 'rejected'
+                ? 'Rejected'
+                : 'Pending';
+    final tone = verified
+        ? SwiperStatusTone.success
+        : status == 'processing'
+            ? SwiperStatusTone.info
+            : status == 'rejected'
+                ? SwiperStatusTone.error
+                : SwiperStatusTone.warning;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFECE4FA)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0A6A45A0),
+              blurRadius: 18,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primarySoft,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(icon, color: AppColors.primary),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1F1630),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF7B728A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SwiperStatusBadge(label: label, tone: tone),
+            const SizedBox(width: AppSpacing.sm),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF98A2B3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OtpSlots extends StatelessWidget {
+  const _OtpSlots({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(6, (index) {
+        final char = index < value.length ? value[index] : '';
+        return SizedBox(
+          width: 46,
+          child: TextFormField(
+            initialValue: char,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            onChanged: (next) {
+              final digit = next.replaceAll(RegExp(r'\D'), '');
+              final chars = value.padRight(6).split('');
+              chars[index] = digit.isEmpty ? '' : digit.characters.last;
+              onChanged(chars.join().trimRight());
+            },
+            decoration: const InputDecoration(counterText: ''),
+            maxLength: 1,
+          ),
+        );
+      }),
+    );
+  }
+}
+
+BoxDecoration _cardDecoration() {
+  return BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(24),
+    border: Border.all(color: const Color(0xFFEEE5F7)),
+    boxShadow: const [
+      BoxShadow(
+        color: Color(0x14562687),
+        blurRadius: 24,
+        offset: Offset(0, 10),
+      ),
+    ],
+  );
+}
+
+Widget _securityCard(String message) {
+  return Container(
+    padding: const EdgeInsets.all(AppSpacing.md),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: const Color(0xFFEADFF8)),
+      gradient: const LinearGradient(
+        colors: [
+          Color(0xFFFBF8FF),
+          Color(0xFFF5EFFF),
+        ],
+      ),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Icon(
+            Icons.verified_user_outlined,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Your security matters',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1F1630),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6F6681),
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _errorBanner(String error) {
+  return Container(
+    padding: const EdgeInsets.all(AppSpacing.md),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFF1F2),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFFFECACA)),
+    ),
+    child: Text(
+      error,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFFDC2626),
+      ),
+    ),
+  );
+}
+
+String _statusLabel(String status) {
+  switch (status) {
+    case 'verified':
+      return 'Verified';
+    case 'processing':
+      return 'Processing';
+    case 'rejected':
+      return 'Rejected';
+    default:
+      return 'Pending';
+  }
+}
+
+SwiperStatusTone _statusTone(String status) {
+  switch (status) {
+    case 'verified':
+      return SwiperStatusTone.success;
+    case 'processing':
+      return SwiperStatusTone.info;
+    case 'rejected':
+      return SwiperStatusTone.error;
+    default:
+      return SwiperStatusTone.warning;
+  }
+}
+
+Widget _sectionCard({
+  required String title,
+  required Widget child,
+}) {
+  return Container(
+    padding: const EdgeInsets.all(AppSpacing.md),
+    decoration: _cardDecoration(),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF111827),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        child,
+      ],
+    ),
+  );
+}
+
+Widget _summaryRow(String label, String value, {bool emphasize = false}) {
+  return Row(
+    children: [
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: emphasize ? 15 : 13,
+            fontWeight: emphasize ? FontWeight.w800 : FontWeight.w500,
+            color: const Color(0xFF4F4663),
+          ),
+        ),
+      ),
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: emphasize ? 22 : 13,
+          fontWeight: FontWeight.w800,
+          color: emphasize ? AppColors.primary : const Color(0xFF24193A),
+        ),
+      ),
+    ],
+  );
+}

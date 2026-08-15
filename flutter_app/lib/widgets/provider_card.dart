@@ -4,7 +4,6 @@ import 'package:flutter/widget_previews.dart';
 import '../models/provider_summary.dart';
 import '../previews/widget_preview_helpers.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_spacing.dart';
 
 class ProviderCard extends StatelessWidget {
   const ProviderCard({super.key, required this.provider, this.onTap});

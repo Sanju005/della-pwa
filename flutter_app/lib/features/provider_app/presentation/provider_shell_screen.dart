@@ -32,12 +32,12 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
       ProviderProfileDemoScreen(repository: widget.repository),
     ];
 
-    const titles = ['Provider Home', 'Jobs', 'Earnings', 'Profile'];
+    const titles = ['Home', 'Bookings', 'Payments', 'Profile'];
     const subtitles = [
-      'Dashboard demo',
-      'Job card preview',
-      'Payout summary UI',
-      'Provider identity and settings',
+      'Provider workspace',
+      'Incoming requests and active jobs',
+      'Ledger and provider earnings',
+      'Provider identity and listing',
     ];
 
     return Scaffold(
@@ -57,8 +57,8 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
         currentIndex: _currentIndex,
         items: const [
           SwiperBottomNavItem(label: 'Home', icon: Icons.home_work_rounded),
-          SwiperBottomNavItem(label: 'Jobs', icon: Icons.assignment_turned_in_rounded),
-          SwiperBottomNavItem(label: 'Earnings', icon: Icons.payments_rounded),
+          SwiperBottomNavItem(label: 'Bookings', icon: Icons.calendar_month_rounded),
+          SwiperBottomNavItem(label: 'Payments', icon: Icons.payments_rounded),
           SwiperBottomNavItem(label: 'Profile', icon: Icons.badge_outlined),
         ],
         onTap: (index) => setState(() => _currentIndex = index),

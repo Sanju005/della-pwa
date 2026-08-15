@@ -10,6 +10,7 @@ import '../../features/auth/presentation/signup_entry_screen.dart';
 import '../../features/booking/presentation/booking_overview_screen.dart';
 import '../../features/booking/presentation/provider_booking_screen.dart';
 import '../../features/home/presentation/customer_shell_screen.dart';
+import '../../features/profile/presentation/customer_profile_subpages.dart';
 import '../../features/provider_app/presentation/provider_shell_screen.dart';
 import '../../features/providers/presentation/provider_list_screen.dart';
 import '../../features/providers/presentation/provider_profile_screen.dart';
@@ -76,6 +77,46 @@ class AppRouter {
       case AppRoutes.bookingDetail:
         return MaterialPageRoute<void>(
           builder: (_) => const BookingDetailScreen(),
+          settings: settings,
+        );
+      case AppRoutes.profileVerification:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerVerificationHubScreen(),
+          settings: settings,
+        );
+      case AppRoutes.profileVerificationEmail:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerEmailVerificationScreen(),
+          settings: settings,
+        );
+      case AppRoutes.profileVerificationPhone:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerPhoneVerificationScreen(),
+          settings: settings,
+        );
+      case AppRoutes.profileVerificationIdentity:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerIdentityVerificationScreen(),
+          settings: settings,
+        );
+      case AppRoutes.profileAddresses:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerAddressesScreen(),
+          settings: settings,
+        );
+      case AppRoutes.profilePayments:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerPaymentsScreen(),
+          settings: settings,
+        );
+      case AppRoutes.profileFavorites:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CustomerFavoritesScreen(),
+          settings: settings,
+        );
+      case AppRoutes.profileNotifications:
+        return MaterialPageRoute<void>(
+          builder: (_) => CustomerNotificationsScreen(repository: _repository),
           settings: settings,
         );
       case AppRoutes.providerBooking:

@@ -96,6 +96,7 @@ class CustomerAccountOverview {
     required this.firstName,
     required this.lastName,
     required this.fullName,
+    required this.avatarUrl,
     required this.email,
     required this.phoneNumber,
     required this.countryCode,
@@ -115,6 +116,7 @@ class CustomerAccountOverview {
   final String firstName;
   final String lastName;
   final String fullName;
+  final String avatarUrl;
   final String email;
   final String phoneNumber;
   final String countryCode;
@@ -498,6 +500,7 @@ class CustomerAccountService {
       fullName: [firstName, lastName]
           .where((item) => item.trim().isNotEmpty)
           .join(' '),
+      avatarUrl: profileRow?['avatar_url']?.toString().trim() ?? '',
       email: profileRow?['email']?.toString().trim() ?? user.email ?? '',
       phoneNumber: phoneParts['phoneNumber'] ?? '',
       countryCode: phoneParts['countryCode'] ?? '+60',
