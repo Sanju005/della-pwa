@@ -317,6 +317,7 @@ export function ProviderRegistrationWizard() {
   const [stepIndex, setStepIndex] = useState(0);
   const [registrationId, setRegistrationId] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [availabilitySetupFailed, setAvailabilitySetupFailed] = useState(false);
   const [basicFieldErrors, setBasicFieldErrors] = useState<Record<string, string>>({});
   const [servicesError, setServicesError] = useState("");
   const [showBasicProfileSavedModal, setShowBasicProfileSavedModal] = useState(false);
@@ -377,6 +378,7 @@ export function ProviderRegistrationWizard() {
               emailVerified: boolean;
               identityVerified: boolean;
               verificationSetupFailed?: boolean;
+              availabilitySetupFailed?: boolean;
             }
           | { error?: string };
 
@@ -405,6 +407,7 @@ export function ProviderRegistrationWizard() {
 
     setHasProviderSession(true);
     setRegistrationId(result.id);
+    setAvailabilitySetupFailed(Boolean(result.availabilitySetupFailed));
     return result;
   };
 
@@ -502,6 +505,7 @@ export function ProviderRegistrationWizard() {
     if (activeStep.type === "review") {
       startTransition(async () => {
         setSubmitError("");
+        setAvailabilitySetupFailed(false);
         try {
           await submitRegistration();
           setStepIndex((current) => Math.min(current + 1, steps.length - 1));
@@ -847,6 +851,7 @@ export function ProviderRegistrationWizard() {
             {activeStep.type === "submitted" ? (
               <SubmissionChoiceStep
                 registrationId={registrationId}
+                availabilitySetupFailed={availabilitySetupFailed}
                 onStartVerification={() =>
                   setStepIndex((current) => Math.min(current + 1, steps.length - 1))
                 }
@@ -1895,9 +1900,11 @@ function SuccessStep({
 
 function SubmissionChoiceStep({
   registrationId,
+  availabilitySetupFailed,
   onStartVerification,
 }: {
   registrationId: string;
+  availabilitySetupFailed: boolean;
   onStartVerification: () => void;
 }) {
   return (
@@ -1918,6 +1925,12 @@ function SubmissionChoiceStep({
           Verify your account now, or go straight to your own profile.
         </p>
       </div>
+
+      {availabilitySetupFailed ? (
+        <div className="rounded-[16px] border border-[#fed7aa] bg-[#fff7ed] px-4 py-3 text-[13px] font-semibold text-[#9a3412]">
+          Your account was created, but availability could not be saved yet. You can continue now and update availability later from your provider profile.
+        </div>
+      ) : null}
 
       <button
         type="button"

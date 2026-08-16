@@ -378,6 +378,17 @@ function isMissingProviderServiceMediaColumnError(message?: string) {
   );
 }
 
+function isMissingRelationError(message?: string) {
+  const normalized = message?.trim().toLowerCase() ?? "";
+
+  return (
+    normalized.includes("does not exist") ||
+    normalized.includes("could not find the table") ||
+    normalized.includes("relation") ||
+    normalized.includes("schema cache")
+  );
+}
+
 function stripProviderServiceMediaFields(
   providerService: Record<string, unknown>,
 ) {
@@ -748,6 +759,8 @@ export async function POST(request: Request) {
       .map((day) => day.trim().toLowerCase())
       .filter(Boolean);
 
+    let availabilitySetupFailed = false;
+
     if (availabilityDays.length > 0) {
       const availabilityRange = getRegistrationAvailabilityRange(payload);
       const availabilityWrite = await adminClient
@@ -763,10 +776,14 @@ export async function POST(request: Request) {
         );
 
       if (availabilityWrite.error) {
-        return NextResponse.json(
-          { error: "Account created, but provider availability setup failed." },
-          { status: 500 }
-        );
+        availabilitySetupFailed = true;
+
+        if (!isMissingRelationError(availabilityWrite.error.message)) {
+          return NextResponse.json(
+            { error: "Account created, but provider availability setup failed." },
+            { status: 500 }
+          );
+        }
       }
     }
 
@@ -918,6 +935,7 @@ export async function POST(request: Request) {
       emailVerified: verificationSetupFailed ? false : record.emailVerified,
       identityVerified: verificationSetupFailed ? false : record.identityVerified,
       verificationSetupFailed,
+      availabilitySetupFailed,
     });
   } catch (error) {
     return NextResponse.json(
