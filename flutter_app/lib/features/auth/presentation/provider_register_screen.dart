@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/browser_file_picker.dart';
 import '../../../services/provider_registration_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
@@ -82,6 +83,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   final Map<String, String> _serviceRateByService = {};
   final Map<String, String> _serviceExperienceByService = {};
   final Map<String, String> _serviceSpecialtiesByService = {};
+  PickedBrowserFile? _profileImage;
+  List<PickedBrowserFile> _workImages = const [];
   String? _submitError;
   ProviderRegistrationResult? _registrationResult;
 
@@ -204,6 +207,10 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     setState(() => _submitError = null);
     if (_step == _ProviderStep.basic) {
       if (!_basicFormKey.currentState!.validate()) return;
+      if (_profileImage == null) {
+        setState(() => _submitError = 'Please upload a profile picture.');
+        return;
+      }
       if (_passwordController.text != _confirmPasswordController.text) {
         setState(() => _submitError = 'Passwords do not match.');
         return;
@@ -218,6 +225,10 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     }
     if (_step == _ProviderStep.services && _selectedServices.isEmpty) {
       setState(() => _submitError = 'Please select at least one service.');
+      return;
+    }
+    if (_step == _ProviderStep.serviceDetail && _workImages.length != 3) {
+      setState(() => _submitError = 'Please upload exactly 3 work images.');
       return;
     }
     if (_step == _ProviderStep.review || _step == _ProviderStep.identity) {
@@ -334,11 +345,52 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     return null;
   }
 
+  Future<void> _pickProfileImage() async {
+    final picked = await pickSingleBrowserFile(accept: 'image/*');
+    if (!mounted || picked == null) {
+      return;
+    }
+    setState(() => _profileImage = picked);
+  }
+
+  Future<void> _pickWorkImages() async {
+    final picked = await pickMultipleBrowserFiles(
+      accept: 'image/*',
+      maxFiles: 3,
+    );
+    if (!mounted || picked.isEmpty) {
+      return;
+    }
+    setState(() => _workImages = picked.take(3).toList(growable: false));
+  }
+
+  void _removeProfileImage() {
+    setState(() => _profileImage = null);
+  }
+
+  void _removeWorkImage(int index) {
+    final next = List<PickedBrowserFile>.from(_workImages);
+    if (index < 0 || index >= next.length) {
+      return;
+    }
+    next.removeAt(index);
+    setState(() => _workImages = next);
+  }
+
   Widget _buildBasicStep() {
     return Form(
       key: _basicFormKey,
       child: Column(
         children: [
+          _ImagePickerCard(
+            title: 'Profile Picture',
+            subtitle: 'Add a clear photo for your provider profile.',
+            file: _profileImage,
+            onPick: _pickProfileImage,
+            onRemove: _profileImage == null ? null : _removeProfileImage,
+            requiredLabel: 'Required',
+          ),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
@@ -577,6 +629,15 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
               controller: _specialtiesController,
               prefixIcon: const Icon(Icons.auto_awesome_outlined),
             ),
+            const SizedBox(height: AppSpacing.md),
+            _MultiImagePickerCard(
+              title: 'Work Images',
+              subtitle: 'Upload 3 photos of your previous work.',
+              files: _workImages,
+              maxFiles: 3,
+              onPick: _pickWorkImages,
+              onRemove: _removeWorkImage,
+            ),
             const SizedBox(height: AppSpacing.sm),
             Align(
               alignment: Alignment.centerLeft,
@@ -689,6 +750,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             'Services: ${_selectedServices.join(', ')}',
             'Availability: ${_availabilityDays.join(', ')} - $_timePreset',
             'Location: ${_areaLabelController.text} / ${_radiusKm.round()} KM',
+            'Profile picture: ${_profileImage?.name ?? 'Missing'}',
+            'Work images: ${_workImages.length}/3 uploaded',
             if (_registrationResult != null)
               'Registration status: ${_registrationResult!.status}',
           ],
@@ -920,12 +983,17 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
           .map((item) => item.trim())
           .where((item) => item.isNotEmpty)
           .toList();
+      final isSelected = _selectedServices.contains(service);
 
       serviceDetails[service] = {
         'yearsExperience': _serviceExperienceByService[service] ?? '',
         'specialties': specialties,
-        'imageCaptions': ['', '', ''],
-        'imageDataUrls': ['', '', ''],
+        'imageCaptions': isSelected
+            ? _workImages.map((file) => file.name).toList(growable: false)
+            : ['', '', ''],
+        'imageDataUrls': isSelected
+            ? _workImages.map((file) => file.dataUrl).toList(growable: false)
+            : ['', '', ''],
         'certificateCaptions': ['', '', ''],
         'certificateDataUrls': ['', '', ''],
         'hourlyRate': _serviceRateByService[service] ?? '',
@@ -938,8 +1006,8 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
         'sex': _gender,
-        'profileImageName': '',
-        'avatarDataUrl': '',
+        'profileImageName': _profileImage?.name ?? '',
+        'avatarDataUrl': _profileImage?.dataUrl ?? '',
         'marketingName': _marketingNameController.text.trim(),
         'dateOfBirth': _toIsoDate(_dobController.text.trim()),
         'unitNumber': '',
@@ -1056,6 +1124,280 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
               ).textTheme.labelMedium?.copyWith(color: AppColors.error),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ImagePickerCard extends StatelessWidget {
+  const _ImagePickerCard({
+    required this.title,
+    required this.subtitle,
+    required this.file,
+    required this.onPick,
+    this.onRemove,
+    this.requiredLabel,
+  });
+
+  final String title;
+  final String subtitle;
+  final PickedBrowserFile? file;
+  final VoidCallback onPick;
+  final VoidCallback? onRemove;
+  final String? requiredLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (requiredLabel != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    requiredLabel!,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            subtitle,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            child: Container(
+              width: double.infinity,
+              height: 180,
+              color: const Color(0xFFF7FAF8),
+              child: file == null
+                  ? const Center(
+                      child: Icon(
+                        Icons.add_a_photo_outlined,
+                        size: 40,
+                        color: AppColors.primary,
+                      ),
+                    )
+                  : Image.network(
+                      file!.dataUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          size: 40,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            file?.name ?? 'No file selected',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: file == null ? AppColors.textSecondary : AppColors.primary,
+              fontWeight: file == null ? FontWeight.w500 : FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onPick,
+                  icon: const Icon(Icons.upload_outlined),
+                  label: Text(file == null ? 'Upload Image' : 'Change Image'),
+                ),
+              ),
+              if (onRemove != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                IconButton(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  color: AppColors.error,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MultiImagePickerCard extends StatelessWidget {
+  const _MultiImagePickerCard({
+    required this.title,
+    required this.subtitle,
+    required this.files,
+    required this.maxFiles,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<PickedBrowserFile> files;
+  final int maxFiles;
+  final VoidCallback onPick;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            subtitle,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '${files.length}/$maxFiles uploaded',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: files.length == maxFiles
+                  ? AppColors.success
+                  : AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (files.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7FAF8),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+              child: const Column(
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: 36,
+                    color: AppColors.primary,
+                  ),
+                  SizedBox(height: AppSpacing.sm),
+                  Text('No work images selected yet'),
+                ],
+              ),
+            )
+          else
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: List.generate(files.length, (index) {
+                final file = files[index];
+                return Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      child: Image.network(
+                        file.dataUrl,
+                        width: 96,
+                        height: 96,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 96,
+                          height: 96,
+                          color: const Color(0xFFF7FAF8),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      child: InkWell(
+                        onTap: () => onRemove(index),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Ink(
+                          width: 26,
+                          height: 26,
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onPick,
+              icon: const Icon(Icons.upload_outlined),
+              label: Text(
+                files.isEmpty ? 'Upload 3 Work Images' : 'Replace Work Images',
+              ),
+            ),
+          ),
         ],
       ),
     );

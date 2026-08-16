@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../widgets/swiper_app_bar.dart';
 import '../../../widgets/swiper_bottom_nav.dart';
@@ -23,6 +25,17 @@ class ProviderShellScreen extends StatefulWidget {
 class _ProviderShellScreenState extends State<ProviderShellScreen> {
   int _currentIndex = 0;
 
+  Future<void> _logOut() async {
+    await Supabase.instance.client.auth.signOut();
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRoutes.login,
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -45,6 +58,13 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
         title: titles[_currentIndex],
         subtitle: subtitles[_currentIndex],
         showBack: true,
+        actions: [
+          IconButton(
+            tooltip: 'Log Out',
+            onPressed: _logOut,
+            icon: const Icon(Icons.logout_rounded),
+          ),
+        ],
       ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 220),
