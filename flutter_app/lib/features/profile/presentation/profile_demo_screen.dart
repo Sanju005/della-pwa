@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
@@ -462,6 +463,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             _OverviewSectionCard(
               title: 'Personal Details',
               actionLabel: 'Edit',
+              onActionTap: () => _openEditDetailsSheet(overview),
               child: Column(
                 children: [
                   _InfoActionRow(
@@ -506,7 +508,13 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                       overview.city,
                       overview.region,
                       overview.country,
-                    ].where((item) => item.trim().isNotEmpty).join(', '),
+                    ].where((item) => item.trim().isNotEmpty).join(', ').isEmpty
+                        ? 'Malaysia'
+                        : [
+                            overview.city,
+                            overview.region,
+                            overview.country,
+                          ].where((item) => item.trim().isNotEmpty).join(', '),
                     isLast: true,
                   ),
                 ],
@@ -678,6 +686,28 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                   ],
                 ],
               ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton(
+              onPressed: () async {
+                await Supabase.instance.client.auth.signOut();
+                if (!context.mounted) {
+                  return;
+                }
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  AppRoutes.login,
+                  (route) => false,
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+              ),
+              child: const Text('Log Out'),
             ),
             const SizedBox(height: 120),
           ],

@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'customer_profile_api_service.dart';
 
 class CustomerAddressSummary {
   const CustomerAddressSummary({
@@ -162,6 +163,8 @@ class CustomerPersonalDetailsInput {
 class CustomerAccountService {
   const CustomerAccountService();
 
+  static const _profileApi = CustomerProfileApiService();
+
   SupabaseClient get _client => Supabase.instance.client;
 
   String _formatCurrency(num value) => 'RM ${value.toStringAsFixed(2)}';
@@ -287,73 +290,13 @@ class CustomerAccountService {
     );
   }
 
-  Future<Map<String, dynamic>?> _fetchCustomerProfileRow(String userId) async {
-    try {
-      return await _client
-          .from('customer_profiles')
-          .select('''
-            first_name,
-            last_name,
-            date_of_birth,
-            sex,
-            phone_number,
-            country_code,
-            emergency_contact_number,
-            city,
-            region,
-            state,
-            country,
-            verified,
-            completion
-          ''')
-          .eq('id', userId)
-          .maybeSingle();
-    } catch (error, stackTrace) {
-      if (kDebugMode) {
-        debugPrint('Customer profile full query failed: $error');
-        debugPrintStack(stackTrace: stackTrace);
-      }
-
-      try {
-        return await _client
-            .from('customer_profiles')
-            .select('''
-              first_name,
-              last_name,
-              date_of_birth,
-              sex,
-              phone_number,
-              country_code,
-              emergency_contact_number,
-              city,
-              region,
-              state,
-              country
-            ''')
-            .eq('id', userId)
-            .maybeSingle();
-      } catch (fallbackError, fallbackStackTrace) {
-        if (kDebugMode) {
-          debugPrint('Customer profile fallback query failed: $fallbackError');
-          debugPrintStack(stackTrace: fallbackStackTrace);
-        }
-        return null;
-      }
-    }
-  }
-
   Future<CustomerAccountOverview?> fetchOverview() async {
     final user = _client.auth.currentUser;
     if (user == null) {
       return null;
     }
 
-    final profileRow = await _client
-        .from('profiles')
-        .select('full_name, email, phone, avatar_url')
-        .eq('id', user.id)
-        .maybeSingle();
-    final customerRow = await _fetchCustomerProfileRow(user.id);
+    final profile = await _profileApi.fetchProfile();
     final addressRows = await _client
             .from('addresses')
             .select(
@@ -382,19 +325,19 @@ class CustomerAccountService {
         as List<dynamic>? ??
         const [];
 
-    final fullName = profileRow?['full_name']?.toString().trim() ?? '';
+    final fullName = profile.fullName.trim();
     final nameParts = fullName.isEmpty ? const <String>[] : fullName.split(RegExp(r'\s+'));
-    final firstName = customerRow?['first_name']?.toString().trim().isNotEmpty == true
-        ? customerRow!['first_name'].toString().trim()
+    final firstName = profile.firstName.trim().isNotEmpty
+        ? profile.firstName.trim()
         : (nameParts.isNotEmpty ? nameParts.first : 'Customer');
-    final lastName = customerRow?['last_name']?.toString().trim().isNotEmpty == true
-        ? customerRow!['last_name'].toString().trim()
+    final lastName = profile.lastName.trim().isNotEmpty
+        ? profile.lastName.trim()
         : (nameParts.length > 1 ? nameParts.skip(1).join(' ') : '');
 
     final phoneParts = _normalizePhoneParts(
-      profileRow?['phone']?.toString(),
-      customerRow?['phone_number']?.toString(),
-      customerRow?['country_code']?.toString(),
+      profile.phoneNumber,
+      profile.phoneNumber,
+      profile.countryCode,
     );
 
     final providerIds = paymentRows
@@ -483,15 +426,11 @@ class CustomerAccountService {
       );
     }).toList();
 
-    final metadata = user.userMetadata ?? const <String, dynamic>{};
     final verification = CustomerVerificationSummary(
-      emailVerified: metadata['email_verified'] == true,
-      phoneVerified: metadata['phone_verified'] == true,
-      identityStatusLabel: _formatStatus(
-        metadata['identity_verification_status']?.toString(),
-      ),
-      verified: customerRow?['verified'] == true ||
-          metadata['identity_verification_status']?.toString() == 'verified',
+      emailVerified: profile.emailVerified,
+      phoneVerified: profile.phoneVerified,
+      identityStatusLabel: _formatStatus(profile.identityVerificationStatus),
+      verified: profile.verified,
     );
 
     return CustomerAccountOverview(
@@ -500,22 +439,17 @@ class CustomerAccountService {
       fullName: [firstName, lastName]
           .where((item) => item.trim().isNotEmpty)
           .join(' '),
-      avatarUrl: profileRow?['avatar_url']?.toString().trim() ?? '',
-      email: profileRow?['email']?.toString().trim() ?? user.email ?? '',
+      avatarUrl: profile.avatarUrl,
+      email: profile.email.isNotEmpty ? profile.email : user.email ?? '',
       phoneNumber: phoneParts['phoneNumber'] ?? '',
       countryCode: phoneParts['countryCode'] ?? '+60',
-      emergencyContactNumber:
-          customerRow?['emergency_contact_number']?.toString().trim() ?? '',
-      city: customerRow?['city']?.toString().trim() ?? '',
-      region: customerRow?['region']?.toString().trim().isNotEmpty == true
-          ? customerRow!['region'].toString().trim()
-          : customerRow?['state']?.toString().trim() ?? '',
-      country: customerRow?['country']?.toString().trim().isNotEmpty == true
-          ? customerRow!['country'].toString().trim()
-          : 'Malaysia',
-      dateOfBirth: _formatDate(customerRow?['date_of_birth']?.toString()),
-      sex: customerRow?['sex']?.toString().trim() ?? '',
-      completion: (customerRow?['completion'] as num?)?.round() ?? 80,
+      emergencyContactNumber: profile.emergencyContactNumber,
+      city: profile.city,
+      region: profile.region,
+      country: profile.country.isNotEmpty ? profile.country : 'Malaysia',
+      dateOfBirth: _formatDate(profile.dateOfBirth),
+      sex: profile.sex,
+      completion: profile.completion,
       addresses: addresses,
       bookingSummary: _buildBookingSummary(bookingRows),
       paymentSummary: CustomerPaymentSummary(
@@ -537,33 +471,19 @@ class CustomerAccountService {
 
     final firstName = input.firstName.trim();
     final lastName = input.lastName.trim();
-    final fullName = [firstName, lastName]
-        .where((item) => item.isNotEmpty)
-        .join(' ')
-        .trim();
-
-    await _client.from('profiles').upsert({
-      'id': user.id,
-      'full_name': fullName,
-      'phone': '${input.countryCode.trim()} ${input.phoneNumber.trim()}'.trim(),
-      'email': user.email,
-      'updated_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'id');
-
-    await _client.from('customer_profiles').upsert({
-      'id': user.id,
-      'first_name': firstName,
-      'last_name': lastName,
-      'date_of_birth': input.dateOfBirth.trim().isEmpty ? null : input.dateOfBirth.trim(),
+    await _profileApi.updateProfile({
+      'firstName': firstName,
+      'lastName': lastName,
+      'phoneNumber': input.phoneNumber.trim(),
+      'countryCode': input.countryCode.trim().isEmpty ? '+60' : input.countryCode.trim(),
+      'emergencyContactNumber': input.emergencyContactNumber.trim(),
+      'dateOfBirth': input.dateOfBirth.trim().isEmpty ? null : input.dateOfBirth.trim(),
       'sex': input.sex.trim(),
-      'phone_number': input.phoneNumber.trim(),
-      'country_code': input.countryCode.trim().isEmpty ? '+60' : input.countryCode.trim(),
-      'emergency_contact_number': input.emergencyContactNumber.trim(),
       'city': input.city.trim(),
       'region': input.region.trim(),
-      'state': input.region.trim(),
       'country': input.country.trim().isEmpty ? 'Malaysia' : input.country.trim(),
-      'updated_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'id');
+      'completion': 100,
+      'verified': false,
+    });
   }
 }
