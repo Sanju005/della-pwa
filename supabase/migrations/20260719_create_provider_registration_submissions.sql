@@ -19,7 +19,7 @@ as $$
 begin
   new.updated_at = timezone('utc', now());
   return new;
-end;
+e
 $$;
 
 drop trigger if exists provider_registration_submissions_set_updated_at

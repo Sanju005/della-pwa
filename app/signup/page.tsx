@@ -64,7 +64,7 @@ function ChoiceCard({
       className="block rounded-[24px] border border-[#e4d7f3] bg-white p-5 shadow-[0_16px_30px_rgba(67,35,104,0.08)]"
     >
       <div className="flex items-start gap-4">
-        <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#f2e9fb_0%,#e4d3f7_100%)] text-[28px] font-extrabold text-[#8E5EB5]">
+        <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#f2e9fb_0%,#e4d3f7_100%)]">
           {role === "user" ? <UserBadgeIllustration /> : <ProviderBadgeIllustration />}
         </div>
         <div className="flex-1">
@@ -100,22 +100,22 @@ function ChoiceCard({
 
 function UserBadgeIllustration() {
   return (
-    <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
+    <svg viewBox="0 0 64 64" className="h-12 w-12" aria-hidden="true">
       <defs>
         <linearGradient id="user-badge-fill" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#A679CF" />
           <stop offset="100%" stopColor="#8E5EB5" />
         </linearGradient>
       </defs>
-      <circle cx="32" cy="23" r="10" fill="url(#user-badge-fill)" />
+      <circle cx="32" cy="22" r="10" fill="url(#user-badge-fill)" />
       <path
-        d="M17 49c2.9-7.8 8.8-11.7 15-11.7 6.2 0 12.1 3.9 15 11.7"
+        d="M17 47c2.9-7.8 8.8-11.7 15-11.7 6.2 0 12.1 3.9 15 11.7"
         fill="none"
         stroke="url(#user-badge-fill)"
         strokeWidth="6"
         strokeLinecap="round"
       />
-      <circle cx="45" cy="18" r="5.5" fill="#F5EEFF" />
+      <circle cx="45" cy="18" r="6" fill="#F5EEFF" stroke="#D9C6EE" strokeWidth="1.5" />
       <path
         d="M45 15v6M42 18h6"
         stroke="#8E5EB5"
@@ -128,7 +128,7 @@ function UserBadgeIllustration() {
 
 function ProviderBadgeIllustration() {
   return (
-    <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
+    <svg viewBox="0 0 64 64" className="h-12 w-12" aria-hidden="true">
       <defs>
         <linearGradient id="provider-badge-fill" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#A679CF" />
@@ -137,7 +137,7 @@ function ProviderBadgeIllustration() {
       </defs>
       <circle cx="23" cy="24" r="9" fill="url(#provider-badge-fill)" />
       <path
-        d="M12 49c2.5-6.8 7.7-10.5 13-10.5 3.5 0 6.8 1.4 9.6 4.2"
+        d="M12 48c2.5-6.8 7.7-10.5 13-10.5 3.5 0 6.8 1.4 9.6 4.2"
         fill="none"
         stroke="url(#provider-badge-fill)"
         strokeWidth="6"
