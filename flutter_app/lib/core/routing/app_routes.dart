@@ -22,4 +22,7 @@ class AppRoutes {
   static const profileFavorites = '/profile/favourites';
   static const profileNotifications = '/profile/notifications';
   static const providerShell = '/provider-workspace';
+  static const providerAvailability = '/provider/availability';
+  static const providerServices = '/provider/services';
+  static const providerReviews = '/provider/reviews';
 }

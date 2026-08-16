@@ -6,6 +6,56 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
 
+List<String> _providerWorkspaceStringList(dynamic value) {
+  return (value as List<dynamic>? ?? const [])
+      .map((item) => item?.toString() ?? '')
+      .where((item) => item.trim().isNotEmpty)
+      .toList(growable: false);
+}
+
+class ProviderWorkspaceServiceModel {
+  const ProviderWorkspaceServiceModel({
+    required this.id,
+    required this.serviceType,
+    required this.yearsExperience,
+    required this.hourlyRate,
+    required this.dailyRate,
+    required this.specialties,
+    required this.imageDataUrls,
+    required this.imageCaptions,
+    required this.certificateDataUrls,
+    required this.certificateCaptions,
+  });
+
+  final String id;
+  final String serviceType;
+  final String yearsExperience;
+  final double hourlyRate;
+  final double dailyRate;
+  final List<String> specialties;
+  final List<String> imageDataUrls;
+  final List<String> imageCaptions;
+  final List<String> certificateDataUrls;
+  final List<String> certificateCaptions;
+
+  factory ProviderWorkspaceServiceModel.fromJson(Map<String, dynamic> json) {
+    return ProviderWorkspaceServiceModel(
+      id: json['id'] as String? ?? '',
+      serviceType: json['serviceType'] as String? ?? '',
+      yearsExperience: json['yearsExperience'] as String? ?? '',
+      hourlyRate: (json['hourlyRate'] as num?)?.toDouble() ?? 0,
+      dailyRate: (json['dailyRate'] as num?)?.toDouble() ?? 0,
+      specialties: _providerWorkspaceStringList(json['specialties']),
+      imageDataUrls: _providerWorkspaceStringList(json['imageDataUrls']),
+      imageCaptions: _providerWorkspaceStringList(json['imageCaptions']),
+      certificateDataUrls:
+          _providerWorkspaceStringList(json['certificateDataUrls']),
+      certificateCaptions:
+          _providerWorkspaceStringList(json['certificateCaptions']),
+    );
+  }
+}
+
 class ProviderWorkspaceProfile {
   const ProviderWorkspaceProfile({
     required this.providerId,
@@ -27,6 +77,13 @@ class ProviderWorkspaceProfile {
     required this.emailVerified,
     required this.phoneVerified,
     required this.identityVerified,
+    required this.identityVerificationStatus,
+    required this.identityDocumentType,
+    required this.identityFrontImageUrl,
+    required this.identityBackImageUrl,
+    required this.kycVerified,
+    required this.backgroundCheckVerified,
+    required this.services,
   });
 
   final String providerId;
@@ -48,6 +105,13 @@ class ProviderWorkspaceProfile {
   final bool emailVerified;
   final bool phoneVerified;
   final bool identityVerified;
+  final String identityVerificationStatus;
+  final String identityDocumentType;
+  final String identityFrontImageUrl;
+  final String identityBackImageUrl;
+  final bool kycVerified;
+  final bool backgroundCheckVerified;
+  final List<ProviderWorkspaceServiceModel> services;
 
   factory ProviderWorkspaceProfile.fromJson(Map<String, dynamic> json) {
     return ProviderWorkspaceProfile(
@@ -71,6 +135,22 @@ class ProviderWorkspaceProfile {
       emailVerified: json['emailVerified'] == true,
       phoneVerified: json['phoneVerified'] == true,
       identityVerified: json['identityVerified'] == true,
+      identityVerificationStatus:
+          json['identityVerificationStatus'] as String? ?? 'pending',
+      identityDocumentType: json['identityDocumentType'] as String? ?? '',
+      identityFrontImageUrl: json['identityFrontImageUrl'] as String? ?? '',
+      identityBackImageUrl: json['identityBackImageUrl'] as String? ?? '',
+      kycVerified: json['kycVerified'] == true,
+      backgroundCheckVerified: json['backgroundCheckVerified'] == true,
+      services: (json['services'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .map(ProviderWorkspaceServiceModel.fromJson)
+          .toList(growable: false),
     );
   }
 }
@@ -129,6 +209,89 @@ class ProviderWorkspaceBooking {
   }
 }
 
+class ProviderAvailabilityEntry {
+  const ProviderAvailabilityEntry({
+    required this.id,
+    required this.day,
+    required this.dayKey,
+    required this.timeMode,
+    required this.startTime,
+    required this.endTime,
+  });
+
+  final String id;
+  final String day;
+  final String dayKey;
+  final String timeMode;
+  final String startTime;
+  final String endTime;
+
+  factory ProviderAvailabilityEntry.fromJson(Map<String, dynamic> json) {
+    return ProviderAvailabilityEntry(
+      id: json['id'] as String? ?? '',
+      day: json['day'] as String? ?? '',
+      dayKey: json['dayKey'] as String? ?? '',
+      timeMode: json['timeMode'] as String? ?? 'custom',
+      startTime: json['startTime'] as String? ?? '08:00',
+      endTime: json['endTime'] as String? ?? '20:00',
+    );
+  }
+}
+
+class ProviderAvailabilitySnapshot {
+  const ProviderAvailabilitySnapshot({
+    required this.enabled,
+    required this.entries,
+  });
+
+  final bool enabled;
+  final List<ProviderAvailabilityEntry> entries;
+
+  factory ProviderAvailabilitySnapshot.fromJson(Map<String, dynamic> json) {
+    return ProviderAvailabilitySnapshot(
+      enabled: json['enabled'] == true,
+      entries: (json['entries'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .map(ProviderAvailabilityEntry.fromJson)
+          .toList(growable: false),
+    );
+  }
+}
+
+class ProviderReviewItem {
+  const ProviderReviewItem({
+    required this.id,
+    required this.customerName,
+    required this.rating,
+    required this.comment,
+    required this.createdAt,
+    required this.createdLabel,
+  });
+
+  final String id;
+  final String customerName;
+  final int rating;
+  final String comment;
+  final String createdAt;
+  final String createdLabel;
+
+  factory ProviderReviewItem.fromJson(Map<String, dynamic> json) {
+    return ProviderReviewItem(
+      id: json['id'] as String? ?? '',
+      customerName: json['customerName'] as String? ?? 'Customer',
+      rating: (json['rating'] as num?)?.toInt() ?? 5,
+      comment: json['comment'] as String? ?? 'Shared feedback',
+      createdAt: json['createdAt'] as String? ?? '',
+      createdLabel: json['createdLabel'] as String? ?? '',
+    );
+  }
+}
+
 class ProviderWorkspaceSnapshot {
   const ProviderWorkspaceSnapshot({
     required this.profile,
@@ -143,7 +306,7 @@ class ProviderWorkspaceService {
   const ProviderWorkspaceService();
 
   Future<ProviderWorkspaceSnapshot> fetchWorkspace() async {
-    final results = await Future.wait([
+    final results = await Future.wait<Object>([
       fetchProfile(),
       fetchBookings(),
     ]);
@@ -154,7 +317,7 @@ class ProviderWorkspaceService {
   }
 
   Future<ProviderWorkspaceProfile> fetchProfile() async {
-    final response = await _get('/api/provider/me');
+    final response = await _request('GET', '/api/provider/me');
     final body = _decodeMap(response.body);
     if (_isSuccess(response.statusCode)) {
       return ProviderWorkspaceProfile.fromJson(body);
@@ -163,23 +326,123 @@ class ProviderWorkspaceService {
   }
 
   Future<List<ProviderWorkspaceBooking>> fetchBookings() async {
-    final response = await _get('/api/provider/bookings');
+    final response = await _request('GET', '/api/provider/bookings');
     final body = _decodeMap(response.body);
     if (_isSuccess(response.statusCode)) {
-      return (body['bookings'] as List<dynamic>? ?? const [])
-          .whereType<Map>()
-          .map(
-            (item) => item.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ),
-          )
+      return _listOfMaps(body['bookings'])
           .map(ProviderWorkspaceBooking.fromJson)
-          .toList();
+          .toList(growable: false);
     }
     throw Exception(_readError(body, 'Unable to load provider bookings.'));
   }
 
-  Future<http.Response> _get(String path) async {
+  Future<ProviderAvailabilitySnapshot> fetchAvailability() async {
+    final response = await _request('GET', '/api/provider/availability');
+    final body = _decodeMap(response.body);
+    if (_isSuccess(response.statusCode)) {
+      return ProviderAvailabilitySnapshot.fromJson(body);
+    }
+    throw Exception(_readError(body, 'Unable to load provider availability.'));
+  }
+
+  Future<void> saveAvailability({
+    required bool enabled,
+    required List<ProviderAvailabilityEntry> entries,
+  }) async {
+    final response = await _request(
+      'PUT',
+      '/api/provider/availability',
+      body: {
+        'enabled': enabled,
+        'entries': entries
+            .map(
+              (entry) => {
+                'day': entry.day,
+                'startTime': entry.startTime,
+                'endTime': entry.endTime,
+                'timeMode': entry.timeMode,
+              },
+            )
+            .toList(growable: false),
+      },
+    );
+    final data = _decodeMap(response.body);
+    if (!_isSuccess(response.statusCode)) {
+      throw Exception(_readError(data, 'Unable to save provider availability.'));
+    }
+  }
+
+  Future<List<ProviderReviewItem>> fetchReviews() async {
+    final response = await _request('GET', '/api/provider/reviews');
+    final body = _decodeMap(response.body);
+    if (_isSuccess(response.statusCode)) {
+      return _listOfMaps(body['reviews'])
+          .map(ProviderReviewItem.fromJson)
+          .toList(growable: false);
+    }
+    throw Exception(_readError(body, 'Unable to load provider reviews.'));
+  }
+
+  Future<void> createService({
+    required String serviceType,
+    required String yearsExperience,
+    required double hourlyRate,
+    required double dailyRate,
+    required List<String> specialties,
+    required List<String> imageDataUrls,
+    required List<String> imageCaptions,
+  }) async {
+    final response = await _request(
+      'POST',
+      '/api/provider/services',
+      body: {
+        'serviceType': serviceType,
+        'yearsExperience': yearsExperience,
+        'hourlyRate': hourlyRate,
+        'dailyRate': dailyRate,
+        'specialties': specialties,
+        'imageDataUrls': imageDataUrls,
+        'imageCaptions': imageCaptions,
+      },
+    );
+    final data = _decodeMap(response.body);
+    if (!_isSuccess(response.statusCode)) {
+      throw Exception(_readError(data, 'Unable to add provider service.'));
+    }
+  }
+
+  Future<void> updateService({
+    required String serviceId,
+    required String yearsExperience,
+    required double hourlyRate,
+    required double dailyRate,
+    required List<String> specialties,
+    required List<String> imageDataUrls,
+    required List<String> imageCaptions,
+  }) async {
+    final response = await _request(
+      'PATCH',
+      '/api/provider/services/$serviceId',
+      body: {
+        'yearsExperience': yearsExperience,
+        'hourlyRate': hourlyRate,
+        'dailyRate': dailyRate,
+        'specialties': specialties,
+        'imageDataUrls': imageDataUrls,
+        'imageCaptions': imageCaptions,
+      },
+    );
+    final data = _decodeMap(response.body);
+    if (!_isSuccess(response.statusCode)) {
+      throw Exception(_readError(data, 'Unable to update provider service.'));
+    }
+  }
+
+  Future<http.Response> _request(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
     final session = Supabase.instance.client.auth.currentSession;
     final accessToken = session?.accessToken;
     if (accessToken == null || accessToken.isEmpty) {
@@ -187,13 +450,37 @@ class ProviderWorkspaceService {
     }
 
     final uri = Uri.parse('${AppConfig.appBaseUrl}$path');
-    return http.get(
-      uri,
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
-    );
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+    if (body != null) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    switch (method.toUpperCase()) {
+      case 'GET':
+        return http.get(uri, headers: headers);
+      case 'POST':
+        return http.post(uri, headers: headers, body: jsonEncode(body));
+      case 'PATCH':
+        return http.patch(uri, headers: headers, body: jsonEncode(body));
+      case 'PUT':
+        return http.put(uri, headers: headers, body: jsonEncode(body));
+      default:
+        throw UnsupportedError('Unsupported request method: $method');
+    }
+  }
+
+  List<Map<String, dynamic>> _listOfMaps(dynamic value) {
+    return (value as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) => item.map(
+            (key, data) => MapEntry(key.toString(), data),
+          ),
+        )
+        .toList(growable: false);
   }
 
   Map<String, dynamic> _decodeMap(String body) {

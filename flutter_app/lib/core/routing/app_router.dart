@@ -11,6 +11,7 @@ import '../../features/booking/presentation/booking_overview_screen.dart';
 import '../../features/booking/presentation/provider_booking_screen.dart';
 import '../../features/home/presentation/customer_shell_screen.dart';
 import '../../features/profile/presentation/customer_profile_subpages.dart';
+import '../../features/provider_app/presentation/provider_workspace_subpages.dart';
 import '../../features/provider_app/presentation/provider_shell_screen.dart';
 import '../../features/providers/presentation/provider_list_screen.dart';
 import '../../features/providers/presentation/provider_profile_screen.dart';
@@ -127,6 +128,21 @@ class AppRouter {
       case AppRoutes.providerShell:
         return MaterialPageRoute<void>(
           builder: (_) => ProviderShellScreen(repository: _repository),
+          settings: settings,
+        );
+      case AppRoutes.providerAvailability:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderAvailabilityScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerServices:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderServicesScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerReviews:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderReviewsScreen(),
           settings: settings,
         );
       default:
