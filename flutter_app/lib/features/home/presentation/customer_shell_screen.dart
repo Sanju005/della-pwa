@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../repositories/demo_repository.dart';
-import '../../../widgets/swiper_app_bar.dart';
+import '../../../widgets/native_tab_scaffold.dart';
 import '../../../widgets/swiper_bottom_nav.dart';
 import '../../booking/presentation/booking_overview_screen.dart';
 import '../../profile/presentation/messages_demo_screen.dart';
@@ -40,29 +40,18 @@ class _CustomerShellScreenState extends State<CustomerShellScreen> {
       'Account and rewards',
     ];
 
-    return Scaffold(
-      appBar: SwiperAppBar(
-        title: titles[_currentIndex],
-        subtitle: subtitles[_currentIndex],
-        showBack: true,
-      ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        child: KeyedSubtree(
-          key: ValueKey(_currentIndex),
-          child: pages[_currentIndex],
-        ),
-      ),
-      bottomNavigationBar: SwiperBottomNav(
-        currentIndex: _currentIndex,
-        items: const [
-          SwiperBottomNavItem(label: 'Home', icon: Icons.home_rounded),
-          SwiperBottomNavItem(label: 'Bookings', icon: Icons.calendar_month_rounded),
-          SwiperBottomNavItem(label: 'Messages', icon: Icons.chat_bubble_outline_rounded),
-          SwiperBottomNavItem(label: 'Profile', icon: Icons.person_outline_rounded),
-        ],
-        onTap: (index) => setState(() => _currentIndex = index),
-      ),
+    return NativeTabScaffold(
+      currentIndex: _currentIndex,
+      title: titles[_currentIndex],
+      subtitle: subtitles[_currentIndex],
+      pages: pages,
+      items: const [
+        SwiperBottomNavItem(label: 'Home', icon: Icons.home_rounded),
+        SwiperBottomNavItem(label: 'Bookings', icon: Icons.calendar_month_rounded),
+        SwiperBottomNavItem(label: 'Messages', icon: Icons.chat_bubble_outline_rounded),
+        SwiperBottomNavItem(label: 'Profile', icon: Icons.person_outline_rounded),
+      ],
+      onTabSelected: (index) => setState(() => _currentIndex = index),
     );
   }
 }

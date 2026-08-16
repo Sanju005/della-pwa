@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
-import '../../../widgets/swiper_app_bar.dart';
+import '../../../widgets/native_tab_scaffold.dart';
 import '../../../widgets/swiper_bottom_nav.dart';
 import 'provider_dashboard_screen.dart';
 import 'provider_earnings_screen.dart';
@@ -53,36 +53,25 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
       'Provider identity and listing',
     ];
 
-    return Scaffold(
-      appBar: SwiperAppBar(
-        title: titles[_currentIndex],
-        subtitle: subtitles[_currentIndex],
-        showBack: true,
-        actions: [
-          IconButton(
-            tooltip: 'Log Out',
-            onPressed: _logOut,
-            icon: const Icon(Icons.logout_rounded),
-          ),
-        ],
-      ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        child: KeyedSubtree(
-          key: ValueKey(_currentIndex),
-          child: pages[_currentIndex],
+    return NativeTabScaffold(
+      currentIndex: _currentIndex,
+      title: titles[_currentIndex],
+      subtitle: subtitles[_currentIndex],
+      pages: pages,
+      items: const [
+        SwiperBottomNavItem(label: 'Home', icon: Icons.home_work_rounded),
+        SwiperBottomNavItem(label: 'Bookings', icon: Icons.calendar_month_rounded),
+        SwiperBottomNavItem(label: 'Payments', icon: Icons.payments_rounded),
+        SwiperBottomNavItem(label: 'Profile', icon: Icons.badge_outlined),
+      ],
+      onTabSelected: (index) => setState(() => _currentIndex = index),
+      actions: [
+        IconButton(
+          tooltip: 'Log Out',
+          onPressed: _logOut,
+          icon: const Icon(Icons.logout_rounded),
         ),
-      ),
-      bottomNavigationBar: SwiperBottomNav(
-        currentIndex: _currentIndex,
-        items: const [
-          SwiperBottomNavItem(label: 'Home', icon: Icons.home_work_rounded),
-          SwiperBottomNavItem(label: 'Bookings', icon: Icons.calendar_month_rounded),
-          SwiperBottomNavItem(label: 'Payments', icon: Icons.payments_rounded),
-          SwiperBottomNavItem(label: 'Profile', icon: Icons.badge_outlined),
-        ],
-        onTap: (index) => setState(() => _currentIndex = index),
-      ),
+      ],
     );
   }
 }
