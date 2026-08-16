@@ -17,14 +17,14 @@ export default function SignupPage() {
           title="I'm a User"
           description="Book trusted services for your home and lifestyle needs."
           features={["Book Services", "Secure Payments", "Track Bookings", "24/7 Support"]}
-          accent="U"
+          role="user"
         />
         <ChoiceCard
           href="/provider/register"
           title="I'm a Service Provider"
           description="Offer your services, grow your business, and reach more customers."
           features={["Manage Jobs", "Grow Business", "Secure Earnings", "Flexible Schedule"]}
-          accent="P"
+          role="provider"
         />
       </div>
 
@@ -50,13 +50,13 @@ function ChoiceCard({
   title,
   description,
   features,
-  accent,
+  role,
 }: {
   href: string;
   title: string;
   description: string;
   features: string[];
-  accent: string;
+  role: "user" | "provider";
 }) {
   return (
     <Link
@@ -65,7 +65,7 @@ function ChoiceCard({
     >
       <div className="flex items-start gap-4">
         <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#f2e9fb_0%,#e4d3f7_100%)] text-[28px] font-extrabold text-[#8E5EB5]">
-          {accent}
+          {role === "user" ? <UserBadgeIllustration /> : <ProviderBadgeIllustration />}
         </div>
         <div className="flex-1">
           <div className="flex items-start justify-between gap-3">
@@ -95,5 +95,57 @@ function ChoiceCard({
         ))}
       </div>
     </Link>
+  );
+}
+
+function UserBadgeIllustration() {
+  return (
+    <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
+      <defs>
+        <linearGradient id="user-badge-fill" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#A679CF" />
+          <stop offset="100%" stopColor="#8E5EB5" />
+        </linearGradient>
+      </defs>
+      <circle cx="32" cy="23" r="10" fill="url(#user-badge-fill)" />
+      <path
+        d="M17 49c2.9-7.8 8.8-11.7 15-11.7 6.2 0 12.1 3.9 15 11.7"
+        fill="none"
+        stroke="url(#user-badge-fill)"
+        strokeWidth="6"
+        strokeLinecap="round"
+      />
+      <circle cx="45" cy="18" r="5.5" fill="#F5EEFF" />
+      <path
+        d="M45 15v6M42 18h6"
+        stroke="#8E5EB5"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ProviderBadgeIllustration() {
+  return (
+    <svg viewBox="0 0 64 64" className="h-10 w-10" aria-hidden="true">
+      <defs>
+        <linearGradient id="provider-badge-fill" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#A679CF" />
+          <stop offset="100%" stopColor="#8E5EB5" />
+        </linearGradient>
+      </defs>
+      <circle cx="23" cy="24" r="9" fill="url(#provider-badge-fill)" />
+      <path
+        d="M12 49c2.5-6.8 7.7-10.5 13-10.5 3.5 0 6.8 1.4 9.6 4.2"
+        fill="none"
+        stroke="url(#provider-badge-fill)"
+        strokeWidth="6"
+        strokeLinecap="round"
+      />
+      <rect x="36" y="18" width="15" height="18" rx="3.5" fill="#F5EEFF" stroke="#8E5EB5" strokeWidth="2.5" />
+      <path d="M40 18v-2.8a3.5 3.5 0 0 1 7 0V18" fill="none" stroke="#8E5EB5" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="m40.5 28.5 3 3 5.5-6.5" fill="none" stroke="#8E5EB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
