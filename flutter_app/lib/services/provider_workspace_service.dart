@@ -158,32 +158,50 @@ class ProviderWorkspaceProfile {
 class ProviderWorkspaceBooking {
   const ProviderWorkspaceBooking({
     required this.id,
+    required this.customerId,
     required this.customerName,
     required this.serviceLabel,
+    required this.serviceKey,
     required this.location,
+    required this.bookingMode,
     required this.bookingStatus,
     required this.statusLabel,
     required this.customerStatusLabel,
     required this.bucket,
+    required this.scheduledDate,
+    required this.scheduledStartTime,
+    required this.scheduledEndTime,
     required this.schedule,
+    required this.customerNote,
+    required this.providerResponseNote,
     required this.quotedAmount,
     required this.paymentStatus,
+    required this.paymentOption,
     required this.companyCommissionAmount,
     required this.providerNetAmount,
     required this.createdAt,
   });
 
   final String id;
+  final String customerId;
   final String customerName;
   final String serviceLabel;
+  final String serviceKey;
   final String location;
+  final String bookingMode;
   final String bookingStatus;
   final String statusLabel;
   final String customerStatusLabel;
   final String bucket;
+  final String scheduledDate;
+  final String scheduledStartTime;
+  final String scheduledEndTime;
   final String schedule;
+  final String customerNote;
+  final String providerResponseNote;
   final double quotedAmount;
   final String paymentStatus;
+  final String paymentOption;
   final double companyCommissionAmount;
   final double providerNetAmount;
   final String createdAt;
@@ -191,20 +209,163 @@ class ProviderWorkspaceBooking {
   factory ProviderWorkspaceBooking.fromJson(Map<String, dynamic> json) {
     return ProviderWorkspaceBooking(
       id: json['id'] as String? ?? '',
+      customerId: json['customerId'] as String? ?? '',
       customerName: json['customerName'] as String? ?? 'Customer',
       serviceLabel: json['serviceLabel'] as String? ?? 'Service',
+      serviceKey: json['serviceKey'] as String? ?? '',
       location: json['location'] as String? ?? '',
+      bookingMode: json['bookingMode'] as String? ?? 'hourly',
       bookingStatus: json['bookingStatus'] as String? ?? 'pending',
       statusLabel: json['statusLabel'] as String? ?? 'Pending',
       customerStatusLabel: json['customerStatusLabel'] as String? ?? 'Pending',
       bucket: json['bucket'] as String? ?? 'active',
+      scheduledDate: json['scheduledDate'] as String? ?? '',
+      scheduledStartTime: json['scheduledStartTime'] as String? ?? '',
+      scheduledEndTime: json['scheduledEndTime'] as String? ?? '',
       schedule: json['schedule'] as String? ?? '',
+      customerNote: json['customerNote'] as String? ?? '',
+      providerResponseNote: json['providerResponseNote'] as String? ?? '',
       quotedAmount: (json['quotedAmount'] as num?)?.toDouble() ?? 0,
       paymentStatus: json['paymentStatus'] as String? ?? 'pending',
+      paymentOption: json['paymentOption'] as String? ?? 'cash',
       companyCommissionAmount:
           (json['companyCommissionAmount'] as num?)?.toDouble() ?? 0,
       providerNetAmount: (json['providerNetAmount'] as num?)?.toDouble() ?? 0,
       createdAt: json['createdAt'] as String? ?? '',
+    );
+  }
+}
+
+class ProviderMessageThread {
+  const ProviderMessageThread({
+    required this.bookingId,
+    required this.counterpartId,
+    required this.counterpartName,
+    required this.serviceLabel,
+    required this.location,
+    required this.schedule,
+    required this.preview,
+    required this.lastMessageAt,
+    required this.lastSenderRole,
+    required this.unreadCount,
+  });
+
+  final String bookingId;
+  final String counterpartId;
+  final String counterpartName;
+  final String serviceLabel;
+  final String location;
+  final String schedule;
+  final String preview;
+  final String lastMessageAt;
+  final String lastSenderRole;
+  final int unreadCount;
+
+  factory ProviderMessageThread.fromJson(Map<String, dynamic> json) {
+    return ProviderMessageThread(
+      bookingId: json['bookingId'] as String? ?? '',
+      counterpartId: json['counterpartId'] as String? ?? '',
+      counterpartName: json['counterpartName'] as String? ?? 'Customer',
+      serviceLabel: json['serviceLabel'] as String? ?? 'Service',
+      location: json['location'] as String? ?? '',
+      schedule: json['schedule'] as String? ?? '',
+      preview: json['preview'] as String? ?? '',
+      lastMessageAt: json['lastMessageAt'] as String? ?? '',
+      lastSenderRole: json['lastSenderRole'] as String? ?? 'system',
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class ProviderConversationMessage {
+  const ProviderConversationMessage({
+    required this.id,
+    required this.bookingId,
+    required this.senderId,
+    required this.senderRole,
+    required this.senderName,
+    required this.messageText,
+    required this.attachmentDataUrl,
+    required this.attachmentFileName,
+    required this.attachmentMimeType,
+    required this.createdAt,
+    required this.isOwnMessage,
+  });
+
+  final String id;
+  final String bookingId;
+  final String senderId;
+  final String senderRole;
+  final String senderName;
+  final String messageText;
+  final String attachmentDataUrl;
+  final String attachmentFileName;
+  final String attachmentMimeType;
+  final String createdAt;
+  final bool isOwnMessage;
+
+  factory ProviderConversationMessage.fromJson(Map<String, dynamic> json) {
+    return ProviderConversationMessage(
+      id: json['id'] as String? ?? '',
+      bookingId: json['bookingId'] as String? ?? '',
+      senderId: json['senderId'] as String? ?? '',
+      senderRole: json['senderRole'] as String? ?? 'system',
+      senderName: json['senderName'] as String? ?? 'User',
+      messageText: json['messageText'] as String? ?? '',
+      attachmentDataUrl: json['attachmentDataUrl'] as String? ?? '',
+      attachmentFileName: json['attachmentFileName'] as String? ?? '',
+      attachmentMimeType: json['attachmentMimeType'] as String? ?? '',
+      createdAt: json['createdAt'] as String? ?? '',
+      isOwnMessage: json['isOwnMessage'] == true,
+    );
+  }
+}
+
+class ProviderConversationDetail {
+  const ProviderConversationDetail({
+    required this.bookingId,
+    required this.counterpartId,
+    required this.counterpartName,
+    required this.serviceLabel,
+    required this.location,
+    required this.schedule,
+    required this.messages,
+    required this.unreadCount,
+    required this.canSendMessages,
+    required this.bookingStatus,
+  });
+
+  final String bookingId;
+  final String counterpartId;
+  final String counterpartName;
+  final String serviceLabel;
+  final String location;
+  final String schedule;
+  final List<ProviderConversationMessage> messages;
+  final int unreadCount;
+  final bool canSendMessages;
+  final String bookingStatus;
+
+  factory ProviderConversationDetail.fromJson(Map<String, dynamic> json) {
+    return ProviderConversationDetail(
+      bookingId: json['bookingId'] as String? ?? '',
+      counterpartId: json['counterpartId'] as String? ?? '',
+      counterpartName: json['counterpartName'] as String? ?? 'Customer',
+      serviceLabel: json['serviceLabel'] as String? ?? 'Service',
+      location: json['location'] as String? ?? '',
+      schedule: json['schedule'] as String? ?? '',
+      messages: (json['messages'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => item.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+          .map(ProviderConversationMessage.fromJson)
+          .toList(growable: false),
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+      canSendMessages: json['canSendMessages'] == true,
+      bookingStatus: json['bookingStatus'] as String? ?? 'pending',
     );
   }
 }
@@ -381,6 +542,120 @@ class ProviderWorkspaceService {
           .toList(growable: false);
     }
     throw Exception(_readError(body, 'Unable to load provider reviews.'));
+  }
+
+  Future<List<ProviderMessageThread>> fetchMessageThreads() async {
+    final response = await _request('GET', '/api/provider/messages');
+    final body = _decodeMap(response.body);
+    if (_isSuccess(response.statusCode)) {
+      return _listOfMaps(body['threads'])
+          .map(ProviderMessageThread.fromJson)
+          .toList(growable: false);
+    }
+    throw Exception(_readError(body, 'Unable to load provider messages.'));
+  }
+
+  Future<ProviderConversationDetail> fetchMessageThreadDetail(
+    String bookingId,
+  ) async {
+    final response = await _request('GET', '/api/provider/messages/$bookingId');
+    final body = _decodeMap(response.body);
+    if (_isSuccess(response.statusCode)) {
+      final thread = body['thread'];
+      if (thread is Map) {
+        return ProviderConversationDetail.fromJson(
+          thread.map((key, value) => MapEntry(key.toString(), value)),
+        );
+      }
+    }
+    throw Exception(_readError(body, 'Unable to load conversation.'));
+  }
+
+  Future<ProviderConversationDetail> sendMessage({
+    required String bookingId,
+    required String messageText,
+    String attachmentDataUrl = '',
+    String attachmentFileName = '',
+    String attachmentMimeType = '',
+  }) async {
+    final response = await _request(
+      'POST',
+      '/api/provider/messages/$bookingId',
+      body: {
+        'messageText': messageText,
+        'attachmentDataUrl': attachmentDataUrl,
+        'attachmentFileName': attachmentFileName,
+        'attachmentMimeType': attachmentMimeType,
+      },
+    );
+    final body = _decodeMap(response.body);
+    if (_isSuccess(response.statusCode)) {
+      final thread = body['thread'];
+      if (thread is Map) {
+        return ProviderConversationDetail.fromJson(
+          thread.map((key, value) => MapEntry(key.toString(), value)),
+        );
+      }
+    }
+    throw Exception(_readError(body, 'Unable to send message.'));
+  }
+
+  Future<void> markConversationRead(String bookingId) async {
+    final response = await _request('PATCH', '/api/provider/messages/$bookingId');
+    final body = _decodeMap(response.body);
+    if (!_isSuccess(response.statusCode)) {
+      throw Exception(
+        _readError(body, 'Unable to mark conversation as read.'),
+      );
+    }
+  }
+
+  Future<ProviderWorkspaceProfile> updateProfile({
+    String? fullName,
+    String? avatarUrl,
+    String? marketingName,
+    String? serviceLocation,
+    double? serviceRadiusKm,
+    String? bio,
+    String? country,
+    String? emergencyContactNumber,
+    bool? phoneVerified,
+    bool? identityVerified,
+    String? identityVerificationStatus,
+    String? identityDocumentType,
+    String? identityFrontImageUrl,
+    String? identityBackImageUrl,
+  }) async {
+    final response = await _request(
+      'PATCH',
+      '/api/provider/me',
+      body: {
+        if (fullName != null) 'fullName': fullName,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
+        if (marketingName != null) 'marketingName': marketingName,
+        if (serviceLocation != null) 'serviceLocation': serviceLocation,
+        if (serviceRadiusKm != null) 'serviceRadiusKm': serviceRadiusKm,
+        if (bio != null) 'bio': bio,
+        if (country != null) 'country': country,
+        if (emergencyContactNumber != null)
+          'emergencyContactNumber': emergencyContactNumber,
+        if (phoneVerified != null) 'phoneVerified': phoneVerified,
+        if (identityVerified != null) 'identityVerified': identityVerified,
+        if (identityVerificationStatus != null)
+          'identityVerificationStatus': identityVerificationStatus,
+        if (identityDocumentType != null)
+          'identityDocumentType': identityDocumentType,
+        if (identityFrontImageUrl != null)
+          'identityFrontImageUrl': identityFrontImageUrl,
+        if (identityBackImageUrl != null)
+          'identityBackImageUrl': identityBackImageUrl,
+      },
+    );
+    final body = _decodeMap(response.body);
+    if (_isSuccess(response.statusCode)) {
+      return ProviderWorkspaceProfile.fromJson(body);
+    }
+    throw Exception(_readError(body, 'Unable to update provider profile.'));
   }
 
   Future<void> createService({

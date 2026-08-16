@@ -25,4 +25,10 @@ class AppRoutes {
   static const providerAvailability = '/provider/availability';
   static const providerServices = '/provider/services';
   static const providerReviews = '/provider/reviews';
+  static const providerCalendar = '/provider/calendar';
+  static const providerMessages = '/provider/messages';
+  static const providerMore = '/provider/more';
+  static const providerVerificationEmail = '/provider/profile/email-verification';
+  static const providerVerificationPhone = '/provider/profile/phone-verification';
+  static const providerVerificationIdentity = '/provider/profile/identity-verification';
 }

@@ -11,6 +11,7 @@ import '../../features/booking/presentation/booking_overview_screen.dart';
 import '../../features/booking/presentation/provider_booking_screen.dart';
 import '../../features/home/presentation/customer_shell_screen.dart';
 import '../../features/profile/presentation/customer_profile_subpages.dart';
+import '../../features/provider_app/presentation/provider_more_screens.dart';
 import '../../features/provider_app/presentation/provider_workspace_subpages.dart';
 import '../../features/provider_app/presentation/provider_shell_screen.dart';
 import '../../features/providers/presentation/provider_list_screen.dart';
@@ -143,6 +144,36 @@ class AppRouter {
       case AppRoutes.providerReviews:
         return MaterialPageRoute<void>(
           builder: (_) => const ProviderReviewsScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerCalendar:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderCalendarScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerMessages:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderMessagesScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerMore:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderMoreScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerVerificationEmail:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderEmailVerificationScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerVerificationPhone:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderPhoneVerificationScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerVerificationIdentity:
+        return MaterialPageRoute<void>(
+          builder: (_) => const ProviderIdentityVerificationScreen(),
           settings: settings,
         );
       default:

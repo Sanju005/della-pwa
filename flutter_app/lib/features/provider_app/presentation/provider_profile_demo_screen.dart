@@ -202,6 +202,30 @@ class ProviderProfileDemoScreen extends StatelessWidget {
                     subtitle: 'Read customer feedback from completed work',
                     onTap: () =>
                         Navigator.of(context).pushNamed(AppRoutes.providerReviews),
+                  ),
+                  _navTile(
+                    context,
+                    icon: Icons.calendar_view_month_outlined,
+                    title: 'Calendar',
+                    subtitle: 'See provider bookings by date',
+                    onTap: () => Navigator.of(context)
+                        .pushNamed(AppRoutes.providerCalendar),
+                  ),
+                  _navTile(
+                    context,
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: 'Messages',
+                    subtitle: 'Open live booking conversations',
+                    onTap: () => Navigator.of(context)
+                        .pushNamed(AppRoutes.providerMessages),
+                  ),
+                  _navTile(
+                    context,
+                    icon: Icons.more_horiz_rounded,
+                    title: 'More',
+                    subtitle: 'Settings, verification, and support',
+                    onTap: () =>
+                        Navigator.of(context).pushNamed(AppRoutes.providerMore),
                     isLast: true,
                   ),
                 ],
