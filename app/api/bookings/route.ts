@@ -119,6 +119,7 @@ type BookingRow = {
   cash_paid_by_user_at?: string | null;
   payment_received_by_provider_at?: string | null;
   completed_at?: string | null;
+  cancelled_at?: string | null;
   work_finished_images?: string[] | null;
   payment_breakdown?: Array<{ description?: string; amount?: number }> | null;
   booking_price?: number | null;
@@ -672,33 +673,38 @@ function toBadgeTone(status: BookingRow["booking_status"]): Booking["badgeTone"]
 }
 
 function buildUserActivitySteps(status: BookingRow["booking_status"]): Booking["activitySteps"] {
-  const stepOrder: string[] = [
-    "pending_provider_response",
-    "accepted",
-    "on_the_way",
-    "arrived",
-    "work_finished_by_provider",
-    "work_confirmed_by_user",
-    "final_payment_sent",
-    "cash_paid_by_user",
-    "completed",
+  const normalizedStatus = normalizeBookingWorkflowStatus(status);
+
+  if (normalizedStatus === "declined_by_provider") {
+    return [
+      { label: "Booking Sent", status: "done" },
+      { label: "Booking Declined", status: "current" },
+    ];
+  }
+
+  if (normalizedStatus === "cancelled") {
+    return [
+      { label: "Booking Sent", status: "done" },
+      { label: "Booking Cancelled", status: "current" },
+    ];
+  }
+
+  const steps = [
+    { key: "pending_provider_response", label: "Booking Sent" },
+    { key: "accepted", label: "Provider Accepted" },
+    { key: "on_the_way", label: "Provider On The Way" },
+    { key: "arrived", label: "Provider Arrived" },
+    { key: "work_finished_by_provider", label: "Job Completed by Provider" },
+    { key: "final_payment_sent", label: "Payment Requested" },
+    { key: "cash_paid_by_user", label: "Paid by Cash" },
+    { key: "payment_received_by_provider", label: "Waiting Provider Payment Confirmation" },
+    { key: "completed", label: "Task Completed" },
   ] as const;
 
-  const labels = [
-    "Booking Sent",
-    "Provider Accepted",
-    "Provider On The Way",
-    "Provider Arrived",
-    "Confirm Work Completion",
-    "Waiting Final Payment",
-    "Paid by Cash",
-    "Task Completed",
-  ];
+  const currentIndex = steps.findIndex((step) => step.key === normalizedStatus);
 
-  const currentIndex = stepOrder.indexOf(normalizeBookingWorkflowStatus(status));
-
-  return labels.map((label, index) => ({
-    label,
+  return steps.map((step, index) => ({
+    label: step.label,
     status:
       currentIndex === -1
         ? index === 0
@@ -853,6 +859,7 @@ async function mapLiveBookingToUi(
     cashPaidByUserAt: row.cash_paid_by_user_at ?? paymentRecord?.paid_at ?? "",
     paymentReceivedByProviderAt: row.payment_received_by_provider_at ?? "",
     completedAt: row.completed_at ?? "",
+    cancelledAt: row.cancelled_at ?? "",
     paidAt: row.cash_paid_by_user_at ?? paymentRecord?.paid_at ?? "",
     activitySteps: buildUserActivitySteps(row.booking_status),
   };
@@ -953,6 +960,7 @@ export async function GET(request: Request) {
           on_the_way_at,
           arrived_at,
           completed_at,
+          cancelled_at,
           payment_records:payments(${CUSTOMER_PAYMENT_RECORDS_SELECT_FULL})
         `)
         .eq("customer_id", verified.profile.id)
@@ -983,6 +991,7 @@ export async function GET(request: Request) {
             on_the_way_at,
             arrived_at,
             completed_at,
+            cancelled_at,
             payment_records:payments(${CUSTOMER_PAYMENT_RECORDS_SELECT_FALLBACK})
           `)
           .eq("customer_id", verified.profile.id)

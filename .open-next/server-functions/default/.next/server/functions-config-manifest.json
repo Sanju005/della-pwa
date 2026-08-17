@@ -1,7 +1,9 @@
 {
   "version": 1,
   "functions": {
+    "/api/admin/customer-status/[id]": {},
     "/api/admin/media-sign": {},
+    "/api/admin/provider-availability/[id]": {},
     "/api/admin/provider-identity-documents/[id]": {},
     "/api/admin/provider-media/[id]": {},
     "/api/admin/provider-registration-debug/[id]": {},

@@ -515,18 +515,21 @@ export function ProviderProfilePage() {
     detail.identityVerificationStatus === "Verified" &&
     detail.status !== "Paused" &&
     detail.status !== "Suspended";
-  const allTaskRows = [
-    ...detail.completedTaskRows,
-    ...detail.upcomingTaskRows.map((task) => ({
-      id: task.id,
-      rawId: task.rawId,
-      service: task.service,
-      customer: task.customer,
-      date: task.schedule,
-      amount: task.amount,
-      status: task.status,
-    })),
-  ];
+  const allTaskRows =
+    detail.allTaskRows?.length
+      ? detail.allTaskRows
+      : [
+          ...detail.completedTaskRows,
+          ...detail.upcomingTaskRows.map((task) => ({
+            id: task.id,
+            rawId: task.rawId,
+            service: task.service,
+            customer: task.customer,
+            date: task.schedule,
+            amount: task.amount,
+            status: task.status,
+          })),
+        ];
   const taskFilterOptions: { value: TaskStatusFilter; label: string }[] = [
     { value: "all", label: "All Tasks" },
     { value: "completed", label: "Completed" },

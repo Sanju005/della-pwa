@@ -23,6 +23,22 @@
   },
   "dynamicRoutes": [
     {
+      "page": "/api/admin/customer-status/[id]",
+      "regex": "^/api/admin/customer\\-status/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/customer\\-status/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/admin/provider-availability/[id]",
+      "regex": "^/api/admin/provider\\-availability/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/provider\\-availability/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/api/admin/provider-identity-documents/[id]",
       "regex": "^/api/admin/provider\\-identity\\-documents/([^/]+?)(?:/)?$",
       "routeKeys": {

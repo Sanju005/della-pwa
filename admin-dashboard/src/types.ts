@@ -407,6 +407,7 @@ export type ProviderDetailRecord = {
   identityDocuments?: ProviderIdentityDocument[];
   workGallery?: ProviderMediaItem[];
   certificates?: ProviderMediaItem[];
+  allTaskRows?: ProviderTaskRow[];
   completedTaskRows: ProviderTaskRow[];
   upcomingTaskRows: ProviderUpcomingTaskRow[];
   payoutRows: ProviderPayoutRow[];

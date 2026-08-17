@@ -848,7 +848,7 @@ function buildMetrics(
     ["completed", "confirmed"].includes(booking.status.trim().toLowerCase())
   ).length;
   const cancelledCount = relatedBookings.filter((booking) =>
-    ["cancelled", "canceled"].includes(booking.status.trim().toLowerCase())
+    ["declined", "declined by provider", "cancelled", "canceled"].includes(booking.status.trim().toLowerCase())
   ).length;
   const totalAmount = relatedPayments.reduce((sum, payment) => {
     const numeric = Number(payment.amount.replace(/[^0-9.]/g, ""));

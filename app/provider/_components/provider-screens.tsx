@@ -2279,7 +2279,7 @@ export function BookingsScreen({
                   onClick={() =>
                     state.handleBookingAction(
                       selectedBooking.id,
-                      "declined",
+                      "declined_by_provider",
                       "Provider declined booking",
                     )
                   }
@@ -2671,7 +2671,7 @@ export function BookingsScreen({
                       tone="danger"
                       disabled={state.actionBookingId === booking.id}
                       onClick={() =>
-                        state.handleBookingAction(booking.id, "declined", "Provider declined booking")
+                        state.handleBookingAction(booking.id, "declined_by_provider", "Provider declined booking")
                       }
                     >
                       Decline

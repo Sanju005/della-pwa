@@ -3010,6 +3010,9 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
   const canReview =
     ["cash_paid_by_user", "payment_received_by_provider", "completed"].includes(booking.workflowStatus) &&
     booking.userReviewStatus !== "submitted";
+  const isProviderDeclined =
+    booking.workflowStatus === "declined_by_provider" || booking.workflowStatus === "declined";
+  const isCancelledFlow = booking.workflowStatus === "cancelled";
   const paidDateLabel =
     paymentMarkedPaid
       ? "Payment Done"
@@ -3261,26 +3264,64 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
       </div>
 
       <div className="mt-4 space-y-4">
-        <StepTimelineCard number={1} title="Booking Sent" state="done" dateLabel={formatStepDate(booking.createdAt)} timeLabel={formatStepTime(booking.createdAt)} />
-        <StepTimelineCard number={2} title="Provider Accepted" state={stepState.confirmed} dateLabel={confirmedDate} timeLabel={confirmedTime} />
-        <StepTimelineCard number={3} title="Provider On The Way" state={stepState.onTheWay} dateLabel={onTheWayDate} timeLabel={onTheWayTime} />
-        <StepTimelineCard number={4} title="Provider Arrived" state={stepState.arrived} dateLabel={arrivedDate} timeLabel={arrivedTime} />
-        <StepTimelineCard
-          number={5}
-          title="Job Completed by Provider"
-          state={stepState.workFinished}
-          dateLabel={workFinishedDate || workConfirmedDate}
-          timeLabel={workFinishedTime || workConfirmedTime}
-        />
-        <StepTimelineCard
-          number={6}
-          title="Payment Requested"
-          state={stepState.paymentRequest}
-          dateLabel={paymentSentDate}
-          timeLabel={paymentSentTime}
-          description="Provider has sent the final payment."
-          expanded={stepState.paymentRequest === "current" || stepState.paymentRequest === "done"}
-        >
+        {isProviderDeclined ? (
+          <>
+            <StepTimelineCard number={1} title="Booking Sent" state="done" dateLabel={formatStepDate(booking.createdAt)} timeLabel={formatStepTime(booking.createdAt)} />
+            <StepTimelineCard
+              number={2}
+              title="Booking Declined"
+              state="current"
+              dateLabel={formatStepDate(booking.cancelledAt || booking.createdAt)}
+              timeLabel={formatStepTime(booking.cancelledAt || booking.createdAt)}
+              description="The provider declined this request. This task is now closed."
+              expanded
+            >
+              <div className="rounded-[18px] border border-[#fecdd3] bg-[#fff1f2] px-4 py-3 text-left text-[13px] leading-6 text-[#9f1239]">
+                <p className="font-extrabold text-[#881337]">Decline reason</p>
+                <p className="mt-1">{booking.cancellationReason?.trim() || "No reason shared by the provider."}</p>
+              </div>
+            </StepTimelineCard>
+          </>
+        ) : isCancelledFlow ? (
+          <>
+            <StepTimelineCard number={1} title="Booking Sent" state="done" dateLabel={formatStepDate(booking.createdAt)} timeLabel={formatStepTime(booking.createdAt)} />
+            <StepTimelineCard
+              number={2}
+              title="Booking Cancelled"
+              state="current"
+              dateLabel={formatStepDate(booking.cancelledAt || booking.createdAt)}
+              timeLabel={formatStepTime(booking.cancelledAt || booking.createdAt)}
+              description="This task was cancelled and is now closed."
+              expanded
+            >
+              <div className="rounded-[18px] border border-[#e6eaf0] bg-[#f8fafc] px-4 py-3 text-left text-[13px] leading-6 text-[#475569]">
+                <p><span className="font-extrabold text-[#0f172a]">Cancelled by:</span> {booking.cancelledBy ?? "Not specified"}</p>
+                <p className="mt-1"><span className="font-extrabold text-[#0f172a]">Reason:</span> {booking.cancellationReason?.trim() || "No cancellation reason shared."}</p>
+              </div>
+            </StepTimelineCard>
+          </>
+        ) : (
+          <>
+            <StepTimelineCard number={1} title="Booking Sent" state="done" dateLabel={formatStepDate(booking.createdAt)} timeLabel={formatStepTime(booking.createdAt)} />
+            <StepTimelineCard number={2} title="Provider Accepted" state={stepState.confirmed} dateLabel={confirmedDate} timeLabel={confirmedTime} />
+            <StepTimelineCard number={3} title="Provider On The Way" state={stepState.onTheWay} dateLabel={onTheWayDate} timeLabel={onTheWayTime} />
+            <StepTimelineCard number={4} title="Provider Arrived" state={stepState.arrived} dateLabel={arrivedDate} timeLabel={arrivedTime} />
+            <StepTimelineCard
+              number={5}
+              title="Job Completed by Provider"
+              state={stepState.workFinished}
+              dateLabel={workFinishedDate || workConfirmedDate}
+              timeLabel={workFinishedTime || workConfirmedTime}
+            />
+            <StepTimelineCard
+              number={6}
+              title="Payment Requested"
+              state={stepState.paymentRequest}
+              dateLabel={paymentSentDate}
+              timeLabel={paymentSentTime}
+              description="Provider has sent the final payment."
+              expanded={stepState.paymentRequest === "current" || stepState.paymentRequest === "done"}
+            >
           {booking.workFinishedImages && booking.workFinishedImages.length > 0 ? (
             <div className="mb-4">
               <p className="text-[14px] font-black text-[#24193a]">
@@ -3367,28 +3408,30 @@ export function BookingDetailScreen({ booking }: BookingDetailProps) {
               </div>
             ) : null}
           </div>
-        </StepTimelineCard>
-        <StepTimelineCard number={7} title="Paid by Cash" state={stepState.cashPaid} dateLabel={cashPaidDate} timeLabel={cashPaidTime} />
-        <StepTimelineCard number={8} title="Waiting Provider Payment Confirmation" state={stepState.providerPaymentConfirmation} dateLabel={paymentReceivedDate} timeLabel={paymentReceivedTime} />
-        <StepTimelineCard number={9} title="Task Completed" state={stepState.completed} dateLabel={completedDate} timeLabel={completedTime} />
-        <StepTimelineCard
-          number={10}
-          title="Optional Review Provider"
-          state={stepState.review}
-          dateLabel={completedDate}
-          timeLabel={completedTime}
-          description="Review popup will appear after both sides complete the job. You can add photos while submitting your review."
-          expanded={canReview}
-        >
-          {canReview ? (
-            <Link
-              href={`/profile/bookings/${booking.id}/review`}
-              className="inline-flex h-12 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] text-[16px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.24)]"
+            </StepTimelineCard>
+            <StepTimelineCard number={7} title="Paid by Cash" state={stepState.cashPaid} dateLabel={cashPaidDate} timeLabel={cashPaidTime} />
+            <StepTimelineCard number={8} title="Waiting Provider Payment Confirmation" state={stepState.providerPaymentConfirmation} dateLabel={paymentReceivedDate} timeLabel={paymentReceivedTime} />
+            <StepTimelineCard number={9} title="Task Completed" state={stepState.completed} dateLabel={completedDate} timeLabel={completedTime} />
+            <StepTimelineCard
+              number={10}
+              title="Optional Review Provider"
+              state={stepState.review}
+              dateLabel={completedDate}
+              timeLabel={completedTime}
+              description="Review popup will appear after both sides complete the job. You can add photos while submitting your review."
+              expanded={canReview}
             >
-              Review This Service
-            </Link>
-          ) : null}
-        </StepTimelineCard>
+              {canReview ? (
+                <Link
+                  href={`/profile/bookings/${booking.id}/review`}
+                  className="inline-flex h-12 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] text-[16px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.24)]"
+                >
+                  Review This Service
+                </Link>
+              ) : null}
+            </StepTimelineCard>
+          </>
+        )}
       </div>
 
       <section id="task-messages" className="mt-4">

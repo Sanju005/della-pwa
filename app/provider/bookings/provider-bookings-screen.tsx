@@ -1760,7 +1760,9 @@ export function ProviderBookingsScreen({
                       <div className="flex flex-1 items-center rounded-[14px] bg-white px-4 text-[13px] font-semibold text-[#64748b]">
                         {isCompletedStatus(booking.bookingStatus)
                             ? "Completed flow"
-                            : isCanceledStatus(booking.bookingStatus)
+                            : booking.bookingStatus === "declined_by_provider" || booking.bookingStatus === "declined"
+                              ? "Declined flow"
+                              : isCanceledStatus(booking.bookingStatus)
                               ? "Canceled flow"
                               : "Live task"}
                       </div>

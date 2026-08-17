@@ -668,6 +668,7 @@ export async function PATCH(
 
   if (nextStatus === "declined_by_provider") {
     updatePayload.decline_reason = note || "Provider declined booking.";
+    updatePayload.cancelled_at = new Date().toISOString();
   }
 
   if (nextStatus === "on_the_way") {

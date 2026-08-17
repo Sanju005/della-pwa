@@ -148,6 +148,7 @@ export type Booking = {
   cashPaidByUserAt?: string;
   paymentReceivedByProviderAt?: string;
   paidAt?: string;
+  cancelledAt?: string;
   activitySteps?: Array<{
     label: string;
     status: "done" | "current" | "pending";

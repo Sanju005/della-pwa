@@ -724,6 +724,7 @@ function createEmptyProviderDetail(providerId: string, name?: string | null, ema
     serviceAreas: [],
     skills: [],
     documents: [],
+    allTaskRows: [],
     completedTaskRows: [],
     upcomingTaskRows: [],
     payoutRows: [],
@@ -1170,9 +1171,25 @@ async function tryFetchProviderGivenReviews(providerId: string) {
 }
 
 function buildTaskRows(liveRows: LiveBookingRow[], customerNames: Map<string, string>): {
+  allTaskRows: ProviderTaskRow[];
   completedTaskRows: ProviderTaskRow[];
   upcomingTaskRows: ProviderUpcomingTaskRow[];
 } {
+  const allTaskRows = liveRows
+    .slice(0, 30)
+    .map((row) => {
+      const service = relationItem(row.provider_services);
+      return {
+        id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
+        rawId: row.id,
+        service: humanizeService(service?.service_type),
+        customer: customerNames.get(row.customer_id ?? "") || "Customer",
+        date: formatSchedule(row.scheduled_date, row.scheduled_start_time),
+        amount: formatCurrency(row.total_amount ?? 0),
+        status: mapTaskStatus(row.booking_status),
+      };
+    });
+
   const completedTaskRows = liveRows
     .filter((row) => ["completed"].includes((row.booking_status ?? "").toLowerCase()))
     .slice(0, 5)
@@ -1190,7 +1207,7 @@ function buildTaskRows(liveRows: LiveBookingRow[], customerNames: Map<string, st
     });
 
   const upcomingTaskRows = liveRows
-    .filter((row) => !["completed", "cancelled", "canceled"].includes((row.booking_status ?? "").toLowerCase()))
+    .filter((row) => !["completed", "declined_by_provider", "declined", "cancelled", "canceled"].includes((row.booking_status ?? "").toLowerCase()))
     .slice(0, 5)
     .map((row) => {
       const service = relationItem(row.provider_services);
@@ -1205,7 +1222,7 @@ function buildTaskRows(liveRows: LiveBookingRow[], customerNames: Map<string, st
       };
     });
 
-  return { completedTaskRows, upcomingTaskRows };
+  return { allTaskRows, completedTaskRows, upcomingTaskRows };
 }
 
 function buildPayoutRows(livePayments: LivePaymentRow[]): ProviderPayoutRow[] {
@@ -1476,10 +1493,16 @@ function buildMetrics(
     return fallbackMetrics;
   }
 
+  const isCancelledLikeStatus = (status?: string | null) =>
+    ["declined_by_provider", "declined", "cancelled", "canceled"].includes((status ?? "").toLowerCase());
+
   const totalTasks = taskRows?.length ?? 0;
   const completedTasks = taskRows?.filter((row) => (row.booking_status ?? "").toLowerCase() === "completed").length ?? 0;
   const upcomingTasks =
-    taskRows?.filter((row) => !["completed", "cancelled", "canceled"].includes((row.booking_status ?? "").toLowerCase())).length ?? 0;
+    taskRows?.filter((row) => {
+      const normalizedStatus = (row.booking_status ?? "").toLowerCase();
+      return normalizedStatus !== "completed" && !isCancelledLikeStatus(normalizedStatus);
+    }).length ?? 0;
   const totalEarnings = paymentRows?.reduce((sum, row) => sum + (row.amount ?? 0), 0) ?? 0;
   const completionRate = totalTasks > 0 ? `${((completedTasks / totalTasks) * 100).toFixed(1)}%` : "0.0%";
 
@@ -1758,7 +1781,9 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     cancellationRate:
       liveTasks?.length
         ? `${(
-            (liveTasks.filter((row) => ["cancelled", "canceled"].includes((row.booking_status ?? "").toLowerCase())).length /
+            (liveTasks.filter((row) =>
+              ["declined_by_provider", "declined", "cancelled", "canceled"].includes((row.booking_status ?? "").toLowerCase())
+            ).length /
               liveTasks.length) *
             100
           ).toFixed(1)}%`
@@ -1771,7 +1796,15 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     availabilityEntries: liveAvailability?.entries ?? [],
     totalTasks: liveTasks?.length ? String(liveTasks.length) : fallback.totalTasks,
     completedTasks: taskRows?.completedTaskRows.length ? String(taskRows.completedTaskRows.length) : fallback.completedTasks,
-    upcomingTasks: taskRows?.upcomingTaskRows.length ? String(taskRows.upcomingTaskRows.length) : fallback.upcomingTasks,
+    upcomingTasks:
+      liveTasks?.length
+        ? String(
+            liveTasks.filter((row) => {
+              const normalizedStatus = (row.booking_status ?? "").toLowerCase();
+              return normalizedStatus !== "completed" && !["declined_by_provider", "declined", "cancelled", "canceled"].includes(normalizedStatus);
+            }).length,
+          )
+        : fallback.upcomingTasks,
     areaCount: String(serviceAreas.length),
     totalEarnings:
       livePayments?.length
@@ -1843,6 +1876,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
             );
             return items.filter((item) => item.previewUrl);
           })().then((items) => (items.length ? items : fallback.certificates)),
+    allTaskRows: taskRows?.allTaskRows.length ? taskRows.allTaskRows : fallback.allTaskRows,
     completedTaskRows: taskRows?.completedTaskRows.length ? taskRows.completedTaskRows : fallback.completedTaskRows,
     upcomingTaskRows: taskRows?.upcomingTaskRows.length ? taskRows.upcomingTaskRows : fallback.upcomingTaskRows,
     payoutRows,

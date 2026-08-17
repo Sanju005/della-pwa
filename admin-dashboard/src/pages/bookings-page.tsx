@@ -38,9 +38,17 @@ export function BookingsPage() {
     );
   }
 
-  const openCount = rows.filter((row) => !["Completed", "Cancelled"].includes(row.status)).length;
+  const isCancelledLikeStatus = (status: string) => {
+    const normalized = status.trim().toLowerCase();
+    return normalized === "cancelled" || normalized === "canceled" || normalized.includes("declined");
+  };
+
+  const openCount = rows.filter((row) => {
+    const normalized = row.status.trim().toLowerCase();
+    return normalized !== "completed" && !isCancelledLikeStatus(row.status);
+  }).length;
   const completedCount = rows.filter((row) => row.status === "Completed").length;
-  const cancelledCount = rows.filter((row) => row.status === "Cancelled").length;
+  const cancelledCount = rows.filter((row) => isCancelledLikeStatus(row.status)).length;
 
   return (
     <ResourcePage
@@ -72,7 +80,7 @@ export function BookingsPage() {
       stats={[
         { label: "Open tasks", value: String(openCount), note: "Pending, accepted, and in progress" },
         { label: "Completed today", value: String(completedCount), note: "Freshly settled jobs" },
-        { label: "Cancelled", value: String(cancelledCount), note: "Needs quality follow-up" },
+        { label: "Cancelled / Declined", value: String(cancelledCount), note: "Provider and user cancellations" },
       ]}
     />
   );
