@@ -123,6 +123,14 @@ function buildChecklistState(detail?: ProviderDetailRecord | null): ApprovalChec
   };
 }
 
+function buildDefaultAvailabilityDay() {
+  return {
+    selected: false,
+    startTime: "08:00",
+    endTime: "20:00",
+  };
+}
+
 function ReviewSlideSection({
   title,
   empty,
@@ -272,7 +280,7 @@ export function ProviderProfilePage() {
   }>({
     enabled: true,
     entries: Object.fromEntries(
-      ALL_DAYS.map((day) => [day.key, { selected: false, startTime: "08:00", endTime: "20:00" }]),
+      ALL_DAYS.map((day) => [day.key, buildDefaultAvailabilityDay()]),
     ) as Record<string, { selected: boolean; startTime: string; endTime: string }>,
   });
 
@@ -308,7 +316,7 @@ export function ProviderProfilePage() {
     setAvailabilityForm({
       enabled: true,
       entries: Object.fromEntries(
-        ALL_DAYS.map((day) => [day.key, { selected: false, startTime: "08:00", endTime: "20:00" }]),
+        ALL_DAYS.map((day) => [day.key, buildDefaultAvailabilityDay()]),
       ) as Record<string, { selected: boolean; startTime: string; endTime: string }>,
     });
 
@@ -336,7 +344,7 @@ export function ProviderProfilePage() {
           about: payload.detail?.about ?? "",
         });
         const nextAvailabilityEntries = Object.fromEntries(
-          ALL_DAYS.map((day) => [day.key, { selected: false, startTime: "08:00", endTime: "20:00" }]),
+          ALL_DAYS.map((day) => [day.key, buildDefaultAvailabilityDay()]),
         ) as Record<string, { selected: boolean; startTime: string; endTime: string }>;
         (payload.detail?.availabilityEntries ?? []).forEach((entry) => {
           nextAvailabilityEntries[entry.dayKey] = {
@@ -416,7 +424,7 @@ export function ProviderProfilePage() {
         about: payload.detail.about,
       });
       const nextAvailabilityEntries = Object.fromEntries(
-        ALL_DAYS.map((day) => [day.key, { selected: false, startTime: "08:00", endTime: "20:00" }]),
+        ALL_DAYS.map((day) => [day.key, buildDefaultAvailabilityDay()]),
       ) as Record<string, { selected: boolean; startTime: string; endTime: string }>;
       (payload.detail.availabilityEntries ?? []).forEach((entry) => {
         nextAvailabilityEntries[entry.dayKey] = {
@@ -655,15 +663,23 @@ export function ProviderProfilePage() {
       return;
     }
 
-    const entries: ProviderAvailabilityEntry[] = ALL_DAYS
-      .filter((day) => availabilityForm.entries[day.key]?.selected)
-      .map((day) => ({
-        day: day.label,
-        dayKey: day.key,
-        startTime: availabilityForm.entries[day.key].startTime,
-        endTime: availabilityForm.entries[day.key].endTime,
-        timeMode: "custom",
-      }));
+    const entries = ALL_DAYS.reduce<ProviderAvailabilityEntry[]>((result, day) => {
+        const entry = availabilityForm.entries[day.key] ?? buildDefaultAvailabilityDay();
+
+        if (!entry.selected) {
+          return result;
+        }
+
+        result.push({
+          day: day.label,
+          dayKey: day.key,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          timeMode: "custom",
+        });
+
+        return result;
+      }, []);
 
     setSaving(true);
     const result = await updateProviderAvailability(detail.providerId, {
@@ -1252,16 +1268,20 @@ export function ProviderProfilePage() {
                           type="checkbox"
                           checked={availabilityForm.entries[day.key]?.selected ?? false}
                           onChange={(event) =>
-                            setAvailabilityForm((current) => ({
-                              ...current,
-                              entries: {
-                                ...current.entries,
-                                [day.key]: {
-                                  ...current.entries[day.key],
-                                  selected: event.target.checked,
+                            setAvailabilityForm((current) => {
+                              const nextDay = current.entries[day.key] ?? buildDefaultAvailabilityDay();
+
+                              return {
+                                ...current,
+                                entries: {
+                                  ...current.entries,
+                                  [day.key]: {
+                                    ...nextDay,
+                                    selected: event.target.checked,
+                                  },
                                 },
-                              },
-                            }))
+                              };
+                            })
                           }
                           className="h-4 w-4 rounded border-slate-300 text-emerald-600"
                         />
@@ -1275,16 +1295,20 @@ export function ProviderProfilePage() {
                         value={availabilityForm.entries[day.key]?.startTime ?? "08:00"}
                         disabled={!availabilityForm.entries[day.key]?.selected}
                         onChange={(event) =>
-                          setAvailabilityForm((current) => ({
-                            ...current,
-                            entries: {
-                              ...current.entries,
-                              [day.key]: {
-                                ...current.entries[day.key],
-                                startTime: event.target.value,
+                          setAvailabilityForm((current) => {
+                            const nextDay = current.entries[day.key] ?? buildDefaultAvailabilityDay();
+
+                            return {
+                              ...current,
+                              entries: {
+                                ...current.entries,
+                                [day.key]: {
+                                  ...nextDay,
+                                  startTime: event.target.value,
+                                },
                               },
-                            },
-                          }))
+                            };
+                          })
                         }
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none disabled:bg-slate-100"
                       />
@@ -1293,16 +1317,20 @@ export function ProviderProfilePage() {
                         value={availabilityForm.entries[day.key]?.endTime ?? "20:00"}
                         disabled={!availabilityForm.entries[day.key]?.selected}
                         onChange={(event) =>
-                          setAvailabilityForm((current) => ({
-                            ...current,
-                            entries: {
-                              ...current.entries,
-                              [day.key]: {
-                                ...current.entries[day.key],
-                                endTime: event.target.value,
+                          setAvailabilityForm((current) => {
+                            const nextDay = current.entries[day.key] ?? buildDefaultAvailabilityDay();
+
+                            return {
+                              ...current,
+                              entries: {
+                                ...current.entries,
+                                [day.key]: {
+                                  ...nextDay,
+                                  endTime: event.target.value,
+                                },
                               },
-                            },
-                          }))
+                            };
+                          })
                         }
                         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none disabled:bg-slate-100"
                       />

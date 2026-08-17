@@ -414,7 +414,7 @@ function formatProviderAvailabilityHours(entries: ProviderAvailabilityEntry[]) {
   }
 
   const uniqueRanges = [...new Set(entries.map((entry) => `${entry.startTime} - ${entry.endTime}`))];
-  return uniqueRanges.length === 1 ? uniqueRanges[0] : "Custom by day";
+  return uniqueRanges.length === 1 ? (uniqueRanges[0] ?? "Not set") : "Custom by day";
 }
 
 async function fetchAdminProviderAvailability(providerId: string) {
