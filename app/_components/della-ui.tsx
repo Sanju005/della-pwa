@@ -34,11 +34,11 @@ export function MobilePage({
   fullWidth?: boolean;
 }) {
   return (
-    <main className="min-h-[100dvh] overflow-x-hidden bg-[radial-gradient(circle_at_top,rgba(166,121,207,0.28),transparent_32%),linear-gradient(180deg,#fcfaff_0%,#f5f1fa_100%)]">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[radial-gradient(circle_at_top,rgba(166,121,207,0.22),transparent_30%),linear-gradient(180deg,#fcfbff_0%,#f7f2fb_100%)]">
       <div
         className={cx(
           "mx-auto min-h-[100dvh] w-full bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
-          fullWidth ? "max-w-[430px] px-3 sm:max-w-[440px] sm:px-4" : "max-w-[430px] px-4 sm:px-5"
+          fullWidth ? "max-w-[430px] px-4 sm:max-w-[440px]" : "max-w-[430px] px-4"
         )}
       >
         <div className={cx("min-h-[100dvh] py-4", className)}>{children}</div>
@@ -57,7 +57,7 @@ export function AppCard({
   return (
     <section
       className={cx(
-        "rounded-[24px] border border-[#e4ece7] bg-white p-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] sm:p-5",
+        "rounded-[18px] border border-[#e8ecef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]",
         className
       )}
     >
@@ -78,23 +78,23 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex min-w-0 items-start gap-3">
+    <div className="flex min-h-[56px] items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         {backHref ? (
           <Link
             href={backHref}
             aria-label="Back"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f5f1fa] text-[#8E5EB5]"
+            className="mobile-pressable inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ece4f6] bg-[#faf7fd] text-[#8E5EB5]"
           >
             <ChevronRight className="h-5 w-5 rotate-180" />
           </Link>
         ) : null}
         <div className="min-w-0">
-          <h1 className="text-[1.65rem] font-extrabold leading-tight tracking-[-0.05em] text-[#0f172a] sm:text-[1.9rem]">
+          <h1 className="text-[1.38rem] font-semibold leading-tight tracking-[-0.04em] text-[#0f172a] sm:text-[1.5rem]">
             {title}
           </h1>
           {subtitle ? (
-            <p className="mt-1 text-[14px] leading-6 text-[#64748b] sm:text-[15px]">
+            <p className="mt-1 text-[13px] leading-5 text-[#64748b] sm:text-[14px]">
               {subtitle}
             </p>
           ) : null}
@@ -117,7 +117,7 @@ export function SectionTitle({
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
       <div>
-        <h2 className="text-[18px] font-extrabold tracking-[-0.04em] text-[#0f172a]">
+        <h2 className="text-[17px] font-semibold tracking-[-0.03em] text-[#0f172a]">
           {title}
         </h2>
         {subtitle ? (
@@ -149,11 +149,11 @@ export function AppButton({
   type?: "button" | "submit";
 }) {
   const classes = cx(
-    "inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-center text-[14px] font-extrabold leading-tight whitespace-normal transition disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[3rem] sm:px-5 sm:py-3 sm:text-[15px]",
+    "mobile-pressable inline-flex min-h-[3rem] items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-center text-[14px] font-medium leading-tight whitespace-normal transition disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[3.125rem] sm:px-5 sm:text-[15px]",
     tone === "primary" &&
-      "bg-[#8E5EB5] text-white shadow-[0_16px_30px_rgba(142,94,181,0.22)] hover:bg-[#7B4EA1]",
+      "bg-[#8E5EB5] text-white shadow-[0_10px_24px_rgba(142,94,181,0.18)] hover:bg-[#7B4EA1]",
     tone === "secondary" &&
-      "border border-[#dce7df] bg-white text-[#0f172a] shadow-[0_10px_22px_rgba(15,23,42,0.04)] hover:bg-[#f8fbf9]",
+      "border border-[#dce7df] bg-white text-[#0f172a] shadow-[0_6px_18px_rgba(15,23,42,0.04)] hover:bg-[#f8fbf9]",
     tone === "ghost" && "bg-[#f5f1fa] text-[#8E5EB5] hover:bg-[#ede4f6]",
     tone === "danger" && "bg-[#fff1f1] text-[#dc2626] hover:bg-[#ffe4e6]",
     className
@@ -186,7 +186,7 @@ export function StatusBadge({
   return (
     <span
       className={cx(
-        "inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset",
+        "inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ring-inset",
         tone === "pending" && "bg-[#fff7e8] text-[#b45309] ring-[#fcd34d]",
         tone === "accepted" && "bg-[#f5f1fa] text-[#8E5EB5] ring-[#d7c1eb]",
         tone === "declined" && "bg-[#fff1f2] text-[#dc2626] ring-[#fecdd3]",
@@ -216,7 +216,7 @@ export function EmptyState({
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f1fa] text-[#8E5EB5]">
         {icon ?? <Bell className="h-6 w-6" />}
       </div>
-      <h3 className="mt-4 text-[16px] font-extrabold text-[#0f172a]">{title}</h3>
+      <h3 className="mt-4 text-[16px] font-semibold text-[#0f172a]">{title}</h3>
       <p className="mx-auto mt-2 max-w-[18rem] text-[14px] leading-6 text-[#64748b]">
         {description}
       </p>
@@ -235,7 +235,7 @@ export function LoadingState({
   return (
     <div className="rounded-[20px] border border-[#e4ece7] bg-white px-4 py-8 text-center shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
       <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-[#8E5EB5]" />
-      <h3 className="mt-4 text-[16px] font-extrabold text-[#0f172a]">{title}</h3>
+      <h3 className="mt-4 text-[16px] font-semibold text-[#0f172a]">{title}</h3>
       <p className="mt-2 text-[14px] leading-6 text-[#64748b]">{description}</p>
     </div>
   );
@@ -281,15 +281,15 @@ export function ProviderCard({
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-[16px] font-extrabold text-[#0f172a]">{name}</h3>
-            <p className="mt-1 text-[14px] font-medium text-[#334155]">{service}</p>
+            <h3 className="truncate text-[16px] font-semibold text-[#0f172a]">{name}</h3>
+            <p className="mt-1 text-[14px] text-[#334155]">{service}</p>
             {subtitle ? (
-              <p className="mt-1 text-[12px] font-semibold text-[#8E5EB5]">{subtitle}</p>
+              <p className="mt-1 text-[12px] font-medium text-[#8E5EB5]">{subtitle}</p>
             ) : null}
           </div>
           <Link
             href={href}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#8E5EB5] text-white shadow-[0_12px_24px_rgba(142,94,181,0.2)]"
+            className="mobile-pressable inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#8E5EB5] text-white shadow-[0_10px_24px_rgba(142,94,181,0.18)]"
           >
             <ChevronRight className="h-5 w-5" />
           </Link>
@@ -302,7 +302,7 @@ export function ProviderCard({
         <div className="mt-4 flex items-center justify-between border-t border-[#e8eeea] pt-4">
           <div>
             <p className="text-[12px] text-[#64748b]">From</p>
-            <p className="text-[18px] font-extrabold text-[#8E5EB5]">{priceLabel}</p>
+            <p className="text-[18px] font-semibold text-[#8E5EB5]">{priceLabel}</p>
           </div>
           <AppButton href={href}>View Profile</AppButton>
         </div>
@@ -343,7 +343,7 @@ export function BookingCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-[15px] font-extrabold text-[#0f172a]">{title}</h3>
+              <h3 className="truncate text-[15px] font-semibold text-[#0f172a]">{title}</h3>
               <p className="mt-1 text-[14px] text-[#475569]">{provider}</p>
             </div>
             <StatusBadge label={statusLabel} tone={statusTone} />
@@ -407,11 +407,11 @@ export function PremiumProviderCard({
 
       <div className="px-6 pb-6 pt-6 text-left">
         <div className="min-w-0">
-          <h3 className="truncate text-[3rem] font-extrabold leading-none tracking-[-0.07em] text-[#162544]">
+          <h3 className="truncate text-[2.3rem] font-semibold leading-none tracking-[-0.06em] text-[#162544]">
             {name}
           </h3>
           <p className="mt-7 text-[14px] font-medium text-[#667085]">Full name</p>
-          <p className="mt-3 truncate text-[1.05rem] font-bold text-[#1f2c44]">
+          <p className="mt-3 truncate text-[1.05rem] font-semibold text-[#1f2c44]">
             {fullName ?? name}
           </p>
         </div>
@@ -446,7 +446,7 @@ export function PremiumProviderCard({
         <div className="mt-8 flex items-end justify-between gap-4 border-t border-[#e9eeea] pt-6">
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-medium text-[#667085]">From</p>
-            <p className="mt-2 text-[2.2rem] font-extrabold leading-none tracking-[-0.05em] text-[#16a34a]">
+            <p className="mt-2 text-[2.2rem] font-semibold leading-none tracking-[-0.05em] text-[#16a34a]">
               {priceLabel}
             </p>
           </div>
@@ -501,19 +501,20 @@ export function BottomNav({
   }>;
 }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] border-t border-[#e8ece8] bg-white/97 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
-      <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#8a94a6]">
+    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
+      <div className="rounded-[20px] border border-[#edf0f3] bg-white/95 px-2 py-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#8a94a6]">
         {items.map((item) => {
           const navClassName = cx(
-            "flex min-w-[3.1rem] flex-col items-center gap-1",
+            "mobile-pressable flex min-w-[3.1rem] flex-1 flex-col items-center gap-1 rounded-[14px] px-1 py-2",
             item.active ? "text-[#16a34a]" : "text-[#8a94a6]"
           );
           const indicator = (
-            <span className="flex h-3 items-end">
+            <span className="flex h-2.5 items-end">
               <span
                 className={cx(
                   "rounded-full transition-all",
-                  item.active ? "h-[3px] w-10 bg-[#16a34a]" : "h-[3px] w-6 bg-transparent"
+                  item.active ? "h-[3px] w-8 bg-[#16a34a]" : "h-[3px] w-5 bg-transparent"
                 )}
               />
             </span>
@@ -537,6 +538,7 @@ export function BottomNav({
             </Link>
           );
         })}
+        </div>
       </div>
     </nav>
   );
@@ -558,10 +560,10 @@ export function AuthInfoPanel({
           {icon}
         </div>
         <div>
-          <p className="text-[13px] font-extrabold uppercase tracking-[0.18em] text-[#16a34a]">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-[#16a34a]">
             DELLA
           </p>
-          <h1 className="text-[28px] font-extrabold text-[#0f172a]">{title}</h1>
+          <h1 className="text-[28px] font-semibold text-[#0f172a]">{title}</h1>
         </div>
       </div>
       <p className="mt-5 text-[15px] leading-7 text-[#64748b]">{description}</p>

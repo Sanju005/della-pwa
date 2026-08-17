@@ -36,9 +36,9 @@ type OtpBoxProps = {
 
 export function RegisterShell({ children }: ShellProps) {
   return (
-    <main className="min-h-[100dvh] overflow-x-hidden bg-[#faf7fd]">
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col bg-white px-5 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-        <div className="min-h-[100dvh] bg-white py-5">
+    <main className="min-h-[100dvh] overflow-x-hidden bg-[radial-gradient(circle_at_top,rgba(166,121,207,0.18),transparent_28%),linear-gradient(180deg,#fcfbff_0%,#f6f1fb_100%)]">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col bg-white px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="min-h-[100dvh] bg-white py-4">
           {children}
         </div>
       </div>
@@ -52,14 +52,14 @@ export function RegisterHeader({
 }: HeaderProps) {
   return (
     <div className="mb-4">
-      <div className="flex items-start justify-between">
+      <div className="flex min-h-[56px] items-center justify-between">
         {showBack ? (
           <Link
             href={backHref}
             aria-label="Back"
-            className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full text-[#8E5EB5]"
+            className="mobile-pressable inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#ece4f6] bg-[#faf7fd] text-[#8E5EB5]"
           >
-            <ArrowLeftIcon className="h-6 w-6" />
+            <ArrowLeftIcon className="h-5 w-5" />
           </Link>
         ) : (
           <div />
@@ -72,7 +72,7 @@ export function RegisterHeader({
 export function RegisterTitle({ title, subtitle }: TitleProps) {
   return (
     <div className="mt-2 text-center">
-      <h1 className="text-[23px] font-extrabold leading-[1.2] tracking-[-0.04em] text-[#111827]">
+      <h1 className="text-[24px] font-semibold leading-[1.2] tracking-[-0.04em] text-[#111827]">
         {title}
       </h1>
       {subtitle ? (
@@ -187,7 +187,7 @@ export function PrimaryLinkButton({ href, children }: ButtonLinkProps) {
   return (
     <Link
       href={href}
-      className="inline-flex h-13 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] px-5 text-[15px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.22)] transition hover:bg-[#7B4EA1]"
+      className="mobile-pressable inline-flex h-12 w-full items-center justify-center rounded-[14px] bg-[#8E5EB5] px-5 text-[15px] font-medium text-white shadow-[0_10px_24px_rgba(142,94,181,0.18)] transition hover:bg-[#7B4EA1]"
     >
       {children}
     </Link>
@@ -198,7 +198,7 @@ export function BottomAuthText() {
   return (
     <p className="mt-4 text-center text-[15px] text-[#4b5563]">
       Already have an account?{" "}
-      <Link href="/login" className="font-extrabold text-[#8E5EB5]">
+      <Link href="/login" className="font-semibold text-[#8E5EB5]">
         Log in
       </Link>
     </p>

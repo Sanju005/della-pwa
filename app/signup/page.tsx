@@ -11,7 +11,7 @@ export default function SignupPage() {
         subtitle="Join as a User or Service Provider and get started with Swiper."
       />
 
-      <div className="mt-8 space-y-5">
+      <div className="mt-8 space-y-4">
         <ChoiceCard
           href="/signup/user"
           title="I'm a User"
@@ -28,16 +28,16 @@ export default function SignupPage() {
         />
       </div>
 
-      <div className="mt-8 rounded-[28px] bg-[radial-gradient(circle_at_top,_rgba(166,121,207,0.18),_transparent_48%),linear-gradient(180deg,#fdfbff_0%,#f6f0fc_100%)] px-6 py-8 text-center shadow-[0_18px_36px_rgba(67,35,104,0.08)]">
+      <div className="mt-7 rounded-[20px] bg-[radial-gradient(circle_at_top,_rgba(166,121,207,0.18),_transparent_48%),linear-gradient(180deg,#fdfbff_0%,#f6f0fc_100%)] px-5 py-7 text-center shadow-[0_12px_28px_rgba(67,35,104,0.06)]">
         <AnimatedSwiperLogo className="scale-[0.94]" />
-        <p className="mt-4 text-[14px] leading-7 text-[#4b5563]">
+        <p className="mt-4 text-[14px] leading-6 text-[#4b5563]">
           Swiper connects people with trusted home and lifestyle services across one simple app.
         </p>
       </div>
 
-      <p className="mt-7 text-center text-[15px] text-[#4b5563]">
+      <p className="mt-6 text-center text-[15px] text-[#4b5563]">
         Already have an account?{" "}
-        <Link href="/login" className="font-extrabold text-[#8E5EB5]">
+        <Link href="/login" className="font-semibold text-[#8E5EB5]">
           Log in
         </Link>
       </p>
@@ -61,34 +61,34 @@ function ChoiceCard({
   return (
     <Link
       href={href}
-      className="block rounded-[24px] border border-[#e4d7f3] bg-white p-5 shadow-[0_16px_30px_rgba(67,35,104,0.08)]"
+      className="mobile-pressable block rounded-[18px] border border-[#e8dff3] bg-[linear-gradient(180deg,#ffffff_0%,#fcfaff_100%)] p-4 shadow-[0_8px_22px_rgba(67,35,104,0.06)]"
     >
       <div className="flex items-start gap-4">
-        <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#f2e9fb_0%,#e4d3f7_100%)]">
+        <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#f2e9fb_0%,#e4d3f7_100%)]">
           {role === "user" ? <UserBadgeIllustration /> : <ProviderBadgeIllustration />}
         </div>
         <div className="flex-1">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-[18px] font-extrabold tracking-[-0.04em] text-[#111827]">
+              <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-[#111827]">
                 {title}
               </h2>
-              <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
+              <p className="mt-1.5 max-w-[14rem] text-[14px] leading-6 text-[#4b5563]">
                 {description}
               </p>
             </div>
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#f3ebfc] text-[22px] font-bold text-[#8E5EB5]">
-              →
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f3ebfc] text-[#8E5EB5]">
+              <ArrowCircleIcon />
             </span>
           </div>
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid grid-cols-2 gap-2">
         {features.map((feature) => (
           <div
             key={feature}
-            className="rounded-[14px] bg-[#faf6fe] px-3 py-2 text-[12px] font-semibold text-[#4d4361]"
+            className="rounded-[12px] bg-[#faf6fe] px-3 py-2 text-[12px] font-medium text-[#4d4361]"
           >
             {feature}
           </div>
@@ -98,9 +98,25 @@ function ChoiceCard({
   );
 }
 
+function ArrowCircleIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.1"
+      aria-hidden="true"
+    >
+      <path d="M5 12h12" strokeLinecap="round" />
+      <path d="m13 7 5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function UserBadgeIllustration() {
   return (
-    <svg viewBox="0 0 64 64" className="h-12 w-12" aria-hidden="true">
+    <svg viewBox="0 0 64 64" className="h-11 w-11" aria-hidden="true">
       <defs>
         <linearGradient id="user-badge-fill" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#A679CF" />
@@ -128,7 +144,7 @@ function UserBadgeIllustration() {
 
 function ProviderBadgeIllustration() {
   return (
-    <svg viewBox="0 0 64 64" className="h-12 w-12" aria-hidden="true">
+    <svg viewBox="0 0 64 64" className="h-11 w-11" aria-hidden="true">
       <defs>
         <linearGradient id="provider-badge-fill" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#A679CF" />
@@ -143,9 +159,31 @@ function ProviderBadgeIllustration() {
         strokeWidth="6"
         strokeLinecap="round"
       />
-      <rect x="36" y="18" width="15" height="18" rx="3.5" fill="#F5EEFF" stroke="#8E5EB5" strokeWidth="2.5" />
-      <path d="M40 18v-2.8a3.5 3.5 0 0 1 7 0V18" fill="none" stroke="#8E5EB5" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="m40.5 28.5 3 3 5.5-6.5" fill="none" stroke="#8E5EB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect
+        x="36"
+        y="18"
+        width="15"
+        height="18"
+        rx="3.5"
+        fill="#F5EEFF"
+        stroke="#8E5EB5"
+        strokeWidth="2.5"
+      />
+      <path
+        d="M40 18v-2.8a3.5 3.5 0 0 1 7 0V18"
+        fill="none"
+        stroke="#8E5EB5"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="m40.5 28.5 3 3 5.5-6.5"
+        fill="none"
+        stroke="#8E5EB5"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
