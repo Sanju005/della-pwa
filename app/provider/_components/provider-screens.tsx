@@ -345,7 +345,7 @@ function PageShell({
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8E5EB5]">
                 Provider App
               </p>
-              <h1 className="mt-2 text-[1.6rem] font-semibold tracking-[-0.05em] text-[#1f1630]">
+              <h1 className="mt-2 text-[1.6rem] font-bold tracking-[-0.02em] text-[#1f1630]">
                 {title}
               </h1>
               <p className="mt-1 text-[13px] leading-5 text-[#7b728a]">{subtitle}</p>
@@ -373,7 +373,7 @@ function MetricCard({
 }) {
   return (
     <div className="rounded-[18px] border border-[#eee5f7] bg-[#fcfaff] p-4 shadow-[0_8px_18px_rgba(86,38,135,0.045)]">
-      <p className={`text-[1.1rem] font-semibold tracking-[-0.04em] ${accent}`}>{value}</p>
+      <p className={`text-[1.1rem] font-bold tracking-[-0.01em] ${accent}`}>{value}</p>
       <p className="mt-1 text-[12px] font-semibold text-[#544b66]">{label}</p>
       <p className="mt-1 text-[11px] text-[#9a90ac]">{meta}</p>
     </div>
@@ -450,7 +450,7 @@ function VerificationStatusCard({
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[1rem] font-semibold tracking-[-0.03em] text-[#1f1630]">{title}</p>
+          <p className="text-[1rem] font-bold tracking-normal text-[#1f1630]">{title}</p>
           <p className="mt-1 text-[13px] text-[#7b728a]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -598,7 +598,7 @@ function VerificationFlowScreen({
         </div>
 
         <header className="pt-2">
-          <h1 className="text-[1.7rem] font-semibold tracking-[-0.05em] text-[#1f1630]">{title}</h1>
+          <h1 className="text-[1.7rem] font-bold tracking-[-0.02em] text-[#1f1630]">{title}</h1>
           <p className="mt-2 text-[14px] leading-5 text-[#7b728a]">{description}</p>
         </header>
 
@@ -1366,7 +1366,7 @@ export function DashboardScreen() {
             </div>
 
             <p className="mt-6 text-[14px] text-[#64748b]">{greetingLabel}</p>
-            <h1 className="mt-1 text-[1.7rem] font-semibold tracking-[-0.04em] text-[#0f172a]">
+            <h1 className="mt-1 text-[1.7rem] font-bold tracking-[-0.02em] text-[#0f172a]">
               {displayName}
             </h1>
             <div className="mt-2 flex items-center gap-1 text-[13px] text-[#475569]">
@@ -1390,7 +1390,7 @@ export function DashboardScreen() {
                     <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#8E5EB5]">
                       Wallet Balance
                     </p>
-                    <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
+                    <p className="mt-2 text-[1.65rem] font-bold tracking-[-0.01em] text-[#1f1630]">
                       {formatCurrency(walletBalance)}
                     </p>
                     <p className="mt-1 text-[12px] text-[#7c728f]">
@@ -1420,7 +1420,7 @@ export function DashboardScreen() {
                     <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E5EB5]">
                       Payable to Company
                     </p>
-                    <p className="mt-1 text-[1.18rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
+                    <p className="mt-1 text-[1.18rem] font-bold tracking-normal text-[#1f1630]">
                       {formatCurrency(companyPayable)}
                     </p>
                     <p className="mt-1 text-[12px] text-[#7c728f]">
@@ -1496,7 +1496,7 @@ export function DashboardScreen() {
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-[1.75rem] font-semibold leading-none tracking-[-0.05em] text-[#645394]">
+                    <p className="text-[1.75rem] font-bold leading-none tracking-[-0.02em] text-[#645394]">
                       {newTasks.length}
                     </p>
                     <p className="text-[14px] font-semibold text-[#1f1630]">New Task</p>
@@ -1522,7 +1522,7 @@ export function DashboardScreen() {
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Clock3 className="h-5 w-5" />
                 </span>
-                <p className="text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-[#645394]">{ongoingBookings.length}</p>
+                <p className="text-[1.3rem] font-bold leading-none tracking-normal text-[#645394]">{ongoingBookings.length}</p>
               </div>
               <p className="relative mt-3 text-[14px] font-semibold text-[#1f1630]">On Going</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Take live task actions</p>
@@ -1536,7 +1536,7 @@ export function DashboardScreen() {
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Bell className="h-5 w-5" />
                 </span>
-                <p className="text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-[#645394]">{pendingTodayTasks.length}</p>
+                <p className="text-[1.3rem] font-bold leading-none tracking-normal text-[#645394]">{pendingTodayTasks.length}</p>
               </div>
               <p className="relative mt-3 text-[14px] font-semibold text-[#1f1630]">Pending Task</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Pending for today</p>
@@ -1550,7 +1550,7 @@ export function DashboardScreen() {
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <CalendarDays className="h-5 w-5" />
                 </span>
-                <p className="text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-[#645394]">{completedBookings.length}</p>
+                <p className="text-[1.3rem] font-bold leading-none tracking-normal text-[#645394]">{completedBookings.length}</p>
               </div>
               <p className="relative mt-3 text-[14px] font-semibold text-[#1f1630]">Completed</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Open finished task details</p>
@@ -1564,7 +1564,7 @@ export function DashboardScreen() {
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Bell className="h-5 w-5" />
                 </span>
-                <p className="text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-[#645394]">{canceledBookings.length}</p>
+                <p className="text-[1.3rem] font-bold leading-none tracking-normal text-[#645394]">{canceledBookings.length}</p>
               </div>
               <p className="relative mt-3 text-[14px] font-semibold text-[#1f1630]">Cancelled</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">View cancelled tasks</p>
@@ -4497,7 +4497,7 @@ export function PaymentsScreen() {
       <section className="space-y-5">
         <header className="flex items-start justify-between gap-4 px-1 pt-2">
           <div>
-            <h1 className="text-[1.8rem] font-semibold tracking-[-0.05em] text-[#17153b]">
+            <h1 className="text-[1.8rem] font-bold tracking-[-0.02em] text-[#17153b]">
               Payments
             </h1>
             <p className="mt-1.5 text-[14px] leading-5 text-[#6f748b]">
@@ -4731,7 +4731,7 @@ export function PaymentsScreen() {
 
                 <section>
                   <div className="flex items-center justify-between gap-3 px-1">
-                    <h2 className="text-[1.1rem] font-semibold tracking-[-0.04em] text-[#1d1633]">
+                    <h2 className="text-[1.1rem] font-bold tracking-normal text-[#1d1633]">
                       Recent Transactions
                     </h2>
                     <button
@@ -5800,7 +5800,7 @@ export function ReviewsScreen() {
   return (
     <PageShell title="Reviews" subtitle="Customer ratings, review feed, and overall provider score.">
       <section className="rounded-[20px] border border-[#eee5f7] bg-white p-4 text-center shadow-[0_12px_24px_rgba(86,38,135,0.06)]">
-        <p className="text-[2.15rem] font-semibold tracking-[-0.05em] text-[#0f172a]">
+        <p className="text-[2.15rem] font-bold tracking-[-0.02em] text-[#0f172a]">
           {data.averageRating > 0 ? data.averageRating.toFixed(1) : "0.0"}
         </p>
         <div className="mt-2 flex items-center justify-center gap-1 text-[#8E5EB5]">
@@ -5915,7 +5915,7 @@ export function ProfileScreen() {
               <span className="text-[1.3rem] font-semibold text-[#16a34a]">{getInitials(displayName)}</span>
             )}
           </div>
-          <h2 className="mt-4 text-[1.45rem] font-semibold tracking-[-0.04em] text-[#0f172a]">
+          <h2 className="mt-4 text-[1.45rem] font-bold tracking-[-0.01em] text-[#0f172a]">
             {displayName}
           </h2>
           <span className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#eef9f1] px-4 py-2 text-[12px] font-medium text-[#16a34a]">
@@ -5985,7 +5985,7 @@ export function ProfileScreen() {
               <ShieldCheck className="h-7 w-7" />
             </span>
             <div>
-              <h3 className="text-[1.2rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
+              <h3 className="text-[1.2rem] font-bold tracking-normal text-[#1f1630]">
                 Verification
               </h3>
               <p className="mt-1 text-[13px] text-[#7b728a]">
@@ -6203,7 +6203,7 @@ export function PhoneVerificationScreen() {
         </div>
 
         <header className="pt-2">
-          <h1 className="text-[1.7rem] font-semibold tracking-[-0.05em] text-[#1f1630]">
+          <h1 className="text-[1.7rem] font-bold tracking-[-0.02em] text-[#1f1630]">
             Phone Verification
           </h1>
           <p className="mt-2 text-[14px] leading-5 text-[#7b728a]">
@@ -6507,7 +6507,7 @@ export function IdentityVerificationScreen() {
         </div>
 
         <header className="pt-2">
-          <h1 className="text-[1.7rem] font-semibold tracking-[-0.05em] text-[#1f1630]">
+          <h1 className="text-[1.7rem] font-bold tracking-[-0.02em] text-[#1f1630]">
             IC / Passport Verification
           </h1>
           <p className="mt-2 text-[14px] leading-5 text-[#7b728a]">
