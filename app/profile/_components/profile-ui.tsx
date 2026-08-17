@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { BookOpen, BriefcaseBusiness, Heart, House } from "lucide-react";
 import {
   AppButton,
   BookingCard as SharedBookingCard,
@@ -5505,23 +5506,23 @@ function BottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
       <div className="rounded-[20px] border border-[#edf0f3] bg-white/95 px-2 py-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)]">
         <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#8A94A6]">
-        <NavItem href="/home" label="Home" icon={<HomeIcon className="h-5 w-5" />} active={pathname === "/home"} />
+        <NavItem href="/home" label="Home" icon={<House className="h-5 w-5 stroke-[1.9]" />} active={pathname === "/home"} />
         <NavItem
           href="/profile/bookings"
           label="Task"
-          icon={<CalendarIcon className="h-5 w-5" />}
+          icon={<BookOpen className="h-5 w-5 stroke-[1.9]" />}
           active={isBookingsRoute && activeTab !== "ongoing"}
         />
         <NavItem
           href="/profile/favourites"
           label="Favourite"
-          icon={<FavoriteHeartIcon className="h-5 w-5" />}
+          icon={<Heart className="h-5 w-5 stroke-[1.9]" />}
           active={pathname.startsWith("/profile/favourites")}
         />
         <NavItem
           href="/profile/bookings?tab=ongoing"
           label="On Going"
-          icon={<CheckCircleIcon className="h-5 w-5" />}
+          icon={<BriefcaseBusiness className="h-5 w-5 stroke-[1.9]" />}
           active={isBookingsRoute && activeTab === "ongoing"}
         />
         </div>

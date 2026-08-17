@@ -266,6 +266,37 @@ function collectRegistrationGallery(
   return gallery;
 }
 
+function collectPortfolioGalleryFromListings(
+  listings: ProviderListing[],
+  preferredServiceKey?: ProviderCategoryKey,
+) {
+  const orderedListings = [
+    ...listings.filter((listing) => listing.serviceKey === preferredServiceKey),
+    ...listings.filter((listing) => listing.serviceKey !== preferredServiceKey),
+  ];
+  const seen = new Set<string>();
+  const gallery: ProviderGalleryImage[] = [];
+
+  for (const listing of orderedListings) {
+    for (const image of listing.portfolioImages) {
+      const normalizedSrc = image.src.trim();
+
+      if (!normalizedSrc || seen.has(normalizedSrc)) {
+        continue;
+      }
+
+      seen.add(normalizedSrc);
+      gallery.push({
+        src: normalizedSrc,
+        alt: `${listing.name} work image ${gallery.length + 1}`,
+        caption: image.caption?.trim() || `${listing.serviceLabel} work ${gallery.length + 1}`,
+      });
+    }
+  }
+
+  return gallery;
+}
+
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -715,6 +746,8 @@ export const getProviderDetail = cache(
   async (id: string, service: string | null): Promise<ProviderDetail | null> => {
     const scopedCatalog = await getProviderCatalog(service);
     const scopedMatch = scopedCatalog.listings.find((listing) => listing.id === id);
+    const allCatalog = service ? await getProviderCatalog(null) : scopedCatalog;
+    const relatedListings = allCatalog.listings.filter((listing) => listing.id === id);
 
     if (scopedMatch) {
       const [registration, customerReviews, availabilityRows, bookedTimeRangesByDate] = await Promise.all([
@@ -747,8 +780,12 @@ export const getProviderDetail = cache(
       const availabilityLabel = availabilityWithConflicts.some((slot) => slot.state === "available")
         ? "Available"
         : "Unavailable";
-      const registrationGallery = scopedMatch.portfolioImages.length
-        ? []
+      const uploadedGallery = collectPortfolioGalleryFromListings(
+        relatedListings.length > 0 ? relatedListings : [scopedMatch],
+        scopedMatch.serviceKey,
+      );
+      const registrationGallery = uploadedGallery.length > 0
+        ? uploadedGallery
         : collectRegistrationGallery(
             registration,
             registrationServiceLabel(scopedMatch.serviceKey),
@@ -766,7 +803,6 @@ export const getProviderDetail = cache(
       });
     }
 
-    const allCatalog = await getProviderCatalog(null);
     const fallbackMatch = allCatalog.listings.find((listing) => listing.id === id);
 
     if (!fallbackMatch) {
@@ -803,8 +839,12 @@ export const getProviderDetail = cache(
     const availabilityLabel = availabilityWithConflicts.some((slot) => slot.state === "available")
       ? "Available"
       : "Unavailable";
-    const registrationGallery = fallbackMatch.portfolioImages.length
-      ? []
+    const uploadedGallery = collectPortfolioGalleryFromListings(
+      relatedListings.length > 0 ? relatedListings : [fallbackMatch],
+      fallbackMatch.serviceKey,
+    );
+    const registrationGallery = uploadedGallery.length > 0
+      ? uploadedGallery
       : collectRegistrationGallery(
           registration,
           registrationServiceLabel(fallbackMatch.serviceKey),
