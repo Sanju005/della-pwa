@@ -466,7 +466,7 @@ async function ensureProviderProfile(
     service_radius_km: 15,
     bio: "",
     approval_status: "pending_review",
-    is_visible: true,
+    is_visible: false,
   };
 
   const { error } = await upsertProviderProfile(adminClient, bootstrapPayload);
@@ -743,8 +743,6 @@ export async function PATCH(request: Request) {
   if (Object.keys(providerPayload).length > 0) {
     const { error } = await upsertProviderProfile(verified.adminClient, {
       id: verified.profile.id,
-      approval_status: "pending_review",
-      is_visible: true,
       ...providerPayload,
     });
 

@@ -31,6 +31,7 @@ import {
   deleteProviderMedia,
   getProviderProfileWithFallback,
   markCompanyPaymentReceived,
+  updateProviderAvailability,
   setProviderIdentityVerified,
   setProviderSuspended,
   setProviderVisibility,
@@ -38,7 +39,7 @@ import {
   uploadProviderIdentityDocument,
   uploadProviderMedia,
 } from "../lib/admin-providers";
-import type { ProviderDetailRecord, ProviderIdentityDocument } from "../types";
+import type { ProviderAvailabilityEntry, ProviderDetailRecord, ProviderIdentityDocument } from "../types";
 import type { DashboardBooking } from "../types";
 
 const tabs = [
@@ -51,6 +52,22 @@ const tabs = [
 
 type TabKey = (typeof tabs)[number];
 type TaskStatusFilter = "all" | "completed" | "upcoming" | "canceled";
+type ApprovalChecklist = {
+  profile: boolean;
+  work: boolean;
+  certificate: boolean;
+  identity: boolean;
+};
+
+const ALL_DAYS = [
+  { key: "monday", label: "Mon" },
+  { key: "tuesday", label: "Tue" },
+  { key: "wednesday", label: "Wed" },
+  { key: "thursday", label: "Thu" },
+  { key: "friday", label: "Fri" },
+  { key: "saturday", label: "Sat" },
+  { key: "sunday", label: "Sun" },
+] as const;
 
 const metricIcons = [
   <BriefcaseBusiness className="size-5" />,
@@ -93,6 +110,17 @@ function initials(name: string) {
 function isPdfAsset(value?: string) {
   const normalized = (value ?? "").toLowerCase();
   return normalized.startsWith("data:application/pdf") || normalized.includes(".pdf");
+}
+
+function buildChecklistState(detail?: ProviderDetailRecord | null): ApprovalChecklist {
+  return {
+    profile: Boolean(detail?.profileImageUrl),
+    work: Boolean(detail?.workGallery?.length),
+    certificate: Boolean(detail?.certificates?.length),
+    identity:
+      detail?.identityVerificationStatus === "Verified" ||
+      Boolean(detail?.identityDocuments?.length),
+  };
 }
 
 function ReviewSlideSection({
@@ -222,14 +250,9 @@ export function ProviderProfilePage() {
   const [taskDateFrom, setTaskDateFrom] = useState("");
   const [taskDateTo, setTaskDateTo] = useState("");
   const [approvalNote, setApprovalNote] = useState("");
-  const [checklist, setChecklist] = useState({
-    identity: false,
-    background: false,
-    phone: false,
-    email: false,
-    tshirt: false,
-  });
+  const [checklist, setChecklist] = useState<ApprovalChecklist>(buildChecklistState(null));
   const [editing, setEditing] = useState(false);
+  const [editingAvailability, setEditingAvailability] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -242,6 +265,15 @@ export function ProviderProfilePage() {
     address: "",
     serviceArea: "",
     about: "",
+  });
+  const [availabilityForm, setAvailabilityForm] = useState<{
+    enabled: boolean;
+    entries: Record<string, { selected: boolean; startTime: string; endTime: string }>;
+  }>({
+    enabled: true,
+    entries: Object.fromEntries(
+      ALL_DAYS.map((day) => [day.key, { selected: false, startTime: "08:00", endTime: "20:00" }]),
+    ) as Record<string, { selected: boolean; startTime: string; endTime: string }>,
   });
 
   useEffect(() => {
@@ -258,13 +290,7 @@ export function ProviderProfilePage() {
     setTaskDateFrom("");
     setTaskDateTo("");
     setApprovalNote("");
-    setChecklist({
-      identity: false,
-      background: false,
-      phone: false,
-      email: false,
-      tshirt: false,
-    });
+    setChecklist(buildChecklistState(null));
     setForm({
       name: "",
       email: "",
@@ -278,6 +304,13 @@ export function ProviderProfilePage() {
       serviceArea: "",
       about: "",
     });
+    setEditingAvailability(false);
+    setAvailabilityForm({
+      enabled: true,
+      entries: Object.fromEntries(
+        ALL_DAYS.map((day) => [day.key, { selected: false, startTime: "08:00", endTime: "20:00" }]),
+      ) as Record<string, { selected: boolean; startTime: string; endTime: string }>,
+    });
 
     async function loadProvider() {
       try {
@@ -288,18 +321,7 @@ export function ProviderProfilePage() {
         }
 
         setProvider(payload.detail);
-        setChecklist({
-          identity: payload.detail?.identityVerificationStatus === "Verified",
-          background: payload.detail?.backgroundCheck === "Verified",
-          phone:
-            payload.detail?.documents.some(
-              (document) =>
-                document.label.toLowerCase().includes("phone") &&
-                document.status.toLowerCase().includes("verified"),
-            ) ?? false,
-          email: true,
-          tshirt: false,
-        });
+        setChecklist(buildChecklistState(payload.detail));
         setForm({
           name: payload.detail?.name ?? "",
           email: payload.detail?.email ?? "",
@@ -312,6 +334,20 @@ export function ProviderProfilePage() {
           address: payload.detail?.address ?? "",
           serviceArea: payload.detail?.serviceArea ?? "",
           about: payload.detail?.about ?? "",
+        });
+        const nextAvailabilityEntries = Object.fromEntries(
+          ALL_DAYS.map((day) => [day.key, { selected: false, startTime: "08:00", endTime: "20:00" }]),
+        ) as Record<string, { selected: boolean; startTime: string; endTime: string }>;
+        (payload.detail?.availabilityEntries ?? []).forEach((entry) => {
+          nextAvailabilityEntries[entry.dayKey] = {
+            selected: true,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+          };
+        });
+        setAvailabilityForm({
+          enabled: payload.detail?.availabilityEnabled ?? true,
+          entries: nextAvailabilityEntries,
         });
       } finally {
         if (active) {
@@ -365,18 +401,7 @@ export function ProviderProfilePage() {
     const payload = await getProviderProfileWithFallback(providerId);
     setProvider(payload.detail);
     if (payload.detail) {
-      setChecklist((current) => ({
-        ...current,
-        identity: payload.detail?.identityVerificationStatus === "Verified",
-        background: payload.detail?.backgroundCheck === "Verified",
-        phone:
-          payload.detail?.documents.some(
-            (document) =>
-              document.label.toLowerCase().includes("phone") &&
-              document.status.toLowerCase().includes("verified"),
-          ) ?? current.phone,
-        email: current.email,
-      }));
+      setChecklist(buildChecklistState(payload.detail));
       setForm({
         name: payload.detail.name,
         email: payload.detail.email,
@@ -389,6 +414,20 @@ export function ProviderProfilePage() {
         address: payload.detail.address,
         serviceArea: payload.detail.serviceArea,
         about: payload.detail.about,
+      });
+      const nextAvailabilityEntries = Object.fromEntries(
+        ALL_DAYS.map((day) => [day.key, { selected: false, startTime: "08:00", endTime: "20:00" }]),
+      ) as Record<string, { selected: boolean; startTime: string; endTime: string }>;
+      (payload.detail.availabilityEntries ?? []).forEach((entry) => {
+        nextAvailabilityEntries[entry.dayKey] = {
+          selected: true,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+        };
+      });
+      setAvailabilityForm({
+        enabled: payload.detail.availabilityEnabled ?? true,
+        entries: nextAvailabilityEntries,
       });
     }
   }
@@ -462,6 +501,7 @@ export function ProviderProfilePage() {
   }
 
   const detail = provider;
+  const allChecklistReady = Object.values(checklist).every(Boolean);
   const isProviderApproved =
     detail.approvalStatus === "Approved" &&
     detail.identityVerificationStatus === "Verified" &&
@@ -610,6 +650,38 @@ export function ProviderProfilePage() {
     flash("Provider disabled.");
   }
 
+  async function handleSaveAvailability() {
+    if (saving) {
+      return;
+    }
+
+    const entries: ProviderAvailabilityEntry[] = ALL_DAYS
+      .filter((day) => availabilityForm.entries[day.key]?.selected)
+      .map((day) => ({
+        day: day.label,
+        dayKey: day.key,
+        startTime: availabilityForm.entries[day.key].startTime,
+        endTime: availabilityForm.entries[day.key].endTime,
+        timeMode: "custom",
+      }));
+
+    setSaving(true);
+    const result = await updateProviderAvailability(detail.providerId, {
+      enabled: availabilityForm.enabled,
+      entries,
+    });
+    setSaving(false);
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    await reloadProviderDetails();
+    setEditingAvailability(false);
+    flash("Provider availability updated.");
+  }
+
   async function handleMarkCompanyPaymentReceived(submissionId: string) {
     const rawAmount = receivedAmounts[submissionId] ?? "";
 
@@ -671,6 +743,11 @@ export function ProviderProfilePage() {
   async function handleApproveProvider() {
     if (!approvalNote.trim()) {
       flash("Please add an admin note before approving this provider.");
+      return;
+    }
+
+    if (!allChecklistReady) {
+      flash("Complete all document checklist items before approving this provider.");
       return;
     }
 
@@ -1135,11 +1212,115 @@ export function ProviderProfilePage() {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-2">
-          <SurfaceCard title="Availability">
+          <SurfaceCard
+            title="Availability"
+            action={
+              <button
+                type="button"
+                onClick={() => setEditingAvailability((current) => !current)}
+                className="rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700"
+              >
+                {editingAvailability ? "Cancel" : "Edit"}
+              </button>
+            }
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               <SummaryMetric label="Working Days" value={detail.workingDays} />
               <SummaryMetric label="Working Hours" value={detail.workingHours} />
             </div>
+            {editingAvailability ? (
+              <div className="mt-6 space-y-4 rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
+                <label className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3 text-sm">
+                  <span className="font-semibold text-slate-900">Provider visible for booking</span>
+                  <input
+                    type="checkbox"
+                    checked={availabilityForm.enabled}
+                    onChange={(event) =>
+                      setAvailabilityForm((current) => ({
+                        ...current,
+                        enabled: event.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                  />
+                </label>
+                <div className="space-y-3">
+                  {ALL_DAYS.map((day) => (
+                    <div key={day.key} className="grid gap-3 rounded-2xl bg-white px-4 py-3 md:grid-cols-[90px_1fr_120px_120px] md:items-center">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <input
+                          type="checkbox"
+                          checked={availabilityForm.entries[day.key]?.selected ?? false}
+                          onChange={(event) =>
+                            setAvailabilityForm((current) => ({
+                              ...current,
+                              entries: {
+                                ...current.entries,
+                                [day.key]: {
+                                  ...current.entries[day.key],
+                                  selected: event.target.checked,
+                                },
+                              },
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                        />
+                        {day.label}
+                      </label>
+                      <span className="text-xs text-slate-500">
+                        {availabilityForm.entries[day.key]?.selected ? "Available" : "Off"}
+                      </span>
+                      <input
+                        type="time"
+                        value={availabilityForm.entries[day.key]?.startTime ?? "08:00"}
+                        disabled={!availabilityForm.entries[day.key]?.selected}
+                        onChange={(event) =>
+                          setAvailabilityForm((current) => ({
+                            ...current,
+                            entries: {
+                              ...current.entries,
+                              [day.key]: {
+                                ...current.entries[day.key],
+                                startTime: event.target.value,
+                              },
+                            },
+                          }))
+                        }
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none disabled:bg-slate-100"
+                      />
+                      <input
+                        type="time"
+                        value={availabilityForm.entries[day.key]?.endTime ?? "20:00"}
+                        disabled={!availabilityForm.entries[day.key]?.selected}
+                        onChange={(event) =>
+                          setAvailabilityForm((current) => ({
+                            ...current,
+                            entries: {
+                              ...current.entries,
+                              [day.key]: {
+                                ...current.entries[day.key],
+                                endTime: event.target.value,
+                              },
+                            },
+                          }))
+                        }
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none disabled:bg-slate-100"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveAvailability()}
+                    disabled={saving}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {saving ? "Saving..." : "Save Availability"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </SurfaceCard>
         </section>
       </>
@@ -1569,125 +1750,23 @@ export function ProviderProfilePage() {
               <InfoRow label="Email" value={detail.email} icon={<Mail className="size-4" />} />
               <InfoRow label="Phone" value={detail.phone} icon={<Phone className="size-4" />} />
             </div>
-            <div className="space-y-3">
-              {detail.documents.map((document) => (
-                <div key={document.id} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4">
-                  <div className="flex items-center gap-3 text-sm text-slate-700">
-                    <FileText className="size-4 text-slate-400" />
-                    <div>
-                      <span>{document.label}</span>
-                      {document.note ? (
-                        <p className="mt-1 text-[11px] text-slate-400">{document.note}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <MiniStatus status={document.status} />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-950">Identity Review</h3>
+                  <h3 className="text-sm font-bold text-slate-950">Approval Status</h3>
                   <p className="mt-1 text-[12px] text-slate-500">
-                    {detail.identityDocuments?.length
-                      ? `${detail.identityDocumentType} submitted ${detail.identitySubmittedAt ? `on ${detail.identitySubmittedAt}` : "for review"}.`
-                      : "No identity image is currently stored for this provider."}
+                    Provider stays hidden from users until admin completes all checks and approves.
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <MiniStatus status={detail.identityVerificationStatus ?? "Pending"} />
-                  <button
-                    type="button"
-                    onClick={() => void handleIdentityVerification(detail.identityVerificationStatus !== "Verified")}
-                    disabled={verifyingIdentity}
-                    className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 disabled:opacity-60"
-                  >
-                    {verifyingIdentity
-                      ? "Saving..."
-                      : detail.identityVerificationStatus === "Verified"
-                        ? "Mark Pending"
-                        : "Mark Verified"}
-                  </button>
-                </div>
+                <MiniStatus status={detail.approvalStatus || "Pending"} />
               </div>
-              <div className="mt-4 flex flex-wrap gap-3">
-                {(["front", "back"] as const).map((side) => (
-                  <label
-                    key={side}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700"
-                  >
-                    <Upload className="size-3.5" />
-                    {identityDocumentSaving === `upload-${side}`
-                      ? "Uploading..."
-                      : `Upload ${side === "front" ? "Front" : "Back"}`}
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      className="hidden"
-                      disabled={Boolean(identityDocumentSaving)}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0] ?? null;
-                        event.target.value = "";
-                        void handleIdentityDocumentUpload(side, file);
-                      }}
-                    />
-                  </label>
-                ))}
-              </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {detail.identityDocuments?.length ? (
-                  detail.identityDocuments.map((document) => {
-                    const side = document.id.includes("back") ? "back" : "front";
-
-                    return (
-                      <div
-                        key={document.id}
-                        className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3"
-                      >
-                        <a
-                          href={document.previewUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block transition hover:opacity-90"
-                        >
-                          <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
-                            {isPdfAsset(document.previewUrl) ? (
-                              <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
-                                <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
-                                <span className="text-[12px] font-semibold">{document.fileName}</span>
-                              </div>
-                            ) : (
-                              <img src={document.previewUrl} alt={document.label} className="h-full w-full object-cover" />
-                            )}
-                          </div>
-                        </a>
-                        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">{document.label}</p>
-                            <p className="mt-1 text-[12px] text-slate-500">{document.fileName}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => void handleIdentityDocumentDelete(side)}
-                            disabled={Boolean(identityDocumentSaving)}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
-                          >
-                            <Trash2 className="size-3.5" />
-                            {identityDocumentSaving === `delete-${side}` ? "Deleting..." : "Delete"}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500 md:col-span-2">
-                    Upload front and back identity images to start review.
-                  </div>
-                )}
-              </div>
+              <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-600">
+                {isProviderApproved
+                  ? "Approved providers are visible to users in the app."
+                  : "Provider app should remain in processing / pending review until approval is completed here."}
+              </p>
             </div>
+          </div>
           <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-950">Profile Photo</h3>
@@ -1842,15 +1921,117 @@ export function ProviderProfilePage() {
             )}
           </div>
 
+          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-950">IC / Passport</h3>
+                <p className="mt-1 text-[12px] text-slate-500">
+                  {detail.identityDocuments?.length
+                    ? `${detail.identityDocumentType} submitted ${detail.identitySubmittedAt ? `on ${detail.identitySubmittedAt}` : "for review"}.`
+                    : "No identity image is currently stored for this provider."}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <MiniStatus status={detail.identityVerificationStatus ?? "Pending"} />
+                <button
+                  type="button"
+                  onClick={() => void handleIdentityVerification(detail.identityVerificationStatus !== "Verified")}
+                  disabled={verifyingIdentity}
+                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 disabled:opacity-60"
+                >
+                  {verifyingIdentity
+                    ? "Saving..."
+                    : detail.identityVerificationStatus === "Verified"
+                      ? "Mark Pending"
+                      : "Mark Verified"}
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {(["front", "back"] as const).map((side) => (
+                <label
+                  key={side}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700"
+                >
+                  <Upload className="size-3.5" />
+                  {identityDocumentSaving === `upload-${side}`
+                    ? "Uploading..."
+                    : `Upload ${side === "front" ? "Front" : "Back"}`}
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    disabled={Boolean(identityDocumentSaving)}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      event.target.value = "";
+                      void handleIdentityDocumentUpload(side, file);
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {detail.identityDocuments?.length ? (
+                detail.identityDocuments.map((document) => {
+                  const side = document.id.includes("back") ? "back" : "front";
+
+                  return (
+                    <div
+                      key={document.id}
+                      className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3"
+                    >
+                      <a
+                        href={document.previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block transition hover:opacity-90"
+                      >
+                        <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                          {isPdfAsset(document.previewUrl) ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
+                              <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                              <span className="text-[12px] font-semibold">{document.fileName}</span>
+                            </div>
+                          ) : (
+                            <img src={document.previewUrl} alt={document.label} className="h-full w-full object-cover" />
+                          )}
+                        </div>
+                      </a>
+                      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{document.label}</p>
+                          <p className="mt-1 text-[12px] text-slate-500">{document.fileName}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleIdentityDocumentDelete(side)}
+                          disabled={Boolean(identityDocumentSaving)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+                        >
+                          <Trash2 className="size-3.5" />
+                          {identityDocumentSaving === `delete-${side}` ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500 md:col-span-2">
+                  Upload front and back identity images to start review.
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="mt-6 rounded-[24px] border border-slate-200 bg-white p-4">
             <h3 className="text-sm font-bold text-slate-950">Approval Checklist</h3>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {([
-                ["identity", "IC / Passport verified"],
-                ["background", "Background checked"],
-                ["phone", "Phone verified"],
-                ["email", "Email verified"],
-                ["tshirt", "T-shirt given"],
+                ["profile", "Profile picture checked"],
+                ["work", "Work images checked"],
+                ["certificate", "Certificates checked"],
+                ["identity", "IC / Passport checked"],
               ] as Array<[keyof typeof checklist, string]>).map(([key, label]) => (
                 <label
                   key={key}
@@ -1885,7 +2066,7 @@ export function ProviderProfilePage() {
               <button
                 type="button"
                 onClick={() => void handleApproveProvider()}
-                disabled={saving || verifyingIdentity || isProviderApproved}
+                disabled={saving || verifyingIdentity || isProviderApproved || !allChecklistReady}
                 className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
               >
                 {isProviderApproved ? "Approved" : "Approve Provider"}

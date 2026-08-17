@@ -6366,19 +6366,12 @@ export function IdentityVerificationScreen() {
   const hydratedSavedIdentityRef = useRef(false);
   const fallback = LoadingOrError(state);
 
-  if (fallback) {
-    return fallback;
-  }
-
-  const data = state.data!;
-  const identityStatus = data.identityVerificationStatus;
-  const isIdentityLocked = data.identityVerified || identityStatus === "processing";
-  const canSubmit = Boolean(frontPreview && backPreview);
-
   useEffect(() => {
-    if (hydratedSavedIdentityRef.current) {
+    if (fallback || hydratedSavedIdentityRef.current || !state.data) {
       return;
     }
+
+    const data = state.data;
 
     if (data.identityDocumentType) {
       setSelectedDocumentType(data.identityDocumentType);
@@ -6400,10 +6393,21 @@ export function IdentityVerificationScreen() {
 
     hydratedSavedIdentityRef.current = true;
   }, [
-    data.identityBackImageUrl,
-    data.identityDocumentType,
-    data.identityFrontImageUrl,
+    fallback,
+    state.data,
+    state.data?.identityBackImageUrl,
+    state.data?.identityDocumentType,
+    state.data?.identityFrontImageUrl,
   ]);
+
+  if (fallback) {
+    return fallback;
+  }
+
+  const data = state.data!;
+  const identityStatus = data.identityVerificationStatus;
+  const isIdentityLocked = data.identityVerified || identityStatus === "processing";
+  const canSubmit = Boolean(frontPreview && backPreview);
 
   const handleFileChange = (side: "front" | "back", source: "gallery" | "camera") =>
     async (event: ChangeEvent<HTMLInputElement>) => {

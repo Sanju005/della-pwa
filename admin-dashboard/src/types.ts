@@ -332,6 +332,14 @@ export type ProviderPayoutRow = {
   status: string;
 };
 
+export type ProviderAvailabilityEntry = {
+  day: string;
+  dayKey: string;
+  startTime: string;
+  endTime: string;
+  timeMode: string;
+};
+
 export type ProviderCommissionRow = {
   submissionId: string;
   payableAmount: string;
@@ -379,6 +387,8 @@ export type ProviderDetailRecord = {
   repeatCustomers: string;
   workingDays: string;
   workingHours: string;
+  availabilityEnabled?: boolean;
+  availabilityEntries?: ProviderAvailabilityEntry[];
   totalTasks: string;
   completedTasks: string;
   upcomingTasks: string;

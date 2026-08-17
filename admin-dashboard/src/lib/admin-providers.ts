@@ -2,6 +2,7 @@ import { bookings, payments, providers as mockProviders, reviews as mockReviews 
 import { providerDetailRecords } from "../data/provider-detail-mocks";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import type {
+  ProviderAvailabilityEntry,
   ProviderCommissionRow,
   ProviderDetailRecord,
   ProviderDocumentItem,
@@ -285,6 +286,16 @@ const APP_BASE_URL =
   (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
   "https://app.myswiper.my";
 
+const DAY_ORDER = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
 const providerProfileSelectWithAddress = `
   id,
   marketing_name,
@@ -387,6 +398,71 @@ function relationItem<T>(value: T | T[] | null | undefined) {
   }
 
   return value ?? null;
+}
+
+function formatProviderAvailabilityDays(entries: ProviderAvailabilityEntry[]) {
+  if (!entries.length) {
+    return "Not set";
+  }
+
+  return entries.map((entry) => entry.day.slice(0, 3)).join(" - ");
+}
+
+function formatProviderAvailabilityHours(entries: ProviderAvailabilityEntry[]) {
+  if (!entries.length) {
+    return "Not set";
+  }
+
+  const uniqueRanges = [...new Set(entries.map((entry) => `${entry.startTime} - ${entry.endTime}`))];
+  return uniqueRanges.length === 1 ? uniqueRanges[0] : "Custom by day";
+}
+
+async function fetchAdminProviderAvailability(providerId: string) {
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${APP_BASE_URL}/api/admin/provider-availability/${providerId}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    const result = (await response.json()) as
+      | {
+          enabled?: boolean;
+          entries?: ProviderAvailabilityEntry[];
+        }
+      | { error?: string };
+
+    if (!response.ok || !("entries" in result)) {
+      return null;
+    }
+
+    const entries = (result.entries ?? [])
+      .filter((entry) => DAY_ORDER.includes((entry.dayKey ?? "").toLowerCase() as (typeof DAY_ORDER)[number]))
+      .sort(
+        (left, right) =>
+          DAY_ORDER.indexOf(left.dayKey.toLowerCase() as (typeof DAY_ORDER)[number]) -
+          DAY_ORDER.indexOf(right.dayKey.toLowerCase() as (typeof DAY_ORDER)[number]),
+      );
+
+    return {
+      enabled: Boolean(result.enabled),
+      entries,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function toTitleCase(value: string) {
@@ -1537,6 +1613,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   const liveCompanyPaymentSubmissions = await tryFetchProviderCompanyPaymentSubmissions(providerId);
   const liveReviews = await tryFetchProviderReviews(providerId);
   const liveGivenReviews = await tryFetchProviderGivenReviews(providerId);
+  const liveAvailability = await fetchAdminProviderAvailability(providerId);
   const customerNames = await fetchProfileNameMap([
     ...(liveTasks?.map((row) => row.customer_id) ?? []),
     ...(liveReviews?.map((row) => row.customer_id) ?? []),
@@ -1688,6 +1765,10 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
         : fallback.cancellationRate,
     averageRating: typeof liveProfile.average_rating === "number" ? liveProfile.average_rating.toFixed(1) : fallback.averageRating,
     totalReviews: String(liveProfile.total_reviews ?? (Number(fallback.totalReviews) || 0)),
+    workingDays: liveAvailability ? formatProviderAvailabilityDays(liveAvailability.entries) : fallback.workingDays,
+    workingHours: liveAvailability ? formatProviderAvailabilityHours(liveAvailability.entries) : fallback.workingHours,
+    availabilityEnabled: liveAvailability?.enabled ?? true,
+    availabilityEntries: liveAvailability?.entries ?? [],
     totalTasks: liveTasks?.length ? String(liveTasks.length) : fallback.totalTasks,
     completedTasks: taskRows?.completedTaskRows.length ? String(taskRows.completedTaskRows.length) : fallback.completedTasks,
     upcomingTasks: taskRows?.upcomingTaskRows.length ? String(taskRows.upcomingTaskRows.length) : fallback.upcomingTasks,
@@ -2155,4 +2236,56 @@ export async function markCompanyPaymentReceived(
   });
 
   return { error: null };
+}
+
+export async function updateProviderAvailability(
+  providerId: string,
+  payload: {
+    enabled: boolean;
+    entries: ProviderAvailabilityEntry[];
+  },
+) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return { error: "Admin session is required." };
+  }
+
+  try {
+    const response = await fetch(`${APP_BASE_URL}/api/admin/provider-availability/${providerId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        enabled: payload.enabled,
+        entries: payload.entries.map((entry) => ({
+          day: entry.dayKey,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          timeMode: entry.timeMode || "custom",
+        })),
+      }),
+    });
+
+    const result = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      return { error: result.error || "Unable to save provider availability." };
+    }
+
+    return { error: null };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to save provider availability.",
+    };
+  }
 }

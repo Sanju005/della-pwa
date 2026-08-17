@@ -703,7 +703,7 @@ export async function POST(request: Request) {
       bio: buildProviderBio(payload),
       approval_status: "pending_review",
       verification_status: "partially_verified",
-      is_visible: true,
+      is_visible: false,
     };
 
     let providerProfileError: { message?: string } | null = null;
