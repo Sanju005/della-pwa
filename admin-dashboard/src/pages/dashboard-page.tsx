@@ -130,9 +130,9 @@ export function DashboardPage() {
             ].map((point) => (
               <div key={point.day} className="flex h-full flex-col justify-end gap-3">
                 <div className="flex h-full items-end gap-1">
-                  <div className="w-full rounded-t-2xl bg-[#8f78c0]" style={{ height: `${point.active}%` }} />
+                  <div className="w-full rounded-t-2xl bg-[#8b79bf]" style={{ height: `${point.active}%` }} />
                   <div className="w-full rounded-t-2xl bg-[#645394]" style={{ height: `${point.completed}%` }} />
-                  <div className="w-full rounded-t-2xl bg-[#b19bd8]" style={{ height: `${point.cancelled}%` }} />
+                  <div className="w-full rounded-t-2xl bg-[#c7bcdf]" style={{ height: `${point.cancelled}%` }} />
                 </div>
                 <p className="text-center text-xs font-medium text-slate-400">{point.day}</p>
               </div>
@@ -141,7 +141,7 @@ export function DashboardPage() {
 
           <div className="mt-6 flex flex-wrap gap-4 text-xs font-semibold text-slate-500">
             <span className="inline-flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#8f78c0]" />
+              <span className="size-2 rounded-full bg-[#8b79bf]" />
               Active
             </span>
             <span className="inline-flex items-center gap-2">
@@ -149,7 +149,7 @@ export function DashboardPage() {
               Completed
             </span>
             <span className="inline-flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#b19bd8]" />
+              <span className="size-2 rounded-full bg-[#c7bcdf]" />
               Cancelled
             </span>
           </div>
