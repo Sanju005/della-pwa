@@ -132,9 +132,19 @@ type AdminCustomerStatusPayload = {
   kycVerifiedAt: string;
 };
 
+type IssueReportRecord = {
+  id: string;
+  reporterUserId: string;
+};
+
 const APP_BASE_URL =
   (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
   "https://app.myswiper.my";
+
+function isCustomerRole(role: string | null | undefined) {
+  const normalized = role?.trim().toLowerCase() ?? "";
+  return normalized === "customer" || normalized === "user";
+}
 
 function relationNode(value?: ProfileRelation) {
   if (Array.isArray(value)) {
@@ -216,6 +226,40 @@ async function fetchAdminCustomerStatus(userId: string) {
     } satisfies AdminCustomerStatusPayload;
   } catch {
     return null;
+  }
+}
+
+async function fetchIssueReportCountForUser(userId: string) {
+  if (!supabase) {
+    return 0;
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return 0;
+  }
+
+  try {
+    const response = await fetch(`${APP_BASE_URL}/api/reports`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return 0;
+    }
+
+    const result = (await response.json()) as {
+      reports?: IssueReportRecord[];
+    };
+
+    return (result.reports ?? []).filter((report) => report.reporterUserId === userId).length;
+  } catch {
+    return 0;
   }
 }
 
@@ -792,6 +836,8 @@ function buildMetrics(
   role: string,
   relatedBookings: DashboardBooking[],
   relatedPayments: PaymentRow[],
+  recentReviews: UserDetailRecord["recentReviews"],
+  issueReportCount: number,
   fallbackMetrics: UserMetric[]
 ) {
   if (!relatedBookings.length && !relatedPayments.length) {
@@ -811,6 +857,12 @@ function buildMetrics(
   const totalBookings = relatedBookings.length;
   const completionRate = totalBookings > 0 ? `${((completedCount / totalBookings) * 100).toFixed(1)}%` : "0.0%";
   const cancellationRate = totalBookings > 0 ? `${((cancelledCount / totalBookings) * 100).toFixed(1)}%` : "0.0%";
+  const reviewCount = recentReviews.length;
+  const averageRating = reviewCount
+    ? (
+        recentReviews.reduce((sum, review) => sum + Number(review.rating ?? 0), 0) / reviewCount
+      ).toFixed(1)
+    : "0.0";
 
   if (role === "provider") {
     return [
@@ -818,9 +870,9 @@ function buildMetrics(
       { id: "live-2", label: "Completed", value: String(completedCount), note: completionRate, tone: "emerald" },
       { id: "live-3", label: "Cancelled", value: String(cancelledCount), note: cancellationRate, tone: "rose" },
       { id: "live-4", label: "Lifetime Earnings", value: formatCurrency(totalAmount), note: "All time", tone: "violet" },
-      fallbackMetrics[4] ?? { id: "live-5", label: "Wallet Balance", value: "RM0.00", note: "Available", tone: "amber" },
-      fallbackMetrics[5] ?? { id: "live-6", label: "Reviews", value: "0", note: "Average: 0.0", tone: "sky" },
-      fallbackMetrics[6] ?? { id: "live-7", label: "Reports", value: "0", note: "No issues", tone: "amber" },
+      { id: "live-5", label: "Wallet Balance", value: "RM0.00", note: "Available", tone: "amber" },
+      { id: "live-6", label: "Reviews", value: String(reviewCount), note: `Average: ${averageRating}`, tone: "sky" },
+      { id: "live-7", label: "Reports", value: String(issueReportCount), note: issueReportCount ? "View reports" : "No issues", tone: "amber" },
     ] satisfies UserMetric[];
   }
 
@@ -829,9 +881,9 @@ function buildMetrics(
     { id: "live-2", label: "Completed Bookings", value: String(completedCount), note: completionRate, tone: "emerald" },
     { id: "live-3", label: "Cancelled Bookings", value: String(cancelledCount), note: cancellationRate, tone: "rose" },
     { id: "live-4", label: "Total Spent", value: formatCurrency(totalAmount), note: "All time", tone: "violet" },
-    fallbackMetrics[4] ?? { id: "live-5", label: "Wallet Balance", value: "RM0.00", note: "Available", tone: "amber" },
-    fallbackMetrics[5] ?? { id: "live-6", label: "Reviews Given", value: "0", note: "Average: 0.0", tone: "sky" },
-    fallbackMetrics[6] ?? { id: "live-7", label: "Reports Submitted", value: "0", note: "No reports", tone: "amber" },
+    { id: "live-5", label: "Wallet Balance", value: "RM0.00", note: "Available", tone: "amber" },
+    { id: "live-6", label: "Reviews Given", value: String(reviewCount), note: `Average: ${averageRating}`, tone: "sky" },
+    { id: "live-7", label: "Reports Submitted", value: String(issueReportCount), note: issueReportCount ? "View reports" : "No reports", tone: "amber" },
   ] satisfies UserMetric[];
 }
 
@@ -932,16 +984,21 @@ export async function listUsersWithFallback() {
   const liveProfiles = await fetchProfiles();
 
   if (!liveProfiles?.length) {
-    return users;
+    return users.filter((row) => isCustomerRole(row.role));
   }
 
-  const liveRows = liveProfiles.map(mapProfileToUserRow);
+  const liveRows = liveProfiles
+    .filter((profile) => isCustomerRole(profile.role))
+    .map(mapProfileToUserRow);
   const seen = new Set(
     liveRows.flatMap((row) => [row.id.trim().toLowerCase(), row.email.trim().toLowerCase()])
   );
 
   const mockRemainder = users.filter(
-    (row) => !seen.has(row.id.trim().toLowerCase()) && !seen.has(row.email.trim().toLowerCase())
+    (row) =>
+      isCustomerRole(row.role) &&
+      !seen.has(row.id.trim().toLowerCase()) &&
+      !seen.has(row.email.trim().toLowerCase())
   );
 
   return [...liveRows, ...mockRemainder];
@@ -1004,6 +1061,7 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
   const liveReviews = await tryFetchLiveReviews(userId, role, profileNames);
   const savedAddresses = role === "provider" ? [] : await fetchSavedAddressesForUser(userId);
   const customerStatus = role === "provider" ? null : await fetchAdminCustomerStatus(userId);
+  const issueReportCount = role === "provider" ? 0 : await fetchIssueReportCountForUser(userId);
   const relatedBookings = liveBookings?.length ? liveBookings : getMockBookings(name, role);
   const relatedPayments = livePayments?.length ? livePayments : getMockPayments(name, role);
   const defaultDetail = Object.values(userDetailRecords)[0]!;
@@ -1014,7 +1072,15 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
     Object.values(userDetailRecords).find((record) => record.role === role) ??
     defaultDetail;
 
-  const metrics = buildMetrics(role, relatedBookings, relatedPayments, baseDetail.metrics);
+  const recentReviews = role === "provider" ? baseDetail.recentReviews : liveReviews ?? [];
+  const metrics = buildMetrics(
+    role,
+    relatedBookings,
+    relatedPayments,
+    recentReviews,
+    issueReportCount,
+    baseDetail.metrics,
+  );
 
   return {
     detail: {
@@ -1051,7 +1117,7 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
       emailVerifiedAt: role === "provider" ? baseDetail.emailVerifiedAt : customerStatus?.emailVerifiedAt ?? "",
       phoneVerifiedAt: role === "provider" ? baseDetail.phoneVerifiedAt : customerStatus?.phoneVerifiedAt ?? "",
       kycVerifiedAt: role === "provider" ? baseDetail.kycVerifiedAt : customerStatus?.kycVerifiedAt ?? "",
-      recentReviews: role === "provider" ? baseDetail.recentReviews : liveReviews ?? [],
+      recentReviews,
       metrics,
     },
     relatedBookings,

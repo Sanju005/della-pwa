@@ -41,7 +41,7 @@ export function UsersPage() {
   return (
     <ResourcePage
       title="Users"
-      description="Customer, provider, and internal user management at a glance."
+      description="Customer accounts only."
       rows={rows}
       columns={[
         {
@@ -64,7 +64,7 @@ export function UsersPage() {
         { key: "joined", label: "Joined" },
       ]}
       statusKey="status"
-      searchPlaceholder="Search users by name, email, or role..."
+      searchPlaceholder="Search customers by name, email, or role..."
       stats={buildUserStats(rows)}
     />
   );
