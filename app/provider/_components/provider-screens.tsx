@@ -264,8 +264,8 @@ function LoadingOrError(state: ReturnType<typeof useProviderAppData>) {
   if (!state.data) {
     return (
       <MobilePage className="pb-28">
-        <section className="rounded-[28px] border border-[#dbe8df] bg-white p-5 shadow-[0_20px_60px_rgba(22,163,74,0.08)]">
-          <h1 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16a34a]">
+        <section className="rounded-[22px] border border-[#dbe8df] bg-white p-5 shadow-[0_12px_30px_rgba(22,163,74,0.06)]">
+          <h1 className="text-[24px] font-semibold tracking-[-0.04em] text-[#16a34a]">
             Provider App
           </h1>
           <p className="mt-3 text-[14px] leading-6 text-[#6b7280]">
@@ -273,7 +273,7 @@ function LoadingOrError(state: ReturnType<typeof useProviderAppData>) {
           </p>
           <Link
             href="/login"
-            className="mt-6 inline-flex h-11 items-center justify-center rounded-[12px] bg-[#16a34a] px-4 text-[14px] font-extrabold text-white"
+            className="mobile-pressable mt-6 inline-flex h-11 items-center justify-center rounded-[12px] bg-[#16a34a] px-4 text-[14px] font-medium text-white"
           >
             Back to login
           </Link>
@@ -339,16 +339,16 @@ function PageShell({
   return (
     <MobilePage className="pb-28">
       <section className="space-y-4">
-        <header className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)] ring-1 ring-[#eee5f7]">
+        <header className="rounded-[22px] bg-white px-4 py-4 shadow-[0_12px_30px_rgba(86,38,135,0.06)] ring-1 ring-[#eee5f7]">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#8E5EB5]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8E5EB5]">
                 Provider App
               </p>
-              <h1 className="mt-2 text-[1.9rem] font-black tracking-[-0.06em] text-[#1f1630]">
+              <h1 className="mt-2 text-[1.6rem] font-semibold tracking-[-0.05em] text-[#1f1630]">
                 {title}
               </h1>
-              <p className="mt-1 text-[13px] leading-6 text-[#7b728a]">{subtitle}</p>
+              <p className="mt-1 text-[13px] leading-5 text-[#7b728a]">{subtitle}</p>
             </div>
             {action}
           </div>
@@ -372,8 +372,8 @@ function MetricCard({
   accent?: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-[#eee5f7] bg-[#fcfaff] p-4 shadow-[0_10px_20px_rgba(86,38,135,0.05)]">
-      <p className={`text-[1.2rem] font-black tracking-[-0.05em] ${accent}`}>{value}</p>
+    <div className="rounded-[18px] border border-[#eee5f7] bg-[#fcfaff] p-4 shadow-[0_8px_18px_rgba(86,38,135,0.045)]">
+      <p className={`text-[1.1rem] font-semibold tracking-[-0.04em] ${accent}`}>{value}</p>
       <p className="mt-1 text-[12px] font-semibold text-[#544b66]">{label}</p>
       <p className="mt-1 text-[11px] text-[#9a90ac]">{meta}</p>
     </div>
@@ -434,10 +434,10 @@ function VerificationStatusCard({
 }) {
   const tone = verified ? "verified" : status;
   const content = (
-    <div className="group rounded-[24px] border border-[#eee7f8] bg-white px-4 py-4 shadow-[0_12px_30px_rgba(86,38,135,0.06)] transition hover:border-[#d8c8f0] hover:shadow-[0_18px_36px_rgba(86,38,135,0.09)]">
+    <div className="mobile-pressable group rounded-[20px] border border-[#eee7f8] bg-white px-4 py-4 shadow-[0_10px_22px_rgba(86,38,135,0.05)] transition hover:border-[#d8c8f0] hover:shadow-[0_14px_28px_rgba(86,38,135,0.07)]">
       <div className="flex items-center gap-4">
         <span
-          className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] ${
+          className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] ${
             tone === "verified"
               ? "bg-[#ecf9f0] text-[#16a34a]"
               : tone === "processing"
@@ -450,7 +450,7 @@ function VerificationStatusCard({
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[1.05rem] font-black tracking-[-0.04em] text-[#1f1630]">{title}</p>
+          <p className="text-[1rem] font-semibold tracking-[-0.03em] text-[#1f1630]">{title}</p>
           <p className="mt-1 text-[13px] text-[#7b728a]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -508,7 +508,7 @@ function OtpInputSlots({
                 inputsRef.current[index - 1]?.focus();
               }
             }}
-            className="h-14 w-12 rounded-[14px] border border-[#e5def3] bg-white text-center text-[1.25rem] font-black text-[#1f1630] outline-none transition focus:border-[#8E5EB5] focus:ring-2 focus:ring-[#efe6fb]"
+            className="h-14 w-12 rounded-[14px] border border-[#e5def3] bg-white text-center text-[1.15rem] font-semibold text-[#1f1630] outline-none transition focus:border-[#8E5EB5] focus:ring-2 focus:ring-[#efe6fb]"
           />
         );
       })}
@@ -590,7 +590,7 @@ function VerificationFlowScreen({
         <div className="flex items-center justify-between gap-3">
           <Link
             href={backHref}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_10px_24px_rgba(86,38,135,0.06)]"
+            className="mobile-pressable inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_8px_18px_rgba(86,38,135,0.06)]"
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
@@ -598,13 +598,13 @@ function VerificationFlowScreen({
         </div>
 
         <header className="pt-2">
-          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">{title}</h1>
-          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">{description}</p>
+          <h1 className="text-[1.7rem] font-semibold tracking-[-0.05em] text-[#1f1630]">{title}</h1>
+          <p className="mt-2 text-[14px] leading-5 text-[#7b728a]">{description}</p>
         </header>
 
-        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+        <section className="rounded-[22px] border border-[#eee5f7] bg-white p-4 shadow-[0_12px_28px_rgba(86,38,135,0.06)]">
           <div>
-            <p className="text-[15px] font-black text-[#1f1630]">{fieldLabel}</p>
+            <p className="text-[15px] font-semibold text-[#1f1630]">{fieldLabel}</p>
             <div className="mt-4 overflow-hidden rounded-[16px] border border-[#e7def4]">
               <div className="flex items-stretch">
                 {leadingPrefix ? (
@@ -642,7 +642,7 @@ function VerificationFlowScreen({
               setScreenNotice(sentMessage);
             }}
             disabled={!canSendOtp}
-            className={`mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border text-[15px] font-black transition ${
+            className={`mobile-pressable mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border text-[14px] font-medium transition ${
               canSendOtp
                 ? "border-[#cdb8f3] bg-white text-[#8E5EB5] shadow-[0_12px_28px_rgba(142,94,181,0.08)]"
                 : "cursor-not-allowed border-[#eadff8] bg-[#faf7fe] text-[#c2b2dc]"
@@ -653,7 +653,7 @@ function VerificationFlowScreen({
           </button>
 
           <div className="mt-6">
-            <p className="text-[15px] font-black text-[#1f1630]">Enter OTP</p>
+            <p className="text-[15px] font-semibold text-[#1f1630]">Enter OTP</p>
             <OtpInputSlots value={otp} onChange={setOtp} />
 
             <div className="mt-4 space-y-2 text-[13px]">
@@ -665,7 +665,7 @@ function VerificationFlowScreen({
                 <Clock3 className="h-4 w-4 text-[#8E5EB5]" />
                 <span>
                   Resend code in{" "}
-                  <strong className="font-black text-[#8E5EB5]">
+                  <strong className="font-semibold text-[#8E5EB5]">
                     00:{String(countdown).padStart(2, "0")}
                   </strong>
                 </span>
@@ -680,7 +680,7 @@ function VerificationFlowScreen({
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[14px] font-black text-[#1f1630]">Your security matters</p>
+              <p className="text-[14px] font-semibold text-[#1f1630]">Your security matters</p>
               <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">{securityMessage}</p>
             </div>
           </div>
@@ -697,7 +697,7 @@ function VerificationFlowScreen({
             state.setNotice(successMessage);
             router.push(backHref);
           }}
-          className={`mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+          className={`mobile-pressable mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[15px] font-medium transition ${
             canVerify
               ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
               : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
@@ -820,7 +820,7 @@ function BookingActionBar({
   children: React.ReactNode;
 }) {
   return (
-    <div className="sticky bottom-[5.5rem] z-20 mt-5 rounded-[22px] border border-[#ebe3f5] bg-white/95 p-3 shadow-[0_18px_44px_rgba(15,23,42,0.12)] backdrop-blur">
+    <div className="sticky bottom-[5.5rem] z-20 mt-5 rounded-[18px] border border-[#ebe3f5] bg-white/95 p-3 shadow-[0_12px_24px_rgba(15,23,42,0.1)] backdrop-blur">
       <div className="flex gap-3">{children}</div>
     </div>
   );
@@ -875,13 +875,13 @@ function InfoRow({
   href?: string;
 }) {
   const content = (
-    <div className="flex items-center justify-between gap-3 rounded-[18px] border border-[#e7eee8] bg-[#fbfffc] px-4 py-3">
+    <div className="mobile-pressable flex items-center justify-between gap-3 rounded-[16px] border border-[#e7eee8] bg-[#fbfffc] px-4 py-3">
       <div className="flex items-center gap-3 text-[14px] text-[#0f172a]">
         {icon}
         <span className="font-semibold">{label}</span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-right text-[13px] font-bold text-[#16a34a]">{value}</span>
+        <span className="text-right text-[13px] font-medium text-[#16a34a]">{value}</span>
         {href ? <ChevronRight className="h-4 w-4 text-[#94a3b8]" /> : null}
       </div>
     </div>
@@ -906,15 +906,15 @@ function ServiceCard({
   experience: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-[#e7eee8] bg-[#fbfffc] p-4">
+    <div className="rounded-[18px] border border-[#e7eee8] bg-[#fbfffc] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[15px] font-black text-[#0f172a]">{name}</p>
+          <p className="text-[15px] font-semibold text-[#0f172a]">{name}</p>
           <p className="mt-1 text-[12px] text-[#64748b]">
             {`RM${hourly}/hr • RM${daily}/day`}
           </p>
         </div>
-        <span className="rounded-full bg-[#eef9f1] px-3 py-1 text-[11px] font-bold text-[#16a34a]">
+        <span className="rounded-full bg-[#eef9f1] px-3 py-1 text-[11px] font-medium text-[#16a34a]">
           {experience || "Experience not set"}
         </span>
       </div>
@@ -1051,10 +1051,10 @@ function ProviderPushNotificationsCard() {
   const enabled = pushState.permission === "granted" && pushState.hasSavedToken;
 
   return (
-    <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+    <section className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[1.1rem] font-black tracking-[-0.04em] text-[#0f172a]">
+          <h3 className="text-[1rem] font-semibold tracking-[-0.03em] text-[#0f172a]">
             Push Notifications
           </h3>
           <p className="mt-1 text-[12px] text-[#64748b]">
@@ -1064,8 +1064,8 @@ function ProviderPushNotificationsCard() {
         <Bell className="h-5 w-5 text-[#16a34a]" />
       </div>
 
-        <div className="mt-4 rounded-[18px] border border-[#e7eee8] bg-[#fbfffc] p-4">
-        <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#94a3b8]">
+        <div className="mt-4 rounded-[16px] border border-[#e7eee8] bg-[#fbfffc] p-4">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8]">
           Status
         </p>
         <p className="mt-2 text-[14px] font-semibold text-[#0f172a]">
@@ -1077,8 +1077,8 @@ function ProviderPushNotificationsCard() {
         </div>
 
         {diagnostics ? (
-        <div className="mt-4 rounded-[18px] border border-[#e7eee8] bg-white p-4 text-[12px] text-[#475569]">
-          <p className="font-bold uppercase tracking-[0.12em] text-[#94a3b8]">
+        <div className="mt-4 rounded-[16px] border border-[#e7eee8] bg-white p-4 text-[12px] text-[#475569]">
+          <p className="font-semibold uppercase tracking-[0.12em] text-[#94a3b8]">
             Device Check
           </p>
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -1093,8 +1093,8 @@ function ProviderPushNotificationsCard() {
         ) : null}
 
         {clientDebug ? (
-          <div className="mt-4 rounded-[18px] border border-[#e7eee8] bg-[#fffdf7] p-4 text-[12px] text-[#475569]">
-            <p className="font-bold uppercase tracking-[0.12em] text-[#b08900]">
+          <div className="mt-4 rounded-[16px] border border-[#e7eee8] bg-[#fffdf7] p-4 text-[12px] text-[#475569]">
+            <p className="font-semibold uppercase tracking-[0.12em] text-[#b08900]">
               Firebase Debug
             </p>
             <div className="mt-2 space-y-1 break-all">
@@ -1123,7 +1123,7 @@ function ProviderPushNotificationsCard() {
           type="button"
           disabled={busy}
           onClick={() => void onEnable()}
-          className="inline-flex h-11 flex-1 items-center justify-center rounded-[14px] bg-[#16a34a] px-4 text-[13px] font-extrabold text-white disabled:opacity-60"
+          className="mobile-pressable inline-flex h-11 flex-1 items-center justify-center rounded-[14px] bg-[#16a34a] px-4 text-[13px] font-medium text-white disabled:opacity-60"
         >
           {busy ? "Updating..." : enabled ? "Enable Again" : "Enable Push"}
         </button>
@@ -1131,7 +1131,7 @@ function ProviderPushNotificationsCard() {
           type="button"
           disabled={busy || !enabled}
           onClick={() => void onDisable()}
-          className="inline-flex h-11 flex-1 items-center justify-center rounded-[14px] border border-[#d8ebdf] bg-white px-4 text-[13px] font-extrabold text-[#166534] disabled:opacity-60"
+          className="mobile-pressable inline-flex h-11 flex-1 items-center justify-center rounded-[14px] border border-[#d8ebdf] bg-white px-4 text-[13px] font-medium text-[#166534] disabled:opacity-60"
         >
           Disable Push
         </button>
@@ -1340,10 +1340,10 @@ export function DashboardScreen() {
           </Link>
         </header>
 
-        <section className="rounded-[30px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+        <section className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
           <div className="flex flex-col items-center text-center">
             <div className="relative">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-[#ebf7ef] ring-4 ring-white shadow-[0_16px_30px_rgba(22,163,74,0.18)]">
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#ebf7ef] ring-4 ring-white shadow-[0_12px_24px_rgba(22,163,74,0.16)]">
                 {data.avatarUrl ? (
                   <Image
                     src={data.avatarUrl}
@@ -1354,24 +1354,24 @@ export function DashboardScreen() {
                     unoptimized
                   />
                 ) : (
-                  <span className="text-[1.4rem] font-black text-[#16a34a]">
+                  <span className="text-[1.2rem] font-semibold text-[#16a34a]">
                     {getInitials(displayName)}
                   </span>
                 )}
               </div>
-              <span className="absolute -bottom-1 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[#16a34a] shadow-[0_10px_24px_rgba(22,163,74,0.15)] ring-1 ring-[#e3eee6]">
+              <span className="absolute -bottom-1 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-medium text-[#16a34a] shadow-[0_8px_18px_rgba(22,163,74,0.12)] ring-1 ring-[#e3eee6]">
                 <span className={`h-2.5 w-2.5 rounded-full ${data.isVisible ? "bg-[#16a34a]" : "bg-[#f59e0b]"}`} />
                 {data.isVisible ? "Available" : "Pending"}
               </span>
             </div>
 
             <p className="mt-6 text-[14px] text-[#64748b]">{greetingLabel}</p>
-            <h1 className="mt-1 text-[2rem] font-black tracking-[-0.06em] text-[#0f172a]">
+            <h1 className="mt-1 text-[1.7rem] font-semibold tracking-[-0.04em] text-[#0f172a]">
               {displayName}
             </h1>
             <div className="mt-2 flex items-center gap-1 text-[13px] text-[#475569]">
               <Star className="h-4 w-4 fill-[#f5b301] text-[#f5b301]" />
-              <span className="font-bold">
+              <span className="font-semibold">
                 {data.averageRating > 0 ? data.averageRating.toFixed(1) : "0.0"}
               </span>
               <span>({data.totalReviews} reviews)</span>
@@ -1382,15 +1382,15 @@ export function DashboardScreen() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-[22px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_16px_36px_rgba(104,63,155,0.1)]">
+          <div className="mt-4 overflow-hidden rounded-[18px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_10px_24px_rgba(104,63,155,0.08)]">
             <div className="space-y-4">
-              <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
+              <div className="rounded-[16px] border border-[#ede4f8] bg-white/90 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#8E5EB5]">
                       Wallet Balance
                     </p>
-                    <p className="mt-2 text-[1.85rem] font-black tracking-[-0.06em] text-[#1f1630]">
+                    <p className="mt-2 text-[1.65rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
                       {formatCurrency(walletBalance)}
                     </p>
                     <p className="mt-1 text-[12px] text-[#7c728f]">
@@ -1404,7 +1404,7 @@ export function DashboardScreen() {
                 <Link
                   href="/provider/payments"
                   aria-disabled={walletBalance <= 0}
-                  className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-extrabold transition ${
+                  className={`mobile-pressable mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-medium transition ${
                     walletBalance <= 0
                       ? "pointer-events-none bg-[#d8cde6] text-white shadow-none"
                       : "bg-[#8E5EB5] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
@@ -1414,27 +1414,27 @@ export function DashboardScreen() {
                 </Link>
               </div>
 
-              <div className="rounded-[18px] border border-[#ede4f8] bg-white/90 p-4">
+              <div className="rounded-[16px] border border-[#ede4f8] bg-white/90 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[#8E5EB5]">
                       Payable to Company
                     </p>
-                    <p className="mt-1 text-[1.3rem] font-black tracking-[-0.05em] text-[#1f1630]">
+                    <p className="mt-1 text-[1.18rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
                       {formatCurrency(companyPayable)}
                     </p>
                     <p className="mt-1 text-[12px] text-[#7c728f]">
                       Amount due to DELLA from recent customer payments
                     </p>
                   </div>
-                  <span className="rounded-full bg-[#f5f1fa] px-3 py-1 text-[11px] font-bold text-[#8E5EB5]">
+                    <span className="rounded-full bg-[#f5f1fa] px-3 py-1 text-[11px] font-medium text-[#8E5EB5]">
                     DELLA
                   </span>
                 </div>
                 <Link
                   href="/provider/payments"
                   aria-disabled={companyPayable <= 0}
-                  className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] border px-4 text-[14px] font-extrabold transition ${
+                  className={`mobile-pressable mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] border px-4 text-[14px] font-medium transition ${
                     companyPayable <= 0
                       ? "pointer-events-none border-[#e6def0] bg-[#f3eef8] text-[#b49bcf]"
                       : "border-[#d9c8ee] bg-white text-[#8E5EB5]"
@@ -1469,11 +1469,11 @@ export function DashboardScreen() {
           </p>
         ) : null}
 
-        <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+        <section className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
           <div className="flex items-center gap-3">
             <span className="h-7 w-1.5 rounded-full bg-[#645394]" />
             <div>
-              <h2 className="text-[17px] font-black tracking-[-0.04em] text-[#0f172a]">
+              <h2 className="text-[17px] font-semibold tracking-[-0.03em] text-[#0f172a]">
                 Today&apos;s Task
               </h2>
               <p className="mt-1 text-[12px] text-[#7b728a]">Total task of the day</p>
@@ -1486,27 +1486,27 @@ export function DashboardScreen() {
                 ? `/provider/bookings?tab=pending&booking=${pendingRequest.id}`
                 : "/provider/bookings?tab=pending"
             }
-            className="relative mt-5 block overflow-hidden rounded-[22px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-4 shadow-[0_12px_28px_rgba(100,83,148,0.12)]"
+            className="mobile-pressable relative mt-4 block overflow-hidden rounded-[18px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-4 shadow-[0_10px_22px_rgba(100,83,148,0.08)]"
           >
             <div className="absolute -bottom-10 -right-6 h-28 w-36 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.16)_0%,rgba(100,83,148,0)_72%)]" />
             <div className="relative flex items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-white text-[#645394] shadow-[0_10px_24px_rgba(100,83,148,0.14)]">
-                  <BriefcaseBusiness className="h-7 w-7" />
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
+                  <BriefcaseBusiness className="h-6 w-6" />
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-[2rem] font-black leading-none tracking-[-0.07em] text-[#645394]">
+                    <p className="text-[1.75rem] font-semibold leading-none tracking-[-0.05em] text-[#645394]">
                       {newTasks.length}
                     </p>
-                    <p className="text-[14px] font-black text-[#1f1630]">New Task</p>
+                    <p className="text-[14px] font-semibold text-[#1f1630]">New Task</p>
                   </div>
                   <p className="mt-1 text-[12px] leading-5 text-[#7b728a]">
                     Reviewing and accepting new requests
                   </p>
                 </div>
               </div>
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.1)]">
                 <ChevronRight className="h-5 w-5" />
               </span>
             </div>
@@ -1515,58 +1515,58 @@ export function DashboardScreen() {
           <div className="mt-4 grid grid-cols-2 gap-3">
             <Link
               href="/provider/bookings?tab=ongoing"
-              className="relative overflow-hidden rounded-[20px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_10px_20px_rgba(100,83,148,0.08)]"
+              className="mobile-pressable relative overflow-hidden rounded-[16px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_8px_18px_rgba(100,83,148,0.07)]"
             >
               <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.14)_0%,rgba(100,83,148,0)_72%)]" />
               <div className="relative flex items-center gap-2.5">
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Clock3 className="h-5 w-5" />
                 </span>
-                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#645394]">{ongoingBookings.length}</p>
+                <p className="text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-[#645394]">{ongoingBookings.length}</p>
               </div>
-              <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">On Going</p>
+              <p className="relative mt-3 text-[14px] font-semibold text-[#1f1630]">On Going</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Take live task actions</p>
             </Link>
             <Link
               href="/provider/bookings?tab=pending"
-              className="relative overflow-hidden rounded-[20px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_10px_20px_rgba(100,83,148,0.08)]"
+              className="mobile-pressable relative overflow-hidden rounded-[16px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_8px_18px_rgba(100,83,148,0.07)]"
             >
               <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.14)_0%,rgba(100,83,148,0)_72%)]" />
               <div className="relative flex items-center gap-2.5">
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Bell className="h-5 w-5" />
                 </span>
-                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#645394]">{pendingTodayTasks.length}</p>
+                <p className="text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-[#645394]">{pendingTodayTasks.length}</p>
               </div>
-              <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Pending Task</p>
+              <p className="relative mt-3 text-[14px] font-semibold text-[#1f1630]">Pending Task</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Pending for today</p>
             </Link>
             <Link
               href="/provider/bookings?tab=completes"
-              className="relative overflow-hidden rounded-[20px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_10px_20px_rgba(100,83,148,0.08)]"
+              className="mobile-pressable relative overflow-hidden rounded-[16px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_8px_18px_rgba(100,83,148,0.07)]"
             >
               <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.14)_0%,rgba(100,83,148,0)_72%)]" />
               <div className="relative flex items-center gap-2.5">
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <CalendarDays className="h-5 w-5" />
                 </span>
-                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#645394]">{completedBookings.length}</p>
+                <p className="text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-[#645394]">{completedBookings.length}</p>
               </div>
-              <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Completed</p>
+              <p className="relative mt-3 text-[14px] font-semibold text-[#1f1630]">Completed</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">Open finished task details</p>
             </Link>
             <Link
               href="/provider/bookings?tab=canceled"
-              className="relative overflow-hidden rounded-[20px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_10px_20px_rgba(100,83,148,0.08)]"
+              className="mobile-pressable relative overflow-hidden rounded-[16px] border border-[#ddd5ec] bg-[linear-gradient(135deg,#faf8ff_0%,#f4f0fb_70%,#ede6f8_100%)] p-3.5 shadow-[0_8px_18px_rgba(100,83,148,0.07)]"
             >
               <div className="absolute -bottom-8 -right-4 h-20 w-24 rounded-full bg-[radial-gradient(circle,rgba(100,83,148,0.14)_0%,rgba(100,83,148,0)_72%)]" />
               <div className="relative flex items-center gap-2.5">
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.12)]">
                   <Bell className="h-5 w-5" />
                 </span>
-                <p className="text-[1.45rem] font-black leading-none tracking-[-0.06em] text-[#645394]">{canceledBookings.length}</p>
+                <p className="text-[1.3rem] font-semibold leading-none tracking-[-0.04em] text-[#645394]">{canceledBookings.length}</p>
               </div>
-              <p className="relative mt-3 text-[14px] font-black text-[#1f1630]">Cancelled</p>
+              <p className="relative mt-3 text-[14px] font-semibold text-[#1f1630]">Cancelled</p>
               <p className="relative mt-1 text-[11px] leading-5 text-[#7b728a]">View cancelled tasks</p>
             </Link>
           </div>
@@ -1673,17 +1673,17 @@ export function DashboardScreen() {
           </div>
         </section>
 
-        <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+        <section className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-[17px] font-black tracking-[-0.04em] text-[#0f172a]">
+              <h2 className="text-[17px] font-semibold tracking-[-0.03em] text-[#0f172a]">
                 Ongoing Tasks
               </h2>
               <p className="mt-1 text-[13px] text-[#64748b]">
                 Active jobs already in progress.
               </p>
             </div>
-            <span className="rounded-full bg-[#eef9f1] px-3 py-1 text-[12px] font-bold text-[#16a34a]">
+            <span className="rounded-full bg-[#eef9f1] px-3 py-1 text-[12px] font-medium text-[#16a34a]">
               {ongoingBookings.length}
             </span>
           </div>
@@ -1696,10 +1696,10 @@ export function DashboardScreen() {
               />
             ) : (
               ongoingBookings.slice(0, 3).map((booking) => (
-                <div key={booking.id} className="rounded-[20px] border border-[#e7eee8] bg-[#fbfffc] p-4">
+                <div key={booking.id} className="rounded-[16px] border border-[#e7eee8] bg-[#fbfffc] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[14px] font-black text-[#0f172a]">{booking.customerName}</p>
+                      <p className="text-[14px] font-semibold text-[#0f172a]">{booking.customerName}</p>
                       <p className="mt-1 text-[12px] text-[#64748b]">{booking.schedule}</p>
                     </div>
                     <StatusBadge label={booking.statusLabel} tone={providerStatusTone(booking.bookingStatus)} />
@@ -1731,17 +1731,17 @@ export function DashboardScreen() {
           </div>
         </section>
 
-        <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+        <section className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-[17px] font-black tracking-[-0.04em] text-[#0f172a]">
+              <h2 className="text-[17px] font-semibold tracking-[-0.03em] text-[#0f172a]">
                 Recent Reviews
               </h2>
               <p className="mt-1 text-[13px] text-[#64748b]">
                 Latest customer feedback from your completed jobs.
               </p>
             </div>
-            <Link href="/provider/reviews" className="text-[13px] font-bold text-[#16a34a]">
+            <Link href="/provider/reviews" className="mobile-pressable text-[13px] font-medium text-[#16a34a]">
               View all
             </Link>
           </div>
@@ -1757,11 +1757,11 @@ export function DashboardScreen() {
                 {state.reviews.slice(0, 8).map((review) => (
                   <div
                     key={review.id}
-                    className="min-w-[17rem] snap-start rounded-[22px] border border-[#eee5f7] bg-[linear-gradient(135deg,#ffffff_0%,#fcfaff_72%,#f3eafd_100%)] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.05)]"
+                    className="min-w-[16rem] snap-start rounded-[18px] border border-[#eee5f7] bg-[linear-gradient(135deg,#ffffff_0%,#fcfaff_72%,#f3eafd_100%)] p-4 shadow-[0_8px_20px_rgba(86,38,135,0.05)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-[14px] font-black text-[#0f172a]">{review.customerName}</p>
+                        <p className="truncate text-[14px] font-semibold text-[#0f172a]">{review.customerName}</p>
                         <p className="mt-1 text-[12px] text-[#64748b]">{review.createdLabel}</p>
                       </div>
                       <div className="flex items-center gap-1 text-[#8E5EB5]">
@@ -4497,16 +4497,16 @@ export function PaymentsScreen() {
       <section className="space-y-5">
         <header className="flex items-start justify-between gap-4 px-1 pt-2">
           <div>
-            <h1 className="text-[2.2rem] font-black tracking-[-0.07em] text-[#17153b]">
+            <h1 className="text-[1.8rem] font-semibold tracking-[-0.05em] text-[#17153b]">
               Payments
             </h1>
-            <p className="mt-2 text-[15px] leading-6 text-[#6f748b]">
+            <p className="mt-1.5 text-[14px] leading-5 text-[#6f748b]">
               Manage your earnings and payments
             </p>
           </div>
           <button
             type="button"
-            className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1c1635] shadow-[0_16px_30px_rgba(86,38,135,0.1)] ring-1 ring-[#efe6fa]"
+            className="mobile-pressable relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1c1635] shadow-[0_10px_22px_rgba(86,38,135,0.08)] ring-1 ring-[#efe6fa]"
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" />
@@ -4514,7 +4514,7 @@ export function PaymentsScreen() {
           </button>
         </header>
 
-        <section className="relative overflow-hidden rounded-[30px] bg-[linear-gradient(135deg,#8e5eb5_0%,#7b46a8_52%,#925ec8_100%)] px-5 py-5 text-white shadow-[0_28px_50px_rgba(122,71,175,0.28)]">
+        <section className="relative overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#8e5eb5_0%,#7b46a8_52%,#925ec8_100%)] px-4 py-4 text-white shadow-[0_16px_32px_rgba(122,71,175,0.2)]">
           <div className="absolute right-[7.5rem] top-5 bottom-5 hidden w-px bg-white/16 sm:block" />
           <div className="absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_38%)]" />
           <div className="relative grid grid-cols-[minmax(0,1fr)_7rem] gap-x-3 gap-y-5 sm:grid-cols-[minmax(0,1fr)_7.25rem_7.25rem] sm:items-center">
@@ -4523,7 +4523,7 @@ export function PaymentsScreen() {
               <p className="mt-4 text-[14px] leading-6 text-white/88">
                 Coming soon: online transfer / card payment earnings minus commission.
               </p>
-              <div className="mt-5 inline-flex min-h-[3.35rem] items-center gap-3 rounded-[18px] bg-white/96 px-4 py-3 text-[15px] font-extrabold text-[#8E5EB5] shadow-[0_14px_28px_rgba(255,255,255,0.2)] opacity-85">
+              <div className="mt-4 inline-flex min-h-[3.1rem] items-center gap-3 rounded-[16px] bg-white/96 px-4 py-3 text-[14px] font-semibold text-[#8E5EB5] shadow-[0_10px_22px_rgba(255,255,255,0.18)] opacity-90">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-[14px] bg-[#f4ecfd]">
                   <Wallet className="h-4.5 w-4.5" />
                 </span>
@@ -4539,7 +4539,7 @@ export function PaymentsScreen() {
                 <div className="absolute inset-x-2 bottom-0 h-[6.1rem] rounded-[24px] border border-white/12 bg-[linear-gradient(180deg,#6e3e9f_0%,#562980_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]" />
                 <div className="absolute right-1 top-[3.4rem] h-11 w-11 rounded-[15px] bg-[linear-gradient(180deg,#7e4aad_0%,#643493_100%)] shadow-[0_12px_24px_rgba(36,13,66,0.28)]" />
                 <div className="absolute right-3 top-[4.6rem] h-2.5 w-2.5 rounded-full bg-[#ffbc5e]" />
-                <div className="absolute bottom-1 right-[-0.35rem] flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-[#f5b557] bg-[linear-gradient(180deg,#ffd77a_0%,#f5a93d_100%)] text-[16px] font-black text-white shadow-[0_12px_18px_rgba(245,169,61,0.35)]">
+                <div className="absolute bottom-1 right-[-0.35rem] flex h-12 w-12 items-center justify-center rounded-full border-[3px] border-[#f5b557] bg-[linear-gradient(180deg,#ffd77a_0%,#f5a93d_100%)] text-[16px] font-semibold text-white shadow-[0_12px_18px_rgba(245,169,61,0.35)]">
                   RM
                 </div>
                 <span className="absolute left-[-0.6rem] top-8 h-1.5 w-1.5 rounded-full bg-white/65" />
@@ -4564,13 +4564,13 @@ export function PaymentsScreen() {
           </section>
         ) : null}
 
-        <section className="rounded-[28px] border border-[#ffd9d5] bg-[linear-gradient(180deg,#fffefe_0%,#fff8f8_100%)] px-5 py-5 shadow-[0_18px_36px_rgba(255,89,89,0.08)]">
+        <section className="rounded-[22px] border border-[#ffd9d5] bg-[linear-gradient(180deg,#fffefe_0%,#fff8f8_100%)] px-4 py-4 shadow-[0_12px_24px_rgba(255,89,89,0.07)]">
           <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#fff1f3_0%,#ffe6eb_100%)] text-[#d61f45]">
               <Landmark className="h-7 w-7" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="max-w-[14rem] text-[1.05rem] font-black leading-6 tracking-[-0.04em] text-[#d62839] sm:max-w-none">
+              <h2 className="max-w-[14rem] text-[1rem] font-semibold leading-6 tracking-[-0.03em] text-[#d62839] sm:max-w-none">
                 {isCompanyPaymentProcessing ? "Company Payment In Process" : "Amount to Pay Company"}
               </h2>
               <p className="mt-1 max-w-[15rem] text-[14px] leading-6 text-[#5d6278] sm:max-w-none">
@@ -4582,24 +4582,24 @@ export function PaymentsScreen() {
               </p>
             </div>
             <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:block sm:text-right">
-              <p className="whitespace-nowrap text-[1.15rem] font-black tracking-[-0.04em] text-[#d62839]">
+              <p className="whitespace-nowrap text-[1.05rem] font-semibold tracking-[-0.03em] text-[#d62839]">
                 {formatCurrency(isCompanyPaymentProcessing ? processingCompanyAmount : pendingCompanyAmount)}
               </p>
               {isCompanyPaymentProcessing ? (
-                <span className="inline-flex min-h-[2.95rem] items-center rounded-[16px] bg-[#f8e9ea] px-4 py-2 text-[14px] font-extrabold text-[#d62839] sm:mt-3">
+                <span className="inline-flex min-h-[2.95rem] items-center rounded-[14px] bg-[#f8e9ea] px-4 py-2 text-[13px] font-semibold text-[#d62839] sm:mt-3">
                   Payment Process
                 </span>
               ) : pendingCompanyAmount > 0 ? (
                 <button
                   type="button"
                   onClick={() => setModal("company")}
-                  className="inline-flex min-h-[2.95rem] items-center gap-2 rounded-[16px] bg-[linear-gradient(180deg,#ec3349_0%,#d81d35_100%)] px-4 py-2 text-[14px] font-extrabold text-white sm:mt-3"
+                  className="mobile-pressable inline-flex min-h-[2.95rem] items-center gap-2 rounded-[14px] bg-[linear-gradient(180deg,#ec3349_0%,#d81d35_100%)] px-4 py-2 text-[13px] font-semibold text-white sm:mt-3"
                 >
                   Pay Now
                   <ChevronRight className="h-4.5 w-4.5" />
                 </button>
               ) : (
-                <span className="inline-flex min-h-[2.95rem] items-center rounded-[16px] bg-[#f8e9ea] px-4 py-2 text-[14px] font-extrabold text-[#d62839] sm:mt-3">
+                <span className="inline-flex min-h-[2.95rem] items-center rounded-[14px] bg-[#f8e9ea] px-4 py-2 text-[13px] font-semibold text-[#d62839] sm:mt-3">
                   No Payable
                 </span>
               )}
@@ -4607,7 +4607,7 @@ export function PaymentsScreen() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-[30px] bg-white shadow-[0_24px_54px_rgba(91,45,144,0.1)] ring-1 ring-[#efe7f8]">
+        <section className="overflow-hidden rounded-[24px] bg-white shadow-[0_14px_32px_rgba(91,45,144,0.08)] ring-1 ring-[#efe7f8]">
           <div className="overflow-x-auto border-b border-[#efe7f8]">
             <div className="grid min-w-full grid-cols-3">
             {paymentTabs.map((tab) => (
@@ -4615,7 +4615,7 @@ export function PaymentsScreen() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-4 text-[11px] leading-4 font-semibold transition sm:flex-row sm:gap-2 sm:px-2 sm:text-[13px] ${
+                className={`mobile-pressable flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-4 text-[11px] leading-4 font-medium transition sm:flex-row sm:gap-2 sm:px-2 sm:text-[13px] ${
                   activeTab === tab.key ? "text-[#8E5EB5]" : "text-[#717791]"
                 }`}
               >
@@ -4643,7 +4643,7 @@ export function PaymentsScreen() {
                   key={range.key}
                   type="button"
                   onClick={() => setActiveRange(range.key)}
-                  className={`inline-flex min-h-[2.95rem] items-center justify-center rounded-[18px] border px-3 text-[14px] font-semibold transition ${
+                  className={`mobile-pressable inline-flex min-h-[2.95rem] items-center justify-center rounded-[16px] border px-3 text-[13px] font-medium transition ${
                     activeRange === range.key
                       ? "border-[#8E5EB5] bg-[#fbf7ff] text-[#8E5EB5] shadow-[0_8px_18px_rgba(142,94,181,0.08)]"
                       : "border-[#ece6f5] bg-[#faf7fd] text-[#747b91]"
@@ -4679,9 +4679,9 @@ export function PaymentsScreen() {
 
             {activeTab === "overview" ? (
               <>
-                <section className="overflow-hidden rounded-[24px] border border-[#efe7f8] bg-white shadow-[0_18px_40px_rgba(91,45,144,0.07)]">
+                <section className="overflow-hidden rounded-[20px] border border-[#efe7f8] bg-white shadow-[0_12px_24px_rgba(91,45,144,0.06)]">
                   <div className="flex items-center gap-3 border-b border-[#f2ebfa] px-4 py-4">
-                    <h2 className="text-[1.05rem] font-black tracking-[-0.04em] text-[#1d1633]">
+                    <h2 className="text-[1rem] font-semibold tracking-[-0.03em] text-[#1d1633]">
                       Daily Summary
                     </h2>
                     <span className="text-[0.98rem] font-medium text-[#6f748b]">
@@ -4695,7 +4695,7 @@ export function PaymentsScreen() {
                         <Wallet className="h-4.5 w-4.5" />
                       </div>
                       <p className="mt-3 text-[12px] text-[#676f86]">Earnings</p>
-                      <p className="mt-1 whitespace-nowrap text-[0.98rem] font-black text-[#1d1633]">
+                      <p className="mt-1 whitespace-nowrap text-[0.95rem] font-semibold text-[#1d1633]">
                         {formatCurrency(earningsToday)}
                       </p>
                     </div>
@@ -4704,7 +4704,7 @@ export function PaymentsScreen() {
                         <Wallet className="h-4.5 w-4.5" />
                       </div>
                       <p className="mt-3 text-[12px] text-[#676f86]">Withdrawn</p>
-                      <p className="mt-1 whitespace-nowrap text-[0.98rem] font-black text-[#1d1633]">
+                      <p className="mt-1 whitespace-nowrap text-[0.95rem] font-semibold text-[#1d1633]">
                         {formatCurrency(withdrawnToday)}
                       </p>
                     </div>
@@ -4713,7 +4713,7 @@ export function PaymentsScreen() {
                         <Landmark className="h-4.5 w-4.5" />
                       </div>
                       <p className="mt-3 text-[12px] text-[#676f86]">To Company</p>
-                      <p className="mt-1 whitespace-nowrap text-[0.98rem] font-black text-[#1d1633]">
+                      <p className="mt-1 whitespace-nowrap text-[0.95rem] font-semibold text-[#1d1633]">
                         {formatCurrency(toCompanyToday)}
                       </p>
                     </div>
@@ -4722,7 +4722,7 @@ export function PaymentsScreen() {
                         <Wallet className="h-4.5 w-4.5" />
                       </div>
                       <p className="mt-3 text-[12px] text-[#676f86]">Balance</p>
-                      <p className="mt-1 whitespace-nowrap text-[0.98rem] font-black text-[#1d1633]">
+                      <p className="mt-1 whitespace-nowrap text-[0.95rem] font-semibold text-[#1d1633]">
                         {formatCurrency(walletBalance)}
                       </p>
                     </div>
@@ -4731,7 +4731,7 @@ export function PaymentsScreen() {
 
                 <section>
                   <div className="flex items-center justify-between gap-3 px-1">
-                    <h2 className="text-[1.3rem] font-black tracking-[-0.05em] text-[#1d1633]">
+                    <h2 className="text-[1.1rem] font-semibold tracking-[-0.04em] text-[#1d1633]">
                       Recent Transactions
                     </h2>
                     <button
@@ -4740,13 +4740,13 @@ export function PaymentsScreen() {
                         setShowLedger(true);
                         router.push("https://app.myswiper.my/provider/payments?view=ledger");
                       }}
-                      className="inline-flex items-center gap-2 text-[14px] font-semibold text-[#8E5EB5]"
+                      className="mobile-pressable inline-flex items-center gap-2 text-[13px] font-medium text-[#8E5EB5]"
                     >
                       View All
                       <ChevronRight className="h-4.5 w-4.5" />
                     </button>
                   </div>
-                  <div className="mt-4 overflow-hidden rounded-[24px] border border-[#efe7f8] bg-white shadow-[0_18px_40px_rgba(91,45,144,0.07)]">
+                  <div className="mt-4 overflow-hidden rounded-[20px] border border-[#efe7f8] bg-white shadow-[0_12px_24px_rgba(91,45,144,0.06)]">
                     {overviewTransactions.length === 0 ? (
                       <div className="px-5 py-8 text-center text-[14px] text-[#7b748f]">
                         No transactions found for this date range.
@@ -4784,7 +4784,7 @@ export function PaymentsScreen() {
                             </div>
                             <div className="shrink-0 text-right">
                               <p
-                                className={`whitespace-nowrap text-[1rem] font-black tracking-[-0.03em] ${
+                                className={`whitespace-nowrap text-[0.95rem] font-semibold tracking-[-0.02em] ${
                                   transaction.direction === "in"
                                     ? "text-[#16a34a]"
                                     : transaction.kind === "commission"
@@ -4809,9 +4809,9 @@ export function PaymentsScreen() {
                 </section>
               </>
             ) : (
-              <section className="overflow-hidden rounded-[24px] border border-[#efe7f8] bg-white shadow-[0_18px_40px_rgba(91,45,144,0.07)]">
+              <section className="overflow-hidden rounded-[20px] border border-[#efe7f8] bg-white shadow-[0_12px_24px_rgba(91,45,144,0.06)]">
                 <div className="border-b border-[#f3edf9] px-4 py-4">
-                  <h2 className="text-[1.05rem] font-black tracking-[-0.04em] text-[#1d1633]">
+                  <h2 className="text-[1rem] font-semibold tracking-[-0.03em] text-[#1d1633]">
                     {activeTab === "payments" ? "Payment History" : "Withdrawal History"}
                   </h2>
                   <p className="mt-1 text-[13px] text-[#7b748f]">
@@ -4828,7 +4828,7 @@ export function PaymentsScreen() {
                           key={`payment-section-${section.key}`}
                           type="button"
                           onClick={() => setPaymentHistorySection(section.key)}
-                          className={`flex min-h-[3rem] items-center justify-center gap-2 px-3 text-[14px] font-semibold transition ${
+                          className={`mobile-pressable flex min-h-[3rem] items-center justify-center gap-2 px-3 text-[13px] font-medium transition ${
                             paymentHistorySection === section.key
                               ? "bg-[#8E5EB5] text-white"
                               : "bg-white text-[#666b86]"
@@ -4890,7 +4890,7 @@ export function PaymentsScreen() {
                         </div>
                         <div className="shrink-0 text-right">
                           <p
-                            className={`whitespace-nowrap text-[1rem] font-black tracking-[-0.03em] ${
+                            className={`whitespace-nowrap text-[0.95rem] font-semibold tracking-[-0.02em] ${
                               transaction.direction === "in" ? "text-[#16a34a]" : "text-[#1d1633]"
                             }`}
                           >
@@ -5249,18 +5249,18 @@ export function ServicesScreen() {
 
   return (
     <PageShell title="My Services" subtitle="Manage the services and pricing visible to customers.">
-      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
-        <div className="mb-5 rounded-[20px] border border-[#dbeee2] bg-[#f6fff8] p-4">
+      <section className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
+        <div className="mb-5 rounded-[18px] border border-[#dbeee2] bg-[#f6fff8] p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-[15px] font-black text-[#0f172a]">Need to edit days and time?</h2>
+              <h2 className="text-[15px] font-semibold text-[#0f172a]">Need to edit days and time?</h2>
               <p className="mt-1 text-[12px] leading-5 text-[#64748b]">
                 Booking days and working hours are managed in your availability settings.
               </p>
             </div>
             <Link
               href="/provider/availability"
-              className="inline-flex h-10 shrink-0 items-center justify-center rounded-[12px] bg-[#16a34a] px-4 text-[12px] font-extrabold text-white"
+              className="mobile-pressable inline-flex h-10 shrink-0 items-center justify-center rounded-[12px] bg-[#16a34a] px-4 text-[12px] font-medium text-white"
             >
               Edit Availability
             </Link>
@@ -5276,10 +5276,10 @@ export function ServicesScreen() {
             />
           ) : (
             data.services.map((service) => (
-              <div key={service.id} className="rounded-[20px] border border-[#e7eee8] bg-[#fbfffc] p-4">
+              <div key={service.id} className="rounded-[18px] border border-[#e7eee8] bg-[#fbfffc] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[15px] font-black text-[#0f172a]">
+                    <p className="text-[15px] font-semibold text-[#0f172a]">
                       {formatServiceLabel(service.serviceType)}
                     </p>
                     <p className="mt-1 text-[12px] text-[#64748b]">
@@ -5302,7 +5302,7 @@ export function ServicesScreen() {
                       setServiceImageFileName("");
                       setMessage("");
                     }}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#eef9f1] text-[#16a34a]"
+                    className="mobile-pressable inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#eef9f1] text-[#16a34a]"
                   >
                     <PencilLine className="h-4 w-4" />
                   </button>
@@ -5319,10 +5319,10 @@ export function ServicesScreen() {
             ))
           )}
         </div>
-        <div className="mt-5 rounded-[22px] border border-[#e7eee8] bg-[#fbfffc] p-4">
+        <div className="mt-5 rounded-[20px] border border-[#e7eee8] bg-[#fbfffc] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-[16px] font-black text-[#0f172a]">
+              <h2 className="text-[16px] font-semibold text-[#0f172a]">
                 {editingServiceId ? "Edit Service" : "Add New Service"}
               </h2>
               <p className="mt-1 text-[12px] text-[#64748b]">
@@ -5348,7 +5348,7 @@ export function ServicesScreen() {
                   setServiceImageCropState(null);
                   setMessage("");
                 }}
-                className="text-[12px] font-bold text-[#16a34a]"
+                className="mobile-pressable text-[12px] font-medium text-[#16a34a]"
               >
                 Cancel
               </button>
@@ -5631,11 +5631,11 @@ export function AvailabilityScreen() {
       title="Availability"
       subtitle="Set the days and hours when customers can book your services."
     >
-      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
-        <div className="rounded-[20px] border border-[#dbeee2] bg-[#f6fff8] p-4">
+      <section className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
+        <div className="rounded-[18px] border border-[#dbeee2] bg-[#f6fff8] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[16px] font-black text-[#0f172a]">
+              <p className="text-[16px] font-semibold text-[#0f172a]">
                 You are <span className="text-[#16a34a]">{enabled ? "Available" : "Offline"}</span>
               </p>
               <p className="mt-1 text-[12px] text-[#64748b]">
@@ -5645,7 +5645,7 @@ export function AvailabilityScreen() {
             <button
               type="button"
               onClick={() => setEnabled((current) => !current)}
-              className={`relative h-8 w-14 rounded-full ${enabled ? "bg-[#16a34a]" : "bg-[#cbd5e1]"}`}
+              className={`mobile-pressable relative h-8 w-14 rounded-full transition ${enabled ? "bg-[#16a34a]" : "bg-[#cbd5e1]"}`}
             >
               <span
                 className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${
@@ -5658,7 +5658,7 @@ export function AvailabilityScreen() {
 
         <div className="mt-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[15px] font-black text-[#0f172a]">Select Days</h2>
+            <h2 className="text-[15px] font-semibold text-[#0f172a]">Select Days</h2>
             <button
               type="button"
               onClick={() =>
@@ -5674,7 +5674,7 @@ export function AvailabilityScreen() {
                   ) as Record<string, { selected: boolean; startTime: string; endTime: string }>,
                 )
               }
-              className="text-[12px] font-bold text-[#16a34a]"
+              className="mobile-pressable text-[12px] font-medium text-[#16a34a]"
             >
               Select all
             </button>
@@ -5683,7 +5683,7 @@ export function AvailabilityScreen() {
             {ALL_DAYS.map((day) => (
               <div
                 key={day}
-                className={`rounded-[18px] border px-4 py-3 ${
+                className={`rounded-[16px] border px-4 py-3 ${
                   daySettings[day]?.selected
                     ? "border-[#b7e4c4] bg-[#f6fff8]"
                     : "border-[#e7eee8] bg-[#fbfffc]"
@@ -5799,8 +5799,8 @@ export function ReviewsScreen() {
 
   return (
     <PageShell title="Reviews" subtitle="Customer ratings, review feed, and overall provider score.">
-      <section className="rounded-[24px] border border-[#eee5f7] bg-white p-5 text-center shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
-        <p className="text-[2.5rem] font-black tracking-[-0.06em] text-[#0f172a]">
+      <section className="rounded-[20px] border border-[#eee5f7] bg-white p-4 text-center shadow-[0_12px_24px_rgba(86,38,135,0.06)]">
+        <p className="text-[2.15rem] font-semibold tracking-[-0.05em] text-[#0f172a]">
           {data.averageRating > 0 ? data.averageRating.toFixed(1) : "0.0"}
         </p>
         <div className="mt-2 flex items-center justify-center gap-1 text-[#8E5EB5]">
@@ -5815,8 +5815,8 @@ export function ReviewsScreen() {
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-[#eee5f7] bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
-        <h2 className="text-[17px] font-black text-[#0f172a]">Customer Reviews</h2>
+      <section className="rounded-[20px] border border-[#eee5f7] bg-white p-4 shadow-[0_12px_24px_rgba(86,38,135,0.06)]">
+        <h2 className="text-[16px] font-semibold text-[#0f172a]">Customer Reviews</h2>
         <p className="mt-1 text-[13px] text-[#64748b]">
           Live customer feedback from your Supabase review records.
         </p>
@@ -5832,11 +5832,11 @@ export function ReviewsScreen() {
               {state.reviews.map((review) => (
                 <div
                   key={review.id}
-                  className="rounded-[20px] border border-[#eee5f7] bg-[#fcfaff] p-4"
+                  className="rounded-[18px] border border-[#eee5f7] bg-[#fcfaff] p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[14px] font-black text-[#0f172a]">{review.customerName}</p>
+                      <p className="text-[14px] font-semibold text-[#0f172a]">{review.customerName}</p>
                       <p className="mt-1 text-[12px] text-[#64748b]">{review.createdLabel}</p>
                     </div>
                     <div className="flex items-center gap-1 text-[#8E5EB5]">
@@ -5850,7 +5850,7 @@ export function ReviewsScreen() {
                     <button
                       type="button"
                       onClick={() => state.setNotice("Provider replies to reviews are not wired yet, but the review feed is live.")}
-                      className="rounded-[10px] border border-[#e5d5fa] bg-white px-3 py-1.5 text-[12px] font-bold text-[#8E5EB5]"
+                      className="mobile-pressable rounded-[10px] border border-[#e5d5fa] bg-white px-3 py-1.5 text-[12px] font-medium text-[#8E5EB5]"
                     >
                       Reply
                     </button>
@@ -5893,13 +5893,13 @@ export function ProfileScreen() {
         <button
           type="button"
           onClick={() => void state.handleSignOut()}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#fff1f2] text-[#dc2626]"
+          className="mobile-pressable inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#fff1f2] text-[#dc2626]"
         >
           <LogOut className="h-4.5 w-4.5" />
         </button>
       }
     >
-      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+      <section className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
         <div className="flex flex-col items-center text-center">
           <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-[#ebf7ef]">
             {data.avatarUrl ? (
@@ -5912,13 +5912,13 @@ export function ProfileScreen() {
                 unoptimized
               />
             ) : (
-              <span className="text-[1.4rem] font-black text-[#16a34a]">{getInitials(displayName)}</span>
+              <span className="text-[1.3rem] font-semibold text-[#16a34a]">{getInitials(displayName)}</span>
             )}
           </div>
-          <h2 className="mt-4 text-[1.7rem] font-black tracking-[-0.05em] text-[#0f172a]">
+          <h2 className="mt-4 text-[1.45rem] font-semibold tracking-[-0.04em] text-[#0f172a]">
             {displayName}
           </h2>
-          <span className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#eef9f1] px-4 py-2 text-[12px] font-bold text-[#16a34a]">
+          <span className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#eef9f1] px-4 py-2 text-[12px] font-medium text-[#16a34a]">
             <ShieldCheck className="h-4 w-4" />
             {providerBadgeLabel}
           </span>
@@ -5937,14 +5937,14 @@ export function ProfileScreen() {
         <div className="mt-5 grid grid-cols-2 gap-3">
           <Link
             href="/provider/services"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[#8E5EB5] px-4 text-[13px] font-extrabold text-white"
+            className="mobile-pressable inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[#8E5EB5] px-4 text-[13px] font-medium text-white"
           >
             <PencilLine className="h-4 w-4" />
             Edit Services
           </Link>
           <Link
             href="/provider/availability"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#d8ebdf] bg-white px-4 text-[13px] font-extrabold text-[#16a34a]"
+            className="mobile-pressable inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#d8ebdf] bg-white px-4 text-[13px] font-medium text-[#16a34a]"
           >
             <CalendarDays className="h-4 w-4" />
             Edit Availability
@@ -5954,10 +5954,10 @@ export function ProfileScreen() {
 
       <ProviderPushNotificationsCard />
 
-      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+      <section className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-[1.1rem] font-black tracking-[-0.04em] text-[#0f172a]">
+            <h3 className="text-[1rem] font-semibold tracking-[-0.03em] text-[#0f172a]">
               Listing Details
             </h3>
             <p className="mt-1 text-[12px] text-[#64748b]">
@@ -5966,7 +5966,7 @@ export function ProfileScreen() {
           </div>
           <Link
             href="/provider/services"
-            className="rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-bold text-[#8E5EB5]"
+            className="mobile-pressable rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-medium text-[#8E5EB5]"
           >
             Edit
           </Link>
@@ -5978,14 +5978,14 @@ export function ProfileScreen() {
         </div>
       </section>
 
-      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+      <section className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-4">
-            <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_10px_24px_rgba(142,94,181,0.18)]">
               <ShieldCheck className="h-7 w-7" />
             </span>
             <div>
-              <h3 className="text-[1.5rem] font-black tracking-[-0.05em] text-[#1f1630]">
+              <h3 className="text-[1.2rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
                 Verification
               </h3>
               <p className="mt-1 text-[13px] text-[#7b728a]">
@@ -5995,7 +5995,7 @@ export function ProfileScreen() {
           </div>
           <Link
             href="/provider/more"
-            className="rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-bold text-[#8E5EB5]"
+            className="mobile-pressable rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-medium text-[#8E5EB5]"
           >
             Verify / Help
           </Link>
@@ -6026,13 +6026,13 @@ export function ProfileScreen() {
           />
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-4 rounded-[22px] border border-[#e7dcf8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f4edff_100%)] p-4">
+        <div className="mt-5 flex items-center justify-between gap-4 rounded-[18px] border border-[#e7dcf8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f4edff_100%)] p-4">
           <div className="flex items-start gap-3">
             <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#7c3aed] shadow-[0_10px_24px_rgba(124,58,237,0.12)]">
               <HelpCircle className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[14px] font-black text-[#1f1630]">Need help?</p>
+              <p className="text-[14px] font-semibold text-[#1f1630]">Need help?</p>
               <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
                 Learn more about verification or contact support for assistance.
               </p>
@@ -6040,7 +6040,7 @@ export function ProfileScreen() {
           </div>
           <Link
             href="/provider/more"
-            className="shrink-0 rounded-[14px] border border-[#decdf7] bg-white px-4 py-3 text-[13px] font-bold text-[#8E5EB5]"
+            className="mobile-pressable shrink-0 rounded-[14px] border border-[#decdf7] bg-white px-4 py-3 text-[13px] font-medium text-[#8E5EB5]"
           >
             Verify / Help
           </Link>
@@ -6051,11 +6051,11 @@ export function ProfileScreen() {
         {data.services.map((service) => (
           <div
             key={service.id}
-            className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]"
+            className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-[1.1rem] font-black tracking-[-0.04em] text-[#0f172a]">
+                <h3 className="text-[1rem] font-semibold tracking-[-0.03em] text-[#0f172a]">
                   {formatServiceLabel(service.serviceType)}
                 </h3>
                 <p className="mt-1 text-[12px] text-[#64748b]">
@@ -6064,7 +6064,7 @@ export function ProfileScreen() {
               </div>
               <Link
                 href="/provider/services"
-                className="rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-bold text-[#8E5EB5]"
+                className="mobile-pressable rounded-[12px] border border-[#e5d5fa] bg-[#fbf8ff] px-3 py-2 text-[12px] font-medium text-[#8E5EB5]"
               >
                 Edit
               </Link>
@@ -6084,7 +6084,7 @@ export function ProfileScreen() {
                   service.specialties.map((specialty) => (
                     <span
                       key={`${service.id}-${specialty}`}
-                      className="rounded-full bg-[#f5f1fa] px-3 py-1.5 text-[12px] font-semibold text-[#8E5EB5]"
+                      className="rounded-full bg-[#f5f1fa] px-3 py-1.5 text-[12px] font-medium text-[#8E5EB5]"
                     >
                       {specialty}
                     </span>
@@ -6135,7 +6135,7 @@ export function ProfileScreen() {
                       href={file}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center justify-between rounded-[16px] border border-[#e7eee8] bg-[#fbfffc] px-4 py-3"
+                      className="mobile-pressable flex items-center justify-between rounded-[16px] border border-[#e7eee8] bg-[#fbfffc] px-4 py-3"
                     >
                       <span className="text-[13px] font-semibold text-[#0f172a]">
                         {service.certificateCaptions[index] || `Certificate ${index + 1}`}
@@ -6195,7 +6195,7 @@ export function PhoneVerificationScreen() {
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/provider/profile"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_10px_24px_rgba(86,38,135,0.06)]"
+            className="mobile-pressable inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_8px_18px_rgba(86,38,135,0.06)]"
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
@@ -6203,17 +6203,17 @@ export function PhoneVerificationScreen() {
         </div>
 
         <header className="pt-2">
-          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+          <h1 className="text-[1.7rem] font-semibold tracking-[-0.05em] text-[#1f1630]">
             Phone Verification
           </h1>
-          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
+          <p className="mt-2 text-[14px] leading-5 text-[#7b728a]">
             Add your phone number and verify it with a one-time code.
           </p>
         </header>
 
-        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+        <section className="rounded-[22px] border border-[#eee5f7] bg-white p-4 shadow-[0_12px_28px_rgba(86,38,135,0.06)]">
           <div>
-            <p className="text-[15px] font-black text-[#1f1630]">Phone Number</p>
+            <p className="text-[15px] font-semibold text-[#1f1630]">Phone Number</p>
             <div className="mt-4 overflow-hidden rounded-[16px] border border-[#e7def4]">
               <div className="flex items-stretch">
                 <div className="flex w-[96px] items-center gap-2 border-r border-[#e7def4] bg-white px-3">
@@ -6245,7 +6245,7 @@ export function PhoneVerificationScreen() {
               setScreenNotice("We sent a 6-digit code by SMS to your phone.");
             }}
             disabled={!canSendOtp}
-            className={`mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border text-[15px] font-black transition ${
+            className={`mobile-pressable mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[16px] border text-[14px] font-medium transition ${
               canSendOtp
                 ? "border-[#cdb8f3] bg-white text-[#8E5EB5] shadow-[0_12px_28px_rgba(142,94,181,0.08)]"
                 : "cursor-not-allowed border-[#eadff8] bg-[#faf7fe] text-[#c2b2dc]"
@@ -6256,7 +6256,7 @@ export function PhoneVerificationScreen() {
           </button>
 
           <div className="mt-6">
-            <p className="text-[15px] font-black text-[#1f1630]">Enter OTP</p>
+            <p className="text-[15px] font-semibold text-[#1f1630]">Enter OTP</p>
             <OtpInputSlots value={otp} onChange={setOtp} />
 
             <div className="mt-4 space-y-2 text-[13px]">
@@ -6268,7 +6268,7 @@ export function PhoneVerificationScreen() {
                 <Clock3 className="h-4 w-4 text-[#8E5EB5]" />
                 <span>
                   Resend code in{" "}
-                  <strong className="font-black text-[#8E5EB5]">
+                  <strong className="font-semibold text-[#8E5EB5]">
                     00:{String(countdown).padStart(2, "0")}
                   </strong>
                 </span>
@@ -6283,7 +6283,7 @@ export function PhoneVerificationScreen() {
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[14px] font-black text-[#1f1630]">Your security matters</p>
+              <p className="text-[14px] font-semibold text-[#1f1630]">Your security matters</p>
               <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
                 Your phone number will be used for account verification and important security alerts.
               </p>
@@ -6302,7 +6302,7 @@ export function PhoneVerificationScreen() {
             state.setNotice("Phone verification submitted successfully.");
             router.push("/provider/profile");
           }}
-          className={`mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+          className={`mobile-pressable mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[15px] font-medium transition ${
             canVerify
               ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
               : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
@@ -6499,7 +6499,7 @@ export function IdentityVerificationScreen() {
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/provider/profile"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_10px_24px_rgba(86,38,135,0.06)]"
+            className="mobile-pressable inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-[#eee5f7] bg-white text-[#8E5EB5] shadow-[0_8px_18px_rgba(86,38,135,0.06)]"
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
@@ -6507,10 +6507,10 @@ export function IdentityVerificationScreen() {
         </div>
 
         <header className="pt-2">
-          <h1 className="text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+          <h1 className="text-[1.7rem] font-semibold tracking-[-0.05em] text-[#1f1630]">
             IC / Passport Verification
           </h1>
-          <p className="mt-2 text-[14px] leading-6 text-[#7b728a]">
+          <p className="mt-2 text-[14px] leading-5 text-[#7b728a]">
             {data.identityVerified
               ? "Your IC / Passport is verified."
               : identityStatus === "processing"
@@ -6537,14 +6537,14 @@ export function IdentityVerificationScreen() {
           </section>
         ) : null}
 
-        <section className="rounded-[22px] border border-[#eadff8] bg-white p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
-          <p className="text-[14px] font-black text-[#1f1630]">Document Type</p>
+        <section className="rounded-[20px] border border-[#eadff8] bg-white p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <p className="text-[14px] font-semibold text-[#1f1630]">Document Type</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setSelectedDocumentType("ic")}
               disabled={isIdentityLocked}
-              className={`rounded-[14px] border px-4 py-3 text-[14px] font-bold transition ${
+              className={`mobile-pressable rounded-[14px] border px-4 py-3 text-[14px] font-medium transition ${
                 selectedDocumentType === "ic"
                   ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
                   : "border-[#e7def4] bg-white text-[#6f6681]"
@@ -6556,7 +6556,7 @@ export function IdentityVerificationScreen() {
               type="button"
               onClick={() => setSelectedDocumentType("passport")}
               disabled={isIdentityLocked}
-              className={`rounded-[14px] border px-4 py-3 text-[14px] font-bold transition ${
+              className={`mobile-pressable rounded-[14px] border px-4 py-3 text-[14px] font-medium transition ${
                 selectedDocumentType === "passport"
                   ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
                   : "border-[#e7def4] bg-white text-[#6f6681]"
@@ -6567,10 +6567,10 @@ export function IdentityVerificationScreen() {
           </div>
         </section>
 
-        <section className="rounded-[26px] border border-[#eee5f7] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)]">
+        <section className="rounded-[22px] border border-[#eee5f7] bg-white p-4 shadow-[0_12px_28px_rgba(86,38,135,0.06)]">
           <div className="space-y-5">
             <div>
-              <p className="text-[15px] font-black text-[#1f1630]">
+              <p className="text-[15px] font-semibold text-[#1f1630]">
                 {selectedDocumentType === "passport" ? "Passport Main Page" : "IC Front"}
               </p>
               <div className="mt-3 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
@@ -6589,13 +6589,13 @@ export function IdentityVerificationScreen() {
                       Upload clear image of {selectedDocumentType === "passport" ? "passport page" : "front side"}
                     </p>
                     {frontFileName ? (
-                      <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{frontFileName}</p>
+                      <p className="mt-2 truncate text-[12px] font-medium text-[#8E5EB5]">{frontFileName}</p>
                     ) : null}
                     <button
                       type="button"
                       onClick={() => openSourcePicker("front")}
                       disabled={isIdentityLocked}
-                      className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                      className="mobile-pressable mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-medium text-[#8E5EB5]"
                     >
                       <Upload className="h-4 w-4" />
                       {selectedDocumentType === "passport" ? "Upload Passport" : "Upload Front"}
@@ -6621,7 +6621,7 @@ export function IdentityVerificationScreen() {
             </div>
 
             <div>
-              <p className="text-[15px] font-black text-[#1f1630]">
+              <p className="text-[15px] font-semibold text-[#1f1630]">
                 {selectedDocumentType === "passport" ? "Passport Supporting Page" : "IC Back"}
               </p>
               <div className="mt-3 rounded-[18px] border border-dashed border-[#dccff3] bg-[#fdfbff] p-4">
@@ -6640,13 +6640,13 @@ export function IdentityVerificationScreen() {
                       Upload clear image of {selectedDocumentType === "passport" ? "supporting page" : "back side"}
                     </p>
                     {backFileName ? (
-                      <p className="mt-2 truncate text-[12px] font-semibold text-[#8E5EB5]">{backFileName}</p>
+                      <p className="mt-2 truncate text-[12px] font-medium text-[#8E5EB5]">{backFileName}</p>
                     ) : null}
                     <button
                       type="button"
                       onClick={() => openSourcePicker("back")}
                       disabled={isIdentityLocked}
-                      className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                      className="mobile-pressable mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-[#ceb9f2] bg-white px-4 text-[14px] font-medium text-[#8E5EB5]"
                     >
                       <Upload className="h-4 w-4" />
                       {selectedDocumentType === "passport" ? "Upload Page" : "Upload Back"}
@@ -6679,7 +6679,7 @@ export function IdentityVerificationScreen() {
               <IdCard className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[14px] font-black text-[#1f1630]">Image Requirements</p>
+              <p className="text-[14px] font-semibold text-[#1f1630]">Image Requirements</p>
               <ul className="mt-2 space-y-1 text-[13px] leading-5 text-[#6f6681]">
                 <li>Ensure the full IC or passport page is visible within the frame</li>
                 <li>All text must be clear and readable</li>
@@ -6697,7 +6697,7 @@ export function IdentityVerificationScreen() {
               <ShieldCheck className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[14px] font-black text-[#1f1630]">Your information is safe</p>
+              <p className="text-[14px] font-semibold text-[#1f1630]">Your information is safe</p>
               <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
                 Your IC or passport images are encrypted and used only for identity verification. We do not store your documents beyond the verification process.
               </p>
@@ -6765,7 +6765,7 @@ export function IdentityVerificationScreen() {
             await state.reloadWorkspace();
             router.push("/provider/profile");
           }}
-          className={`mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[16px] font-black transition ${
+          className={`mobile-pressable mt-2 inline-flex h-[52px] w-full items-center justify-center rounded-[16px] text-[15px] font-medium transition ${
             canSubmit && !isIdentityLocked
               ? "bg-[linear-gradient(135deg,#8E5EB5_0%,#6f43b6_100%)] text-white shadow-[0_18px_34px_rgba(111,67,182,0.28)]"
               : "cursor-not-allowed bg-[#ddd2ef] text-white shadow-none"
@@ -6776,8 +6776,8 @@ export function IdentityVerificationScreen() {
 
         {identityUploadTarget ? (
           <div className="fixed inset-0 z-40 flex items-end justify-center bg-[#111827]/45 px-4 pb-6">
-            <div className="w-full max-w-[430px] rounded-[24px] bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)]">
-              <p className="text-[16px] font-black text-[#1f1630]">
+            <div className="w-full max-w-[430px] rounded-[22px] bg-white p-5 shadow-[0_20px_44px_rgba(15,23,42,0.18)]">
+              <p className="text-[16px] font-semibold text-[#1f1630]">
                 {identityUploadTarget === "front" ? "Front document image" : "Back document image"}
               </p>
               <p className="mt-1 text-[13px] leading-5 text-[#6f6681]">
@@ -6787,14 +6787,14 @@ export function IdentityVerificationScreen() {
                 <button
                   type="button"
                   onClick={() => activeInputs.gallery.current?.click()}
-                  className="inline-flex h-12 items-center justify-center rounded-[14px] border border-[#d9c8ee] bg-white px-4 text-[14px] font-bold text-[#8E5EB5]"
+                  className="mobile-pressable inline-flex h-12 items-center justify-center rounded-[14px] border border-[#d9c8ee] bg-white px-4 text-[14px] font-medium text-[#8E5EB5]"
                 >
                   Choose from Gallery
                 </button>
                 <button
                   type="button"
                   onClick={() => activeInputs.camera.current?.click()}
-                  className="inline-flex h-12 items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-bold text-white"
+                  className="mobile-pressable inline-flex h-12 items-center justify-center rounded-[14px] bg-[#8E5EB5] px-4 text-[14px] font-medium text-white"
                 >
                   Open Camera
                 </button>
@@ -6802,7 +6802,7 @@ export function IdentityVerificationScreen() {
               <button
                 type="button"
                 onClick={() => setIdentityUploadTarget(null)}
-                className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-[14px] border border-[#eee5f7] bg-[#faf7fe] text-[14px] font-bold text-[#6f6681]"
+                className="mobile-pressable mt-3 inline-flex h-11 w-full items-center justify-center rounded-[14px] border border-[#eee5f7] bg-[#faf7fe] text-[14px] font-medium text-[#6f6681]"
               >
                 Cancel
               </button>
@@ -6835,7 +6835,7 @@ export function MoreScreen() {
 
   return (
     <PageShell title="More" subtitle="Provider settings, support, and quick links to the rest of the app.">
-      <section className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]">
+      <section className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
         <div className="space-y-3">
           <InfoRow icon={<UserRound className="h-4.5 w-4.5 text-[#16a34a]" />} label="Personal Information" value="Open" href="/provider/profile" />
           <InfoRow icon={<Landmark className="h-4.5 w-4.5 text-[#16a34a]" />} label="Bank Details" value="Wallet" href="/provider/payments" />
@@ -6844,7 +6844,12 @@ export function MoreScreen() {
           <InfoRow icon={<Star className="h-4.5 w-4.5 text-[#16a34a]" />} label="Reviews" value="View" href="/provider/reviews" />
           <InfoRow icon={<HelpCircle className="h-4.5 w-4.5 text-[#16a34a]" />} label="Help & Support" value="Soon" />
         </div>
-        <div className="mt-5">
+        <div className="mt-5 rounded-[18px] border border-[#fbe2e5] bg-[#fff7f7] p-3">
+          <p className="text-[13px] font-medium text-[#7f1d1d]">
+            Signing out only updates your session state. No provider data or settings are changed.
+          </p>
+        </div>
+        <div className="mt-4">
           <AppButton className="w-full" tone="danger" onClick={() => void state.handleSignOut()}>
             Log Out
           </AppButton>

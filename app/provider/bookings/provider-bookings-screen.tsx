@@ -1536,8 +1536,8 @@ export function ProviderBookingsScreen({
   if (!state.data) {
     return (
       <MobilePage className="pb-28">
-        <section className="rounded-[28px] border border-[#dbe8df] bg-white p-5 shadow-[0_20px_60px_rgba(22,163,74,0.08)]">
-          <h1 className="text-[28px] font-extrabold tracking-[-0.05em] text-[#16a34a]">
+        <section className="rounded-[20px] border border-[#dbe8df] bg-white p-5 shadow-[0_10px_24px_rgba(22,163,74,0.08)]">
+          <h1 className="text-[24px] font-semibold tracking-[-0.04em] text-[#16a34a]">
             Provider Bookings
           </h1>
           <p className="mt-3 text-[14px] leading-6 text-[#6b7280]">
@@ -1555,11 +1555,11 @@ export function ProviderBookingsScreen({
   return (
     <MobilePage className="pb-28">
       <section className="space-y-4">
-        <header className="rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(86,38,135,0.08)] ring-1 ring-[#eee5f7]">
-          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#8E5EB5]">
+        <header className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)] ring-1 ring-[#eee5f7]">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#8E5EB5]">
             Provider App
           </p>
-          <h1 className="mt-2 text-[1.9rem] font-black tracking-[-0.06em] text-[#1f1630]">
+          <h1 className="mt-2 text-[1.6rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
             Bookings
           </h1>
           <p className="mt-1 text-[13px] leading-6 text-[#7b728a]">
@@ -1597,20 +1597,20 @@ export function ProviderBookingsScreen({
           />
         ) : null}
 
-        <section className="rounded-[24px] border border-[#eee5f7] bg-white p-5 shadow-[0_14px_32px_rgba(86,38,135,0.08)]">
-          <div className="rounded-[20px] border border-[#eee5f7] bg-[#fcfaff] p-4">
+        <section className="rounded-[20px] border border-[#eee5f7] bg-white p-4 shadow-[0_10px_24px_rgba(86,38,135,0.06)]">
+          <div className="rounded-[16px] border border-[#eee5f7] bg-[#fcfaff] p-4">
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() =>
                   setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))
                 }
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8E5EB5]"
+                className="mobile-pressable inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8E5EB5]"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <div className="text-center">
-                <p className="text-[15px] font-black text-[#1f1630]">{monthLabel}</p>
+                <p className="text-[15px] font-semibold text-[#1f1630]">{monthLabel}</p>
                 <p className="mt-1 text-[12px] text-[#7b728a]">
                   Select a date to load booking cards below.
                 </p>
@@ -1620,13 +1620,13 @@ export function ProviderBookingsScreen({
                 onClick={() =>
                   setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))
                 }
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8E5EB5]"
+                className="mobile-pressable inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8E5EB5]"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-7 gap-2 text-center text-[11px] font-bold text-[#94a3b8]">
+            <div className="mt-4 grid grid-cols-7 gap-2 text-center text-[11px] font-medium text-[#94a3b8]">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
                 <span key={label}>{label}</span>
               ))}
@@ -1649,7 +1649,7 @@ export function ProviderBookingsScreen({
                         setSelectedDate(cell.key);
                       }
                     }}
-                    className={`flex h-14 flex-col items-center justify-center rounded-[14px] text-[12px] font-bold ${
+                    className={`mobile-pressable flex h-14 flex-col items-center justify-center rounded-[14px] text-[12px] font-medium ${
                       isActive
                         ? "bg-[#8E5EB5] text-white"
                         : "bg-white text-[#1f1630] disabled:bg-transparent disabled:text-transparent"
@@ -1682,11 +1682,11 @@ export function ProviderBookingsScreen({
               items.map((booking) => (
                 <div
                   key={booking.id}
-                  className="rounded-[22px] border border-[#eee5f7] bg-[#fcfaff] p-4 shadow-[0_10px_24px_rgba(86,38,135,0.05)]"
+                  className="rounded-[18px] border border-[#eee5f7] bg-[#fcfaff] p-4 shadow-[0_8px_20px_rgba(86,38,135,0.05)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[15px] font-black text-[#0f172a]">{booking.customerName || "Customer"}</p>
+                      <p className="text-[15px] font-semibold text-[#0f172a]">{booking.customerName || "Customer"}</p>
                     </div>
                     <StatusBadge
                       label={booking.statusLabel}

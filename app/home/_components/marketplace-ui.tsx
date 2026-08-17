@@ -167,8 +167,8 @@ export function MarketplaceScreen({
 
   return (
     <main className="min-h-[100dvh] overflow-x-hidden bg-[#fbf8ff]">
-      <div className="mx-auto min-h-[100dvh] w-full max-w-[430px] bg-[linear-gradient(180deg,#ffffff_0%,#fbf8fe_100%)] px-5 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-        <div className="relative min-h-[100dvh] bg-transparent py-5 pb-28">
+      <div className="mx-auto min-h-[100dvh] w-full max-w-[430px] bg-[linear-gradient(180deg,#ffffff_0%,#fbf8fe_100%)] px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div className="relative min-h-[100dvh] bg-transparent py-4 pb-28">
           <div className="pointer-events-none absolute right-[-12%] top-[-2%] h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(142,94,181,0.22),_transparent_68%)]" />
 
           <header className="relative z-10">
@@ -178,7 +178,7 @@ export function MarketplaceScreen({
                   src={swiperLogo}
                   alt="Swiper"
                   priority
-                  className="h-auto w-[148px]"
+                  className="h-auto w-[132px]"
                 />
                 <h1 className="mt-7 text-[26px] font-normal leading-[1.2] tracking-[-0.03em] text-[#0F172A]">
                   <span className="block">{greetingLabel}</span>
@@ -189,14 +189,14 @@ export function MarketplaceScreen({
                 <div className="mt-3">
                   {savedPlaces.length > 0 ? (
                     <label className="mb-2 block">
-                      <span className="mb-2 block text-[11px] font-bold uppercase tracking-[0.08em] text-[#6b7280]">
+                      <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.08em] text-[#6b7280]">
                         Search by location
                       </span>
                       <span className="relative block">
                         <select
                           value={selectedPlaceId}
                           onChange={(event) => setSelectedPlaceId(event.target.value)}
-                          className="h-11 w-full appearance-none rounded-[18px] border border-[#e3ebe6] bg-white px-4 pr-10 text-[14px] font-semibold text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)] outline-none"
+                          className="h-12 w-full appearance-none rounded-[16px] border border-[#e3ebe6] bg-white px-4 pr-10 text-[14px] font-medium text-[#0F172A] shadow-[0_6px_18px_rgba(15,23,42,0.04)] outline-none"
                         >
                           <option value="current">Current location</option>
                           {savedPlaces.map((place) => (
@@ -231,15 +231,15 @@ export function MarketplaceScreen({
               <Link
                 href="/profile"
                 aria-label="Profile"
-                className="relative mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-[#0F172A] shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+                className="mobile-pressable relative mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#edf0f3] bg-white text-[#0F172A] shadow-[0_6px_18px_rgba(15,23,42,0.04)]"
               >
                 <CircleUserRound className="h-7 w-7 stroke-[2.1]" />
               </Link>
             </div>
           </header>
 
-          <section className="mt-8 rounded-[26px] border border-[#E8EEE9] bg-white px-4 py-5 shadow-[0_14px_32px_rgba(15,23,42,0.05)]">
-            <div className="grid grid-cols-4 gap-y-6">
+          <section className="mt-7 rounded-[18px] border border-[#E8EEE9] bg-white px-3 py-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+            <div className="grid grid-cols-4 gap-y-4">
               {categories.map((category) => (
                 <CategoryItem key={category.key} category={category} />
               ))}
@@ -248,7 +248,7 @@ export function MarketplaceScreen({
 
           <Link
             href="/profile/rewards"
-            className="relative mt-5 block overflow-hidden rounded-[24px] border border-[#efe5ff] bg-[radial-gradient(circle_at_top_right,_rgba(176,108,255,0.24),_transparent_28%),linear-gradient(135deg,#ffffff_0%,#f8f2ff_42%,#eedfff_100%)] px-3.5 py-3.5 shadow-[0_14px_28px_rgba(124,58,237,0.08)]"
+            className="mobile-pressable relative mt-4 block overflow-hidden rounded-[18px] border border-[#efe5ff] bg-[radial-gradient(circle_at_top_right,_rgba(176,108,255,0.24),_transparent_28%),linear-gradient(135deg,#ffffff_0%,#f8f2ff_42%,#eedfff_100%)] px-4 py-4 shadow-[0_10px_24px_rgba(124,58,237,0.08)]"
           >
             <span className="pointer-events-none absolute -right-14 -top-12 h-36 w-36 rounded-full bg-[radial-gradient(circle,_rgba(196,153,255,0.34),_transparent_68%)]" />
             <span className="pointer-events-none absolute -bottom-9 right-0 h-24 w-40 rounded-full bg-[radial-gradient(circle,_rgba(206,178,255,0.26),_transparent_70%)]" />
@@ -262,8 +262,8 @@ export function MarketplaceScreen({
                   Available Points
                 </h2>
                 <p className="mt-2.5 flex items-end gap-1 tracking-[-0.05em] text-[#7c3aed]">
-                  <span className="text-[2.85rem] font-semibold leading-none">1,250</span>
-                  <span className="pb-1 text-[1.4rem] font-medium leading-none">pts</span>
+                  <span className="text-[2.4rem] font-semibold leading-none">1,250</span>
+                  <span className="pb-1 text-[1.15rem] font-medium leading-none">pts</span>
                 </p>
                 <p className="mt-3 flex items-center gap-2 text-[10px] font-normal text-[#4b5563] min-[390px]:text-[11px]">
                   <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#efe7ff] text-[#7c3aed]">
@@ -272,8 +272,8 @@ export function MarketplaceScreen({
                   <span>Tap to view rewards and redeem options.</span>
                 </p>
               </div>
-              <span className="inline-flex h-[5.2rem] w-[5.2rem] shrink-0 items-center justify-center rounded-[22px] border border-white/70 bg-[linear-gradient(180deg,#8b5cf6_0%,#4f1fd3_100%)] text-white shadow-[0_14px_22px_rgba(109,63,224,0.22)]">
-                <CreditCard className="h-8 w-8 stroke-[1.8]" />
+              <span className="inline-flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center rounded-[18px] border border-white/70 bg-[linear-gradient(180deg,#8b5cf6_0%,#4f1fd3_100%)] text-white shadow-[0_10px_20px_rgba(109,63,224,0.18)]">
+                <CreditCard className="h-6 w-6 stroke-[1.8]" />
               </span>
             </div>
           </Link>
@@ -347,22 +347,22 @@ function ProviderSliderSection({
   }
 
   return (
-    <section className="mt-7">
+    <section className="mt-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-[18px] font-extrabold tracking-[-0.04em] text-[#0F172A]">
+        <h2 className="text-[17px] font-semibold tracking-[-0.03em] text-[#0F172A]">
           {title}
         </h2>
-        <Link href={href} className="text-[14px] font-extrabold text-[#8E5EB5]">
+        <Link href={href} className="mobile-pressable text-[14px] font-medium text-[#8E5EB5]">
           See all
         </Link>
       </div>
 
-      <div className="-mx-5 overflow-x-auto px-5 pb-2">
-        <div className="flex gap-4">
+      <div className="-mx-4 overflow-x-auto px-4 pb-1">
+        <div className="flex gap-3">
           {providers.map((provider) => (
             <div
               key={`${title}-${provider.id}`}
-              className="w-[calc(100vw-5.5rem)] max-w-[17rem] shrink-0"
+              className="w-[calc(100vw-4.8rem)] max-w-[16rem] shrink-0"
             >
               <PopularProviderCard
                 href={buildProviderDetailHref({
@@ -383,7 +383,7 @@ function ProviderSliderSection({
               />
             </div>
           ))}
-          <div className="w-[calc(100vw-5.5rem)] max-w-[17rem] shrink-0">
+          <div className="w-[calc(100vw-4.8rem)] max-w-[16rem] shrink-0">
             <ShowAllProvidersCard href={href} title={title} />
           </div>
         </div>
@@ -422,9 +422,9 @@ function PopularProviderCard({
   return (
     <Link
       href={href}
-      className="mx-auto block w-full max-w-[312px] rounded-[22px] border border-[#eef2ef] bg-white p-4 text-left shadow-[0_14px_32px_rgba(15,23,42,0.07)]"
+      className="mobile-pressable mx-auto block w-full max-w-[312px] rounded-[18px] border border-[#eef2ef] bg-white p-3.5 text-left shadow-[0_8px_22px_rgba(15,23,42,0.05)]"
     >
-      <div className="relative h-[168px] overflow-hidden rounded-[14px] bg-[#eef4ef]">
+      <div className="relative h-[156px] overflow-hidden rounded-[14px] bg-[#eef4ef]">
         <Image
           src={portraitSrc}
           alt={name}
@@ -436,11 +436,11 @@ function PopularProviderCard({
       </div>
 
       <div className="pt-4">
-        <h3 className="text-[1.28rem] font-semibold leading-none tracking-[-0.045em] text-[#162544]">
+        <h3 className="text-[1.12rem] font-semibold leading-none tracking-[-0.035em] text-[#162544]">
           {name}
         </h3>
 
-        <p className="mt-2 text-[0.78rem] font-medium text-[#1f2c44]">{fullName}</p>
+        <p className="mt-1.5 text-[0.76rem] text-[#1f2c44]">{fullName}</p>
 
         <div className="mt-2 flex items-center gap-2.5 text-[#667085]">
           <span className="inline-flex items-center gap-1 text-[0.72rem] font-semibold text-[#1f2c44]">
@@ -468,7 +468,7 @@ function PopularProviderCard({
           <p className="text-[1.08rem] font-medium leading-none tracking-[-0.01em] text-[#8E5EB5]">
             {priceLabel}
           </p>
-          <div className="flex items-center gap-2 text-[0.8rem] font-semibold text-[#1f2c44]">
+          <div className="flex items-center gap-2 text-[0.8rem] font-medium text-[#1f2c44]">
             <MapPin className="h-5.5 w-5.5 text-[#667085]" />
             <span>
               <ProviderDistanceText
@@ -499,13 +499,13 @@ function ShowAllProvidersCard({
   return (
     <Link
       href={href}
-      className="flex h-full min-h-[25.5rem] w-full flex-col justify-between rounded-[22px] border border-dashed border-[#dcccf0] bg-[linear-gradient(180deg,#fcf8ff_0%,#f7efff_100%)] p-4 text-center shadow-[0_14px_32px_rgba(15,23,42,0.06)]"
+      className="mobile-pressable flex h-full min-h-[23rem] w-full flex-col justify-between rounded-[18px] border border-dashed border-[#dcccf0] bg-[linear-gradient(180deg,#fcf8ff_0%,#f7efff_100%)] p-4 text-center shadow-[0_8px_22px_rgba(15,23,42,0.05)]"
     >
       <div className="flex flex-col items-center">
-        <div className="inline-flex h-14 w-14 items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#8E5EB5_0%,#7247ac_100%)] text-white shadow-[0_14px_28px_rgba(142,94,181,0.18)]">
-          <ChevronRight className="h-7 w-7" />
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#8E5EB5_0%,#7247ac_100%)] text-white shadow-[0_10px_22px_rgba(142,94,181,0.16)]">
+          <ChevronRight className="h-6 w-6" />
         </div>
-        <h3 className="mt-5 text-[1.25rem] font-bold leading-tight tracking-[-0.04em] text-[#162544]">
+        <h3 className="mt-4 text-[1.08rem] font-semibold leading-tight tracking-[-0.03em] text-[#162544]">
           Show All
         </h3>
         <p className="mt-2 max-w-[15rem] text-[0.9rem] leading-6 text-[#667085]">
@@ -515,7 +515,7 @@ function ShowAllProvidersCard({
 
       <div className="rounded-[16px] border border-[#e4d7f5] bg-white/80 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[0.82rem] font-semibold text-[#8E5EB5]">
+          <span className="text-[0.82rem] font-medium text-[#8E5EB5]">
             Open full list
           </span>
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f4ebfc] text-[#8E5EB5]">
@@ -591,12 +591,12 @@ function CategoryItem({ category }: { category: HomeServiceCategory }) {
   return (
     <Link
       href={`/providers?service=${category.key}`}
-      className="flex flex-col items-center text-center"
+      className="mobile-pressable flex flex-col items-center rounded-[14px] px-1 py-1 text-center"
     >
-      <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[18px] border border-[#eee5f7] bg-white">
+      <div className="flex h-[4rem] w-[4rem] items-center justify-center rounded-[16px] border border-[#eee5f7] bg-white">
         <CategoryIcon kind={category.key} />
       </div>
-      <p className="mt-3 text-[13px] font-semibold tracking-[-0.02em] text-[#0F172A]">
+      <p className="mt-2 text-[12px] font-medium tracking-[-0.01em] text-[#0F172A]">
         {category.label}
       </p>
     </Link>

@@ -306,31 +306,31 @@ export function ProfileShell({
 }: ShellProps) {
   return (
     <main className="min-h-[100dvh] overflow-x-hidden bg-[#faf7fd]">
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col bg-white px-5 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col bg-white px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="relative min-h-[100dvh] overflow-hidden bg-white">
-          <div className="bg-[linear-gradient(180deg,#8E5EB5_0%,#7A49A7_100%)] px-5 pb-4 pt-5 text-white shadow-[0_12px_28px_rgba(122,73,167,0.22)]">
-            <div className="mt-4 flex items-center justify-between">
+          <div className="bg-[linear-gradient(180deg,#8E5EB5_0%,#7A49A7_100%)] px-4 pb-3 pt-4 text-white shadow-[0_10px_24px_rgba(122,73,167,0.18)]">
+            <div className="mt-3 flex min-h-[56px] items-center justify-between">
               <div className="flex items-center gap-2">
                 {showBack ? (
                   <Link
                     href={backHref}
                     aria-label="Back"
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/95 ring-1 ring-white/15"
+                    className="mobile-pressable inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/95 ring-1 ring-white/15"
                   >
                     <ArrowLeftIcon className="h-5 w-5" />
                   </Link>
                 ) : null}
-                <h1 className="text-[18px] font-extrabold">{title}</h1>
+                <h1 className="text-[18px] font-semibold tracking-[-0.02em]">{title}</h1>
               </div>
               {!showBack ? (
                 <Link
                   href="/profile/notifications"
                   aria-label="Notifications"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/95 ring-1 ring-white/15"
+                  className="mobile-pressable inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/95 ring-1 ring-white/15"
                 >
                   <BellIcon className="h-5 w-5" />
                 </Link>
-              ) : <span className="h-8 w-8" aria-hidden />}
+              ) : <span className="h-10 w-10" aria-hidden />}
             </div>
           </div>
 
@@ -351,7 +351,7 @@ function StickyActionBar({
   children: React.ReactNode;
 }) {
   return (
-    <div className="sticky bottom-[5.5rem] z-20 mt-5 rounded-[20px] border border-[#ebe3f5] bg-white/95 p-3 shadow-[0_18px_44px_rgba(86,38,135,0.12)] backdrop-blur">
+    <div className="sticky bottom-[5.5rem] z-20 mt-5 rounded-[16px] border border-[#ebe3f5] bg-white/95 p-3 shadow-[0_10px_24px_rgba(86,38,135,0.08)] backdrop-blur">
       {children}
     </div>
   );
@@ -574,7 +574,7 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
                     accent={provider.accent}
                   />
                 )}
-                <p className="mt-2 text-[13px] font-bold text-[#111827]">
+                <p className="mt-2 text-[13px] font-semibold text-[#111827]">
                   {provider.name}
                 </p>
                 <p className="text-[12px] text-[#6b7280]">{provider.role}</p>
@@ -605,7 +605,7 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
               </p>
               <Link
                 href="/profile/addresses"
-                className="mt-3 inline-flex h-10 items-center justify-center rounded-[12px] bg-[#f5f1fa] px-4 text-[13px] font-bold text-[#8E5EB5]"
+                  className="mobile-pressable mt-3 inline-flex h-10 items-center justify-center rounded-[12px] bg-[#f5f1fa] px-4 text-[13px] font-medium text-[#8E5EB5]"
               >
                 Open Saved Addresses
               </Link>
@@ -625,14 +625,14 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
                 <WalletIcon className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-[14px] font-semibold text-[#111827]">
+                <p className="text-[14px] font-medium text-[#111827]">
                   {method.label}
                 </p>
               </div>
             </div>
             <div className="text-right">
               {method.isDefault ? (
-                <span className="rounded-full bg-[#f5f1fa] px-2 py-1 text-[11px] font-bold text-[#8E5EB5]">
+                <span className="rounded-full bg-[#f5f1fa] px-2 py-1 text-[11px] font-medium text-[#8E5EB5]">
                   Default
                 </span>
               ) : null}
@@ -669,7 +669,7 @@ export function ProfileOverviewScreen({ initialData }: OverviewProps) {
           type="button"
           onClick={handleLogout}
           disabled={isLoggingOut}
-          className="inline-flex h-12 w-full items-center justify-center rounded-[14px] bg-[#ef4444] px-4 text-[15px] font-extrabold text-white shadow-[0_12px_24px_rgba(239,68,68,0.18)] disabled:opacity-70"
+          className="mobile-pressable inline-flex h-12 w-full items-center justify-center rounded-[14px] bg-[#ef4444] px-4 text-[15px] font-medium text-white shadow-[0_10px_22px_rgba(239,68,68,0.16)] disabled:opacity-70"
         >
           {isLoggingOut ? "Logging out..." : "Log Out"}
         </button>
@@ -689,14 +689,14 @@ function CustomerVerificationSection({
   return (
     <Link
       href="/profile/verification"
-      className="mt-4 flex items-center justify-between gap-3 rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] ring-1 ring-[#e6eee8]"
+      className="mobile-pressable mt-4 flex items-center justify-between gap-3 rounded-[18px] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.05)] ring-1 ring-[#e6eee8]"
     >
       <div className="flex min-w-0 items-center gap-4">
-        <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_16px_36px_rgba(142,94,181,0.22)]">
-          <CheckShieldIcon className="h-7 w-7" />
+        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_10px_24px_rgba(142,94,181,0.18)]">
+          <CheckShieldIcon className="h-6 w-6" />
         </span>
         <div className="min-w-0">
-          <h3 className="text-[1.25rem] font-black tracking-[-0.05em] text-[#1f1630]">
+          <h3 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-[#1f1630]">
             Verification
           </h3>
           <p className="mt-1 text-[13px] leading-5 text-[#7b728a]">
@@ -706,7 +706,7 @@ function CustomerVerificationSection({
       </div>
       <div className="flex shrink-0 items-center gap-3">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold ${
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-medium ${
             profile.verified
               ? "bg-[#eef9f0] text-[#16a34a]"
               : "bg-[#fff7ed] text-[#f59e0b]"
@@ -4833,7 +4833,7 @@ function ProfileSummaryCard({
   return (
     <Link
       href="/profile/edit"
-      className="block rounded-[18px] border border-[#e4ece7] bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)] transition hover:border-[#d9c8ee] hover:shadow-[0_14px_30px_rgba(106,69,160,0.08)]"
+      className="mobile-pressable block rounded-[16px] border border-[#e4ece7] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] transition hover:border-[#d9c8ee] hover:shadow-[0_12px_24px_rgba(106,69,160,0.07)]"
     >
       <div className="flex items-center gap-4">
         {profile.avatarUrl ? (
@@ -4856,7 +4856,7 @@ function ProfileSummaryCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-[16px] font-extrabold text-[#111827]">
+              <h2 className="text-[16px] font-semibold text-[#111827]">
                 {fullName}
               </h2>
               <div className="mt-1 flex items-center gap-1 text-[13px] text-[#6b7280]">
@@ -4868,7 +4868,7 @@ function ProfileSummaryCard({
           </div>
 
           {profile.verified ? (
-            <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#f5f1fa] px-2.5 py-1 text-[12px] font-bold text-[#8E5EB5]">
+            <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-[#f5f1fa] px-2.5 py-1 text-[12px] font-medium text-[#8E5EB5]">
               <CheckShieldIcon className="h-4 w-4" />
               Phone Verified
             </span>
@@ -4922,7 +4922,7 @@ function WalletSummaryCard({
   const withdrawDisabled = walletBalance <= 0;
 
   return (
-    <section className="mt-4 overflow-hidden rounded-[22px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_16px_36px_rgba(104,63,155,0.1)]">
+    <section className="mt-4 overflow-hidden rounded-[18px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_10px_24px_rgba(104,63,155,0.08)]">
       <div
         role="button"
         tabIndex={0}
@@ -4933,14 +4933,14 @@ function WalletSummaryCard({
             router.push("/profile/wallet");
           }
         }}
-        className="cursor-pointer rounded-[18px] border border-[#ede4f8] bg-white/90 p-4"
+        className="mobile-pressable cursor-pointer rounded-[16px] border border-[#ede4f8] bg-white/90 p-4"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#8E5EB5]">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#8E5EB5]">
               Wallet Balance
             </p>
-            <p className="mt-2 text-[2rem] font-black tracking-[-0.06em] text-[#1f1630]">
+            <p className="mt-2 text-[1.8rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
               {formatRinggit(walletBalance)}
             </p>
             <p className="mt-1 text-[12px] text-[#7c728f]">
@@ -4958,7 +4958,7 @@ function WalletSummaryCard({
             onWithdrawClick();
           }}
           disabled={withdrawDisabled}
-          className={`mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-extrabold transition ${
+          className={`mobile-pressable mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-medium transition ${
             withdrawDisabled
               ? "cursor-not-allowed bg-[#d8cde6] text-white shadow-none"
               : "bg-[#8E5EB5] text-white shadow-[0_12px_24px_rgba(142,94,181,0.18)]"
@@ -4967,10 +4967,10 @@ function WalletSummaryCard({
           Withdraw
         </button>
         {walletPanel === "withdraw" ? (
-          <div className="mt-4 rounded-[18px] border border-[#e8def6] bg-white p-4">
+          <div className="mt-4 rounded-[16px] border border-[#e8def6] bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[14px] font-extrabold text-[#1f1630]">Connect bank account</p>
+                <p className="text-[14px] font-semibold text-[#1f1630]">Connect bank account</p>
                 <p className="mt-1 text-[12px] text-[#7c728f]">
                   Choose the bank account to receive {formatRinggit(walletBalance)}.
                 </p>
@@ -4981,7 +4981,7 @@ function WalletSummaryCard({
                   event.stopPropagation();
                   onClosePanel();
                 }}
-                className="text-[12px] font-bold text-[#8E5EB5]"
+                className="mobile-pressable text-[12px] font-medium text-[#8E5EB5]"
               >
                 Close
               </button>
@@ -4995,7 +4995,7 @@ function WalletSummaryCard({
                     event.stopPropagation();
                     onSelectedBankChange(bank);
                   }}
-                  className={`rounded-[12px] border px-3 py-3 text-left text-[13px] font-bold ${
+                  className={`mobile-pressable rounded-[12px] border px-3 py-3 text-left text-[13px] font-medium ${
                     selectedBank === bank
                       ? "border-[#8E5EB5] bg-[#f7f1fc] text-[#8E5EB5]"
                       : "border-[#e5e7eb] bg-white text-[#374151]"
@@ -5011,7 +5011,7 @@ function WalletSummaryCard({
                 event.stopPropagation();
                 onConnectBank();
               }}
-              className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#22c55e] px-4 text-[14px] font-extrabold text-white shadow-[0_12px_24px_rgba(34,197,94,0.18)]"
+              className="mobile-pressable mt-4 inline-flex h-11 w-full items-center justify-center rounded-[14px] bg-[#22c55e] px-4 text-[14px] font-medium text-white shadow-[0_10px_22px_rgba(34,197,94,0.16)]"
             >
               Connect and Withdraw
             </button>
@@ -5036,7 +5036,7 @@ function RewardsSummaryCard({
   return (
     <Link
       href="/profile/rewards"
-      className="mt-4 block rounded-[18px] border border-[#e8def6] bg-[linear-gradient(180deg,#ffffff_0%,#faf6ff_100%)] p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)]"
+      className="mobile-pressable mt-4 block rounded-[16px] border border-[#e8def6] bg-[linear-gradient(180deg,#ffffff_0%,#faf6ff_100%)] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -5044,17 +5044,17 @@ function RewardsSummaryCard({
             <CoinsIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-[15px] font-extrabold text-[#1f1630]">Available Points</p>
+            <p className="text-[15px] font-semibold text-[#1f1630]">Available Points</p>
             <p className="mt-1 text-[12px] text-[#7c728f]">
               Tap to view referral link, points and redeem options
             </p>
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[1.4rem] font-black tracking-[-0.05em] text-[#1f1630]">
+          <p className="text-[1.3rem] font-semibold tracking-[-0.04em] text-[#1f1630]">
             {availablePoints.toLocaleString()}
           </p>
-          <p className="text-[12px] font-bold text-[#8E5EB5]">pts</p>
+          <p className="text-[12px] font-medium text-[#8E5EB5]">pts</p>
         </div>
       </div>
     </Link>
@@ -5273,16 +5273,16 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-4 rounded-[18px] border border-[#e4ece7] bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.04)]">
+    <section className="mt-4 rounded-[16px] border border-[#e4ece7] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-[14px] font-extrabold text-[#111827]">{title}</h3>
+        <h3 className="text-[14px] font-semibold text-[#111827]">{title}</h3>
         {actionLabel ? (
           actionHref ? (
-            <Link href={actionHref} className="text-[13px] font-bold text-[#8E5EB5]">
+            <Link href={actionHref} className="mobile-pressable text-[13px] font-medium text-[#8E5EB5]">
               {actionLabel}
             </Link>
           ) : (
-            <span className="text-[13px] font-bold text-[#8E5EB5]">{actionLabel}</span>
+            <span className="text-[13px] font-medium text-[#8E5EB5]">{actionLabel}</span>
           )
         ) : null}
       </div>
@@ -5502,8 +5502,9 @@ function BottomNav() {
   const isBookingsRoute = pathname.startsWith("/profile/bookings");
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] border-t border-[#E8ECE8] bg-white/97 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
-      <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#8A94A6]">
+    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
+      <div className="rounded-[20px] border border-[#edf0f3] bg-white/95 px-2 py-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#8A94A6]">
         <NavItem href="/home" label="Home" icon={<HomeIcon className="h-5 w-5" />} active={pathname === "/home"} />
         <NavItem
           href="/profile/bookings"
@@ -5523,6 +5524,7 @@ function BottomNav() {
           icon={<CheckCircleIcon className="h-5 w-5" />}
           active={isBookingsRoute && activeTab === "ongoing"}
         />
+        </div>
       </div>
     </nav>
   );
@@ -5542,16 +5544,16 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex min-w-[3.1rem] flex-col items-center gap-1 ${
+      className={`mobile-pressable flex min-w-[3.1rem] flex-1 flex-col items-center gap-1 rounded-[14px] px-1 py-2 ${
         active ? "text-[#8E5EB5]" : "text-[#8A94A6]"
       }`}
     >
       {icon}
       <span>{label}</span>
-      <span className="flex h-3 items-end">
+      <span className="flex h-2.5 items-end">
         <span
           className={`rounded-full transition-all ${
-            active ? "h-[3px] w-10 bg-[#8E5EB5]" : "h-[3px] w-6 bg-transparent"
+            active ? "h-[3px] w-8 bg-[#8E5EB5]" : "h-[3px] w-5 bg-transparent"
           }`}
         />
       </span>

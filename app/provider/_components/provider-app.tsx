@@ -817,8 +817,9 @@ export function ProviderBottomNav() {
   ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] border-t border-[#ede4f7] bg-white/97 px-3 pb-[calc(0.8rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
-      <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#7f849f]">
+    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] bg-white/95 px-3 pb-[calc(0.8rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
+      <div className="rounded-[20px] border border-[#edf0f3] bg-white/95 px-2 py-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#7f849f]">
         {items.map((item) => (
           item.label === "Ledger" || item.label === "Payments" ? (
             <button
@@ -832,16 +833,16 @@ export function ProviderBottomNav() {
 
                 router.push(item.href);
               }}
-              className={`flex min-w-[3.1rem] flex-col items-center gap-1 transition ${
+              className={`mobile-pressable flex min-w-[3.1rem] flex-1 flex-col items-center gap-1 rounded-[14px] px-1 py-2 transition ${
                 item.active ? "text-[#8E5EB5]" : "text-[#7f849f]"
               }`}
             >
               {item.icon}
               <span>{item.label}</span>
-              <span className="flex h-3 items-end">
+              <span className="flex h-2.5 items-end">
                 <span
                   className={`rounded-full transition-all ${
-                    item.active ? "h-[3px] w-10 bg-[#8E5EB5]" : "h-[3px] w-6 bg-transparent"
+                    item.active ? "h-[3px] w-8 bg-[#8E5EB5]" : "h-[3px] w-5 bg-transparent"
                   }`}
                 />
               </span>
@@ -850,22 +851,23 @@ export function ProviderBottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-w-[3.1rem] flex-col items-center gap-1 transition ${
+              className={`mobile-pressable flex min-w-[3.1rem] flex-1 flex-col items-center gap-1 rounded-[14px] px-1 py-2 transition ${
                 item.active ? "text-[#8E5EB5]" : "text-[#7f849f]"
               }`}
             >
               {item.icon}
               <span>{item.label}</span>
-              <span className="flex h-3 items-end">
+              <span className="flex h-2.5 items-end">
                 <span
                   className={`rounded-full transition-all ${
-                    item.active ? "h-[3px] w-10 bg-[#8E5EB5]" : "h-[3px] w-6 bg-transparent"
+                    item.active ? "h-[3px] w-8 bg-[#8E5EB5]" : "h-[3px] w-5 bg-transparent"
                   }`}
                 />
               </span>
             </Link>
           )
         ))}
+        </div>
       </div>
     </nav>
   );
