@@ -85,7 +85,7 @@ export function AdminShell() {
         >
           <div className="flex items-center justify-between px-2">
             <Link to="/" className="font-display text-[2.15rem] font-extrabold tracking-tight text-[#6f1244]">
-              DELLA
+              Swiper
             </Link>
             <button
               type="button"

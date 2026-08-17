@@ -46,16 +46,16 @@ export function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.24),_transparent_28%),linear-gradient(180deg,_#f8fff9_0%,_#eaf8ef_45%,_#f8fafc_100%)] px-4 py-8 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
-      <section className="hidden rounded-[36px] bg-[linear-gradient(135deg,#0c1f17_0%,#0f8b3d_38%,#6d28d9_100%)] p-10 text-white shadow-[0_30px_100px_rgba(12,31,23,0.25)] lg:flex lg:flex-col lg:justify-between">
+    <div className="grid min-h-screen bg-[radial-gradient(circle_at_top,_rgba(142,94,181,0.22),_transparent_28%),linear-gradient(180deg,_#fcf9ff_0%,_#f5effd_45%,_#f8fafc_100%)] px-4 py-8 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
+      <section className="hidden rounded-[36px] bg-[linear-gradient(135deg,#2b1d45_0%,#6f43b6_42%,#8E5EB5_100%)] p-10 text-white shadow-[0_30px_100px_rgba(86,38,135,0.24)] lg:flex lg:flex-col lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-100">
             admin.myswiper.my
           </p>
           <h1 className="mt-5 max-w-xl font-display text-5xl font-extrabold leading-tight">
-            DELLA control room for users, providers, payments, and trust.
+            Swiper control room for users, providers, payments, and trust.
           </h1>
-          <p className="mt-5 max-w-lg text-lg leading-8 text-emerald-50/90">
+          <p className="mt-5 max-w-lg text-lg leading-8 text-white/82">
             A premium operational dashboard designed for fast decisions, careful review,
             and clean visibility across the whole marketplace.
           </p>
@@ -69,7 +69,7 @@ export function LoginPage() {
           ].map(([value, label]) => (
             <div key={label} className="rounded-[28px] border border-white/15 bg-white/10 p-5 backdrop-blur">
               <p className="font-display text-3xl font-bold">{value}</p>
-              <p className="mt-2 text-sm uppercase tracking-[0.18em] text-emerald-100/80">
+              <p className="mt-2 text-sm uppercase tracking-[0.18em] text-white/72">
                 {label}
               </p>
             </div>
@@ -80,12 +80,12 @@ export function LoginPage() {
       <section className="flex items-center justify-center">
         <div className="w-full max-w-xl rounded-[32px] border border-white/80 bg-white/90 p-6 shadow-[0_28px_90px_rgba(15,23,42,0.12)] backdrop-blur sm:p-8">
           <div className="flex items-center gap-3">
-            <div className="grid size-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,#4F46E5,#7C3AED)] text-white shadow-lg shadow-violet-500/20">
+            <div className="grid size-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,#6f43b6,#8E5EB5)] text-white shadow-lg shadow-violet-500/20">
               <ShieldCheck className="size-5" />
             </div>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">
-                DELLA Admin
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8E5EB5]">
+                Swiper Admin
               </p>
               <h2 className="font-display text-3xl font-bold tracking-tight text-slate-950">
                 Secure sign in
@@ -109,7 +109,7 @@ export function LoginPage() {
                 }}
                 placeholder="admin@myswiper.my"
                 autoComplete="username"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-950 outline-none transition focus:border-[#8E5EB5] focus:bg-white"
                 required
               />
             </label>
@@ -124,13 +124,13 @@ export function LoginPage() {
                 }}
                 placeholder="Enter your password"
                 autoComplete="current-password"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-slate-950 outline-none transition focus:border-[#8E5EB5] focus:bg-white"
                 required
               />
             </label>
 
             <div className="flex justify-end">
-              <Link to="/forgot-password" className="text-sm font-semibold text-emerald-700">
+              <Link to="/forgot-password" className="text-sm font-semibold text-[#8E5EB5]">
                 Forgot password?
               </Link>
             </div>
@@ -144,7 +144,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-2xl bg-[linear-gradient(135deg,#0f8b3d,#16a34a)] px-4 py-3.5 font-semibold text-white shadow-[0_18px_40px_rgba(15,139,61,0.35)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
+              className="w-full rounded-2xl bg-[linear-gradient(135deg,#6f43b6,#8E5EB5)] px-4 py-3.5 font-semibold text-white shadow-[0_18px_40px_rgba(111,67,182,0.3)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {submitting || (session && access !== "allowed")
                 ? "Checking access..."
@@ -154,7 +154,7 @@ export function LoginPage() {
 
           <p className="mt-6 text-sm text-slate-500">
             Main marketplace:{" "}
-            <Link to="https://app.myswiper.my" className="font-semibold text-emerald-700">
+            <Link to="https://app.myswiper.my" className="font-semibold text-[#8E5EB5]">
               app.myswiper.my
             </Link>
           </p>
