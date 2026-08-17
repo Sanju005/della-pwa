@@ -356,6 +356,11 @@ export function ProviderRegistrationWizard() {
 
   const activeStep = steps[Math.min(stepIndex, steps.length - 1)];
   const getStepIndex = (type: FlowStep["type"]) => steps.findIndex((step) => step.type === type);
+  const isPostSubmissionStep =
+    activeStep.type === "submitted" ||
+    activeStep.type === "verification" ||
+    activeStep.type === "identity" ||
+    activeStep.type === "success";
 
   const submitRegistration = async () => {
     const payload = await prepareRegistrationPayloadForSubmit(
@@ -538,6 +543,13 @@ export function ProviderRegistrationWizard() {
           return;
         }
 
+        if (!hasIdentityDocumentsReady(data)) {
+          setSubmitError(
+            "Please select a document type and upload both front and back identity images before submitting."
+          );
+          return;
+        }
+
         const {
           data: { session },
         } = await client.auth.getSession();
@@ -556,13 +568,7 @@ export function ProviderRegistrationWizard() {
           body: JSON.stringify({
             phoneVerified: data.verification.phoneOtp.join("") === "123456",
             identityVerified: false,
-            identityVerificationStatus: Boolean(
-              data.verification.documentType &&
-                data.verification.frontImageName &&
-                data.verification.backImageName
-            )
-              ? "processing"
-              : "pending",
+            identityVerificationStatus: "processing",
             identityDocumentType: data.verification.documentType
               .trim()
               .toLowerCase()
@@ -747,7 +753,7 @@ export function ProviderRegistrationWizard() {
         <div className="safe-top safe-bottom-lg overflow-hidden rounded-[34px] border border-[#e6daf1] bg-white shadow-[0_20px_60px_rgba(142,94,181,0.08)]">
           <div className="px-5 pb-6 pt-5">
             <div className="mb-5 flex items-center gap-3">
-              {stepIndex > 0 ? (
+              {stepIndex > 0 && !isPostSubmissionStep ? (
                 <button
                   type="button"
                   onClick={goBack}
@@ -881,8 +887,11 @@ export function ProviderRegistrationWizard() {
               <button
                 type="button"
                 onClick={goNext}
-                disabled={isSubmitting}
-                className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-[12px] bg-[#8E5EB5] text-[15px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.2)]"
+                disabled={
+                  isSubmitting ||
+                  (activeStep.type === "identity" && !hasIdentityDocumentsReady(data))
+                }
+                className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-[12px] bg-[#8E5EB5] text-[15px] font-extrabold text-white shadow-[0_16px_30px_rgba(142,94,181,0.2)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? "Submitting..." : buttonLabel(activeStep)}
               </button>
@@ -2737,6 +2746,16 @@ function getProviderFullName(data: ProviderRegistrationData) {
     .filter(Boolean)
     .join(" ")
     .trim();
+}
+
+function hasIdentityDocumentsReady(data: ProviderRegistrationData) {
+  return Boolean(
+    data.verification.documentType.trim() &&
+      data.verification.frontImageName.trim() &&
+      data.verification.frontImageDataUrl.trim() &&
+      data.verification.backImageName.trim() &&
+      data.verification.backImageDataUrl.trim()
+  );
 }
 
 function screenHeading(step: FlowStep) {
