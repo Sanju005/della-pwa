@@ -256,6 +256,9 @@ export type UserDetailRecord = {
   completionRate: string;
   cancellationRate: string;
   averageRating: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  identityVerificationStatus?: "pending" | "processing" | "verified" | "rejected" | string;
   emailVerifiedAt: string;
   phoneVerifiedAt: string;
   kycVerifiedAt: string;

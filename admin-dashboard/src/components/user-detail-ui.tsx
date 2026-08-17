@@ -119,11 +119,13 @@ export function PillBadge({
   tone = "slate",
 }: {
   children: ReactNode;
-  tone?: "emerald" | "blue" | "slate";
+  tone?: "emerald" | "blue" | "slate" | "amber" | "rose";
 }) {
   const tones = {
     emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
     blue: "border-blue-200 bg-blue-50 text-blue-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    rose: "border-rose-200 bg-rose-50 text-rose-700",
     slate: "border-slate-200 bg-slate-50 text-slate-700",
   };
 

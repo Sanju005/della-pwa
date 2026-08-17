@@ -1,7 +1,7 @@
 import { bookings, payments, users } from "../data/mock-data";
 import { userDetailRecords } from "../data/user-detail-mocks";
 import { isSupabaseConfigured, supabase } from "./supabase";
-import type { DashboardBooking, PaymentRow, UserDetailRecord, UserMetric, UserRow } from "../types";
+import type { DashboardBooking, PaymentRow, UserAddress, UserDetailRecord, UserMetric, UserRow } from "../types";
 
 type ProfileRelation =
   | {
@@ -109,7 +109,32 @@ type LiveReviewRow = {
   provider_profiles?: ProfileRelation;
 };
 
+type AddressRow = {
+  id: string;
+  label: string | null;
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  state: string | null;
+  postcode: string | null;
+  country: string | null;
+  is_default: boolean | null;
+};
+
 type ProfileNameMap = Map<string, string>;
+
+type AdminCustomerStatusPayload = {
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  identityVerificationStatus: "pending" | "processing" | "verified" | "rejected";
+  emailVerifiedAt: string;
+  phoneVerifiedAt: string;
+  kycVerifiedAt: string;
+};
+
+const APP_BASE_URL =
+  (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
+  "https://app.myswiper.my";
 
 function relationNode(value?: ProfileRelation) {
   if (Array.isArray(value)) {
@@ -127,6 +152,73 @@ function isHttpUrl(value: string) {
   return value.startsWith("http://") || value.startsWith("https://");
 }
 
+function formatVerificationDate(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+async function fetchAdminCustomerStatus(userId: string) {
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${APP_BASE_URL}/api/admin/customer-status/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    const result = (await response.json()) as
+      | {
+          status?: {
+            emailVerified?: boolean;
+            phoneVerified?: boolean;
+            identityVerificationStatus?: "pending" | "processing" | "verified" | "rejected";
+            emailVerifiedAt?: string | null;
+            phoneVerifiedAt?: string | null;
+            kycVerifiedAt?: string | null;
+          };
+        }
+      | { error?: string };
+
+    if (!response.ok || !("status" in result) || !result.status) {
+      return null;
+    }
+
+    return {
+      emailVerified: Boolean(result.status.emailVerified),
+      phoneVerified: Boolean(result.status.phoneVerified),
+      identityVerificationStatus: result.status.identityVerificationStatus ?? "pending",
+      emailVerifiedAt: formatVerificationDate(result.status.emailVerifiedAt) || "",
+      phoneVerifiedAt: formatVerificationDate(result.status.phoneVerifiedAt) || "",
+      kycVerifiedAt: formatVerificationDate(result.status.kycVerifiedAt) || "",
+    } satisfies AdminCustomerStatusPayload;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveAdminMediaUrl(
   bucket: "profile-images",
   value?: string | null,
@@ -139,14 +231,6 @@ async function resolveAdminMediaUrl(
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(trimmed);
   return data.publicUrl;
-}
-
-function isDataUrl(value: string) {
-  return value.startsWith("data:");
-}
-
-function isHttpUrl(value: string) {
-  return value.startsWith("http://") || value.startsWith("https://");
 }
 
 async function resolveCompletionImageUrl(value?: string | null) {
@@ -376,6 +460,60 @@ function extractCity(profile: ProfileRow) {
   }
 
   return "Malaysia";
+}
+
+function buildProfileFallbackAddress(profile: ProfileRow): UserAddress[] {
+  const customerProfile = relationNode(profile.customer_profiles);
+  const parts = [
+    customerProfile?.city?.trim(),
+    customerProfile?.state?.trim(),
+    customerProfile?.country?.trim(),
+  ].filter(Boolean);
+
+  if (parts.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      id: `${profile.id}-registration-address`,
+      label: "Registration Address",
+      line1: parts[0] ?? "Malaysia",
+      line2: parts.slice(1).join(", "),
+      tag: "Default",
+    },
+  ];
+}
+
+function mapSavedAddress(row: AddressRow): UserAddress {
+  return {
+    id: row.id,
+    label: row.label?.trim() || "Address",
+    line1: row.address_line_1?.trim() || [row.city?.trim(), row.state?.trim()].filter(Boolean).join(", ") || "Malaysia",
+    line2: [row.address_line_2?.trim(), row.postcode?.trim(), row.city?.trim(), row.state?.trim(), row.country?.trim()]
+      .filter(Boolean)
+      .join(", "),
+    tag: row.is_default ? "Default" : undefined,
+  };
+}
+
+async function fetchSavedAddressesForUser(userId: string) {
+  if (!supabase) {
+    return [] satisfies UserAddress[];
+  }
+
+  const { data, error } = await supabase
+    .from("addresses")
+    .select("id, label, address_line_1, address_line_2, city, state, postcode, country, is_default")
+    .eq("user_id", userId)
+    .order("is_default", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    return [] satisfies UserAddress[];
+  }
+
+  return (data as AddressRow[]).map(mapSavedAddress);
 }
 
 function findMockDetailByUser(profile: Pick<ProfileRow, "id" | "email" | "full_name">) {
@@ -864,6 +1002,8 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
   const liveBookings = await tryFetchLiveBookings(userId, role, profileNames);
   const livePayments = await tryFetchLivePayments(userId, role, profileNames);
   const liveReviews = await tryFetchLiveReviews(userId, role, profileNames);
+  const savedAddresses = role === "provider" ? [] : await fetchSavedAddressesForUser(userId);
+  const customerStatus = role === "provider" ? null : await fetchAdminCustomerStatus(userId);
   const relatedBookings = liveBookings?.length ? liveBookings : getMockBookings(name, role);
   const relatedPayments = livePayments?.length ? livePayments : getMockPayments(name, role);
   const defaultDetail = Object.values(userDetailRecords)[0]!;
@@ -886,17 +1026,32 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
       role,
       status,
       phone: liveProfile.phone?.trim() || baseDetail.phone,
+      emailVerified: role === "provider" ? baseDetail.emailVerified ?? true : customerStatus?.emailVerified ?? false,
+      phoneVerified: role === "provider" ? baseDetail.phoneVerified ?? true : customerStatus?.phoneVerified ?? false,
+      identityVerificationStatus:
+        role === "provider"
+          ? baseDetail.identityVerificationStatus ?? "verified"
+          : customerStatus?.identityVerificationStatus ?? "pending",
       dob: formatDateOfBirth(customerProfile?.date_of_birth) || baseDetail.dob,
       gender:
         customerProfile?.sex === "Male" || customerProfile?.sex === "Female"
           ? customerProfile.sex
           : baseDetail.gender,
       city,
+      addresses:
+        savedAddresses.length > 0
+          ? savedAddresses
+          : buildProfileFallbackAddress(liveProfile).length > 0
+            ? buildProfileFallbackAddress(liveProfile)
+            : baseDetail.addresses,
       joined: formatDate(liveProfile.created_at),
       registeredAt: formatDateTime(liveProfile.created_at),
       lastLogin: baseDetail.lastLogin,
       accountType: toTitleCase(role),
-      recentReviews: liveReviews?.length ? liveReviews : baseDetail.recentReviews,
+      emailVerifiedAt: role === "provider" ? baseDetail.emailVerifiedAt : customerStatus?.emailVerifiedAt ?? "",
+      phoneVerifiedAt: role === "provider" ? baseDetail.phoneVerifiedAt : customerStatus?.phoneVerifiedAt ?? "",
+      kycVerifiedAt: role === "provider" ? baseDetail.kycVerifiedAt : customerStatus?.kycVerifiedAt ?? "",
+      recentReviews: role === "provider" ? baseDetail.recentReviews : liveReviews ?? [],
       metrics,
     },
     relatedBookings,

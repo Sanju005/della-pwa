@@ -3,7 +3,6 @@ import {
   Ban,
   CalendarDays,
   CheckCircle2,
-  CreditCard,
   Edit3,
   FileClock,
   FileText,
@@ -30,7 +29,6 @@ import {
   ReviewStars,
   SurfaceCard,
   TableShell,
-  TimelineItem,
   VerificationDot,
 } from "../components/user-detail-ui";
 import { userDetailRecords } from "../data/user-detail-mocks";
@@ -47,8 +45,6 @@ const tabs = [
   "Bookings",
   "Payments",
   "Reviews",
-  "Activity Log",
-  "Documents",
   "Reports",
 ] as const;
 
@@ -88,6 +84,56 @@ function avatarGradient(name: string) {
 function isPdfDataUrl(value?: string) {
   const normalized = (value ?? "").toLowerCase();
   return normalized.startsWith("data:application/pdf") || normalized.includes(".pdf");
+}
+
+function normalizeVerificationStatus(value?: string) {
+  const normalized = value?.trim().toLowerCase() ?? "";
+
+  if (
+    normalized === "verified" ||
+    normalized === "processing" ||
+    normalized === "rejected" ||
+    normalized === "pending"
+  ) {
+    return normalized;
+  }
+
+  return "pending";
+}
+
+function verificationTone(status: "verified" | "processing" | "rejected" | "pending") {
+  if (status === "verified") {
+    return "emerald";
+  }
+
+  if (status === "processing") {
+    return "amber";
+  }
+
+  if (status === "rejected") {
+    return "rose";
+  }
+
+  return "slate";
+}
+
+function verificationSummary(
+  status: "verified" | "processing" | "rejected" | "pending",
+  verifiedAt?: string,
+) {
+  if (status === "verified") {
+    return verifiedAt ? `Verified on ${verifiedAt}` : "Verified";
+  }
+
+  if (status === "processing") {
+    return "Submitted and under review";
+  }
+
+  if (status === "rejected") {
+    return "Verification was rejected";
+  }
+
+  return "Not verified yet";
 }
 
 export function UserProfilePage() {
@@ -166,6 +212,9 @@ export function UserProfilePage() {
 
   const detail = record;
   const recentReviews = detail.recentReviews;
+  const emailStatus = detail.emailVerified ? "verified" : "pending";
+  const phoneStatus = detail.phoneVerified ? "verified" : "pending";
+  const kycStatus = normalizeVerificationStatus(detail.identityVerificationStatus);
 
   function flash(nextMessage: string) {
     setMessage(nextMessage);
@@ -359,54 +408,24 @@ export function UserProfilePage() {
             <SurfaceCard title="Verification & Security">
               <div className="grid gap-3 sm:grid-cols-3">
                 {[
-                  ["Email Verified", detail.emailVerifiedAt],
-                  ["Phone Verified", detail.phoneVerifiedAt],
-                  ["KYC Verified", detail.kycVerifiedAt],
-                ].map(([label, date]) => (
+                  ["Email Verification", emailStatus, detail.emailVerifiedAt],
+                  ["Phone Verification", phoneStatus, detail.phoneVerifiedAt],
+                  ["KYC Verification", kycStatus, detail.kycVerifiedAt],
+                ].map(([label, statusValue, date]) => {
+                  const normalizedStatus = normalizeVerificationStatus(statusValue);
+
+                  return (
                   <div key={label} className="rounded-2xl bg-slate-50 px-4 py-3">
                     <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                      <VerificationDot status="Verified" />
+                      <VerificationDot status={normalizedStatus === "verified" ? "Verified" : normalizedStatus === "rejected" ? "Rejected" : normalizedStatus === "processing" ? "Pending" : "Pending"} />
                       {label}
                     </div>
-                    <p className="mt-1 text-[12px] text-slate-500">Verified on {date}</p>
+                    <p className="mt-1 text-[12px] text-slate-500">{verificationSummary(normalizedStatus, date)}</p>
                   </div>
-                ))}
+                )})}
               </div>
             </SurfaceCard>
           </div>
-
-          <SurfaceCard
-            title="Activity Timeline"
-            action={<button className="rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700">View all activity</button>}
-            className="h-full"
-          >
-            <div className="space-y-5">
-              {detail.timeline.map((item, index) => (
-                <div key={item.id} className="relative">
-                  {index < detail.timeline.length - 1 ? (
-                    <div className="absolute left-4 top-10 h-[calc(100%+0.8rem)] w-px bg-slate-200" />
-                  ) : null}
-                  <TimelineItem
-                    title={item.title}
-                    note={item.note}
-                    time={item.time}
-                    tone={item.tone}
-                    icon={
-                      item.tone === "emerald" ? (
-                        <CheckCircle2 className="size-4" />
-                      ) : item.tone === "sky" ? (
-                        <CalendarDays className="size-4" />
-                      ) : item.tone === "violet" ? (
-                        <CreditCard className="size-4" />
-                      ) : (
-                        <Star className="size-4" />
-                      )
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-          </SurfaceCard>
 
           <div className="space-y-4">
             <SurfaceCard title="User Status">
@@ -512,26 +531,30 @@ export function UserProfilePage() {
           </TableShell>
 
           <TableShell title="Recent Reviews" action={<button className="text-xs font-semibold text-emerald-700">View all reviews</button>}>
-            <table className="min-w-full text-left text-[13px]">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400">
-                  <th className="pb-3 font-semibold">Provider</th>
-                  <th className="pb-3 font-semibold">Rating</th>
-                  <th className="pb-3 font-semibold">Review</th>
-                  <th className="pb-3 font-semibold">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentReviews.map((review) => (
-                  <tr key={review.id} className="border-b border-slate-50 align-top">
-                    <td className="py-3 text-slate-700">{review.provider}</td>
-                    <td className="py-3"><ReviewStars rating={review.rating} /></td>
-                    <td className="py-3 text-slate-700">{review.review}</td>
-                    <td className="py-3 text-slate-500">{review.date}</td>
+            {recentReviews.length ? (
+              <table className="min-w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400">
+                    <th className="pb-3 font-semibold">Provider</th>
+                    <th className="pb-3 font-semibold">Rating</th>
+                    <th className="pb-3 font-semibold">Review</th>
+                    <th className="pb-3 font-semibold">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentReviews.map((review) => (
+                    <tr key={review.id} className="border-b border-slate-50 align-top">
+                      <td className="py-3 text-slate-700">{review.provider}</td>
+                      <td className="py-3"><ReviewStars rating={review.rating} /></td>
+                      <td className="py-3 text-slate-700">{review.review}</td>
+                      <td className="py-3 text-slate-500">{review.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-sm text-slate-500">No real reviews found for this user yet.</p>
+            )}
           </TableShell>
         </section>
       </>
@@ -690,9 +713,9 @@ export function UserProfilePage() {
               <p className="mt-1 text-sm text-slate-500">User ID: {detail.userId}</p>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <PillBadge tone="emerald"><BadgeCheck className="size-3.5" /> Email Verified</PillBadge>
-                <PillBadge tone="emerald"><Phone className="size-3.5" /> Phone Verified</PillBadge>
-                <PillBadge tone="emerald"><ScanFace className="size-3.5" /> KYC Verified</PillBadge>
+                <PillBadge tone={verificationTone(emailStatus)}><BadgeCheck className="size-3.5" /> {detail.emailVerified ? "Email Verified" : "Email Pending"}</PillBadge>
+                <PillBadge tone={verificationTone(phoneStatus)}><Phone className="size-3.5" /> {detail.phoneVerified ? "Phone Verified" : "Phone Pending"}</PillBadge>
+                <PillBadge tone={verificationTone(kycStatus)}><ScanFace className="size-3.5" /> {kycStatus === "verified" ? "KYC Verified" : kycStatus === "processing" ? "KYC Processing" : kycStatus === "rejected" ? "KYC Rejected" : "KYC Pending"}</PillBadge>
                 <PillBadge tone="blue">{detail.accountType}</PillBadge>
               </div>
 
@@ -835,50 +858,23 @@ export function UserProfilePage() {
         : null}
 
       {activeTab === "Reviews"
-        ? renderSimpleTable(
-            "All Reviews",
-            ["Provider", "Rating", "Review", "Date"],
-            recentReviews.map((review) => [
-              review.provider,
-              `${review.rating}/5`,
-              review.review,
-              review.date,
-            ])
+        ? recentReviews.length
+          ? renderSimpleTable(
+              "All Reviews",
+              ["Provider", "Rating", "Review", "Date"],
+              recentReviews.map((review) => [
+                review.provider,
+                `${review.rating}/5`,
+                review.review,
+                review.date,
+              ])
+            )
+          : (
+            <SurfaceCard title="All Reviews">
+              <p className="text-sm text-slate-500">No real reviews found for this user yet.</p>
+            </SurfaceCard>
           )
         : null}
-
-      {activeTab === "Activity Log" ? (
-        <SurfaceCard title="Full Activity Log">
-          <div className="space-y-5">
-            {detail.timeline.map((item) => (
-              <TimelineItem
-                key={item.id}
-                title={item.title}
-                note={item.note}
-                time={item.time}
-                tone={item.tone}
-                icon={<CheckCircle2 className="size-4" />}
-              />
-            ))}
-          </div>
-        </SurfaceCard>
-      ) : null}
-
-      {activeTab === "Documents" ? (
-        <SurfaceCard title="Documents">
-          <div className="space-y-3">
-            {detail.documents.map((document) => (
-              <div key={document.id} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{document.label}</p>
-                  <p className="mt-1 text-[13px] text-slate-500">Updated {document.updated}</p>
-                </div>
-                <MiniStatus status={document.status} />
-              </div>
-            ))}
-          </div>
-        </SurfaceCard>
-      ) : null}
 
       {activeTab === "Reports" ? (
         <SurfaceCard title="Reports">
