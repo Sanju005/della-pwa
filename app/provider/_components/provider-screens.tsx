@@ -1338,7 +1338,7 @@ export function DashboardScreen() {
           </Link>
         </header>
 
-        <section className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
+        <section className="rounded-[20px] px-1 py-3">
           <div className="flex flex-col items-center text-center">
             <div className="relative">
               <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#ebf7ef] ring-4 ring-white shadow-[0_12px_24px_rgba(22,163,74,0.16)]">
@@ -1467,7 +1467,7 @@ export function DashboardScreen() {
           </p>
         ) : null}
 
-        <section className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
+        <section className="rounded-[20px] px-1 py-3">
           <div className="flex items-center gap-3">
             <span className="h-7 w-1.5 rounded-full bg-[#645394]" />
             <div>
@@ -1669,7 +1669,7 @@ export function DashboardScreen() {
           </div>
         </section>
 
-        <section className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
+        <section className="rounded-[20px] px-1 py-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-[17px] font-semibold tracking-[-0.03em] text-[#0f172a]">
@@ -1727,7 +1727,7 @@ export function DashboardScreen() {
           </div>
         </section>
 
-        <section className="rounded-[20px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
+        <section className="rounded-[20px] px-1 py-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-[17px] font-semibold tracking-[-0.03em] text-[#0f172a]">

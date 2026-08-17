@@ -689,7 +689,7 @@ function CustomerVerificationSection({
   return (
     <Link
       href="/profile/verification"
-      className="mobile-pressable mt-4 flex items-center justify-between gap-3 rounded-[18px] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.05)] ring-1 ring-[#e6eee8]"
+      className="mobile-pressable mt-4 flex items-center justify-between gap-3 rounded-[18px] px-1 py-3"
     >
       <div className="flex min-w-0 items-center gap-4">
         <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#c18eff_0%,#8E5EB5_100%)] text-white shadow-[0_10px_24px_rgba(142,94,181,0.18)]">
@@ -4833,7 +4833,7 @@ function ProfileSummaryCard({
   return (
     <Link
       href="/profile/edit"
-      className="mobile-pressable block rounded-[16px] border border-[#e4ece7] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)] transition hover:border-[#d9c8ee] hover:shadow-[0_12px_24px_rgba(106,69,160,0.07)]"
+      className="mobile-pressable block rounded-[16px] px-1 py-3 transition"
     >
       <div className="flex items-center gap-4">
         {profile.avatarUrl ? (
@@ -5273,7 +5273,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-4 rounded-[16px] border border-[#e4ece7] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+    <section className="mt-4 rounded-[16px] px-1 py-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-[14px] font-semibold text-[#111827]">{title}</h3>
         {actionLabel ? (
