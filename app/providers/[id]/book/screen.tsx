@@ -152,6 +152,24 @@ function doesTimeRangeOverlap(
   return startMinutes < bookedEndMinutes && endMinutes > bookedStartMinutes;
 }
 
+function isTimeRangeWithinProviderWindow(
+  startLabel: string,
+  endLabel: string,
+  providerStartLabel: string,
+  providerEndLabel: string,
+) {
+  if (!startLabel || !endLabel || !providerStartLabel || !providerEndLabel) {
+    return false;
+  }
+
+  const startMinutes = timeToMinutes(startLabel);
+  const endMinutes = timeToMinutes(endLabel);
+  const providerStartMinutes = timeToMinutes(providerStartLabel);
+  const providerEndMinutes = timeToMinutes(providerEndLabel);
+
+  return startMinutes >= providerStartMinutes && endMinutes <= providerEndMinutes;
+}
+
 export function BookingFormScreen({
   detail,
   serviceQuery,
@@ -219,6 +237,9 @@ export function BookingFormScreen({
     if (selectedDateIso !== nowInKl.date) {
       return providerStartTimeOptions.filter((option) => {
         const candidateEnd = addHours(option, hourlyDuration);
+        if (!isTimeRangeWithinProviderWindow(option, candidateEnd, providerStartTime, providerEndTime)) {
+          return false;
+        }
         return !bookedTimeRangesForSelectedDate.some((bookedRange) =>
           doesTimeRangeOverlap(option, candidateEnd, bookedRange),
         );
@@ -229,6 +250,9 @@ export function BookingFormScreen({
       .filter((option) => timeToMinutes(option) > nowInKl.minutes)
       .filter((option) => {
         const candidateEnd = addHours(option, hourlyDuration);
+        if (!isTimeRangeWithinProviderWindow(option, candidateEnd, providerStartTime, providerEndTime)) {
+          return false;
+        }
         return !bookedTimeRangesForSelectedDate.some((bookedRange) =>
           doesTimeRangeOverlap(option, candidateEnd, bookedRange),
         );
@@ -238,6 +262,8 @@ export function BookingFormScreen({
     hourlyDuration,
     nowInKl.date,
     nowInKl.minutes,
+    providerEndTime,
+    providerStartTime,
     providerStartTimeOptions,
     selectedDateIso,
   ]);
@@ -290,6 +316,19 @@ export function BookingFormScreen({
 
       if (!serviceAddress.trim()) {
         throw new Error("Please choose or enter the service address.");
+      }
+
+      if (
+        !isTimeRangeWithinProviderWindow(
+          bookingStartLabel,
+          bookingEndLabel,
+          providerStartTime,
+          providerEndTime,
+        )
+      ) {
+        throw new Error(
+          `This provider works ${providerStartTime} - ${providerEndTime} on the selected day. Please choose a time that ends within that schedule.`,
+        );
       }
 
       const client = getSupabaseClient();

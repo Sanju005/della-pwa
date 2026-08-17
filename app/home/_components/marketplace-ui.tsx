@@ -67,9 +67,12 @@ export function MarketplaceScreen({
     setSavedPlaces(initialSavedPlaces);
 
     void (async () => {
+      let resolvedLiveProfile = false;
+
       if (client) {
         try {
           const session = await client.auth.getSession();
+          const accessToken = session.data.session?.access_token ?? "";
           const metadata =
             session.data.session?.user.user_metadata &&
             typeof session.data.session.user.user_metadata === "object"
@@ -83,6 +86,53 @@ export function MarketplaceScreen({
           if (sessionFirstName) {
             setDisplayName(sessionFirstName);
           }
+
+          if (accessToken) {
+            const response = await fetch("/api/profile/me", {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            }).catch(() => null);
+
+            const result = response
+              ? ((await response.json().catch(() => null)) as
+                  | {
+                      profile?: {
+                        firstName?: string;
+                        lastName?: string;
+                        city?: string;
+                        region?: string;
+                      };
+                    }
+                  | null)
+              : null;
+
+            const liveProfile = result?.profile;
+            const liveFirstName = liveProfile?.firstName?.trim() ?? "";
+            const liveLastName = liveProfile?.lastName?.trim() ?? "";
+            const liveDisplayName = [liveFirstName, liveLastName]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+
+            if (liveFirstName) {
+              setDisplayName(liveFirstName);
+              resolvedLiveProfile = true;
+            } else if (liveDisplayName) {
+              setDisplayName(liveDisplayName);
+              resolvedLiveProfile = true;
+            }
+
+            const liveLocation = [liveProfile?.city, liveProfile?.region]
+              .filter(Boolean)
+              .join(", ")
+              .trim();
+
+            if (liveLocation) {
+              setDisplayLocation(liveLocation);
+              resolvedLiveProfile = true;
+            }
+          }
         } catch {
           // Fall back to local profile below if session lookup fails.
         }
@@ -91,7 +141,7 @@ export function MarketplaceScreen({
       if (storedProfile) {
         const firstName = storedProfile.firstName.trim();
 
-        if (firstName) {
+        if (firstName && !resolvedLiveProfile) {
           setDisplayName(firstName);
         }
 
@@ -100,7 +150,7 @@ export function MarketplaceScreen({
           .join(", ")
           .trim();
 
-        if (nextLocation) {
+        if (nextLocation && !resolvedLiveProfile) {
           setDisplayLocation(nextLocation);
         }
       }

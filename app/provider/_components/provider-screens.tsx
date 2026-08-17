@@ -455,9 +455,7 @@ function VerificationStatusCard({
         </div>
         <div className="flex items-center gap-3">
           <VerificationStatusPill verified={verified} status={status} />
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#fbf8ff] text-[#8E5EB5] transition group-hover:bg-[#f4eefc]">
-            <ChevronRight className="h-5 w-5" />
-          </span>
+          <ChevronRight className="h-5 w-5 text-[#8E5EB5]" />
         </div>
       </div>
     </div>
@@ -1506,9 +1504,7 @@ export function DashboardScreen() {
                   </p>
                 </div>
               </div>
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#645394] shadow-[0_8px_18px_rgba(100,83,148,0.1)]">
-                <ChevronRight className="h-5 w-5" />
-              </span>
+              <ChevronRight className="h-5 w-5 shrink-0 text-[#645394]" />
             </div>
           </Link>
 
