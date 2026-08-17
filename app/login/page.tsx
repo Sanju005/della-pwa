@@ -144,7 +144,7 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute bottom-[-12%] right-[-8%] h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(142,94,181,0.18)_0%,rgba(142,94,181,0)_72%)]" />
         <div className="pointer-events-none absolute bottom-[-10%] left-[-12%] h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(166,121,207,0.16)_0%,rgba(166,121,207,0)_72%)]" />
 
-        <section className="relative z-10 w-full rounded-[32px] bg-white/94 px-5 py-7 shadow-[0_24px_60px_rgba(67,35,104,0.12)] ring-1 ring-[#f0e8fa] backdrop-blur">
+        <section className="relative z-10 w-full px-5 py-7">
           <div className="flex flex-col items-center text-center">
             <AnimatedSwiperLogo />
             <h1 className="mt-2 text-[2rem] font-extrabold tracking-[-0.05em] text-[#1f1830]">

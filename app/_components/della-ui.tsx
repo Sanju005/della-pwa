@@ -57,7 +57,7 @@ export function AppCard({
   return (
     <section
       className={cx(
-        "rounded-[18px] border border-[#e8ecef] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]",
+        "bg-transparent p-4",
         className
       )}
     >
@@ -212,7 +212,7 @@ export function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    <div className="rounded-[20px] border border-dashed border-[#d8e3dc] bg-[#fbfefc] px-4 py-8 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
+    <div className="px-4 py-8 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f1fa] text-[#8E5EB5]">
         {icon ?? <Bell className="h-6 w-6" />}
       </div>
@@ -233,7 +233,7 @@ export function LoadingState({
   description?: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-[#e4ece7] bg-white px-4 py-8 text-center shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+    <div className="px-4 py-8 text-center">
       <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-[#8E5EB5]" />
       <h3 className="mt-4 text-[16px] font-semibold text-[#0f172a]">{title}</h3>
       <p className="mt-2 text-[14px] leading-6 text-[#64748b]">{description}</p>
@@ -502,7 +502,7 @@ export function BottomNav({
 }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur">
-      <div className="rounded-[20px] border border-[#edf0f3] bg-white/95 px-2 py-1.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)]">
+      <div className="bg-white/95 px-2 py-1.5">
         <div className="flex items-center justify-between gap-1 text-[10.5px] font-medium text-[#8a94a6]">
         {items.map((item) => {
           const navClassName = cx(
@@ -554,7 +554,7 @@ export function AuthInfoPanel({
   description: string;
 }) {
   return (
-    <AppCard className="rounded-[30px] px-6 py-7">
+    <AppCard className="px-6 py-7">
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e8f7ea] text-[#16a34a]">
           {icon}
