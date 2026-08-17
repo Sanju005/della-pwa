@@ -4922,7 +4922,7 @@ function WalletSummaryCard({
   const withdrawDisabled = walletBalance <= 0;
 
   return (
-    <section className="mt-4 overflow-hidden rounded-[18px] border border-[#e7def4] bg-[linear-gradient(135deg,#ffffff_0%,#f8f3fd_100%)] p-4 shadow-[0_10px_24px_rgba(104,63,155,0.08)]">
+    <section className="mt-4 overflow-hidden rounded-[18px] px-1 py-3">
       <div
         role="button"
         tabIndex={0}
@@ -4933,7 +4933,7 @@ function WalletSummaryCard({
             router.push("/profile/wallet");
           }
         }}
-        className="mobile-pressable cursor-pointer rounded-[16px] border border-[#ede4f8] bg-white/90 p-4"
+        className="mobile-pressable cursor-pointer rounded-[16px] p-4"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -5036,7 +5036,7 @@ function RewardsSummaryCard({
   return (
     <Link
       href="/profile/rewards"
-      className="mobile-pressable mt-4 block rounded-[16px] border border-[#e8def6] bg-[linear-gradient(180deg,#ffffff_0%,#faf6ff_100%)] p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]"
+      className="mobile-pressable mt-4 block rounded-[16px] px-1 py-3"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">

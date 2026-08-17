@@ -5245,7 +5245,7 @@ export function ServicesScreen() {
 
   return (
     <PageShell title="My Services" subtitle="Manage the services and pricing visible to customers.">
-      <section className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]">
+      <section className="rounded-[22px] px-1 py-3">
         <div className="mb-5 rounded-[18px] border border-[#dbeee2] bg-[#f6fff8] p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -6022,7 +6022,7 @@ export function ProfileScreen() {
           />
         </div>
 
-        <div className="mt-5 flex items-center justify-between gap-4 rounded-[18px] border border-[#e7dcf8] bg-[linear-gradient(135deg,#fbf8ff_0%,#f4edff_100%)] p-4">
+        <div className="mt-5 flex items-center justify-between gap-4 rounded-[18px] p-4">
           <div className="flex items-start gap-3">
             <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-white text-[#7c3aed] shadow-[0_10px_24px_rgba(124,58,237,0.12)]">
               <HelpCircle className="h-5 w-5" />
@@ -6047,7 +6047,7 @@ export function ProfileScreen() {
         {data.services.map((service) => (
           <div
             key={service.id}
-            className="rounded-[22px] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)] ring-1 ring-[#e6eee8]"
+            className="rounded-[22px] px-1 py-3"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
