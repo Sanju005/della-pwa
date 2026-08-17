@@ -232,6 +232,7 @@ export type UserDetailRecord = {
   userId: string;
   name: string;
   email: string;
+  profileImageUrl?: string;
   role: string;
   status: string;
   phone: string;

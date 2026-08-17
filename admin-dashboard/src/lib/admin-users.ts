@@ -34,6 +34,7 @@ type ProfileRow = {
   status: string | null;
   phone?: string | null;
   created_at?: string | null;
+  avatar_url?: string | null;
   customer_profiles?: ProfileRelation;
   provider_profiles?: ProfileRelation;
 };
@@ -116,6 +117,28 @@ function relationNode(value?: ProfileRelation) {
   }
 
   return value ?? null;
+}
+
+function isDataUrl(value: string) {
+  return value.startsWith("data:");
+}
+
+function isHttpUrl(value: string) {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+async function resolveAdminMediaUrl(
+  bucket: "profile-images",
+  value?: string | null,
+) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed || isDataUrl(trimmed) || isHttpUrl(trimmed) || !supabase) {
+    return trimmed;
+  }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(trimmed);
+  return data.publicUrl;
 }
 
 function isDataUrl(value: string) {
@@ -704,6 +727,7 @@ async function fetchProfiles() {
       status,
       phone,
       created_at,
+      avatar_url,
       customer_profiles (
         date_of_birth,
         sex,
@@ -742,6 +766,7 @@ async function fetchProfileById(userId: string) {
       status,
       phone,
       created_at,
+      avatar_url,
       customer_profiles (
         date_of_birth,
         sex,
@@ -842,6 +867,7 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
   const relatedBookings = liveBookings?.length ? liveBookings : getMockBookings(name, role);
   const relatedPayments = livePayments?.length ? livePayments : getMockPayments(name, role);
   const defaultDetail = Object.values(userDetailRecords)[0]!;
+  const profileImageUrl = await resolveAdminMediaUrl("profile-images", liveProfile.avatar_url);
 
   const baseDetail =
     mockDetail ??
@@ -856,6 +882,7 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
       userId: liveProfile.id,
       name,
       email,
+      profileImageUrl: profileImageUrl || baseDetail.profileImageUrl,
       role,
       status,
       phone: liveProfile.phone?.trim() || baseDetail.phone,

@@ -659,15 +659,23 @@ export function UserProfilePage() {
             <div
               className={`grid size-[104px] shrink-0 place-items-center rounded-[30px] bg-gradient-to-br ${avatarGradient(detail.name)} shadow-inner ring-8 ring-slate-50`}
             >
-              <div className="grid size-[82px] place-items-center rounded-[26px] bg-white/70 backdrop-blur">
-                <span className="font-display text-[2rem] font-extrabold text-slate-700">
-                  {detail.name
-                    .split(" ")
-                    .slice(0, 2)
-                    .map((part) => part[0])
-                    .join("")}
-                </span>
-              </div>
+              {detail.profileImageUrl ? (
+                <img
+                  src={detail.profileImageUrl}
+                  alt={detail.name}
+                  className="size-[82px] rounded-[26px] object-cover ring-4 ring-white/70"
+                />
+              ) : (
+                <div className="grid size-[82px] place-items-center rounded-[26px] bg-white/70 backdrop-blur">
+                  <span className="font-display text-[2rem] font-extrabold text-slate-700">
+                    {detail.name
+                      .split(" ")
+                      .slice(0, 2)
+                      .map((part) => part[0])
+                      .join("")}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="min-w-0">
