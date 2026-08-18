@@ -1,8 +1,5 @@
-import { getEditableProfileData } from "@/lib/profile-service";
+import { redirect } from "next/navigation";
 
-import { CustomerIdentityVerificationScreen } from "../../_components/profile-ui";
-
-export default async function ProfileIdentityVerificationPage() {
-  const profile = await getEditableProfileData();
-  return <CustomerIdentityVerificationScreen initialProfile={profile} />;
+export default function ProfileIdentityVerificationPage() {
+  redirect("/profile/verification");
 }

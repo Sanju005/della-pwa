@@ -701,7 +701,7 @@ function CustomerVerificationSection({
             Verification
           </h3>
           <p className="mt-1 text-[13px] leading-5 text-[#7b728a]">
-            Open phone, email, and IC / passport verification
+            Open phone and email verification
           </p>
         </div>
       </div>
@@ -764,14 +764,6 @@ export function CustomerVerificationHubScreen({ initialProfile }: EditProps) {
             title="Phone"
             subtitle="Phone status"
             verified={profile.phoneVerified}
-          />
-          <CustomerVerificationStatusCard
-            href="/profile/verification/identity"
-            icon={<DocumentIcon className="h-6 w-6" />}
-            title="IC / Passport"
-            subtitle="Identity check"
-            verified={profile.verified}
-            status={profile.identityVerificationStatus}
           />
         </div>
       </section>

@@ -12,7 +12,6 @@ import {
   MapPin,
   MonitorSmartphone,
   Phone,
-  ScanFace,
   Shield,
   ShieldCheck,
   Star,
@@ -215,7 +214,6 @@ export function UserProfilePage() {
   const recentReviews = detail.recentReviews;
   const emailStatus = detail.emailVerified ? "verified" : "pending";
   const phoneStatus = detail.phoneVerified ? "verified" : "pending";
-  const kycStatus = normalizeVerificationStatus(detail.identityVerificationStatus);
 
   function flash(nextMessage: string) {
     setMessage(nextMessage);
@@ -407,11 +405,10 @@ export function UserProfilePage() {
             </SurfaceCard>
 
             <SurfaceCard title="Verification & Security">
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {[
                   ["Email Verification", emailStatus, detail.emailVerifiedAt],
                   ["Phone Verification", phoneStatus, detail.phoneVerifiedAt],
-                  ["KYC Verification", kycStatus, detail.kycVerifiedAt],
                 ].map(([label, statusValue, date]) => {
                   const normalizedStatus = normalizeVerificationStatus(statusValue);
 
@@ -716,7 +713,6 @@ export function UserProfilePage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <PillBadge tone={verificationTone(emailStatus)}><BadgeCheck className="size-3.5" /> {detail.emailVerified ? "Email Verified" : "Email Pending"}</PillBadge>
                 <PillBadge tone={verificationTone(phoneStatus)}><Phone className="size-3.5" /> {detail.phoneVerified ? "Phone Verified" : "Phone Pending"}</PillBadge>
-                <PillBadge tone={verificationTone(kycStatus)}><ScanFace className="size-3.5" /> {kycStatus === "verified" ? "KYC Verified" : kycStatus === "processing" ? "KYC Processing" : kycStatus === "rejected" ? "KYC Rejected" : "KYC Pending"}</PillBadge>
                 <PillBadge tone="blue">{detail.accountType}</PillBadge>
               </div>
 
