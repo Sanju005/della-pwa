@@ -587,7 +587,7 @@ async function fetchProviderBookedTimeRangesByDate(
     .eq("provider_id", providerId)
     .gte("scheduled_date", today)
     .lte("scheduled_date", maxDateIso)
-    .not("booking_status", "in", '("declined","cancelled")')
+    .not("booking_status", "in", '("declined","declined_by_provider","cancelled")')
     .order("scheduled_date", { ascending: true })
     .order("scheduled_start_time", { ascending: true });
 

@@ -832,7 +832,11 @@ function getBookingTab(
     return "pending";
   }
 
-  if (booking.bookingStatus === "declined" || booking.bookingStatus === "cancelled") {
+  if (
+    booking.bookingStatus === "declined" ||
+    booking.bookingStatus === "declined_by_provider" ||
+    booking.bookingStatus === "cancelled"
+  ) {
     return "canceled";
   }
 
@@ -1217,6 +1221,7 @@ export function DashboardScreen() {
       (booking) =>
         booking.scheduledDate === todayKey &&
         booking.bookingStatus !== "declined" &&
+        booking.bookingStatus !== "declined_by_provider" &&
         booking.bookingStatus !== "cancelled",
     )
     .sort((left, right) =>
@@ -1233,7 +1238,10 @@ export function DashboardScreen() {
     ["completed", "paid", "review_requested", "reviewed"].includes(booking.bookingStatus),
   );
   const canceledBookings = state.bookings.filter(
-    (booking) => booking.bookingStatus === "declined" || booking.bookingStatus === "cancelled",
+    (booking) =>
+      booking.bookingStatus === "declined" ||
+      booking.bookingStatus === "declined_by_provider" ||
+      booking.bookingStatus === "cancelled",
   );
   const collectedBookings = state.bookings.filter(
     (booking) =>
@@ -2099,7 +2107,11 @@ export function BookingsScreen({
         return false;
       }
     } else if (tab === "canceled") {
-      if (!(booking.bookingStatus === "declined" || booking.bookingStatus === "cancelled")) {
+      if (!(
+        booking.bookingStatus === "declined" ||
+        booking.bookingStatus === "declined_by_provider" ||
+        booking.bookingStatus === "cancelled"
+      )) {
         return false;
       }
     } else if (tab === "completes" && !["completed", "paid", "review_requested", "reviewed"].includes(booking.bookingStatus)) {
@@ -2261,6 +2273,7 @@ export function BookingsScreen({
             ) : null}
 
             {selectedBooking.bookingStatus !== "declined" &&
+            selectedBooking.bookingStatus !== "declined_by_provider" &&
             selectedBooking.bookingStatus !== "cancelled" ? (
               <div className="mt-4 rounded-[18px] border border-[#ebe3f5] bg-white px-4 py-4">
                 <p className="text-[14px] font-extrabold text-[#0f172a]">Task Progress</p>

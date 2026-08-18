@@ -431,7 +431,7 @@ function mapBookingSummary(rows: BookingAggregateRow[]) {
   for (const row of rows) {
     const status = row.booking_status?.trim().toLowerCase() ?? "";
 
-    if (status === "declined" || status === "cancelled" || status === "canceled") {
+    if (status === "declined" || status === "declined_by_provider" || status === "cancelled" || status === "canceled") {
       cancelled += 1;
       continue;
     }

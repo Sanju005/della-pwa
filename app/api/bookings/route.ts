@@ -519,7 +519,7 @@ async function validateProviderAvailabilityAndConflicts(
     .select("id, scheduled_start_time, scheduled_end_time, booking_status")
     .eq("provider_id", providerId)
     .eq("scheduled_date", scheduledDate)
-    .not("booking_status", "in", '("declined","cancelled")')
+    .not("booking_status", "in", '("declined","declined_by_provider","cancelled")')
     .lt("scheduled_start_time", scheduledEndTime)
     .gt("scheduled_end_time", scheduledStartTime)
     .limit(1);
