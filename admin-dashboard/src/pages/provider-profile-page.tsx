@@ -45,7 +45,7 @@ import type { DashboardBooking } from "../types";
 const tabs = [
   "Overview",
   "Tasks",
-  "Payments & Withdrawals",
+  "Accounts",
   "Reviews",
   "Documents & Verification",
 ] as const;
@@ -237,6 +237,19 @@ function renderSimpleRows(title: string, headers: string[], rows: string[][]) {
       </table>
     </TableShell>
   );
+}
+
+function parseCurrencyValue(value?: string) {
+  const numeric = Number((value ?? "").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function formatRinggitAmount(value: number) {
+  return new Intl.NumberFormat("en-MY", {
+    style: "currency",
+    currency: "MYR",
+    minimumFractionDigits: 2,
+  }).format(value);
 }
 
 export function ProviderProfilePage() {
@@ -566,6 +579,17 @@ export function ProviderProfilePage() {
 
     return true;
   });
+  const cashRows = detail.cashRows ?? [];
+  const cashTotals = cashRows.reduce(
+    (summary, row) => ({
+      gross: summary.gross + parseCurrencyValue(row.grossAmount),
+      commission: summary.commission + parseCurrencyValue(row.commissionAmount),
+      net: summary.net + parseCurrencyValue(row.netAmount),
+      payable: summary.payable + (row.companyPaymentStatus === "paid" ? 0 : parseCurrencyValue(row.commissionAmount)),
+      paid: summary.paid + (row.companyPaymentStatus === "paid" ? parseCurrencyValue(row.paidToCompany) : 0),
+    }),
+    { gross: 0, commission: 0, net: 0, payable: 0, paid: 0 },
+  );
 
   async function handleSaveProfile() {
     if (saving) {
@@ -1661,15 +1685,95 @@ export function ProviderProfilePage() {
             </div>
           )
         : null}
-      {activeTab === "Payments & Withdrawals"
+      {activeTab === "Accounts"
         ? (
             <div className="space-y-4">
+              <section className="grid gap-4 md:grid-cols-5">
+                <SurfaceCard title="Gross">
+                  <SummaryMetric label="All bookings" value={formatRinggitAmount(cashTotals.gross)} />
+                </SurfaceCard>
+                <SurfaceCard title="Commission">
+                  <SummaryMetric label="Company share" value={formatRinggitAmount(cashTotals.commission)} />
+                </SurfaceCard>
+                <SurfaceCard title="Net">
+                  <SummaryMetric label="Provider earnings" value={formatRinggitAmount(cashTotals.net)} />
+                </SurfaceCard>
+                <SurfaceCard title="Payable">
+                  <SummaryMetric label="Not yet paid" value={formatRinggitAmount(cashTotals.payable)} />
+                </SurfaceCard>
+                <SurfaceCard title="Paid">
+                  <SummaryMetric label="Received by company" value={formatRinggitAmount(cashTotals.paid)} />
+                </SurfaceCard>
+              </section>
+
+              <TableShell title="Cash">
+                <table className="min-w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400">
+                      <th className="pb-3 font-semibold">Date</th>
+                      <th className="pb-3 font-semibold">Booking ID</th>
+                      <th className="pb-3 font-semibold">Gross Amount</th>
+                      <th className="pb-3 font-semibold">Commission</th>
+                      <th className="pb-3 font-semibold">Net Amount</th>
+                      <th className="pb-3 font-semibold">Payable to Company</th>
+                      <th className="pb-3 font-semibold">Paid to Company</th>
+                      <th className="pb-3 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cashRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-4 text-slate-500">
+                          No cash records found for this provider yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      cashRows.map((row) => (
+                        <tr key={row.id} className="border-b border-slate-50 align-top">
+                          <td className="py-3 text-slate-600">{row.date}</td>
+                          <td className="py-3 font-semibold text-emerald-700">{row.bookingId}</td>
+                          <td className="py-3 text-slate-700">{row.grossAmount}</td>
+                          <td className="py-3 text-slate-700">{row.commissionAmount}</td>
+                          <td className="py-3 font-semibold text-slate-900">{row.netAmount}</td>
+                          <td className="py-3 text-amber-700">{row.payableToCompany}</td>
+                          <td className="py-3 text-emerald-700">{row.paidToCompany}</td>
+                          <td className="py-3">
+                            <MiniStatus
+                              status={
+                                row.companyPaymentStatus === "paid"
+                                  ? "Paid"
+                                  : row.companyPaymentStatus === "processing"
+                                    ? "Processing"
+                                    : "Pending"
+                              }
+                            />
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {cashRows.length ? (
+                    <tfoot>
+                      <tr className="border-t border-slate-200 bg-slate-50/70 text-slate-900">
+                        <td className="py-3 font-bold" colSpan={2}>Total</td>
+                        <td className="py-3 font-bold">{formatRinggitAmount(cashTotals.gross)}</td>
+                        <td className="py-3 font-bold">{formatRinggitAmount(cashTotals.commission)}</td>
+                        <td className="py-3 font-bold">{formatRinggitAmount(cashTotals.net)}</td>
+                        <td className="py-3 font-bold text-amber-700">{formatRinggitAmount(cashTotals.payable)}</td>
+                        <td className="py-3 font-bold text-emerald-700">{formatRinggitAmount(cashTotals.paid)}</td>
+                        <td className="py-3 font-bold">Summary</td>
+                      </tr>
+                    </tfoot>
+                  ) : null}
+                </table>
+              </TableShell>
+
               {renderSimpleRows(
-                "Payments & Withdrawals",
+                "Others",
                 ["ID", "Type", "Amount", "Date", "Status"],
                 detail.payoutRows.map((row) => [row.id, row.type, row.amount, row.date, row.status])
               )}
-              <TableShell title="Company Commission Payments">
+              <TableShell title="Others: Company Commission Payments">
                 <table className="min-w-full text-left text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400">

@@ -332,6 +332,19 @@ export type ProviderPayoutRow = {
   status: string;
 };
 
+export type ProviderCashRow = {
+  id: string;
+  paymentId?: string;
+  date: string;
+  bookingId: string;
+  grossAmount: string;
+  commissionAmount: string;
+  netAmount: string;
+  payableToCompany: string;
+  paidToCompany: string;
+  companyPaymentStatus: "pending" | "processing" | "paid";
+};
+
 export type ProviderAvailabilityEntry = {
   day: string;
   dayKey: string;
@@ -410,6 +423,7 @@ export type ProviderDetailRecord = {
   allTaskRows?: ProviderTaskRow[];
   completedTaskRows: ProviderTaskRow[];
   upcomingTaskRows: ProviderUpcomingTaskRow[];
+  cashRows?: ProviderCashRow[];
   payoutRows: ProviderPayoutRow[];
   commissionRows?: ProviderCommissionRow[];
   providerReviewsReceived?: UserReviewItem[];

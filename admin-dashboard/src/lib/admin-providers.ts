@@ -3,6 +3,7 @@ import { providerDetailRecords } from "../data/provider-detail-mocks";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import type {
   ProviderAvailabilityEntry,
+  ProviderCashRow,
   ProviderCommissionRow,
   ProviderDetailRecord,
   ProviderDocumentItem,
@@ -727,6 +728,7 @@ function createEmptyProviderDetail(providerId: string, name?: string | null, ema
     allTaskRows: [],
     completedTaskRows: [],
     upcomingTaskRows: [],
+    cashRows: [],
     payoutRows: [],
     commissionRows: [],
     recentActions: [],
@@ -1235,6 +1237,38 @@ function buildPayoutRows(livePayments: LivePaymentRow[]): ProviderPayoutRow[] {
   }));
 }
 
+function buildCashRows(livePayments: LivePaymentRow[]): ProviderCashRow[] {
+  return livePayments.slice(0, 30).map((row) => {
+    const grossAmount = Number(row.amount ?? 0);
+    const commissionAmount = Number(row.company_commission_amount ?? 0);
+    const netAmount = Math.max(grossAmount - commissionAmount, 0);
+    const companyPaymentStatus =
+      row.company_payment_status === "paid"
+        ? "paid"
+        : row.company_payment_status === "payment_process"
+          ? "processing"
+          : "pending";
+    const paidAmount = Number(
+      row.admin_company_received_amount ??
+        row.provider_company_payment_amount ??
+        (companyPaymentStatus === "paid" ? commissionAmount : 0),
+    );
+
+    return {
+      id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
+      paymentId: row.id,
+      date: formatDate(row.created_at),
+      bookingId: row.booking_id ? `#${row.booking_id.slice(0, 8).toUpperCase()}` : "-",
+      grossAmount: formatCurrency(grossAmount),
+      commissionAmount: formatCurrency(commissionAmount),
+      netAmount: formatCurrency(netAmount),
+      payableToCompany: companyPaymentStatus === "paid" ? "-" : formatCurrency(commissionAmount),
+      paidToCompany: companyPaymentStatus === "paid" ? formatCurrency(paidAmount) : "-",
+      companyPaymentStatus,
+    };
+  });
+}
+
 function buildCommissionRows(
   liveSubmissions: LiveCompanyPaymentSubmissionRow[],
 ): Promise<ProviderCommissionRow[]> {
@@ -1643,6 +1677,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     ...(liveGivenReviews?.map((row) => row.customer_id) ?? []),
   ]);
   const taskRows = liveTasks?.length ? buildTaskRows(liveTasks, customerNames) : null;
+  const cashRows = livePayments?.length ? buildCashRows(livePayments) : fallback.cashRows;
   const payoutRows = livePayments?.length ? buildPayoutRows(livePayments) : fallback.payoutRows;
   const paymentCommissionRows = livePayments?.length
     ? await buildCommissionRowsFromPayments(livePayments)
@@ -1879,6 +1914,7 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     allTaskRows: taskRows?.allTaskRows.length ? taskRows.allTaskRows : fallback.allTaskRows,
     completedTaskRows: taskRows?.completedTaskRows.length ? taskRows.completedTaskRows : fallback.completedTaskRows,
     upcomingTaskRows: taskRows?.upcomingTaskRows.length ? taskRows.upcomingTaskRows : fallback.upcomingTaskRows,
+    cashRows,
     payoutRows,
     commissionRows,
     providerReviewsReceived: reviewRows,
