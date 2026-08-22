@@ -5,7 +5,7 @@ import { DataTable } from "../components/data-table";
 import { StatusBadge, statusToTone } from "../components/status-badge";
 import { LoadingState, SectionTitle } from "../components/ui-kit";
 import { getDashboardSnapshot } from "../lib/dashboard-metrics";
-import type { ComplaintRow, DashboardBooking, PaymentRow, ReviewRow, UserRow } from "../types";
+import type { ComplaintRow, DashboardBooking, PaymentRow, ReviewRow } from "../types";
 
 const bookingColumns = [
   { key: "id", label: "ID" },
@@ -42,7 +42,12 @@ export function DashboardPage() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [complaints, setComplaints] = useState<ComplaintRow[]>([]);
-  const [users, setUsers] = useState<UserRow[]>([]);
+  const [userSummary, setUserSummary] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    banned: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,7 +67,7 @@ export function DashboardPage() {
       setPayments(snapshot.recentPayments);
       setReviews(snapshot.recentReviews);
       setComplaints(snapshot.recentComplaints);
-      setUsers(snapshot.userRows);
+      setUserSummary(snapshot.userSummary);
       setLoading(false);
     }
 
@@ -82,10 +87,10 @@ export function DashboardPage() {
   const acceptedTasks = bookings.filter((row) => row.status.toLowerCase() === "accepted").length;
   const inProgressTasks = bookings.filter((row) => row.status.toLowerCase() === "in progress").length;
   const completedTasks = bookings.filter((row) => row.status.toLowerCase() === "completed").length;
-  const activeUsers = users.filter((row) => ["active", "verified"].includes(row.status.toLowerCase())).length;
-  const inactiveUsers = users.filter((row) => row.status.toLowerCase() === "inactive").length;
-  const bannedUsers = users.filter((row) => ["banned", "suspended", "deleted"].includes(row.status.toLowerCase())).length;
-  const totalUsers = users.length;
+  const activeUsers = userSummary.active;
+  const inactiveUsers = userSummary.inactive;
+  const bannedUsers = userSummary.banned;
+  const totalUsers = userSummary.total;
 
   const taskMix = [
     ["Pending", String(pendingTasks), totalTasks ? `${((pendingTasks / totalTasks) * 100).toFixed(1)}%` : "0.0%", "amber"],

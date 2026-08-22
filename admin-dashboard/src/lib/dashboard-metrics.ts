@@ -1,11 +1,7 @@
 import { approvalItems, complaints, dashboardMetrics } from "../data/mock-data";
 import { listApprovalQueueWithFallback } from "./admin-approvals";
-import { listBookingsWithFallback } from "./admin-bookings";
 import { listComplaintsWithFallback } from "./admin-complaints";
-import { listPaymentsWithFallback } from "./admin-payments";
-import { listReviewsWithFallback } from "./admin-reviews";
-import { listUsersWithFallback } from "./admin-users";
-import type { ApprovalItem, ComplaintRow, DashboardBooking, PaymentRow, ReviewRow, UserRow } from "../types";
+import type { ApprovalItem, ComplaintRow, DashboardBooking, PaymentRow, ReviewRow } from "../types";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 type LiveMetricCard = {
@@ -29,11 +25,16 @@ type DashboardSnapshot = {
   approvals: LiveApprovalItem[];
   complaintsOpen: number;
   summaryCards: DashboardSummaryCard[];
+  userSummary: {
+    total: number;
+    active: number;
+    inactive: number;
+    banned: number;
+  };
   recentBookings: DashboardBooking[];
   recentPayments: PaymentRow[];
   recentReviews: ReviewRow[];
   recentComplaints: ComplaintRow[];
-  userRows: UserRow[];
 };
 
 type DashboardSummaryItem = {
@@ -65,6 +66,52 @@ type LiveIssueReportRow = {
 type LiveProfileRoleRow = {
   id: string;
   role?: string | null;
+};
+
+type LiveProfileStatusRow = {
+  status?: string | null;
+};
+
+type RecentBookingRow = {
+  id: string;
+  booking_status?: string | null;
+  service_label?: string | null;
+  scheduled_date?: string | null;
+  scheduled_start_time?: string | null;
+  total_amount?: number | null;
+  customer_id?: string | null;
+  provider_id?: string | null;
+  provider_profiles?: { marketing_name?: string | null }[] | { marketing_name?: string | null } | null;
+  provider_services?: { service_type?: string | null }[] | { service_type?: string | null } | null;
+};
+
+type RecentPaymentRow = {
+  id: string;
+  amount?: number | null;
+  status?: string | null;
+  payment_method?: string | null;
+  created_at?: string | null;
+  customer_id?: string | null;
+  provider_id?: string | null;
+};
+
+type RecentReviewRow = {
+  id: string;
+  rating?: number | null;
+  comment?: string | null;
+  created_at?: string | null;
+  customer_id?: string | null;
+  provider_id?: string | null;
+};
+
+type NameRow = {
+  id: string;
+  full_name?: string | null;
+};
+
+type ProviderNameRow = {
+  id: string;
+  marketing_name?: string | null;
 };
 
 async function countRows(table: string, filters?: Array<[string, string | boolean]>) {
@@ -217,6 +264,240 @@ function formatCurrencyDetailed(value: number) {
   }).format(value);
 }
 
+function normalizeStatus(value?: string | null) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-MY", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatTime(dateValue?: string | null, timeValue?: string | null) {
+  if (!dateValue || !timeValue) {
+    return "-";
+  }
+
+  const value = new Date(`${dateValue}T${timeValue}`);
+  if (Number.isNaN(value.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-MY", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(value);
+}
+
+function humanizeText(value?: string | null) {
+  const normalized = value?.trim() ?? "";
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized
+    .replaceAll("_", " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function relationItem<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+async function fetchProfileNames(ids: string[]) {
+  if (!supabase) {
+    return new Map<string, string>();
+  }
+
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", uniqueIds);
+
+  if (error || !data) {
+    return new Map<string, string>();
+  }
+
+  return new Map((data as NameRow[]).map((row) => [row.id, row.full_name?.trim() || ""]));
+}
+
+async function fetchProviderNames(ids: string[]) {
+  if (!supabase) {
+    return new Map<string, string>();
+  }
+
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const { data, error } = await supabase
+    .from("provider_profiles")
+    .select("id, marketing_name")
+    .in("id", uniqueIds);
+
+  if (error || !data) {
+    return new Map<string, string>();
+  }
+
+  return new Map((data as ProviderNameRow[]).map((row) => [row.id, row.marketing_name?.trim() || ""]));
+}
+
+async function fetchProfileStatuses() {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("status")
+    .limit(5000);
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as LiveProfileStatusRow[];
+}
+
+async function fetchRecentBookingsSummary() {
+  if (!supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(`
+      id,
+      booking_status,
+      service_label,
+      scheduled_date,
+      scheduled_start_time,
+      total_amount,
+      customer_id,
+      provider_id,
+      provider_profiles (
+        marketing_name
+      ),
+      provider_services (
+        service_type
+      )
+    `)
+    .order("scheduled_date", { ascending: false })
+    .limit(5);
+
+  if (error || !data) {
+    return [];
+  }
+
+  const rows = data as RecentBookingRow[];
+  const names = await fetchProfileNames(rows.flatMap((row) => [row.customer_id ?? "", row.provider_id ?? ""]));
+
+  return rows.map((row) => {
+    const providerProfile = relationItem(row.provider_profiles);
+    const providerService = relationItem(row.provider_services);
+
+    return {
+      id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
+      rawId: row.id,
+      service: row.service_label?.trim() || humanizeText(providerService?.service_type) || "Service",
+      provider: providerProfile?.marketing_name?.trim() || names.get(row.provider_id ?? "") || "Provider",
+      providerId: row.provider_id ?? "",
+      customer: names.get(row.customer_id ?? "") || "Customer",
+      customerId: row.customer_id ?? "",
+      status: humanizeText(row.booking_status) || "Pending",
+      amount: formatCurrencyDetailed(Number(row.total_amount ?? 0)),
+      schedule: `${formatDate(row.scheduled_date)} ${formatTime(row.scheduled_date, row.scheduled_start_time)}`,
+    } satisfies DashboardBooking;
+  });
+}
+
+async function fetchRecentPaymentsSummary() {
+  if (!supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("payments")
+    .select("id, amount, status, payment_method, created_at, customer_id, provider_id")
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  if (error || !data) {
+    return [];
+  }
+
+  const rows = data as RecentPaymentRow[];
+  const names = await fetchProfileNames(rows.flatMap((row) => [row.customer_id ?? "", row.provider_id ?? ""]));
+
+  return rows.map((row) => ({
+    id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
+    rawId: row.id,
+    customer: names.get(row.customer_id ?? "") || "Customer",
+    customerId: row.customer_id ?? "",
+    provider: names.get(row.provider_id ?? "") || "Provider",
+    providerId: row.provider_id ?? "",
+    amount: formatCurrencyDetailed(Number(row.amount ?? 0)),
+    method: row.payment_method?.trim() || "Cash",
+    status: humanizeText(row.status) || "Pending",
+    date: formatDate(row.created_at),
+    createdAt: row.created_at ?? "",
+  })) satisfies PaymentRow[];
+}
+
+async function fetchRecentReviewsSummary() {
+  if (!supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("id, rating, comment, created_at, customer_id, provider_id")
+    .order("created_at", { ascending: false })
+    .limit(4);
+
+  if (error || !data) {
+    return [];
+  }
+
+  const rows = data as RecentReviewRow[];
+  const [customerNames, providerNames] = await Promise.all([
+    fetchProfileNames(rows.map((row) => row.customer_id ?? "")),
+    fetchProviderNames(rows.map((row) => row.provider_id ?? "")),
+  ]);
+
+  return rows.map((row) => ({
+    id: row.id.startsWith("REV-") ? row.id : `REV-${row.id.slice(0, 8).toUpperCase()}`,
+    customer: customerNames.get(row.customer_id ?? "") || "Customer",
+    provider: providerNames.get(row.provider_id ?? "") || "Provider",
+    rating: typeof row.rating === "number" ? row.rating.toFixed(1) : "0.0",
+    comment: row.comment?.trim() || "Shared feedback",
+    status: "Published",
+    date: formatDate(row.created_at),
+  })) satisfies ReviewRow[];
+}
+
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   if (!isSupabaseConfigured || !supabase) {
     return {
@@ -224,11 +505,16 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       approvals: approvalItems,
       complaintsOpen: fallbackComplaintCount(),
       summaryCards: [],
+      userSummary: {
+        total: 0,
+        active: 0,
+        inactive: 0,
+        banned: 0,
+      },
       recentBookings: [],
       recentPayments: [],
       recentReviews: [],
       recentComplaints: complaints,
-      userRows: [],
     };
   }
 
@@ -242,12 +528,12 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     bookingStatuses,
     paymentSummaries,
     issueReports,
+    profileStatuses,
     approvalRows,
     recentBookings,
     recentPayments,
     recentReviews,
     recentComplaints,
-    userRows,
   ] = await Promise.all([
     countRows("profiles"),
     countRows("profiles", [["role", "provider"]]),
@@ -258,12 +544,12 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     fetchBookingStatuses(),
     fetchPaymentSummaries(),
     fetchIssueReports(),
+    fetchProfileStatuses(),
     listApprovalQueueWithFallback(),
-    listBookingsWithFallback(),
-    listPaymentsWithFallback(),
-    listReviewsWithFallback(),
+    fetchRecentBookingsSummary(),
+    fetchRecentPaymentsSummary(),
+    fetchRecentReviewsSummary(),
     listComplaintsWithFallback(),
-    listUsersWithFallback(),
   ]);
 
   const liveComplaintsOpen =
@@ -271,7 +557,6 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     liveComplaintsOpenTable ||
     fallbackComplaintCount();
 
-  const normalizeStatus = (value?: string | null) => value?.trim().toLowerCase() ?? "";
   const totalTasksCount = bookingStatuses?.length ?? 0;
   const completedTasksCount =
     bookingStatuses?.filter((row) => normalizeStatus(row.booking_status) === "completed").length ?? 0;
@@ -302,6 +587,14 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     }, 0) ?? 0;
   const payableCommission = Math.max(totalCommission - paidCommission, 0);
   const netSales = Math.max(grossSales - totalCommission, 0);
+  const activeUsersCount =
+    profileStatuses?.filter((row) => ["active", "verified"].includes(normalizeStatus(row.status))).length ?? 0;
+  const inactiveUsersCount =
+    profileStatuses?.filter((row) => normalizeStatus(row.status) === "inactive").length ?? 0;
+  const bannedUsersCount =
+    profileStatuses?.filter((row) =>
+      ["banned", "suspended", "deleted"].includes(normalizeStatus(row.status)),
+    ).length ?? 0;
   const issueReporterRoles = await fetchProfileRoles((issueReports ?? []).map((report) => report.reporterUserId));
   const customerReportsCount =
     issueReports?.filter((report) => {
@@ -317,7 +610,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       accent: "from-[#d946ef] to-[#ec4899]",
       icon: dashboardMetrics[0]!.icon,
       items: [
-        { label: "Total users", value: formatCompactNumber(totalUsers ?? userRows.length) },
+        { label: "Total users", value: formatCompactNumber(totalUsers ?? 0) },
       ],
     },
     {
@@ -440,10 +733,15 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     approvals,
     complaintsOpen: liveComplaintsOpen ?? fallbackComplaintCount(),
     summaryCards,
-    recentBookings: recentBookings.slice(0, 5),
-    recentPayments: recentPayments.slice(0, 5),
-    recentReviews: recentReviews.slice(0, 4),
+    userSummary: {
+      total: totalUsers ?? 0,
+      active: activeUsersCount,
+      inactive: inactiveUsersCount,
+      banned: bannedUsersCount,
+    },
+    recentBookings,
+    recentPayments,
+    recentReviews,
     recentComplaints: recentComplaints.slice(0, 5),
-    userRows: userRows.slice(0, 200),
   };
 }
