@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { approvalItems, dashboardMetrics } from "../data/mock-data";
 import { DataTable } from "../components/data-table";
 import { StatusBadge, statusToTone } from "../components/status-badge";
-import { AdminStatCard, LoadingState, SectionTitle } from "../components/ui-kit";
+import { LoadingState, SectionTitle } from "../components/ui-kit";
 import { getDashboardSnapshot } from "../lib/dashboard-metrics";
 import type { ComplaintRow, DashboardBooking, PaymentRow, ReviewRow, UserRow } from "../types";
 
@@ -29,6 +29,14 @@ const paymentColumns = [
 
 export function DashboardPage() {
   const [metrics, setMetrics] = useState(dashboardMetrics);
+  const [summaryCards, setSummaryCards] = useState<
+    Array<{
+      title: string;
+      accent: string;
+      icon: (typeof dashboardMetrics)[number]["icon"];
+      items: Array<{ label: string; value: string }>;
+    }>
+  >([]);
   const [approvals, setApprovals] = useState(approvalItems);
   const [bookings, setBookings] = useState<DashboardBooking[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -48,6 +56,7 @@ export function DashboardPage() {
       }
 
       setMetrics(snapshot.metrics);
+      setSummaryCards(snapshot.summaryCards);
       setApprovals(snapshot.approvals);
       setBookings(snapshot.recentBookings);
       setPayments(snapshot.recentPayments);
@@ -94,18 +103,33 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {metrics.map((metric) => {
+        {summaryCards.map((metric) => {
           const Icon = metric.icon;
           return (
-            <AdminStatCard
+            <article
               key={metric.title}
-              title={metric.title}
-              value={metric.value}
-              delta={metric.delta}
-              trend={metric.trend}
-              accent={metric.accent}
-              icon={<Icon className="size-6" />}
-            />
+              className="rounded-[28px] border border-[#eadff6] bg-white/92 p-5 shadow-[0_20px_60px_rgba(100,83,148,0.08)]"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className={`grid size-14 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-lg ${metric.accent}`}>
+                  <Icon className="size-6" />
+                </div>
+              </div>
+              <p className="mt-6 text-sm font-semibold uppercase tracking-[0.2em] text-[#8f82ad]">
+                {metric.title}
+              </p>
+              <div className="mt-5 space-y-3">
+                {metric.items.map((item) => (
+                  <div
+                    key={`${metric.title}-${item.label}`}
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-[#f0e8fa] bg-[#fbf8ff] px-4 py-3"
+                  >
+                    <span className="text-sm font-medium text-slate-600">{item.label}</span>
+                    <span className="text-base font-bold text-slate-950">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
           );
         })}
       </section>
