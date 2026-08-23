@@ -19,6 +19,7 @@ class AppRoutes {
   static const profileVerificationIdentity = '/profile/verification/identity';
   static const profileAddresses = '/profile/addresses';
   static const profilePayments = '/profile/payments';
+  static const profileCoupons = '/profile/coupons';
   static const profileFavorites = '/profile/favourites';
   static const profileNotifications = '/profile/notifications';
   static const providerShell = '/provider-workspace';

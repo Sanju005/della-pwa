@@ -42,6 +42,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   bool _isSubmittingReview = false;
   bool _isSubmittingIssue = false;
   PickedBrowserFile? _paymentProof;
+  final TextEditingController _messageController = TextEditingController();
+  final List<_BookingChatMessage> _messages = <_BookingChatMessage>[];
   DateTime? _lastUpdatedAt;
   Timer? _pollTimer;
   bool _didReadRoute = false;
@@ -65,6 +67,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _messageController.dispose();
     super.dispose();
   }
 
@@ -126,6 +129,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           'completed',
         ].contains(booking.workflowStatus) &&
         booking.userReviewStatus != 'submitted';
+    final isTaskCompleted = booking.workflowStatus == 'completed';
 
     return RefreshIndicator(
       onRefresh: _loadBooking,
@@ -150,7 +154,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               title: booking.activitySteps[index].label,
               state: booking.activitySteps[index].status,
               subtitle: _stepSubtitle(booking, index),
-              description: _stepDescription(index),
               child: index == 9 && canReview
                   ? Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.md),
@@ -164,7 +167,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     )
                   : null,
             ),
-            const SizedBox(height: AppSpacing.md),
+            if (index != booking.activitySteps.length - 1) ...[
+              _TaskStepConnector(state: booking.activitySteps[index].status),
+              const SizedBox(height: AppSpacing.sm),
+            ] else
+              const SizedBox(height: AppSpacing.md),
           ],
           _buildProviderSummaryCard(context, booking),
           const SizedBox(height: AppSpacing.md),
@@ -176,9 +183,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             canReview: canReview,
           ),
           const SizedBox(height: AppSpacing.md),
-          _buildIssueSection(context, booking),
-          const SizedBox(height: AppSpacing.md),
-          _buildMessagePlaceholder(context),
+          _buildMessageSection(context, booking, isTaskCompleted: isTaskCompleted),
+          if (isTaskCompleted) ...[
+            const SizedBox(height: AppSpacing.md),
+            _buildIssueSection(context, booking),
+          ],
         ],
       ),
     );
@@ -347,23 +356,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         : 'Waiting';
   }
 
-  String _stepDescription(int index) {
-    switch (index) {
-      case 4:
-        return 'Review the task and confirm the provider has finished.';
-      case 5:
-        return 'Wait for the provider to send the final payment amount.';
-      case 6:
-        return 'Confirm cash payment after you pay the provider.';
-      case 7:
-        return 'Waiting for the provider to confirm the received payment.';
-      case 9:
-        return 'Review popup will appear after both sides complete the job.';
-      default:
-        return '';
-    }
-  }
-
   Widget _buildProviderSummaryCard(
     BuildContext context,
     CustomerBookingDetail booking,
@@ -426,6 +418,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           _summaryTile(Icons.calendar_today_rounded, booking.schedule),
           _summaryTile(Icons.place_outlined, booking.location),
           _summaryTile(Icons.wallet_outlined, booking.paymentAmountLabel, emphasize: true),
+          _summaryTile(Icons.payments_outlined, booking.paymentMethod),
         ],
       ),
     );
@@ -596,7 +589,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  Widget _buildMessagePlaceholder(BuildContext context) {
+  Widget _buildMessageSection(
+    BuildContext context,
+    CustomerBookingDetail booking, {
+    required bool isTaskCompleted,
+  }) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -608,27 +605,99 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Send message',
+            'Live message',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          const Text(
-            'Booking chat is not connected in Flutter yet.',
-            style: TextStyle(
+          Text(
+            isTaskCompleted
+                ? 'Messaging is closed because this task is completed.'
+                : 'Send live updates to the provider while this task is active.',
+            style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
+          Container(
+            constraints: const BoxConstraints(minHeight: 120),
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+              color: const Color(0xFFFDFCFF),
+            ),
+            child: _messages.isEmpty
+                ? Text(
+                    isTaskCompleted
+                        ? 'No messages were sent for this booking.'
+                        : 'Start the conversation with Maya Suri here.',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (final message in _messages) ...[
+                        Align(
+                          alignment: message.isUser
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: message.isUser
+                                  ? AppColors.primarySoft
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  message.text,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  DateFormat('h:mm a').format(message.sentAt),
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           TextField(
-            minLines: 3,
-            maxLines: 5,
-            readOnly: true,
-            decoration: const InputDecoration(
-              hintText: 'Booking chat will appear here later.',
+            controller: _messageController,
+            minLines: 2,
+            maxLines: 4,
+            enabled: !isTaskCompleted,
+            decoration: InputDecoration(
+              hintText: isTaskCompleted
+                  ? 'Messaging closed after task completion.'
+                  : 'Type your message here...',
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -638,14 +707,20 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: SwiperButton(
                   label: 'Attach File',
                   isSecondary: true,
-                  onPressed: null,
+                  onPressed: isTaskCompleted
+                      ? null
+                      : () {
+                          _showNotice(
+                            'File sharing for live message will be connected next.',
+                          );
+                        },
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: SwiperButton(
                   label: 'Send',
-                  onPressed: null,
+                  onPressed: isTaskCompleted ? null : () => _sendMessage(booking),
                 ),
               ),
             ],
@@ -653,6 +728,27 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         ],
       ),
     );
+  }
+
+  void _sendMessage(CustomerBookingDetail booking) {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) {
+      _showNotice('Please type a message first.');
+      return;
+    }
+
+    setState(() {
+      _messages.add(
+        _BookingChatMessage(
+          text: text,
+          sentAt: DateTime.now(),
+          isUser: true,
+        ),
+      );
+      _messageController.clear();
+    });
+
+    _showNotice('Message sent to ${booking.providerFullName}.');
   }
 
   Future<void> _pickPaymentProof() async {
@@ -1131,7 +1227,6 @@ class _TaskStepCard extends StatelessWidget {
     required this.title,
     required this.state,
     required this.subtitle,
-    this.description = '',
     this.child,
   });
 
@@ -1139,25 +1234,22 @@ class _TaskStepCard extends StatelessWidget {
   final String title;
   final String state;
   final String subtitle;
-  final String description;
   final Widget? child;
 
   @override
   Widget build(BuildContext context) {
     final tone = switch (state) {
-      'done' => const Color(0xFF1FA971),
+      'done' => const Color(0xFF16A34A),
       'current' => AppColors.primary,
-      _ => const Color(0xFF94A3B8),
+      _ => const Color(0xFFF59E0B),
     };
-
-    final label = switch (state) {
-      'done' => 'Done',
-      'current' => 'Current Step',
-      _ => 'Waiting',
+    final stateIcon = switch (state) {
+      'done' => Icons.check_circle_rounded,
+      'current' => Icons.radio_button_checked_rounded,
+      _ => Icons.schedule_rounded,
     };
-
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -1166,22 +1258,26 @@ class _TaskStepCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '$number',
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppColors.primary,
+          Column(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.border),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$number',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -1189,53 +1285,40 @@ class _TaskStepCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        '$number. $title',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$number. $title',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                  ),
                             ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: tone.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: tone.withValues(alpha: 0.25)),
-                      ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          color: tone,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            stateIcon,
+                            color: tone,
+                            size: 18,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    description,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                ],
                 if (child != null) child!,
               ],
             ),
@@ -1244,6 +1327,111 @@ class _TaskStepCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TaskStepConnector extends StatefulWidget {
+  const _TaskStepConnector({required this.state});
+
+  final String state;
+
+  @override
+  State<_TaskStepConnector> createState() => _TaskStepConnectorState();
+}
+
+class _TaskStepConnectorState extends State<_TaskStepConnector>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final baseColor = widget.state == 'done'
+        ? const Color(0xFF86EFAC)
+        : const Color(0xFFD1FAE5);
+    final glowColor = widget.state == 'done'
+        ? const Color(0xFF16A34A)
+        : const Color(0xFF4ADE80);
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 27),
+      child: SizedBox(
+        width: 12,
+        height: 46,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final runnerY = (_controller.value * 2) - 1;
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 2.5,
+                  height: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    color: baseColor,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment(0, runnerY),
+                  child: Container(
+                    width: 14,
+                    height: 18,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: Colors.white,
+                      border: Border.all(
+                        color: glowColor.withValues(alpha: 0.55),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: glowColor.withValues(alpha: 0.38),
+                          blurRadius: 8,
+                          spreadRadius: 0.8,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: glowColor,
+                      size: 14,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _BookingChatMessage {
+  const _BookingChatMessage({
+    required this.text,
+    required this.sentAt,
+    required this.isUser,
+  });
+
+  final String text;
+  final DateTime sentAt;
+  final bool isUser;
 }
 
 class _InlineNotice extends StatelessWidget {

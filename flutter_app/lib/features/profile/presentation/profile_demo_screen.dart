@@ -13,6 +13,7 @@ import '../../../widgets/empty_state.dart';
 import '../../../widgets/loading_state.dart';
 import '../../../widgets/notification_card.dart';
 import '../../../widgets/profile_avatar.dart';
+import '../../../widgets/address_live_map.dart';
 import '../../../widgets/swiper_bottom_sheet.dart';
 import '../../../widgets/swiper_button.dart';
 import '../../../widgets/swiper_status_badge.dart';
@@ -32,6 +33,24 @@ class ProfileDemoScreen extends StatefulWidget {
 class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
   static const _accountService = CustomerAccountService();
   static const _addressService = CustomerAddressService();
+  static const _malaysianStates = <String>[
+    'Johor',
+    'Kedah',
+    'Kelantan',
+    'Kuala Lumpur',
+    'Labuan',
+    'Malacca',
+    'Negeri Sembilan',
+    'Pahang',
+    'Penang',
+    'Perak',
+    'Perlis',
+    'Putrajaya',
+    'Sabah',
+    'Sarawak',
+    'Selangor',
+    'Terengganu',
+  ];
 
   late Future<CustomerAccountOverview?> _overviewFuture;
 
@@ -241,9 +260,9 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
     final line1Controller = TextEditingController();
     final line2Controller = TextEditingController();
     final cityController = TextEditingController();
-    final stateController = TextEditingController();
     final postcodeController = TextEditingController();
     final countryController = TextEditingController(text: 'Malaysia');
+    var selectedState = _malaysianStates.first;
     var isDefault = false;
 
     await SwiperBottomSheet.show<void>(
@@ -252,41 +271,69 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
       subtitle: 'Save Home, Work, or any other location for faster booking.',
       child: StatefulBuilder(
         builder: (context, setSheetState) {
+          final previewAddress = [
+            line1Controller.text.trim(),
+            line2Controller.text.trim(),
+            cityController.text.trim(),
+            selectedState.trim(),
+            postcodeController.text.trim(),
+            countryController.text.trim(),
+          ].where((item) => item.isNotEmpty).join(', ');
+
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _AddressPreviewMap(address: previewAddress),
+              const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: labelController,
+                onChanged: (_) => setSheetState(() {}),
                 decoration: const InputDecoration(labelText: 'Label'),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: line1Controller,
+                onChanged: (_) => setSheetState(() {}),
                 decoration: const InputDecoration(labelText: 'Address Line 1'),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: line2Controller,
+                onChanged: (_) => setSheetState(() {}),
                 decoration: const InputDecoration(labelText: 'Address Line 2'),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: cityController,
+                onChanged: (_) => setSheetState(() {}),
                 decoration: const InputDecoration(labelText: 'City'),
               ),
               const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: stateController,
+              DropdownButtonFormField<String>(
+                initialValue: selectedState,
                 decoration: const InputDecoration(labelText: 'State'),
+                items: _malaysianStates
+                    .map(
+                      (state) => DropdownMenuItem<String>(
+                        value: state,
+                        child: Text(state),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setSheetState(() => selectedState = value ?? _malaysianStates.first);
+                },
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: postcodeController,
+                onChanged: (_) => setSheetState(() {}),
                 decoration: const InputDecoration(labelText: 'Postcode'),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: countryController,
+                onChanged: (_) => setSheetState(() {}),
                 decoration: const InputDecoration(labelText: 'Country'),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -309,7 +356,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                         line1: line1Controller.text.trim(),
                         line2: line2Controller.text.trim(),
                         city: cityController.text.trim(),
-                        state: stateController.text.trim(),
+                        state: selectedState.trim(),
                         postcode: postcodeController.text.trim(),
                         country: countryController.text.trim(),
                         isDefault: isDefault,
@@ -462,8 +509,6 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             const SizedBox(height: AppSpacing.lg),
             _OverviewSectionCard(
               title: 'Personal Details',
-              actionLabel: 'Edit',
-              onActionTap: () => _openEditDetailsSheet(overview),
               child: Column(
                 children: [
                   _InfoActionRow(
@@ -517,37 +562,153 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                           ].where((item) => item.trim().isNotEmpty).join(', '),
                     isLast: true,
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  SwiperButton(
+                    label: 'Edit And Save Details',
+                    isSecondary: true,
+                    onPressed: () => _openEditDetailsSheet(overview),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            _OverviewSectionCard(
-              title: 'Verification Details',
-              child: Column(
-                children: [
-                  _InfoActionRow(
-                    icon: Icons.mail_outline_rounded,
-                    label: 'Email',
-                    value: overview.verification.emailVerified
-                        ? 'Verified'
-                        : 'Pending',
+            InkWell(
+              borderRadius: BorderRadius.circular(26),
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.profilePayments,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(26),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF1B103E),
+                      AppColors.primary,
+                    ],
                   ),
-                  _InfoActionRow(
-                    icon: Icons.phone_outlined,
-                    label: 'Phone',
-                    value: overview.verification.phoneVerified
-                        ? 'Verified'
-                        : 'Pending',
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1F684AB3),
+                      blurRadius: 24,
+                      offset: Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Wallet',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Open your wallet, check balance, and top up anytime.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.82),
+                                  height: 1.4,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            InkWell(
+              borderRadius: BorderRadius.circular(26),
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.profileCoupons,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(26),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFFFF7ED),
+                      Color(0xFFFFEDD5),
+                    ],
                   ),
-                  _InfoActionRow(
-                    icon: Icons.badge_outlined,
-                    label: 'IC / Passport',
-                    value: overview.verification.verified
-                        ? 'Verified'
-                        : overview.verification.identityStatusLabel,
-                    isLast: true,
-                  ),
-                ],
+                  border: Border.all(color: const Color(0xFFF4D6A8)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1DE),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.local_offer_outlined,
+                        color: Color(0xFFEA7A00),
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Coupons',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: const Color(0xFF7C2D12),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'See available demo coupons and use them later during booking.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: const Color(0xFF9A3412),
+                                  height: 1.4,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Color(0xFFEA7A00),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -989,7 +1150,7 @@ class _VerificationHubCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Open phone, email, and IC / passport verification',
+                  'Open phone and email verification',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: const Color(0xFF7B728A),
                         height: 1.5,
@@ -1133,6 +1294,93 @@ class _PlaceholderPanel extends StatelessWidget {
                   color: AppColors.textSecondary,
                   height: 1.5,
                 ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddressPreviewMap extends StatelessWidget {
+  const _AddressPreviewMap({
+    required this.address,
+  });
+
+  final String address;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayAddress = address.trim().isEmpty
+        ? 'Type an address and it will appear on the saved-location map preview.'
+        : address.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFF8F3FF),
+            Color(0xFFEDE5FF),
+          ],
+        ),
+        border: Border.all(color: const Color(0xFFE4D7F5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Location Preview',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            height: 136,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: AddressLiveMap(
+                      address: displayAddress,
+                      height: 136,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      displayAddress,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

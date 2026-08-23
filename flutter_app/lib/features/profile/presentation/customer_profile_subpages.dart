@@ -68,17 +68,6 @@ class CustomerVerificationHubScreen extends StatelessWidget {
                   context,
                 ).pushNamed(AppRoutes.profileVerificationPhone),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              _VerificationStatusTile(
-                title: 'IC / Passport',
-                subtitle: 'Identity check',
-                verified: profile.verified,
-                status: profile.identityVerificationStatus,
-                icon: Icons.badge_outlined,
-                onTap: () => Navigator.of(
-                  context,
-                ).pushNamed(AppRoutes.profileVerificationIdentity),
-              ),
             ],
           );
         },
@@ -135,7 +124,7 @@ class CustomerVerificationHubScreen extends StatelessWidget {
                 Text(
                   profile.verified
                       ? 'Your account is verified.'
-                      : 'Open phone, email, and IC / passport verification',
+                      : 'Open phone and email verification',
                   style: const TextStyle(
                     color: Color(0xFF7B728A),
                     fontSize: 13,
@@ -427,8 +416,8 @@ class _CustomerPhoneVerificationScreenState
     extends State<CustomerPhoneVerificationScreen> {
   static const _service = CustomerProfileApiService();
 
-  final _phoneController = TextEditingController();
   String _countryCode = '+60';
+  String _phoneNumber = '';
   String _otp = '';
   int _countdown = 30;
   Timer? _timer;
@@ -446,7 +435,6 @@ class _CustomerPhoneVerificationScreenState
   @override
   void dispose() {
     _timer?.cancel();
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -459,7 +447,7 @@ class _CustomerPhoneVerificationScreenState
       setState(() {
         _profile = profile;
         _countryCode = profile.countryCode;
-        _phoneController.text = profile.phoneNumber;
+        _phoneNumber = profile.phoneNumber;
       });
     } catch (error) {
       if (!mounted) {
@@ -492,7 +480,7 @@ class _CustomerPhoneVerificationScreenState
   }
 
   Future<void> _verify() async {
-    if (_phoneController.text.trim().length < 7 || _otp.length != 6) {
+    if (_phoneNumber.trim().length < 7 || _otp.length != 6) {
       return;
     }
     setState(() {
@@ -501,7 +489,7 @@ class _CustomerPhoneVerificationScreenState
     });
     try {
       final profile = await _service.updateProfile({
-        'phoneNumber': _phoneController.text.trim(),
+        'phoneNumber': _phoneNumber.trim(),
         'countryCode': _countryCode,
         'phoneVerified': true,
       });
@@ -533,7 +521,7 @@ class _CustomerPhoneVerificationScreenState
       return const Scaffold(
         appBar: SwiperAppBar(
           title: 'Phone Verification',
-          subtitle: 'Add your phone and verify it',
+          subtitle: 'Verify your saved phone number',
           showBack: true,
         ),
         body: LoadingState(label: 'Loading phone verification...'),
@@ -543,7 +531,7 @@ class _CustomerPhoneVerificationScreenState
     return Scaffold(
       appBar: const SwiperAppBar(
         title: 'Phone Verification',
-        subtitle: 'Add your phone and verify it',
+        subtitle: 'Verify your saved phone number',
         showBack: true,
       ),
       body: ListView(
@@ -570,7 +558,7 @@ class _CustomerPhoneVerificationScreenState
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'Add your phone number and verify it with a one-time code.',
+            'We use the phone number from your profile. Update it in personal details if you need to change it, then verify again.',
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF7B728A),
@@ -612,11 +600,24 @@ class _CustomerPhoneVerificationScreenState
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
-                      child: TextField(
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
-                          hintText: 'Enter phone number',
+                      child: Container(
+                        height: 52,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F5FF),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE7DEF4)),
+                        ),
+                        child: Text(
+                          _phoneNumber.isEmpty ? 'No phone number saved' : _phoneNumber,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _phoneNumber.isEmpty
+                                ? const Color(0xFF9B93AA)
+                                : const Color(0xFF1F1630),
+                          ),
                         ),
                       ),
                     ),
@@ -626,9 +627,7 @@ class _CustomerPhoneVerificationScreenState
                 SwiperButton(
                   label: 'Send OTP',
                   isSecondary: true,
-                  onPressed: _phoneController.text.trim().length >= 7
-                      ? _startOtp
-                      : null,
+                  onPressed: _phoneNumber.trim().length >= 7 ? _startOtp : null,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
@@ -657,7 +656,7 @@ class _CustomerPhoneVerificationScreenState
           ),
           const SizedBox(height: AppSpacing.lg),
           _securityCard(
-            'Your phone number will be used for account verification and important security alerts.',
+            'Your phone number is managed from your profile and will be used for account verification and important security alerts.',
           ),
           if (_error.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
@@ -1153,6 +1152,7 @@ class CustomerPaymentsScreen extends StatefulWidget {
 
 class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
   static const _service = CustomerProfileApiService();
+  static const double _demoWalletBalance = 128.40;
 
   List<CustomerPaymentHistoryModel>? _items;
   String _error = '';
@@ -1160,6 +1160,7 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
   String _selectedMonth = '';
   String _dateFrom = '';
   String _dateTo = '';
+  String _selectedTopUpMethod = 'FPX';
 
   @override
   void initState() {
@@ -1193,11 +1194,11 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
     if (items == null && _error.isEmpty) {
       return const Scaffold(
         appBar: SwiperAppBar(
-          title: 'Payment',
-          subtitle: 'Customer payment history',
+          title: 'Wallet',
+          subtitle: 'Balance, top up, and payments',
           showBack: true,
         ),
-        body: LoadingState(label: 'Loading payments...'),
+        body: LoadingState(label: 'Loading wallet...'),
       );
     }
 
@@ -1209,8 +1210,8 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
 
     return Scaffold(
       appBar: const SwiperAppBar(
-        title: 'Payment',
-        subtitle: 'Customer payment history',
+        title: 'Wallet',
+        subtitle: 'Balance, top up, and payments',
         showBack: true,
       ),
       body: ListView(
@@ -1259,45 +1260,90 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
   Widget _leadPaymentCard(CustomerPaymentHistoryModel? leadPayment) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: _cardDecoration(),
-      child: Row(
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: const Color(0xFF221531),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(Icons.account_balance_wallet, color: Colors.white),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF221531),
+            AppColors.primary,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x261D1242),
+            blurRadius: 28,
+            offset: Offset(0, 14),
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  leadPayment?.provider ?? 'Service Payment',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF1F1630),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'Demo Balance',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  leadPayment?.serviceTitle ?? 'Customer booking payment',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF6D6480)),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  leadPayment == null
-                      ? 'No payments available'
-                      : DateFormat('d MMM yyyy, h:mm a')
-                          .format(DateTime.parse(leadPayment.paidAt)),
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF8F86A2)),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const Text(
+            'Available Balance',
+            style: TextStyle(
+              color: Color(0xE6FFFFFF),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'RM ${_demoWalletBalance.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            leadPayment == null
+                ? 'Top up your wallet to pay faster when online payments are enabled.'
+                : 'Last payment on ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.parse(leadPayment.paidAt))}',
+            style: const TextStyle(
+              color: Color(0xCCFFFFFF),
+              fontSize: 12,
+              height: 1.5,
             ),
           ),
         ],
@@ -1311,19 +1357,22 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
   ) {
     final amount = leadPayment?.amount ?? totalPaid;
     return _sectionCard(
-      title: 'Payment Summary',
+      title: 'Wallet Summary',
       child: Column(
         children: [
-          _summaryRow('Service Charges', 'RM${amount.toStringAsFixed(2)}'),
+          _summaryRow(
+            'Current Balance',
+            'RM${_demoWalletBalance.toStringAsFixed(2)}',
+            emphasize: true,
+          ),
           const SizedBox(height: AppSpacing.sm),
-          _summaryRow('Service Fee', 'RM0.00'),
+          _summaryRow('Suggested Top Up', 'RM50.00'),
           const SizedBox(height: AppSpacing.sm),
-          _summaryRow('Platform Fee', 'RM0.00'),
+          _summaryRow('Last Payment', 'RM${amount.toStringAsFixed(2)}'),
           const Divider(height: 24),
           _summaryRow(
             'Total Paid',
             'RM${amount.toStringAsFixed(2)}',
-            emphasize: true,
           ),
         ],
       ),
@@ -1332,23 +1381,106 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
 
   Widget _paymentMethodCard(CustomerPaymentHistoryModel? leadPayment) {
     return _sectionCard(
-      title: 'Payment Method',
-      child: Container(
+      title: 'Top Up Method',
+      child: Column(
+        children: [
+          _topUpMethodTile(
+            icon: Icons.account_balance_rounded,
+            label: 'FPX',
+            subtitle: 'Online banking instant top up',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _topUpMethodTile(
+            icon: Icons.credit_card_rounded,
+            label: 'Card',
+            subtitle: 'Visa, Mastercard, and debit card',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _topUpMethodTile(
+            icon: Icons.qr_code_rounded,
+            label: 'Touch n Go',
+            subtitle: 'Use your Touch n Go eWallet',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _completedCard(CustomerPaymentHistoryModel? leadPayment) {
+    return _sectionCard(
+      title: 'Top Up Wallet',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: const [
+              _WalletAmountChip(label: 'RM20'),
+              _WalletAmountChip(label: 'RM50'),
+              _WalletAmountChip(label: 'RM100'),
+              _WalletAmountChip(label: 'RM200'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'This is a demo wallet screen for now. Later we can connect real top-up checkout flows here.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF7B728A),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SwiperButton(
+            label: 'Top Up Wallet',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Demo top up via $_selectedTopUpMethod will be connected later.',
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _topUpMethodTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+  }) {
+    final selected = _selectedTopUpMethod == label;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => setState(() => _selectedTopUpMethod = label),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE7DCF7)),
+          color: selected ? const Color(0xFFF5F0FF) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.primary : const Color(0xFFE7DCF7),
+            width: selected ? 1.4 : 1,
+          ),
         ),
         child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: AppColors.primarySoft,
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.12)
+                    : AppColors.primarySoft,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.wallet_outlined, color: AppColors.primary),
+              child: Icon(icon, color: AppColors.primary),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -1356,73 +1488,30 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    leadPayment?.paymentMethod ?? 'Cash',
+                    label,
                     style: const TextStyle(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       color: Color(0xFF24193A),
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Text(
-                    'Only cash is available right now',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF8F86A2)),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF8F86A2),
+                    ),
                   ),
                 ],
               ),
             ),
-            const SwiperStatusBadge(label: 'Cash', tone: SwiperStatusTone.info),
+            if (selected)
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.primary,
+              ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _completedCard(CustomerPaymentHistoryModel? leadPayment) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFFBF1),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFD7EFDB)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              color: Color(0xFF22C55E),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.check, color: Colors.white, size: 18),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Payment Completed',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1F4D2B),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  leadPayment == null
-                      ? 'Waiting for payment record'
-                      : 'Paid on ${DateFormat('d MMM yyyy, h:mm a').format(DateTime.parse(leadPayment.paidAt))}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF5F7D67),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1932,6 +2021,170 @@ class _CustomerNotificationsScreenState
   }
 }
 
+class CustomerCouponsScreen extends StatelessWidget {
+  const CustomerCouponsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    const coupons = <({String title, String code, String expiry, String note})>[
+      (
+        title: '5% Discount',
+        code: 'SAVE5',
+        expiry: 'Expires in 5 days',
+        note: 'Use this demo coupon on your next booking to save 5%.',
+      ),
+      (
+        title: 'RM10 Discount',
+        code: 'LESS10',
+        expiry: 'Expires in 13 hrs',
+        note: 'Demo coupon for RM10 off selected service bookings.',
+      ),
+      (
+        title: 'Free Platform Fee',
+        code: 'NOFEE',
+        expiry: 'Expires in 2 days',
+        note: 'Waives the platform fee on one future booking.',
+      ),
+    ];
+
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Coupons',
+        subtitle: 'Demo coupons for future bookings',
+        showBack: true,
+      ),
+      body: ListView(
+        padding: AppSpacing.screenPadding,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFFF7ED),
+                  Color(0xFFFFEDD5),
+                ],
+              ),
+              border: Border.all(color: const Color(0xFFF4D6A8)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Available Coupons',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF7C2D12),
+                  ),
+                ),
+                SizedBox(height: AppSpacing.sm),
+                Text(
+                  'These are demo coupons for now. Later, users will be able to apply them during booking checkout.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF9A3412),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          for (final coupon in coupons) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: _cardDecoration(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1DE),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Icon(
+                          Icons.local_offer_outlined,
+                          color: Color(0xFFEA7A00),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              coupon.title,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF24193A),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              coupon.expiry,
+                              style: const TextStyle(
+                                color: Color(0xFF9A3412),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SwiperStatusBadge(
+                        label: 'Demo',
+                        tone: SwiperStatusTone.info,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBF5),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFF4D6A8)),
+                    ),
+                    child: Text(
+                      'Code: ${coupon.code}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF7C2D12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    coupon.note,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6F6681),
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _VerificationStatusTile extends StatelessWidget {
   const _VerificationStatusTile({
     required this.title,
@@ -1939,32 +2192,20 @@ class _VerificationStatusTile extends StatelessWidget {
     required this.verified,
     required this.icon,
     required this.onTap,
-    this.status,
   });
 
   final String title;
   final String subtitle;
   final bool verified;
-  final String? status;
   final IconData icon;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final label = verified
-        ? 'Verified'
-        : status == 'processing'
-            ? 'Processing'
-            : status == 'rejected'
-                ? 'Rejected'
-                : 'Pending';
+    final label = verified ? 'Verified' : 'Pending';
     final tone = verified
         ? SwiperStatusTone.success
-        : status == 'processing'
-            ? SwiperStatusTone.info
-            : status == 'rejected'
-                ? SwiperStatusTone.error
-                : SwiperStatusTone.warning;
+        : SwiperStatusTone.warning;
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),
@@ -2182,6 +2423,31 @@ SwiperStatusTone _statusTone(String status) {
       return SwiperStatusTone.error;
     default:
       return SwiperStatusTone.warning;
+  }
+}
+
+class _WalletAmountChip extends StatelessWidget {
+  const _WalletAmountChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F0FF),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE7DCF7)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }
 

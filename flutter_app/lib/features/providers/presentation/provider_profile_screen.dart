@@ -193,20 +193,13 @@ class ProviderProfileScreen extends StatelessWidget {
                                 runSpacing: 8,
                                 children: [
                                   _miniStatus(
-                                    icon: Icons.badge_outlined,
-                                    label: detail.identityVerified
-                                        ? 'IC Verified'
-                                        : 'IC Pending',
-                                    color: detail.identityVerified
-                                        ? AppColors.success
-                                        : AppColors.warning,
-                                  ),
-                                  _miniStatus(
-                                    icon: Icons.call_outlined,
-                                    label: detail.phoneVerified
-                                        ? 'Mobile Verified'
-                                        : 'Mobile Pending',
-                                    color: detail.phoneVerified
+                                    icon: detail.verified
+                                        ? Icons.verified_outlined
+                                        : Icons.hourglass_top_rounded,
+                                    label: detail.verified
+                                        ? 'Verified'
+                                        : 'Pending',
+                                    color: detail.verified
                                         ? AppColors.success
                                         : AppColors.warning,
                                   ),

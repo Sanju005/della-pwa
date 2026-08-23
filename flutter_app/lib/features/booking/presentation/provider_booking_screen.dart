@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../models/provider_summary.dart';
-import '../../../services/current_location_service.dart';
 import '../../../services/customer_account_service.dart';
 import '../../../services/customer_address_service.dart';
 import '../../../services/provider_booking_service.dart';
@@ -32,6 +31,7 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
   static const _bookingService = ProviderBookingService();
   static const _accountService = CustomerAccountService();
   static const _addressService = CustomerAddressService();
+  static const _paymentMethod = 'Cash';
 
   final _addressController = TextEditingController();
   final _accessNoteController = TextEditingController();
@@ -39,14 +39,12 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
 
   ProviderSummary? _provider;
   ProviderDetailModel? _detail;
-  CustomerAddressSummary? _defaultAddress;
   BookingMode _bookingMode = BookingMode.hourly;
   String? _selectedDateKey;
   String? _selectedStartTime;
   int _selectedHours = 1;
   bool _isLoading = true;
   bool _isSubmitting = false;
-  bool _isResolvingLocation = false;
   String? _errorMessage;
   bool _didLoad = false;
 
@@ -142,7 +140,6 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
 
       setState(() {
         _detail = detail;
-        _defaultAddress = defaultAddress.label.isEmpty ? null : defaultAddress;
         _bookingMode = BookingMode.hourly;
         _selectedHours = 1;
         _selectedDateKey = _firstAvailableDateKey(detail);
@@ -151,12 +148,12 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
       });
 
       if (_addressController.text.trim().isEmpty &&
-          defaultAddress.label.isNotEmpty) {
-        _addressController.text = defaultAddress.formattedAddress;
-      } else if (_addressController.text.trim().isEmpty &&
           activeLocation != null &&
           activeLocation.address.trim().isNotEmpty) {
         _addressController.text = activeLocation.address.trim();
+      } else if (_addressController.text.trim().isEmpty &&
+          defaultAddress.label.isNotEmpty) {
+        _addressController.text = defaultAddress.formattedAddress;
       }
     } catch (error, stackTrace) {
       if (kDebugMode) {
@@ -416,6 +413,7 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
     });
 
     final notes = [
+      'Payment method: $_paymentMethod',
       if (_accessNoteController.text.trim().isNotEmpty)
         'Access note: ${_accessNoteController.text.trim()}',
       if (_notesController.text.trim().isNotEmpty)
@@ -482,43 +480,6 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
-  }
-
-  Future<void> _useCurrentLocation() async {
-    if (_isResolvingLocation) {
-      return;
-    }
-
-    setState(() {
-      _isResolvingLocation = true;
-    });
-
-    try {
-      final result = await fetchCurrentLocation();
-      if (!mounted) {
-        return;
-      }
-      _addressController.text = result.label;
-      _showSnackBar('Current location added to the address field.');
-    } catch (error, stackTrace) {
-      if (kDebugMode) {
-        debugPrint('Current location failed: $error');
-        debugPrintStack(stackTrace: stackTrace);
-      }
-      if (!mounted) {
-        return;
-      }
-      final message = error is Exception
-          ? error.toString().replaceFirst('Exception: ', '')
-          : 'Unable to get your current location.';
-      _showSnackBar(message);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isResolvingLocation = false;
-        });
-      }
-    }
   }
 
   @override
@@ -803,30 +764,16 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
                 controller: _addressController,
                 minLines: 3,
                 maxLines: 4,
-                hintText: 'Add the address where the provider should come.',
+                hintText:
+                    'The provider will use the location selected on your home screen.',
+                readOnly: true,
               ),
               const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  SwiperButton(
-                    label: 'Use Saved Address',
-                    isSecondary: true,
-                    onPressed: _defaultAddress == null
-                        ? null
-                        : () {
-                            _addressController.text =
-                                _defaultAddress!.formattedAddress;
-                          },
-                  ),
-                  SwiperButton(
-                    label: 'Use Current Location',
-                    isSecondary: true,
-                    isLoading: _isResolvingLocation,
-                    onPressed: _useCurrentLocation,
-                  ),
-                ],
+              Text(
+                'This service address follows the location the customer selected on the home screen before browsing providers.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
               ),
             ],
           ),
@@ -857,6 +804,34 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
         const SizedBox(height: AppSpacing.md),
         _section(
           context,
+          title: '5. Payment Method',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: const [
+                  _PaymentMethodChip(label: 'Cash', selected: true),
+                  _PaymentMethodChip(label: 'QR', enabled: false),
+                  _PaymentMethodChip(label: 'Bank Transfer', enabled: false),
+                  _PaymentMethodChip(label: 'Card', enabled: false),
+                  _PaymentMethodChip(label: 'Wallet', enabled: false),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Cash is the default payment method for now. QR, bank transfer, card, and wallet will be available later.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _section(
+          context,
           title: 'Booking Summary',
           child: Column(
             children: [
@@ -877,6 +852,7 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
                     ? '-'
                     : '${_bookingMode == BookingMode.daily ? selectedSlot?.startTimeLabel ?? '-' : _selectedStartTime} - ${_endTimeForSelection(detail)}',
               ),
+              _summaryRow('Payment Method', _paymentMethod),
               const Divider(height: 24),
               _summaryRow(
                 'Total',
@@ -951,12 +927,8 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
                   runSpacing: 8,
                   children: [
                     _statusBadge(
-                      detail.identityVerified ? 'IC Verified' : 'IC Pending',
-                      detail.identityVerified,
-                    ),
-                    _statusBadge(
-                      detail.phoneVerified ? 'Mobile Verified' : 'Mobile Pending',
-                      detail.phoneVerified,
+                      detail.verified ? 'Verified' : 'Pending',
+                      detail.verified,
                     ),
                   ],
                 ),
@@ -1257,11 +1229,13 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
     required int minLines,
     required int maxLines,
     required String hintText,
+    bool readOnly = false,
   }) {
     return TextField(
       controller: controller,
       minLines: minLines,
       maxLines: maxLines,
+      readOnly: readOnly,
       decoration: InputDecoration(
         hintText: hintText,
         filled: true,
@@ -1362,6 +1336,69 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
               color: emphasize ? AppColors.primary : AppColors.textPrimary,
               fontSize: emphasize ? 18 : 13,
               fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentMethodChip extends StatelessWidget {
+  const _PaymentMethodChip({
+    required this.label,
+    this.selected = false,
+    this.enabled = true,
+  });
+
+  final String label;
+  final bool selected;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = selected
+        ? AppColors.primarySoft
+        : enabled
+            ? Colors.white
+            : const Color(0xFFF8F6FC);
+    final borderColor = selected
+        ? AppColors.primary
+        : enabled
+            ? const Color(0xFFE7ECE8)
+            : const Color(0xFFE7E1F4);
+    final textColor = selected
+        ? AppColors.primary
+        : enabled
+            ? AppColors.textPrimary
+            : AppColors.textSecondary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            selected
+                ? Icons.radio_button_checked_rounded
+                : Icons.radio_button_off_rounded,
+            size: 16,
+            color: textColor,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            enabled ? label : '$label Soon',
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

@@ -112,6 +112,11 @@ class AppRouter {
           builder: (_) => const CustomerPaymentsScreen(),
           settings: settings,
         );
+      case AppRoutes.profileCoupons:
+        return buildAppPageRoute<void>(
+          builder: (_) => const CustomerCouponsScreen(),
+          settings: settings,
+        );
       case AppRoutes.profileFavorites:
         return buildAppPageRoute<void>(
           builder: (_) => const CustomerFavoritesScreen(),

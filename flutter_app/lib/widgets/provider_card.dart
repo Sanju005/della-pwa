@@ -20,15 +20,13 @@ class ProviderCard extends StatelessWidget {
         ? 'Top Rated Provider'
         : 'Popular Provider';
     final serviceTags = <String>[
+      if (provider.specialties.isNotEmpty) provider.specialties[0],
       if (provider.specialties.length > 1) provider.specialties[1],
       if (provider.specialties.length > 2) provider.specialties[2],
-      if (provider.specialties.length > 3) provider.specialties[3],
-      if (provider.specialties.length > 4) provider.specialties[4],
-      if (provider.specialties.length <= 1) 'Emergency Repair',
-      if (provider.specialties.length <= 2) 'Socket Repair',
-      if (provider.specialties.length <= 3) 'Wiring',
-      if (provider.specialties.length <= 4) 'Switch Board Repair',
-    ].take(4).toList();
+      if (provider.specialties.isEmpty) 'Emergency Repair',
+      if (provider.specialties.length <= 1) 'Socket Repair',
+      if (provider.specialties.length <= 2) 'Wiring',
+    ].take(3).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -95,6 +93,24 @@ class ProviderCard extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 8),
                                     _RankingBadge(label: rankingBadge),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      provider.identityVerified &&
+                                              provider.phoneVerified
+                                          ? 'Verified'
+                                          : 'Pending',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                            color:
+                                                provider.identityVerified &&
+                                                        provider.phoneVerified
+                                                    ? const Color(0xFF138A36)
+                                                    : const Color(0xFFD97706),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -175,49 +191,35 @@ class ProviderCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _VerificationPill(
-                      icon: Icons.badge_outlined,
-                      label:
-                          provider.identityVerified ? 'ID Verified' : 'ID Pending',
-                      verified: provider.identityVerified,
-                    ),
-                    _VerificationPill(
-                      icon: Icons.call_outlined,
-                      label: provider.phoneVerified
-                          ? 'Phone Verified'
-                          : 'Phone Pending',
-                      verified: provider.phoneVerified,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+                Row(
                   children: serviceTags
                       .map(
-                        (tag) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF3EBFC),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            tag,
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        (tag) => Expanded(
+                          child: Container(
+                            margin: EdgeInsets.only(
+                              right: tag == serviceTags.last ? 0 : 6,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3EBFC),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              tag,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
                           ),
                         ),
                       )
@@ -270,25 +272,6 @@ class ProviderCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(44),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: onTap,
-                    child: const Text(
-                      'View Profile',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
                   ),
                 ),
               ],
@@ -433,72 +416,6 @@ class _Metric extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _VerificationPill extends StatelessWidget {
-  const _VerificationPill({
-    required this.icon,
-    required this.label,
-    required this.verified,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool verified;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderColor =
-        verified ? const Color(0xFFCBE8D2) : const Color(0xFFFDE2B7);
-    final backgroundColor =
-        verified ? const Color(0xFFF2FBF5) : const Color(0xFFFFF8EE);
-    final textColor =
-        verified ? const Color(0xFF138A36) : const Color(0xFFD97706);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 18,
-            height: 18,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: borderColor),
-            ),
-            child: Icon(icon, size: 11, color: textColor),
-          ),
-          if (verified) ...[
-            const SizedBox(width: 5),
-            Container(
-              width: 18,
-              height: 18,
-              decoration: const BoxDecoration(
-                color: Color(0xFF16A34A),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check, size: 12, color: Colors.white),
-            ),
-          ],
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: textColor,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ],
-      ),
     );
   }
 }
