@@ -15,6 +15,7 @@ class NativeTabScaffold extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.actions,
+    this.showAppBar = true,
   });
 
   final int currentIndex;
@@ -24,6 +25,7 @@ class NativeTabScaffold extends StatelessWidget {
   final String title;
   final String subtitle;
   final List<Widget>? actions;
+  final bool showAppBar;
 
   @override
   Widget build(BuildContext context) {
@@ -43,11 +45,13 @@ class NativeTabScaffold extends StatelessWidget {
           }
         },
         child: Scaffold(
-          appBar: SwiperAppBar(
-            title: title,
-            subtitle: subtitle,
-            actions: actions,
-          ),
+          appBar: showAppBar
+              ? SwiperAppBar(
+                  title: title,
+                  subtitle: subtitle,
+                  actions: actions,
+                )
+              : null,
           body: IndexedStack(
             index: currentIndex,
             children: pages,

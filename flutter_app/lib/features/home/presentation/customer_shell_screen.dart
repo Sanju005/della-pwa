@@ -44,6 +44,7 @@ class _CustomerShellScreenState extends State<CustomerShellScreen> {
       currentIndex: _currentIndex,
       title: titles[_currentIndex],
       subtitle: subtitles[_currentIndex],
+      showAppBar: _currentIndex != 0,
       pages: pages,
       items: const [
         SwiperBottomNavItem(label: 'Home', icon: Icons.home_rounded),
