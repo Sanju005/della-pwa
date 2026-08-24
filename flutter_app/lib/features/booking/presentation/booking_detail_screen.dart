@@ -1389,27 +1389,37 @@ class _TaskStepConnectorState extends State<_TaskStepConnector>
                 Align(
                   alignment: Alignment(0, runnerY),
                   child: Container(
-                    width: 14,
-                    height: 18,
+                    width: 22,
+                    height: 24,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      color: Colors.white,
-                      border: Border.all(
-                        color: glowColor.withValues(alpha: 0.55),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: glowColor.withValues(alpha: 0.28),
+                            blurRadius: 10,
+                            spreadRadius: 0.8,
+                          ),
+                        ],
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: glowColor.withValues(alpha: 0.38),
-                          blurRadius: 8,
-                          spreadRadius: 0.8,
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: glowColor,
-                      size: 14,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: glowColor,
+                            size: 18,
+                          ),
+                          Transform.translate(
+                            offset: const Offset(0, -8),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: glowColor.withValues(alpha: 0.85),
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

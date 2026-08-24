@@ -314,13 +314,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Transform.translate(
-                        offset: const Offset(0, -34),
+                        offset: const Offset(0, -18),
                         child: _LocationCard(
                           selectedLocation: _selectedLocation,
                           onChangePressed: _chooseLocation,
                         ),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 12),
                       _WalletBalanceCard(
                         balance: 128.40,
                         onTap: () => Navigator.of(
@@ -542,16 +542,15 @@ class _HeroSectionState extends State<_HeroSection>
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
+                      Expanded(
                         child: Text(
                           greeting.label,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          overflow: TextOverflow.visible,
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 28,
+                            fontSize: greeting.label.length > 24 ? 21 : 28,
                             fontWeight: FontWeight.w600,
                             height: 1.1,
                           ),
@@ -585,7 +584,7 @@ class _HeroSectionState extends State<_HeroSection>
                         child: Icon(
                           greeting.icon,
                           color: greeting.iconColor,
-                          size: 32,
+                          size: greeting.label.length > 24 ? 28 : 32,
                         ),
                       ),
                     ],
@@ -611,97 +610,100 @@ class _WalletBalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(28),
-      onTap: onTap,
-      child: Ink(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFF160C38),
-              Color(0xFF432199),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.18),
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x332D1C66),
-              blurRadius: 28,
-              offset: Offset(0, 16),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF160C38),
+                Color(0xFF432199),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Row(
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.16),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.18),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x332D1C66),
+                blurRadius: 28,
+                offset: Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: Colors.white,
+                    size: 28,
                   ),
                 ),
-                child: const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: Colors.white,
-                  size: 28,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Wallet Balance',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'RM ${balance.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              color: Colors.white,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Tap to top up or manage your wallet.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.86),
+                              height: 1.4,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Wallet Balance',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'RM ${balance.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                            fontSize: 30,
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Tap to top up or manage your wallet.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.86),
-                            height: 1.4,
-                          ),
-                    ),
-                  ],
+                const SizedBox(width: AppSpacing.md),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1078,7 +1080,12 @@ class _LocationCard extends StatelessWidget {
             : 'Choose a saved address or use your current location';
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 2),
@@ -1103,42 +1110,7 @@ class _LocationCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFF8F3FF),
-                      Color(0xFFE9DDFF),
-                    ],
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x14684AB3),
-                      blurRadius: 18,
-                      offset: Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.location_on_rounded,
-                  color: AppColors.primary,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Text(
-                  'Service Location',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontSize: 22,
-                      ),
-                ),
-              ),
+              const Spacer(),
               Wrap(
                 spacing: 4,
                 runSpacing: 4,
@@ -1156,12 +1128,12 @@ class _LocationCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 6),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.lg,
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
             ),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -1184,8 +1156,8 @@ class _LocationCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 58,
-                  height: 58,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
@@ -1196,7 +1168,7 @@ class _LocationCard extends StatelessWidget {
                   child: const Icon(
                     Icons.my_location_rounded,
                     color: Colors.white,
-                    size: 28,
+                    size: 24,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
@@ -1221,6 +1193,7 @@ class _LocationCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
+                              fontSize: 18,
                             ),
                       ),
                     ],
@@ -1229,14 +1202,14 @@ class _LocationCard extends StatelessWidget {
                 Icon(
                   Icons.location_on_rounded,
                   color: Colors.white.withValues(alpha: 0.10),
-                  size: 42,
+                  size: 34,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 8),
           SizedBox(
-            height: 118,
+            height: 86,
             child: Row(
               children: [
                 Expanded(
@@ -1253,14 +1226,14 @@ class _LocationCard extends StatelessWidget {
                         onTap: onChangePressed,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.lg,
-                            vertical: AppSpacing.lg,
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.md,
                           ),
                           child: Row(
                             children: [
                               Container(
-                                width: 48,
-                                height: 48,
+                                width: 42,
+                                height: 42,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: const Color(0xFFF3ECFF),
@@ -1268,7 +1241,7 @@ class _LocationCard extends StatelessWidget {
                                 child: const Icon(
                                   Icons.location_on_rounded,
                                   color: AppColors.primary,
-                                  size: 24,
+                                  size: 20,
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.md),
@@ -1829,8 +1802,8 @@ class _MapBadgeState extends State<_MapBadge>
         final glow = 0.28 + (_controller.value * 0.18);
 
         return Container(
-          width: 130,
-          height: 118,
+          width: 110,
+          height: 96,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             gradient: const LinearGradient(
@@ -1848,11 +1821,11 @@ class _MapBadgeState extends State<_MapBadge>
               Positioned(
                 left: 16,
                 right: 12,
-                bottom: 18,
+                bottom: 14,
                 child: Transform.rotate(
                   angle: -0.42,
                   child: Container(
-                    height: 38,
+                    height: 32,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: Colors.white.withValues(alpha: 0.76),
@@ -1862,13 +1835,13 @@ class _MapBadgeState extends State<_MapBadge>
                 ),
               ),
               Positioned(
-                top: 20 - lift,
+                top: 14 - lift,
                 child: Container(
-                  width: 52,
-                  height: 52,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(26),
+                    borderRadius: BorderRadius.circular(23),
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFF6B43D8).withValues(alpha: glow),
