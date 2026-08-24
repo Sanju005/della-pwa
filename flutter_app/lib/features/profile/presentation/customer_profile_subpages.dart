@@ -1906,6 +1906,28 @@ class _CustomerNotificationsScreenState
     _items = widget.repository.getNotifications();
   }
 
+  void _openNotification(NotificationItem item, int index) {
+    setState(() {
+      _items = [
+        for (var i = 0; i < _items.length; i++)
+          NotificationItem(
+            title: _items[i].title,
+            body: _items[i].body,
+            timeLabel: _items[i].timeLabel,
+            isUnread: i == index ? false : _items[i].isUnread,
+            targetRoute: _items[i].targetRoute,
+            targetArgument: _items[i].targetArgument,
+          ),
+      ];
+    });
+
+    if (item.targetRoute != null) {
+      Navigator.of(
+        context,
+      ).pushNamed(item.targetRoute!, arguments: item.targetArgument);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1932,19 +1954,7 @@ class _CustomerNotificationsScreenState
                 padding: const EdgeInsets.only(bottom: AppSpacing.md),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(18),
-                  onTap: () {
-                    setState(() {
-                      _items = [
-                        for (var i = 0; i < _items.length; i++)
-                          NotificationItem(
-                            title: _items[i].title,
-                            body: _items[i].body,
-                            timeLabel: _items[i].timeLabel,
-                            isUnread: i == index ? false : _items[i].isUnread,
-                          ),
-                      ];
-                    });
-                  },
+                  onTap: () => _openNotification(item, index),
                   child: Container(
                     padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(

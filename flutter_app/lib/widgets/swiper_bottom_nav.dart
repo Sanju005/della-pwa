@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/animation/app_motion.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 
@@ -52,17 +53,42 @@ class SwiperBottomNav extends StatelessWidget {
             horizontal: AppSpacing.xs,
             vertical: AppSpacing.xs,
           ),
-          child: Row(
-            children: [
-              for (var index = 0; index < items.length; index++)
-                Expanded(
-                  child: _BottomNavButton(
-                    item: items[index],
-                    selected: index == currentIndex,
-                    onTap: () => onTap(index),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth / items.length;
+              return Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: AppMotion.resolveDuration(context, AppMotion.normal),
+                    curve: AppMotion.emphasizedCurve,
+                    left: (itemWidth * currentIndex) + 4,
+                    top: 4,
+                    width: itemWidth - 8,
+                    bottom: 4,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySoft,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-            ],
+                  Row(
+                    children: [
+                      for (var index = 0; index < items.length; index++)
+                        Expanded(
+                          child: _BottomNavButton(
+                            item: items[index],
+                            selected: index == currentIndex,
+                            onTap: () => onTap(index),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -83,34 +109,42 @@ class _BottomNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.primarySoft : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              duration: AppMotion.resolveDuration(context, AppMotion.fast),
+              curve: AppMotion.emphasizedCurve,
+              scale: selected && !AppMotion.reduceMotion(context) ? 1.08 : 1,
+              child: Icon(
                 item.icon,
                 color: selected ? AppColors.primary : AppColors.textSecondary,
               ),
-              const SizedBox(height: 4),
-              Text(
+            ),
+            const SizedBox(height: 4),
+            AnimatedOpacity(
+              duration: AppMotion.resolveDuration(context, AppMotion.fast),
+              curve: AppMotion.enterCurve,
+              opacity: selected ? 1 : 0.78,
+              child: Text(
                 item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: selected ? AppColors.primary : AppColors.textSecondary,
                     ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

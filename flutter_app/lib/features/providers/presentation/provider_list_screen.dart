@@ -1,22 +1,31 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/animation/app_motion.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/provider_marketplace_service.dart';
 import '../../../theme/app_spacing.dart';
+import '../../../widgets/app_reveal.dart';
 import '../../../widgets/empty_state.dart';
-import '../../../widgets/loading_state.dart';
 import '../../../widgets/provider_card.dart';
+import '../../../widgets/provider_skeleton_card.dart';
 import '../../../widgets/swiper_app_bar.dart';
 
-class ProviderListScreen extends StatelessWidget {
+class ProviderListScreen extends StatefulWidget {
   const ProviderListScreen({
     super.key,
     required this.repository,
   });
 
   final DemoRepository repository;
+  @override
+  State<ProviderListScreen> createState() => _ProviderListScreenState();
+}
+
+class _ProviderListScreenState extends State<ProviderListScreen> {
   static const _marketplaceService = ProviderMarketplaceService();
+  bool _allowEntranceAnimations = true;
+  bool _didScheduleAnimationStop = false;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +46,12 @@ class ProviderListScreen extends StatelessWidget {
         future: _marketplaceService.fetchCatalog(service: service),
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const LoadingState(label: 'Loading providers...');
+            return ListView.separated(
+              padding: AppSpacing.screenPadding,
+              itemCount: 4,
+              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
+              itemBuilder: (context, index) => const ProviderSkeletonCard(),
+            );
           }
 
           if (snapshot.hasError) {
@@ -60,13 +74,36 @@ class ProviderListScreen extends StatelessWidget {
             );
           }
 
+          if (!_didScheduleAnimationStop) {
+            _didScheduleAnimationStop = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              await Future<void>.delayed(
+                AppMotion.reduceMotion(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 900),
+              );
+              if (mounted) {
+                setState(() => _allowEntranceAnimations = false);
+              }
+            });
+          }
+
           return ListView.separated(
             padding: AppSpacing.screenPadding,
-            itemBuilder: (context, index) => ProviderCard(
-              provider: providers[index],
-              onTap: () => Navigator.of(context).pushNamed(
-                AppRoutes.providerProfile,
-                arguments: providers[index],
+            itemBuilder: (context, index) => AppReveal(
+              key: ValueKey('provider-list-${providers[index].id}'),
+              delay: _allowEntranceAnimations
+                  ? Duration(milliseconds: 40 + (index * 55))
+                  : Duration.zero,
+              duration: AppMotion.normal,
+              beginOffset: const Offset(0, 0.05),
+              beginScale: 0.98,
+              child: ProviderCard(
+                provider: providers[index],
+                onTap: () => Navigator.of(context).pushNamed(
+                  AppRoutes.providerProfile,
+                  arguments: providers[index],
+                ),
               ),
             ),
             separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),

@@ -7,6 +7,7 @@ import '../../../services/provider_registration_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
+import '../../../widgets/malaysia_state_autocomplete_field.dart';
 import '../../../widgets/swiper_password_field.dart';
 import '../../../widgets/swiper_text_field.dart';
 import 'auth_flow_scaffold.dart';
@@ -42,7 +43,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   final _address2Controller = TextEditingController();
   final _postcodeController = TextEditingController();
   final _cityController = TextEditingController();
-  final _stateController = TextEditingController(text: 'Kuala Lumpur');
+  final _stateController = TextEditingController();
   final _countryController = TextEditingController(text: 'Malaysia');
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -487,11 +488,10 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          SwiperTextField(
-            label: 'State',
-            hintText: 'State',
+          MalaysiaStateAutocompleteField(
             controller: _stateController,
-            prefixIcon: const Icon(Icons.map_outlined),
+            label: 'State',
+            hintText: 'Type first letter',
             validator: (value) => _required(value, 'State'),
           ),
           const SizedBox(height: AppSpacing.md),

@@ -78,7 +78,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          minimumSize: const Size.fromHeight(56),
+          minimumSize: const Size.fromHeight(52),
           elevation: 0,
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -94,7 +94,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(56),
+          minimumSize: const Size.fromHeight(52),
           side: const BorderSide(color: AppColors.border),
           foregroundColor: AppColors.textPrimary,
           shape: RoundedRectangleBorder(
@@ -110,6 +110,7 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         surfaceTintColor: Colors.transparent,
         showDragHandle: true,
+        constraints: BoxConstraints(maxWidth: 640),
         modalBackgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(

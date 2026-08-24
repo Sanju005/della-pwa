@@ -14,6 +14,7 @@ import '../../../widgets/loading_state.dart';
 import '../../../widgets/notification_card.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../../widgets/address_live_map.dart';
+import '../../../widgets/malaysia_state_autocomplete_field.dart';
 import '../../../widgets/swiper_bottom_sheet.dart';
 import '../../../widgets/swiper_button.dart';
 import '../../../widgets/swiper_status_badge.dart';
@@ -33,25 +34,6 @@ class ProfileDemoScreen extends StatefulWidget {
 class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
   static const _accountService = CustomerAccountService();
   static const _addressService = CustomerAddressService();
-  static const _malaysianStates = <String>[
-    'Johor',
-    'Kedah',
-    'Kelantan',
-    'Kuala Lumpur',
-    'Labuan',
-    'Malacca',
-    'Negeri Sembilan',
-    'Pahang',
-    'Penang',
-    'Perak',
-    'Perlis',
-    'Putrajaya',
-    'Sabah',
-    'Sarawak',
-    'Selangor',
-    'Terengganu',
-  ];
-
   late Future<CustomerAccountOverview?> _overviewFuture;
 
   @override
@@ -262,7 +244,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
     final cityController = TextEditingController();
     final postcodeController = TextEditingController();
     final countryController = TextEditingController(text: 'Malaysia');
-    var selectedState = _malaysianStates.first;
+    final stateController = TextEditingController();
     var isDefault = false;
 
     await SwiperBottomSheet.show<void>(
@@ -275,7 +257,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             line1Controller.text.trim(),
             line2Controller.text.trim(),
             cityController.text.trim(),
-            selectedState.trim(),
+            stateController.text.trim(),
             postcodeController.text.trim(),
             countryController.text.trim(),
           ].where((item) => item.isNotEmpty).join(', ');
@@ -309,20 +291,12 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                 decoration: const InputDecoration(labelText: 'City'),
               ),
               const SizedBox(height: AppSpacing.sm),
-              DropdownButtonFormField<String>(
-                initialValue: selectedState,
-                decoration: const InputDecoration(labelText: 'State'),
-                items: _malaysianStates
-                    .map(
-                      (state) => DropdownMenuItem<String>(
-                        value: state,
-                        child: Text(state),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  setSheetState(() => selectedState = value ?? _malaysianStates.first);
-                },
+              MalaysiaStateAutocompleteField(
+                controller: stateController,
+                hintText: 'Type first letter',
+                onChanged: (_) => setSheetState(() {}),
+                validator: (value) =>
+                    (value == null || value.trim().isEmpty) ? 'Enter state' : null,
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
@@ -356,7 +330,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                         line1: line1Controller.text.trim(),
                         line2: line2Controller.text.trim(),
                         city: cityController.text.trim(),
-                        state: selectedState.trim(),
+                        state: stateController.text.trim(),
                         postcode: postcodeController.text.trim(),
                         country: countryController.text.trim(),
                         isDefault: isDefault,
@@ -449,12 +423,6 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
         return ListView(
           padding: AppSpacing.screenPadding,
           children: [
-            _ProfileSummaryCard(
-              displayName: displayName,
-              overview: overview,
-              onEdit: () => _openEditDetailsSheet(overview),
-            ),
-            const SizedBox(height: AppSpacing.lg),
             _OverviewSectionCard(
               title: 'Profile Completion',
               child: Column(
@@ -497,6 +465,12 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
+            _ProfileSummaryCard(
+              displayName: displayName,
+              overview: overview,
+              onEdit: () => _openEditDetailsSheet(overview),
+            ),
+            const SizedBox(height: AppSpacing.lg),
             InkWell(
               borderRadius: BorderRadius.circular(26),
               onTap: () => Navigator.of(context).pushNamed(
@@ -504,71 +478,6 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
               ),
               child: _VerificationHubCard(
                 verified: overview.verification.verified,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _OverviewSectionCard(
-              title: 'Personal Details',
-              child: Column(
-                children: [
-                  _InfoActionRow(
-                    icon: Icons.person_outline_rounded,
-                    label: 'Full Name',
-                    value: displayName,
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.mail_outline_rounded,
-                    label: 'Email',
-                    value: overview.email.isEmpty ? '-' : overview.email,
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.phone_outlined,
-                    label: 'Phone',
-                    value:
-                        '${overview.countryCode} ${overview.phoneNumber}'.trim(),
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.cake_outlined,
-                    label: 'Date of Birth',
-                    value: overview.dateOfBirth.isEmpty
-                        ? '-'
-                        : overview.dateOfBirth,
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.wc_outlined,
-                    label: 'Sex',
-                    value: overview.sex.isEmpty ? '-' : overview.sex,
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.support_agent_outlined,
-                    label: 'Emergency Contact',
-                    value: overview.emergencyContactNumber.isEmpty
-                        ? '-'
-                        : overview.emergencyContactNumber,
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.place_outlined,
-                    label: 'Location',
-                    value: [
-                      overview.city,
-                      overview.region,
-                      overview.country,
-                    ].where((item) => item.trim().isNotEmpty).join(', ').isEmpty
-                        ? 'Malaysia'
-                        : [
-                            overview.city,
-                            overview.region,
-                            overview.country,
-                          ].where((item) => item.trim().isNotEmpty).join(', '),
-                    isLast: true,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SwiperButton(
-                    label: 'Edit And Save Details',
-                    isSecondary: true,
-                    onPressed: () => _openEditDetailsSheet(overview),
-                  ),
-                ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -798,7 +707,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            _OverviewSectionCard(
+            if (false) _OverviewSectionCard(
               title: 'Payment',
               actionLabel: 'View All',
               onActionTap: () => Navigator.of(
@@ -899,19 +808,18 @@ class _ProfileSummaryCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         onTap: onEdit,
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE4ECE7)),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x0A0F172A),
-                blurRadius: 26,
-                offset: Offset(0, 10),
+                blurRadius: 14,
+                offset: Offset(0, 4),
               ),
             ],
           ),
@@ -976,11 +884,11 @@ class _ProfileSummaryCard extends StatelessWidget {
                       ],
                     ),
                     if (overview.verification.verified) ...[
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.xs),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                          horizontal: 8,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.primarySoft,
@@ -1037,13 +945,12 @@ class _OverviewSectionCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE4ECE7)),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0A0F172A),
-            blurRadius: 26,
-            offset: Offset(0, 10),
+            blurRadius: 14,
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -1056,7 +963,7 @@ class _OverviewSectionCard extends StatelessWidget {
                 child: Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFF111827),
                       ),
@@ -1076,7 +983,7 @@ class _OverviewSectionCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
           child,
         ],
       ),

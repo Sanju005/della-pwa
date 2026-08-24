@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:animations/animations.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/routing/app_routes.dart';
+import '../../../core/animation/app_motion.dart';
 import '../../../models/provider_summary.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/provider_detail_service.dart';
@@ -9,6 +11,7 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/loading_state.dart';
+import '../../../widgets/provider_card.dart';
 import '../../../widgets/swiper_button.dart';
 import '../../../widgets/swiper_app_bar.dart';
 
@@ -76,39 +79,47 @@ class ProviderProfileScreen extends StatelessWidget {
                 service: provider.serviceKey,
               ),
               builder: (context, snapshot) {
+                Widget child;
                 if (snapshot.connectionState != ConnectionState.done) {
-                  return const LoadingState(
+                  child = const LoadingState(
+                    key: ValueKey('loading'),
                     label: 'Loading provider profile...',
                   );
-                }
-
-                if (snapshot.hasError || snapshot.data == null) {
-                  return const EmptyState(
+                } else if (snapshot.hasError || snapshot.data == null) {
+                  child = const EmptyState(
+                    key: ValueKey('error'),
                     title: 'Unable to load provider profile',
                     subtitle: 'Please try again.',
                     icon: Icons.error_outline_rounded,
                   );
-                }
-
-                final detail = snapshot.data!;
-                return ListView(
+                } else {
+                  final detail = snapshot.data!;
+                  child = ListView(
+                    key: ValueKey('provider-${provider.id}'),
                   padding: AppSpacing.screenPadding,
                   children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(22),
-                          child: detail.profileImage.trim().isNotEmpty
-                              ? Image.network(
-                                  _resolveImageUrl(detail.profileImage),
-                                  width: 118,
-                                  height: 162,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      _profileFallback(detail),
-                                )
-                              : _profileFallback(detail),
+                        Hero(
+                          tag: providerHeroTag(provider),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(22),
+                              child: detail.profileImage.trim().isNotEmpty
+                                  ? Image.network(
+                                      _resolveImageUrl(detail.profileImage),
+                                      width: 118,
+                                      height: 162,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                          _profileFallback(detail),
+                                    )
+                                  : _profileFallback(detail),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
@@ -274,7 +285,8 @@ class ProviderProfileScreen extends StatelessWidget {
                                               ? Image.network(
                                                   imageSrc,
                                                   fit: BoxFit.cover,
-                                                  errorBuilder: (_, __, ___) {
+                                                  errorBuilder:
+                                                      (context, error, stackTrace) {
                                                     return const Center(
                                                       child: Icon(
                                                         Icons
@@ -545,6 +557,26 @@ class ProviderProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 120),
                   ],
+                  );
+                }
+
+                return PageTransitionSwitcher(
+                  duration: AppMotion.resolveDuration(context, AppMotion.normal),
+                  reverse: false,
+                  transitionBuilder:
+                      (child, primaryAnimation, secondaryAnimation) {
+                    if (AppMotion.reduceMotion(context)) {
+                      return child;
+                    }
+                    return SharedAxisTransition(
+                      animation: primaryAnimation,
+                      secondaryAnimation: secondaryAnimation,
+                      transitionType: SharedAxisTransitionType.vertical,
+                      fillColor: Colors.transparent,
+                      child: child,
+                    );
+                  },
+                  child: child,
                 );
               },
             ),

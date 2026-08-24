@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 
+import '../../../core/animation/app_motion.dart';
 import '../../../core/routing/app_routes.dart';
+import '../../../models/notification_item.dart';
 import '../../../models/provider_summary.dart';
 import '../../../models/service_category.dart';
 import '../../../previews/widget_preview_helpers.dart';
@@ -18,10 +20,12 @@ import '../../../services/provider_marketplace_service.dart';
 import '../../../services/service_location_store.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
+import '../../../widgets/app_reveal.dart';
 import '../../../widgets/empty_state.dart';
-import '../../../widgets/loading_state.dart';
 import '../../../widgets/notification_card.dart';
 import '../../../widgets/provider_card.dart';
+import '../../../widgets/provider_skeleton_card.dart';
+import '../../../widgets/malaysia_state_autocomplete_field.dart';
 import '../../../widgets/swiper_bottom_sheet.dart';
 import '../../../widgets/swiper_button.dart';
 
@@ -63,12 +67,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   };
 
   ServiceLocationSelection? _selectedLocation;
+  late List<NotificationItem> _notifications;
   bool _changingLocation = false;
 
   @override
   void initState() {
     super.initState();
     _selectedLocation = ServiceLocationStore.load();
+    _notifications = widget.repository.getNotifications();
   }
 
   Future<void> _chooseLocation() async {
@@ -261,45 +267,86 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     final customer = snapshot.data;
                     final firstName = customer?.firstName ?? 'Customer';
                     final fullName = customer?.fullName ?? 'Customer';
-                    return _HeroSection(
-                      firstName: firstName,
-                      fullName: fullName,
-                      avatarUrl: customer?.avatarUrl ?? '',
-                      onNotificationsTap: () async {
-                        final notifications = widget.repository.getNotifications();
-                        if (!mounted) {
-                          return;
-                        }
-                        await SwiperBottomSheet.show<void>(
-                          context,
-                          title: 'Notifications',
-                          subtitle:
-                              'Read your latest booking, provider, and account updates.',
-                          child: notifications.isEmpty
-                              ? const EmptyState(
-                                  title: 'No notifications yet',
-                                  subtitle:
-                                      'New updates will appear here when they arrive.',
-                                  icon: Icons.notifications_none_rounded,
-                                )
-                              : Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    for (
-                                      var index = 0;
-                                      index < notifications.length;
-                                      index++
-                                    ) ...[
-                                      NotificationCard(
-                                        notification: notifications[index],
-                                      ),
-                                      if (index != notifications.length - 1)
-                                        const SizedBox(height: AppSpacing.sm),
+                    return AppReveal(
+                      delay: const Duration(milliseconds: 40),
+                      duration: AppMotion.normal,
+                      beginOffset: const Offset(0, 0.04),
+                      child: _HeroSection(
+                        firstName: firstName,
+                        fullName: fullName,
+                        avatarUrl: customer?.avatarUrl ?? '',
+                        unreadCount:
+                            _notifications.where((item) => item.isUnread).length,
+                        onNotificationsTap: () async {
+                          if (!mounted) {
+                            return;
+                          }
+                          await SwiperBottomSheet.show<void>(
+                            context,
+                            title: 'Notifications',
+                            subtitle:
+                                'Read your latest booking, provider, and account updates.',
+                            child: _notifications.isEmpty
+                                ? const EmptyState(
+                                    title: 'No notifications yet',
+                                    subtitle:
+                                        'New updates will appear here when they arrive.',
+                                    icon: Icons.notifications_none_rounded,
+                                  )
+                                : Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      for (
+                                        var index = 0;
+                                        index < _notifications.length;
+                                        index++
+                                      ) ...[
+                                        NotificationCard(
+                                          notification: _notifications[index],
+                                          onTap: () {
+                                            final item = _notifications[index];
+                                            final targetRoute = item.targetRoute;
+                                            setState(() {
+                                              _notifications = [
+                                                for (var i = 0;
+                                                    i < _notifications.length;
+                                                    i++)
+                                                  NotificationItem(
+                                                    title:
+                                                        _notifications[i].title,
+                                                    body: _notifications[i].body,
+                                                    timeLabel:
+                                                        _notifications[i].timeLabel,
+                                                    isUnread: i == index
+                                                        ? false
+                                                        : _notifications[i].isUnread,
+                                                    targetRoute: _notifications[i]
+                                                        .targetRoute,
+                                                    targetArgument:
+                                                        _notifications[i]
+                                                            .targetArgument,
+                                                  ),
+                                              ];
+                                            });
+                                            Navigator.of(context).pop();
+                                            if (targetRoute != null && mounted) {
+                                              Navigator.of(context).pushNamed(
+                                                targetRoute,
+                                                arguments: item.targetArgument,
+                                              );
+                                            }
+                                          },
+                                        ),
+                                        if (index != _notifications.length - 1)
+                                          const SizedBox(
+                                            height: AppSpacing.sm,
+                                          ),
+                                      ],
                                     ],
-                                  ],
-                                ),
-                        );
-                      },
+                                  ),
+                          );
+                        },
+                      ),
                     );
                   },
                 ),
@@ -313,11 +360,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Transform.translate(
-                        offset: const Offset(0, -18),
-                        child: _LocationCard(
-                          selectedLocation: _selectedLocation,
-                          onChangePressed: _chooseLocation,
+                      AppReveal(
+                        delay: const Duration(milliseconds: 110),
+                        duration: AppMotion.fast,
+                        beginOffset: const Offset(0, 0),
+                        child: Transform.translate(
+                          offset: const Offset(0, -18),
+                          child: _LocationCard(
+                            selectedLocation: _selectedLocation,
+                            onChangePressed: _chooseLocation,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -341,13 +393,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             ),
                         itemBuilder: (context, index) {
                           final category = categories[index];
-                          return _ServiceTile(
-                            category: category,
-                            subtitle:
-                                _categoryDescriptions[category.label] ?? 'Trusted help',
-                            onTap: () => Navigator.of(context).pushNamed(
-                              AppRoutes.providers,
-                              arguments: category.label.toLowerCase(),
+                          return AppReveal(
+                            delay: Duration(
+                              milliseconds: 150 + (index * 55),
+                            ),
+                            duration: AppMotion.normal,
+                            beginOffset: const Offset(0, 0.05),
+                            child: _ServiceTile(
+                              category: category,
+                              subtitle: _categoryDescriptions[category.label] ??
+                                  'Trusted help',
+                              onTap: () => Navigator.of(context).pushNamed(
+                                AppRoutes.providers,
+                                arguments: category.label.toLowerCase(),
+                              ),
                             ),
                           );
                         },
@@ -381,12 +440,14 @@ class _HeroSection extends StatefulWidget {
     required this.firstName,
     required this.fullName,
     required this.avatarUrl,
+    required this.unreadCount,
     required this.onNotificationsTap,
   });
 
   final String firstName;
   final String fullName;
   final String avatarUrl;
+  final int unreadCount;
   final VoidCallback onNotificationsTap;
 
   @override
@@ -397,6 +458,7 @@ class _HeroSectionState extends State<_HeroSection>
     with SingleTickerProviderStateMixin {
   late final AnimationController _sunController;
   Timer? _greetingTimer;
+  bool _isSunAnimating = false;
 
   @override
   void initState() {
@@ -404,12 +466,28 @@ class _HeroSectionState extends State<_HeroSection>
     _sunController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
-    )..repeat();
+    );
     _greetingTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) {
         setState(() {});
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final shouldAnimate = !AppMotion.reduceMotion(context);
+    if (shouldAnimate == _isSunAnimating) {
+      return;
+    }
+    _isSunAnimating = shouldAnimate;
+    if (shouldAnimate) {
+      _sunController.repeat();
+    } else {
+      _sunController.stop();
+      _sunController.value = 0;
+    }
   }
 
   @override
@@ -535,15 +613,17 @@ class _HeroSectionState extends State<_HeroSection>
                       const SizedBox(width: AppSpacing.sm),
                       _IconBubble(
                         icon: Icons.notifications_none_rounded,
-                        showDot: true,
+                        unreadCount: widget.unreadCount,
                         onTap: widget.onNotificationsTap,
                       ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Expanded(
+                      Flexible(
                         child: Text(
                           greeting.label,
                           maxLines: 1,
@@ -556,12 +636,15 @@ class _HeroSectionState extends State<_HeroSection>
                           ),
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.sm),
+                      const SizedBox(width: 6),
                       AnimatedBuilder(
                         animation: _sunController,
                         builder: (context, child) {
-                          final glow =
-                              0.78 + (math.sin(_sunController.value * math.pi * 2) * 0.18);
+                          final glow = _isSunAnimating
+                              ? 0.78 +
+                                  (math.sin(_sunController.value * math.pi * 2) *
+                                      0.18)
+                              : 0.78;
                           return DecoratedBox(
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
@@ -576,7 +659,9 @@ class _HeroSectionState extends State<_HeroSection>
                               ],
                             ),
                             child: Transform.rotate(
-                              angle: greeting.rotate ? _sunController.value * math.pi * 2 : 0,
+                              angle: greeting.rotate && _isSunAnimating
+                                  ? _sunController.value * math.pi * 2
+                                  : 0,
                               child: child,
                             ),
                           );
@@ -986,9 +1071,9 @@ class _AddLocationSheetState extends State<_AddLocationSheet> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: TextFormField(
+                    child: MalaysiaStateAutocompleteField(
                       controller: _stateController,
-                      decoration: const InputDecoration(labelText: 'State'),
+                      hintText: 'Type first letter',
                       validator: (value) =>
                           (value == null || value.trim().isEmpty) ? 'Enter state' : null,
                     ),
@@ -1065,9 +1150,13 @@ class _LocationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasSelection = selectedLocation != null;
     final isCurrentLocation = selectedLocation?.type == 'current';
-    final address = selectedLocation?.address.isNotEmpty == true
+    final rawAddress = selectedLocation?.address.isNotEmpty == true
         ? selectedLocation!.address
         : 'Choose a saved address or use your current location';
+    final address = isCurrentLocation &&
+            (rawAddress.contains('Lat:') || rawAddress.contains('Lng:'))
+        ? 'Current location selected'
+        : rawAddress;
     final labelText = isCurrentLocation
         ? 'Current Location'
         : hasSelection
@@ -1082,13 +1171,12 @@ class _LocationCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
-        AppSpacing.sm,
+        AppSpacing.xs,
         AppSpacing.md,
         AppSpacing.md,
       ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 2),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1099,9 +1187,9 @@ class _LocationCard extends StatelessWidget {
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x14684AB3),
-            blurRadius: 30,
-            offset: Offset(0, 12),
+            color: Color(0x12684AB3),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
@@ -1128,7 +1216,7 @@ class _LocationCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xs),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(
@@ -1144,12 +1232,12 @@ class _LocationCard extends StatelessWidget {
                   Color(0xFF34206D),
                 ],
               ),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x1A3D2182),
-                  blurRadius: 24,
-                  offset: Offset(0, 12),
+                  blurRadius: 14,
+                  offset: Offset(0, 6),
                 ),
               ],
             ),
@@ -1185,7 +1273,7 @@ class _LocationCard extends StatelessWidget {
                               fontWeight: FontWeight.w500,
                             ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xxs),
                       Text(
                         addressText,
                         maxLines: 2,
@@ -1207,65 +1295,69 @@ class _LocationCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 86,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: const Color(0xFFE7DCF7)),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        onTap: onChangePressed,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.md,
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFFF3ECFF),
-                                ),
-                                child: const Icon(
-                                  Icons.location_on_rounded,
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 76),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      onTap: onChangePressed,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFF3ECFF),
+                              ),
+                              child: const Icon(
+                                Icons.location_on_rounded,
+                                color: AppColors.primary,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            const Expanded(
+                              child: Text(
+                                'Choose location',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
                                   color: AppColors.primary,
-                                  size: 20,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(width: AppSpacing.md),
-                              const Expanded(
-                                child: Text(
-                                  'Choose location',
-                                  style: TextStyle(
-                                    color: AppColors.primary,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
-                const _MapBadge(),
-              ],
-            ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              _MapBadge(
+                address: address,
+                latitude: selectedLocation?.latitude,
+                longitude: selectedLocation?.longitude,
+              ),
+            ],
           ),
         ],
       ),
@@ -1369,13 +1461,13 @@ class _SafetyBanner extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF35127B),
-            Color(0xFF6731C9),
+            Color(0xFF0E5D3B),
+            Color(0xFF21A76F),
           ],
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x1A452091),
+            color: Color(0x1A0B5A39),
             blurRadius: 28,
             offset: Offset(0, 14),
           ),
@@ -1439,7 +1531,10 @@ class _NearbyCategorySection extends StatelessWidget {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            child: LoadingState(label: 'Loading nearby providers...'),
+            child: SizedBox(
+              height: 430,
+              child: _NearbyProviderSkeletonList(),
+            ),
           );
         }
 
@@ -1486,20 +1581,31 @@ class _NearbyCategorySection extends StatelessWidget {
                 separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
                 itemBuilder: (context, index) {
                   if (index >= providers.length.clamp(0, 5)) {
-                    return _ShowAllProvidersCard(
-                      serviceKey: serviceKey,
-                      title: title,
+                    return AppReveal(
+                      delay: Duration(milliseconds: 160 + (index * 55)),
+                      duration: AppMotion.normal,
+                      beginOffset: const Offset(0, 0.05),
+                      child: _ShowAllProvidersCard(
+                        serviceKey: serviceKey,
+                        title: title,
+                      ),
                     );
                   }
 
                   final provider = providers[index];
-                  return SizedBox(
-                    width: 312,
-                    child: ProviderCard(
-                      provider: provider,
-                      onTap: () => Navigator.of(context).pushNamed(
-                        AppRoutes.providerProfile,
-                        arguments: provider,
+                  return AppReveal(
+                    delay: Duration(milliseconds: 160 + (index * 55)),
+                    duration: AppMotion.normal,
+                    beginOffset: const Offset(0, 0.05),
+                    beginScale: 0.985,
+                    child: SizedBox(
+                      width: 312,
+                      child: ProviderCard(
+                        provider: provider,
+                        onTap: () => Navigator.of(context).pushNamed(
+                          AppRoutes.providerProfile,
+                          arguments: provider,
+                        ),
                       ),
                     ),
                   );
@@ -1507,6 +1613,25 @@ class _NearbyCategorySection extends StatelessWidget {
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+}
+
+class _NearbyProviderSkeletonList extends StatelessWidget {
+  const _NearbyProviderSkeletonList();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      itemCount: 3,
+      separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
+      itemBuilder: (context, index) {
+        return const SizedBox(
+          width: 312,
+          child: ProviderSkeletonCard(),
         );
       },
     );
@@ -1710,12 +1835,12 @@ class _HeroArc extends StatelessWidget {
 class _IconBubble extends StatelessWidget {
   const _IconBubble({
     required this.icon,
-    this.showDot = false,
+    this.unreadCount = 0,
     this.onTap,
   });
 
   final IconData icon;
-  final bool showDot;
+  final int unreadCount;
   final VoidCallback? onTap;
 
   @override
@@ -1740,11 +1865,11 @@ class _IconBubble extends StatelessWidget {
             ),
           ),
         ),
-        if (showDot)
-          const Positioned(
-            top: 10,
-            right: 10,
-            child: _AlertDot(),
+        if (unreadCount > 0)
+          Positioned(
+            top: 6,
+            right: 6,
+            child: _AlertDot(count: unreadCount),
           ),
       ],
     );
@@ -1752,23 +1877,43 @@ class _IconBubble extends StatelessWidget {
 }
 
 class _AlertDot extends StatelessWidget {
-  const _AlertDot();
+  const _AlertDot({required this.count});
+
+  final int count;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 10,
-      height: 10,
+      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: const Color(0xFFFF4B4B),
         borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
       ),
     );
   }
 }
 
 class _MapBadge extends StatefulWidget {
-  const _MapBadge();
+  const _MapBadge({
+    required this.address,
+    this.latitude,
+    this.longitude,
+  });
+
+  final String address;
+  final double? latitude;
+  final double? longitude;
 
   @override
   State<_MapBadge> createState() => _MapBadgeState();
@@ -1818,6 +1963,27 @@ class _MapBadgeState extends State<_MapBadge>
           child: Stack(
             alignment: Alignment.center,
             children: [
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: CustomPaint(
+                    painter: _MiniMapPainter(),
+                  ),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.10),
+                      Colors.white.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
               Positioned(
                 left: 16,
                 right: 12,
@@ -1828,7 +1994,7 @@ class _MapBadgeState extends State<_MapBadge>
                     height: 32,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
-                      color: Colors.white.withValues(alpha: 0.76),
+                      color: Colors.white.withValues(alpha: 0.84),
                       border: Border.all(color: const Color(0xFFDCCCF8)),
                     ),
                   ),
@@ -1865,6 +2031,49 @@ class _MapBadgeState extends State<_MapBadge>
   }
 }
 
+class _MiniMapPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = const Color(0xFFDCCCF8)
+      ..strokeWidth = 1;
+
+    final pathPaint = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.72)
+      ..style = PaintingStyle.fill;
+
+    for (double x = -8; x <= size.width + 8; x += size.width / 3) {
+      canvas.drawLine(Offset(x, 0), Offset(x - 18, size.height), linePaint);
+    }
+
+    for (double y = 10; y <= size.height; y += size.height / 3) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
+
+    final cardPath = Path()
+      ..moveTo(18, size.height - 24)
+      ..quadraticBezierTo(
+        size.width * 0.45,
+        size.height - 44,
+        size.width - 12,
+        size.height - 18,
+      )
+      ..lineTo(size.width - 22, size.height - 2)
+      ..quadraticBezierTo(
+        size.width * 0.45,
+        size.height - 24,
+        12,
+        size.height - 10,
+      )
+      ..close();
+
+    canvas.drawPath(cardPath, pathPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _ShieldBadge extends StatelessWidget {
   const _ShieldBadge();
 
@@ -1879,8 +2088,8 @@ class _ShieldBadge extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF5D2DD1),
-            Color(0xFF34106D),
+            Color(0xFF15724E),
+            Color(0xFF0C4E33),
           ],
         ),
         border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
@@ -1894,23 +2103,77 @@ class _ShieldBadge extends StatelessWidget {
   }
 }
 
-class _ProviderGroup extends StatelessWidget {
+class _ProviderGroup extends StatefulWidget {
   const _ProviderGroup();
 
   @override
+  State<_ProviderGroup> createState() => _ProviderGroupState();
+}
+
+class _ProviderGroupState extends State<_ProviderGroup>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 106,
-      height: 94,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: const [
-          Positioned(left: 0, top: 16, child: _ProviderAvatar(color: Color(0xFFFFE5C2), icon: Icons.restaurant_rounded)),
-          Positioned(left: 28, top: 8, child: _ProviderAvatar(color: Color(0xFFFFE0D3), icon: Icons.cleaning_services_rounded)),
-          Positioned(left: 54, top: 16, child: _ProviderAvatar(color: Color(0xFFDCCBFF), icon: Icons.local_taxi_rounded)),
-          Positioned(right: 6, bottom: -6, child: _MiniShield()),
-        ],
-      ),
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final wave = math.sin(_controller.value * math.pi * 2);
+        return SizedBox(
+          width: 106,
+          height: 94,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 0,
+                top: 16 - (wave * 2),
+                child: const _ProviderAvatar(
+                  color: Color(0xFFFFE5C2),
+                  icon: Icons.restaurant_rounded,
+                ),
+              ),
+              Positioned(
+                left: 28,
+                top: 8 + (wave * 2),
+                child: const _ProviderAvatar(
+                  color: Color(0xFFFFE0D3),
+                  icon: Icons.cleaning_services_rounded,
+                ),
+              ),
+              Positioned(
+                left: 54,
+                top: 16 - (wave * 1.5),
+                child: const _ProviderAvatar(
+                  color: Color(0xFFDCCBFF),
+                  icon: Icons.local_taxi_rounded,
+                ),
+              ),
+              Positioned(
+                right: 6,
+                bottom: -6 + (wave * 1.5),
+                child: const _MiniShield(),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -1948,7 +2211,7 @@ class _MiniShield extends StatelessWidget {
       width: 38,
       height: 38,
       decoration: BoxDecoration(
-        color: const Color(0xFF7B49F1),
+        color: const Color(0xFF1D9E69),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white, width: 2),
       ),

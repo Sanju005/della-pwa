@@ -17,10 +17,12 @@ class BookingOverviewScreen extends StatefulWidget {
     super.key,
     required this.repository,
     this.embedded = false,
+    this.activeOnly = false,
   });
 
   final DemoRepository repository;
   final bool embedded;
+  final bool activeOnly;
 
   @override
   State<BookingOverviewScreen> createState() => _BookingOverviewScreenState();
@@ -29,6 +31,8 @@ class BookingOverviewScreen extends StatefulWidget {
 class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
   static const _bookingService = BookingOverviewService();
   BookingFilter _filter = BookingFilter.all;
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
 
   @override
   Widget build(BuildContext context) {
@@ -68,15 +72,10 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
             return first.compareTo(second);
           });
 
-        final visibleRecords = allRecords.where(_matchesFilter).toList();
-
-        if (visibleRecords.isEmpty) {
-          return const EmptyState(
-            title: 'No bookings for this filter',
-            subtitle: 'Try another booking date filter.',
-            icon: Icons.filter_alt_off_outlined,
-          );
-        }
+        final scopedRecords = widget.activeOnly
+            ? allRecords.where((record) => !record.isPast).toList()
+            : allRecords;
+        final visibleRecords = scopedRecords.where(_matchesFilter).toList();
 
         return ListView(
           padding: AppSpacing.screenPadding,
@@ -99,12 +98,27 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
                 ),
               ),
             ],
-            _filterCard(),
-            const SizedBox(height: AppSpacing.lg),
-            for (final record in visibleRecords) ...[
-              _bookingCard(context, record),
+            if (!widget.activeOnly) ...[
+              _filterCard(),
               const SizedBox(height: AppSpacing.lg),
             ],
+            if (visibleRecords.isEmpty)
+              EmptyState(
+                title: widget.activeOnly
+                    ? 'No ongoing tasks'
+                    : 'No bookings for this filter',
+                subtitle: widget.activeOnly
+                    ? 'Your pending and ongoing tasks will appear here.'
+                    : 'Try another booking date filter.',
+                icon: widget.activeOnly
+                    ? Icons.task_alt_outlined
+                    : Icons.filter_alt_off_outlined,
+              )
+            else
+              for (final record in visibleRecords) ...[
+                _bookingCard(context, record),
+                const SizedBox(height: AppSpacing.lg),
+              ],
           ],
         );
       },
@@ -115,9 +129,11 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
     }
 
     return Scaffold(
-      appBar: const SwiperAppBar(
-        title: 'My Bookings',
-        subtitle: 'Latest booking first',
+      appBar: SwiperAppBar(
+        title: widget.activeOnly ? 'Ongoing Task' : 'My Bookings',
+        subtitle: widget.activeOnly
+            ? 'Pending and ongoing tasks'
+            : 'Latest booking first',
         showBack: true,
       ),
       body: content,
@@ -141,22 +157,37 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
       case BookingFilter.month:
         return date.year == now.year && date.month == now.month;
       case BookingFilter.custom:
-        return !date.isBefore(now);
+        if (_customStartDate == null || _customEndDate == null) {
+          return true;
+        }
+        final rangeStart = DateTime(
+          _customStartDate!.year,
+          _customStartDate!.month,
+          _customStartDate!.day,
+        );
+        final rangeEnd = DateTime(
+          _customEndDate!.year,
+          _customEndDate!.month,
+          _customEndDate!.day,
+          23,
+          59,
+          59,
+        );
+        return !date.isBefore(rangeStart) && !date.isAfter(rangeEnd);
     }
   }
 
   Widget _filterCard() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         boxShadow: const [
           BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 24,
-            offset: Offset(0, 10),
+            color: Color(0x0A111720),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
@@ -177,7 +208,7 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    SizedBox(height: AppSpacing.xxs),
                     Text(
                       'Sorted by latest booking first',
                       style: TextStyle(color: AppColors.textSecondary),
@@ -204,18 +235,39 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
             children: [
-              Expanded(child: _filterChip('All', BookingFilter.all)),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(child: _filterChip('Today', BookingFilter.today)),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(child: _filterChip('Month', BookingFilter.month)),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(child: _filterChip('Custom', BookingFilter.custom)),
+              _filterChip('All', BookingFilter.all),
+              _filterChip('Today', BookingFilter.today),
+              _filterChip('Month', BookingFilter.month),
+              _filterChip('Custom', BookingFilter.custom),
             ],
           ),
+          if (_filter == BookingFilter.custom) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: _dateField(
+                    label: 'From',
+                    value: _customStartDate,
+                    onTap: () => _pickCustomDate(isStart: true),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _dateField(
+                    label: 'To',
+                    value: _customEndDate,
+                    onTap: () => _pickCustomDate(isStart: false),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -225,9 +277,20 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
     final selected = _filter == filter;
     return InkWell(
       borderRadius: BorderRadius.circular(999),
-      onTap: () => setState(() => _filter = filter),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+      onTap: () => setState(() {
+        _filter = filter;
+        if (filter != BookingFilter.custom) {
+          _customStartDate = null;
+          _customEndDate = null;
+        } else {
+          _customStartDate ??= DateTime.now().subtract(const Duration(days: 7));
+          _customEndDate ??= DateTime.now();
+        }
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(999),
@@ -237,7 +300,6 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
         ),
         child: Text(
           label,
-          textAlign: TextAlign.center,
           style: TextStyle(
             color: selected ? Colors.white : AppColors.textSecondary,
             fontWeight: FontWeight.w700,
@@ -245,6 +307,109 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
         ),
       ),
     );
+  }
+
+  Widget _dateField({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9F7FF),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value == null ? 'Select date' : _formatDate(value),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.calendar_month_rounded,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickCustomDate({required bool isStart}) async {
+    final now = DateTime.now();
+    final initialDate = isStart
+        ? (_customStartDate ?? now)
+        : (_customEndDate ?? _customStartDate ?? now);
+    final firstDate = DateTime(now.year - 2);
+    final lastDate = DateTime(now.year + 2, 12, 31);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      if (isStart) {
+        _customStartDate = picked;
+        if (_customEndDate != null && _customEndDate!.isBefore(picked)) {
+          _customEndDate = picked;
+        }
+      } else {
+        _customEndDate = picked;
+        if (_customStartDate != null && picked.isBefore(_customStartDate!)) {
+          _customStartDate = picked;
+        }
+      }
+    });
+  }
+
+  String _formatDate(DateTime value) {
+    final monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${value.day} ${monthNames[value.month - 1]} ${value.year}';
   }
 
   Widget _bookingCard(BuildContext context, CustomerBookingRecord record) {
@@ -257,16 +422,15 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
             : AppColors.primary;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         boxShadow: const [
           BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 28,
-            offset: Offset(0, 10),
+            color: Color(0x0A111720),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
@@ -285,11 +449,11 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
                   children: [
                     Text(
                       booking.providerName,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
                           ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xxs),
                     Text(
                       booking.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -301,8 +465,8 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+                  horizontal: 12,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
@@ -321,7 +485,7 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
           _detailTile(
             icon: Icons.calendar_today_rounded,
             text: booking.schedule,
@@ -335,7 +499,7 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
             text: booking.amountLabel,
             emphasize: true,
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.sm),
           SizedBox(
             width: double.infinity,
             child: SwiperButton(
@@ -361,31 +525,34 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.border),
+        color: const Color(0xFFF9F8FC),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       ),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 40,
+            height: 40,
             decoration: const BoxDecoration(
               color: AppColors.primarySoft,
-              borderRadius: BorderRadius.all(Radius.circular(18)),
+              borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
-            child: Icon(icon, color: AppColors.primary),
+            child: Icon(icon, color: AppColors.primary, size: 20),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
-                color: emphasize ? AppColors.textPrimary : AppColors.textPrimary,
+                color: AppColors.textPrimary,
                 fontSize: emphasize ? 16 : 15,
-                fontWeight: emphasize ? FontWeight.w900 : FontWeight.w600,
+                fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
               ),
             ),
           ),

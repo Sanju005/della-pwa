@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/routing/app_routes.dart';
 import '../models/booking_item.dart';
 import '../models/message_item.dart';
 import '../models/notification_item.dart';
@@ -114,12 +115,14 @@ class DemoDataService {
         body: 'Nur Aisyah confirmed your chef booking for tonight.',
         timeLabel: '5 min ago',
         isUnread: true,
+        targetRoute: AppRoutes.bookingOverview,
       ),
       NotificationItem(
         title: 'Payout scheduled',
         body: 'Your provider payout will arrive in 1-2 business days.',
         timeLabel: '1 hr ago',
         isUnread: false,
+        targetRoute: AppRoutes.profilePayments,
       ),
     ];
   }

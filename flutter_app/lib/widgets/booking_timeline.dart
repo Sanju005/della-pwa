@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/animation/app_motion.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 
@@ -26,7 +27,8 @@ class BookingTimeline extends StatelessWidget {
             Column(
               children: [
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
+                  duration: AppMotion.resolveDuration(context, AppMotion.fast),
+                  curve: AppMotion.emphasizedCurve,
                   height: 24,
                   width: 24,
                   decoration: BoxDecoration(
@@ -44,10 +46,23 @@ class BookingTimeline extends StatelessWidget {
                   ),
                 ),
                 if (index != steps.length - 1)
-                  Container(
-                    width: 2,
-                    height: 30,
-                    color: AppColors.border,
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: isDone ? 1 : 0.4),
+                    duration: AppMotion.resolveDuration(
+                      context,
+                      AppMotion.normal,
+                    ),
+                    curve: AppMotion.enterCurve,
+                    builder: (context, value, child) {
+                      return Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          width: 2,
+                          height: 30 * value,
+                          color: isDone ? AppColors.success : AppColors.border,
+                        ),
+                      );
+                    },
                   ),
               ],
             ),

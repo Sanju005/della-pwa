@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/animation/app_motion.dart';
 import '../../../core/config/app_config.dart';
 import '../../../services/booking_overview_service.dart';
 import '../../../services/browser_file_picker.dart';
@@ -1248,7 +1248,9 @@ class _TaskStepCard extends StatelessWidget {
       'current' => Icons.radio_button_checked_rounded,
       _ => Icons.schedule_rounded,
     };
-    return Container(
+    return AnimatedContainer(
+      duration: AppMotion.resolveDuration(context, AppMotion.fast),
+      curve: AppMotion.emphasizedCurve,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1301,10 +1303,32 @@ class _TaskStepCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Icon(
-                            stateIcon,
-                            color: tone,
-                            size: 18,
+                          AnimatedSwitcher(
+                            duration: AppMotion.resolveDuration(
+                              context,
+                              AppMotion.fast,
+                            ),
+                            transitionBuilder: (child, animation) {
+                              if (AppMotion.reduceMotion(context)) {
+                                return child;
+                              }
+                              return FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: Tween<double>(
+                                    begin: 0.96,
+                                    end: 1,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Icon(
+                              stateIcon,
+                              key: ValueKey('$state-$number'),
+                              color: tone,
+                              size: 18,
+                            ),
                           ),
                         ],
                       ),
@@ -1348,7 +1372,20 @@ class _TaskStepConnectorState extends State<_TaskStepConnector>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat();
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (AppMotion.reduceMotion(context)) {
+      _controller.stop();
+      _controller.value = 0;
+      return;
+    }
+    if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
   }
 
   @override
@@ -1643,7 +1680,7 @@ class _ProofMedia extends StatelessWidget {
         height: 180,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) {
+        errorBuilder: (context, error, stackTrace) {
           return Container(
             height: 180,
             color: Colors.white,

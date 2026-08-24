@@ -4,6 +4,16 @@ import 'package:flutter/widget_previews.dart';
 import '../models/provider_summary.dart';
 import '../previews/widget_preview_helpers.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+
+String providerHeroTag(ProviderSummary provider) {
+  final normalizedId = provider.id.trim().isNotEmpty
+      ? provider.id.trim()
+      : '${provider.serviceKey}-${provider.name}'
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+  return 'provider-avatar-$normalizedId';
+}
 
 class ProviderCard extends StatelessWidget {
   const ProviderCard({super.key, required this.provider, this.onTap});
@@ -31,23 +41,22 @@ class ProviderCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFFE7ECE8)),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0F172A10),
-            blurRadius: 30,
-            offset: Offset(0, 14),
+            color: Color(0x0A172A10),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -55,7 +64,7 @@ class ProviderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _Portrait(provider: provider),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,9 +100,9 @@ class ProviderCard extends StatelessWidget {
                                             color: const Color(0xFF1F2C44),
                                           ),
                                     ),
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: AppSpacing.xs),
                                     _RankingBadge(label: rankingBadge),
-                                    const SizedBox(height: 6),
+                                    const SizedBox(height: AppSpacing.xxs),
                                     Text(
                                       provider.identityVerified &&
                                               provider.phoneVerified
@@ -126,8 +135,8 @@ class ProviderCard extends StatelessWidget {
                                   boxShadow: const [
                                     BoxShadow(
                                       color: Color(0x0F172A0D),
-                                      blurRadius: 14,
-                                      offset: Offset(0, 6),
+                                    blurRadius: 10,
+                                    offset: Offset(0, 4),
                                     ),
                                   ],
                                 ),
@@ -148,14 +157,14 @@ class ProviderCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.sm),
                 Container(
                   decoration: const BoxDecoration(
                     border: Border(
                       bottom: BorderSide(color: Color(0xFFEDF1EE)),
                     ),
                   ),
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                   child: GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
@@ -190,7 +199,7 @@ class ProviderCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 Row(
                   children: serviceTags
                       .map(
@@ -225,16 +234,15 @@ class ProviderCard extends StatelessWidget {
                       )
                       .toList(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 4,
-                    vertical: 6,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFBFDFB),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFEDF1EE)),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   ),
                   child: Row(
                     children: [
@@ -292,21 +300,28 @@ class _Portrait extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageUrl = provider.avatarUrl.trim();
 
-    return Container(
-      width: 98,
-      height: 116,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEF4EF),
-        borderRadius: BorderRadius.circular(18),
+    return Hero(
+      tag: providerHeroTag(provider),
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 98,
+          height: 116,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF4EF),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: imageUrl.isNotEmpty
+              ? Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      _PortraitFallback(name: provider.name),
+                )
+              : _PortraitFallback(name: provider.name),
+        ),
       ),
-      child: imageUrl.isNotEmpty
-          ? Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _PortraitFallback(name: provider.name),
-            )
-          : _PortraitFallback(name: provider.name),
     );
   }
 }
