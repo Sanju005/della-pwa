@@ -21,6 +21,7 @@ import '../../../services/service_location_store.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/app_reveal.dart';
+import '../../../widgets/address_live_map.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/notification_card.dart';
 import '../../../widgets/provider_card.dart';
@@ -1297,69 +1298,103 @@ class _LocationCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 76),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      onTap: onChangePressed,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: AppSpacing.sm,
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFF3ECFF),
-                              ),
-                              child: const Icon(
-                                Icons.location_on_rounded,
-                                color: AppColors.primary,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            const Expanded(
-                              child: Text(
-                                'Choose location',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                child: _LocationMapCard(
+                  address: address,
+                  latitude: selectedLocation?.latitude,
+                  longitude: selectedLocation?.longitude,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              _MapBadge(
-                address: address,
-                latitude: selectedLocation?.latitude,
-                longitude: selectedLocation?.longitude,
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LocationMapCard extends StatelessWidget {
+  const _LocationMapCard({
+    required this.address,
+    this.latitude,
+    this.longitude,
+  });
+
+  final String address;
+  final double? latitude;
+  final double? longitude;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 124,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: const Color(0xFFE7DCF7)),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              child: AddressLiveMap(
+                address: address,
+                latitude: latitude,
+                longitude: longitude,
+                height: 124,
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.06),
+                    Colors.white.withValues(alpha: 0.22),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const Center(
+            child: _StaticMapPin(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StaticMapPin extends StatelessWidget {
+  const _StaticMapPin();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(21),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x29684AB3),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.location_on_rounded,
+        color: Colors.white,
+        size: 26,
       ),
     );
   }
@@ -1581,10 +1616,8 @@ class _NearbyCategorySection extends StatelessWidget {
                 separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
                 itemBuilder: (context, index) {
                   if (index >= providers.length.clamp(0, 5)) {
-                    return AppReveal(
-                      delay: Duration(milliseconds: 160 + (index * 55)),
-                      duration: AppMotion.normal,
-                      beginOffset: const Offset(0, 0.05),
+                    return SizedBox(
+                      width: 312,
                       child: _ShowAllProvidersCard(
                         serviceKey: serviceKey,
                         title: title,
@@ -1593,19 +1626,13 @@ class _NearbyCategorySection extends StatelessWidget {
                   }
 
                   final provider = providers[index];
-                  return AppReveal(
-                    delay: Duration(milliseconds: 160 + (index * 55)),
-                    duration: AppMotion.normal,
-                    beginOffset: const Offset(0, 0.05),
-                    beginScale: 0.985,
-                    child: SizedBox(
-                      width: 312,
-                      child: ProviderCard(
-                        provider: provider,
-                        onTap: () => Navigator.of(context).pushNamed(
-                          AppRoutes.providerProfile,
-                          arguments: provider,
-                        ),
+                  return SizedBox(
+                    width: 312,
+                    child: ProviderCard(
+                      provider: provider,
+                      onTap: () => Navigator.of(context).pushNamed(
+                        AppRoutes.providerProfile,
+                        arguments: provider,
                       ),
                     ),
                   );
@@ -1662,14 +1689,20 @@ class _ShowAllProvidersCard extends StatelessWidget {
       child: Container(
         width: 312,
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              Color(0xFF645394),
+              Color(0xFF4B0082),
+            ],
+          ),
           borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: const Color(0xFFE7ECE8)),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x0F172A10),
-              blurRadius: 30,
-              offset: Offset(0, 14),
+              color: Color(0x261A0938),
+              blurRadius: 24,
+              offset: Offset(0, 12),
             ),
           ],
         ),
@@ -1682,15 +1715,7 @@ class _ShowAllProvidersCard extends StatelessWidget {
                 height: 116,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF24145A),
-                      AppColors.primary,
-                      Color(0xFFA77CFF),
-                    ],
-                  ),
+                  color: Colors.white.withValues(alpha: 0.10),
                 ),
                 child: Stack(
                   children: [
@@ -1735,14 +1760,14 @@ class _ShowAllProvidersCard extends StatelessWidget {
                 'Show All',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFF162544),
+                      color: Colors.white,
                     ),
               ),
               const SizedBox(height: 6),
               Text(
                 'Explore the full $label list and find more trusted providers near your selected area.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: Colors.white.withValues(alpha: 0.82),
                       height: 1.45,
                     ),
               ),
@@ -1750,9 +1775,11 @@ class _ShowAllProvidersCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFBFDFB),
+                  color: Colors.white.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFEDF1EE)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -1760,7 +1787,7 @@ class _ShowAllProvidersCard extends StatelessWidget {
                       child: Text(
                         'Open full list',
                         style: TextStyle(
-                          color: AppColors.primary,
+                          color: Colors.white,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -1768,13 +1795,13 @@ class _ShowAllProvidersCard extends StatelessWidget {
                     Container(
                       width: 40,
                       height: 40,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primarySoft,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.arrow_forward_rounded,
-                        color: AppColors.primary,
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -1790,13 +1817,13 @@ class _ShowAllProvidersCard extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
-                  color: const Color(0xFFF7F1FF),
+                  color: Colors.white.withValues(alpha: 0.12),
                 ),
-                child: const Text(
+                child: Text(
                   'See all nearby providers in one place.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.primary,
+                  style: const TextStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -1902,176 +1929,6 @@ class _AlertDot extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MapBadge extends StatefulWidget {
-  const _MapBadge({
-    required this.address,
-    this.latitude,
-    this.longitude,
-  });
-
-  final String address;
-  final double? latitude;
-  final double? longitude;
-
-  @override
-  State<_MapBadge> createState() => _MapBadgeState();
-}
-
-class _MapBadgeState extends State<_MapBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final lift = 6 * _controller.value;
-        final glow = 0.28 + (_controller.value * 0.18);
-
-        return Container(
-          width: 110,
-          height: 96,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFFF7F3FF),
-                Color(0xFFE8DEFF),
-              ],
-            ),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: CustomPaint(
-                    painter: _MiniMapPainter(),
-                  ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.10),
-                      Colors.white.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 16,
-                right: 12,
-                bottom: 14,
-                child: Transform.rotate(
-                  angle: -0.42,
-                  child: Container(
-                    height: 32,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.white.withValues(alpha: 0.84),
-                      border: Border.all(color: const Color(0xFFDCCCF8)),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 14 - lift,
-                child: Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(23),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6B43D8).withValues(alpha: glow),
-                        blurRadius: 22,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.location_on_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MiniMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = const Color(0xFFDCCCF8)
-      ..strokeWidth = 1;
-
-    final pathPaint = Paint()
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.72)
-      ..style = PaintingStyle.fill;
-
-    for (double x = -8; x <= size.width + 8; x += size.width / 3) {
-      canvas.drawLine(Offset(x, 0), Offset(x - 18, size.height), linePaint);
-    }
-
-    for (double y = 10; y <= size.height; y += size.height / 3) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
-    }
-
-    final cardPath = Path()
-      ..moveTo(18, size.height - 24)
-      ..quadraticBezierTo(
-        size.width * 0.45,
-        size.height - 44,
-        size.width - 12,
-        size.height - 18,
-      )
-      ..lineTo(size.width - 22, size.height - 2)
-      ..quadraticBezierTo(
-        size.width * 0.45,
-        size.height - 24,
-        12,
-        size.height - 10,
-      )
-      ..close();
-
-    canvas.drawPath(cardPath, pathPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _ShieldBadge extends StatelessWidget {
