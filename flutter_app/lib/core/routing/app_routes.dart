@@ -29,6 +29,9 @@ class AppRoutes {
   static const providerCalendar = '/provider/calendar';
   static const providerMessages = '/provider/messages';
   static const providerMore = '/provider/more';
+  static const providerPersonalDetails = '/provider/profile/personal-details';
+  static const providerVerificationHub = '/provider/profile/verification';
+  static const providerServiceArea = '/provider/profile/service-area';
   static const providerVerificationEmail = '/provider/profile/email-verification';
   static const providerVerificationPhone = '/provider/profile/phone-verification';
   static const providerVerificationIdentity = '/provider/profile/identity-verification';

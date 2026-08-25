@@ -48,9 +48,12 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
   final _hourlyController = TextEditingController();
   final _dailyController = TextEditingController();
   final _specialtiesController = TextEditingController();
-  String _serviceImageDataUrl = '';
-  String _serviceImageCaption = 'Cover image';
-  String _serviceImageFileName = '';
+  List<String> _serviceImageDataUrls = const [];
+  List<String> _serviceImageCaptions = const [];
+  List<String> _serviceImageFileNames = const [];
+  List<String> _certificateDataUrls = const [];
+  List<String> _certificateCaptions = const [];
+  List<String> _certificateFileNames = const [];
   bool _saving = false;
   String _message = '';
   String _error = '';
@@ -84,9 +87,12 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       _hourlyController.clear();
       _dailyController.clear();
       _specialtiesController.clear();
-      _serviceImageDataUrl = '';
-      _serviceImageCaption = 'Cover image';
-      _serviceImageFileName = '';
+      _serviceImageDataUrls = const [];
+      _serviceImageCaptions = const [];
+      _serviceImageFileNames = const [];
+      _certificateDataUrls = const [];
+      _certificateCaptions = const [];
+      _certificateFileNames = const [];
       _message = '';
       _error = '';
     });
@@ -100,28 +106,116 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       _hourlyController.text = service.hourlyRate.toStringAsFixed(0);
       _dailyController.text = service.dailyRate.toStringAsFixed(0);
       _specialtiesController.text = service.specialties.join(', ');
-      _serviceImageDataUrl =
-          service.imageDataUrls.isNotEmpty ? service.imageDataUrls.first : '';
-      _serviceImageCaption = service.imageCaptions.isNotEmpty
-          ? service.imageCaptions.first
-          : 'Cover image';
-      _serviceImageFileName = '';
+      _serviceImageDataUrls = List<String>.from(service.imageDataUrls);
+      _serviceImageCaptions = service.imageCaptions.isNotEmpty
+          ? List<String>.from(service.imageCaptions)
+          : List<String>.generate(
+              service.imageDataUrls.length,
+              (index) => 'Work image ${index + 1}',
+            );
+      _serviceImageFileNames = const [];
+      _certificateDataUrls = List<String>.from(service.certificateDataUrls);
+      _certificateCaptions = service.certificateCaptions.isNotEmpty
+          ? List<String>.from(service.certificateCaptions)
+          : List<String>.generate(
+              service.certificateDataUrls.length,
+              (index) => 'Certificate ${index + 1}',
+            );
+      _certificateFileNames = const [];
       _message = '';
       _error = '';
     });
   }
 
-  Future<void> _pickServiceImage() async {
-    final picked = await pickSingleBrowserFile(accept: 'image/*');
-    if (!mounted || picked == null) {
+  Future<void> _pickServiceImages() async {
+    final remainingSlots = 3 - _serviceImageDataUrls.length;
+    if (remainingSlots <= 0) {
+      setState(() => _error = 'You can upload up to 3 service images.');
+      return;
+    }
+    final picked = await pickMultipleBrowserFiles(
+      accept: 'image/*',
+      maxFiles: remainingSlots,
+    );
+    if (!mounted || picked.isEmpty) {
       return;
     }
     setState(() {
-      _serviceImageDataUrl = picked.dataUrl;
-      _serviceImageFileName = picked.name;
-      _serviceImageCaption = 'Cover image';
+      _serviceImageDataUrls = [
+        ..._serviceImageDataUrls,
+        ...picked.map((file) => file.dataUrl),
+      ];
+      _serviceImageCaptions = List<String>.generate(
+        _serviceImageDataUrls.length,
+        (index) => 'Work image ${index + 1}',
+      );
+      _serviceImageFileNames = [
+        ..._serviceImageFileNames,
+        ...picked.map((file) => file.name),
+      ];
       _error = '';
       _message = '';
+    });
+  }
+
+  Future<void> _pickCertificates() async {
+    final remainingSlots = 3 - _certificateDataUrls.length;
+    if (remainingSlots <= 0) {
+      setState(() => _error = 'You can upload up to 3 certificates.');
+      return;
+    }
+    final picked = await pickMultipleBrowserFiles(
+      accept: 'image/*,application/pdf',
+      maxFiles: remainingSlots,
+    );
+    if (!mounted || picked.isEmpty) {
+      return;
+    }
+    setState(() {
+      _certificateDataUrls = [
+        ..._certificateDataUrls,
+        ...picked.map((file) => file.dataUrl),
+      ];
+      _certificateCaptions = List<String>.generate(
+        _certificateDataUrls.length,
+        (index) => 'Certificate ${index + 1}',
+      );
+      _certificateFileNames = [
+        ..._certificateFileNames,
+        ...picked.map((file) => file.name),
+      ];
+      _error = '';
+      _message = '';
+    });
+  }
+
+  void _removeServiceImage(int index) {
+    setState(() {
+      _serviceImageDataUrls = List<String>.from(_serviceImageDataUrls)
+        ..removeAt(index);
+      _serviceImageCaptions = List<String>.generate(
+        _serviceImageDataUrls.length,
+        (itemIndex) => 'Work image ${itemIndex + 1}',
+      );
+      if (index < _serviceImageFileNames.length) {
+        _serviceImageFileNames = List<String>.from(_serviceImageFileNames)
+          ..removeAt(index);
+      }
+    });
+  }
+
+  void _removeCertificate(int index) {
+    setState(() {
+      _certificateDataUrls = List<String>.from(_certificateDataUrls)
+        ..removeAt(index);
+      _certificateCaptions = List<String>.generate(
+        _certificateDataUrls.length,
+        (itemIndex) => 'Certificate ${itemIndex + 1}',
+      );
+      if (index < _certificateFileNames.length) {
+        _certificateFileNames = List<String>.from(_certificateFileNames)
+          ..removeAt(index);
+      }
     });
   }
 
@@ -146,12 +240,10 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           .map((item) => item.trim())
           .where((item) => item.isNotEmpty)
           .toList(growable: false);
-      final imageDataUrls = _serviceImageDataUrl.isEmpty
-          ? const <String>[]
-          : <String>[_serviceImageDataUrl];
-      final imageCaptions = imageDataUrls.isEmpty
-          ? const <String>[]
-          : <String>[_serviceImageCaption];
+      final imageDataUrls = List<String>.from(_serviceImageDataUrls);
+      final imageCaptions = List<String>.from(_serviceImageCaptions);
+      final certificateDataUrls = List<String>.from(_certificateDataUrls);
+      final certificateCaptions = List<String>.from(_certificateCaptions);
 
       final isNewService = _editingServiceId.isEmpty;
       if (isNewService) {
@@ -163,6 +255,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           specialties: specialties,
           imageDataUrls: imageDataUrls,
           imageCaptions: imageCaptions,
+          certificateDataUrls: certificateDataUrls,
+          certificateCaptions: certificateCaptions,
         );
       } else {
         await _workspaceService.updateService(
@@ -173,6 +267,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           specialties: specialties,
           imageDataUrls: imageDataUrls,
           imageCaptions: imageCaptions,
+          certificateDataUrls: certificateDataUrls,
+          certificateCaptions: certificateCaptions,
         );
       }
 
@@ -259,16 +355,54 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.success,
                             foregroundColor: Colors.white,
+                            elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius:
                                   BorderRadius.circular(AppSpacing.radiusSm),
                             ),
                           ),
-                          child: const Text('Back'),
+                          child: const Text('Availability'),
                         ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.lg),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFF8F4FF), Color(0xFFF3FBF7)],
+                        ),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.10),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _serviceStatTile(
+                              context,
+                              value: '${profile.services.length}',
+                              label: 'Live services',
+                              tint: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: _serviceStatTile(
+                              context,
+                              value:
+                                  '${profile.services.fold<int>(0, (sum, item) => sum + item.imageDataUrls.length)}',
+                              label: 'Portfolio photos',
+                              tint: AppColors.success,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
                     if (profile.services.isEmpty)
                       const EmptyState(
                         title: 'No services added yet',
@@ -280,7 +414,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                       ...profile.services.map(
                         (service) => Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: _serviceCard(context, service),
+                          child: _premiumServiceCard(context, service),
                         ),
                       ),
                   ],
@@ -291,38 +425,58 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _editingServiceId.isEmpty
-                                    ? 'Add New Service'
-                                    : 'Edit Service',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                'Save pricing and specialties directly to your provider listing.',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: AppColors.textSecondary),
-                              ),
-                            ],
-                          ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFF8F4FF), Colors.white],
                         ),
-                        if (_editingServiceId.isNotEmpty)
-                          TextButton(
-                            onPressed: _startNewService,
-                            child: const Text('Cancel'),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.10),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _editingServiceId.isEmpty
+                                      ? 'Add New Service'
+                                      : 'Edit Service',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  _editingServiceId.isEmpty
+                                      ? 'Create another listing with pricing, specialties, photos, and certificates.'
+                                      : 'Update this service and save changes directly to your live provider listing.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.textSecondary,
+                                        height: 1.45,
+                                      ),
+                                ),
+                              ],
+                            ),
                           ),
-                      ],
+                          if (_editingServiceId.isNotEmpty)
+                            TextButton(
+                              onPressed: _startNewService,
+                              child: const Text('Cancel'),
+                            ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     _inputCard(
@@ -378,7 +532,35 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                       hint: 'Malay, Arabic, Event catering',
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    _uploadCard(context),
+                    _uploadCard(
+                      context,
+                      title: 'Service Images',
+                      subtitle:
+                          'Upload up to 3 service images. Remove old images and upload new images anytime.',
+                      dataUrls: _serviceImageDataUrls,
+                      fileNames: _serviceImageFileNames,
+                      emptyLabel: 'No service images selected',
+                      onUpload: _pickServiceImages,
+                      onRemove: _removeServiceImage,
+                      uploadLabel: _serviceImageDataUrls.isEmpty
+                          ? 'Upload Service Images'
+                          : 'Add More Images',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _uploadCard(
+                      context,
+                      title: 'Certificates',
+                      subtitle:
+                          'Upload up to 3 certificates or proof files. Remove old files and upload new ones anytime.',
+                      dataUrls: _certificateDataUrls,
+                      fileNames: _certificateFileNames,
+                      emptyLabel: 'No certificates selected',
+                      onUpload: _pickCertificates,
+                      onRemove: _removeCertificate,
+                      uploadLabel: _certificateDataUrls.isEmpty
+                          ? 'Upload Certificates'
+                          : 'Add More Certificates',
+                    ),
                     if (_error.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.md),
                       _noticeCard(_error, AppColors.error, const Color(0xFFFFF1F2)),
@@ -454,7 +636,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'RM${service.hourlyRate.toStringAsFixed(0)}/hr • RM${service.dailyRate.toStringAsFixed(0)}/day',
+                      'RM${service.hourlyRate.toStringAsFixed(0)}/hr - RM${service.dailyRate.toStringAsFixed(0)}/day',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
@@ -487,15 +669,33 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           ),
           if (service.imageDataUrls.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                service.imageDataUrls.first,
-                height: 140,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _imagePlaceholder(),
+            SizedBox(
+              height: 96,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: service.imageDataUrls.length,
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                itemBuilder: (context, index) => ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    service.imageDataUrls[index],
+                    height: 96,
+                    width: 112,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                  ),
+                ),
               ),
+            ),
+          ],
+          if (service.certificateDataUrls.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              '${service.certificateDataUrls.length} certificate file${service.certificateDataUrls.length == 1 ? '' : 's'} attached',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -503,74 +703,485 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     );
   }
 
-  Widget _uploadCard(BuildContext context) {
-    return _inputCard(
+  Widget _premiumServiceCard(
+    BuildContext context,
+    ProviderWorkspaceServiceModel service,
+  ) {
+    final chipStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w700,
+        );
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFFFFF), Color(0xFFFCFAFF)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE9E1F4)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x120F0B1F),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _editingServiceId.isEmpty ? 'Service Image' : 'Current Service Image',
-            style: Theme.of(context)
-                .textTheme
-                .labelLarge
-                ?.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: AppSpacing.sm),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: _serviceImageDataUrl.isEmpty
-                    ? _imagePlaceholder()
-                    : Image.network(
-                        _serviceImageDataUrl,
-                        height: 96,
-                        width: 112,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _imagePlaceholder(),
-                      ),
-              ),
-              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _editingServiceId.isEmpty
-                          ? 'Upload a cover image for this service.'
-                          : 'Replace the current service cover image.',
+                      _toTitleCase(service.serviceType),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'RM${service.hourlyRate.toStringAsFixed(0)}/hr - RM${service.dailyRate.toStringAsFixed(0)}/day',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton.tonal(
+                onPressed: () => _editService(service),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primarySoft,
+                  foregroundColor: AppColors.primary,
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('Edit'),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              _miniChip(
+                label: service.yearsExperience.isEmpty
+                    ? 'Experience not set'
+                    : service.yearsExperience,
+                background: const Color(0xFFF4EDFF),
+                foreground: AppColors.primary,
+              ),
+              _miniChip(
+                label:
+                    '${service.imageDataUrls.length} image${service.imageDataUrls.length == 1 ? '' : 's'}',
+                background: const Color(0xFFEFFAF5),
+                foreground: AppColors.success,
+              ),
+              if (service.certificateDataUrls.isNotEmpty)
+                _miniChip(
+                  label:
+                      '${service.certificateDataUrls.length} certificate${service.certificateDataUrls.length == 1 ? '' : 's'}',
+                  background: const Color(0xFFFFF4E8),
+                  foreground: AppColors.warning,
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (service.specialties.isEmpty)
+            Text('No specialties added yet.', style: chipStyle)
+          else
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: service.specialties
+                  .map(
+                    (item) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F4FF),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.10),
+                        ),
+                      ),
+                      child: Text(item, style: chipStyle),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          if (service.imageDataUrls.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              height: 96,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: service.imageDataUrls.length,
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                itemBuilder: (context, index) => ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    service.imageDataUrls[index],
+                    height: 96,
+                    width: 112,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (service.certificateDataUrls.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              '${service.certificateDataUrls.length} certificate file${service.certificateDataUrls.length == 1 ? '' : 's'} attached',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _serviceStatTile(
+    BuildContext context, {
+    required String value,
+    required String label,
+    required Color tint,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: tint.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: tint,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniChip({
+    required String label,
+    required Color background,
+    required Color foreground,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: foreground,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _uploadCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required List<String> dataUrls,
+    required List<String> fileNames,
+    required String emptyLabel,
+    required VoidCallback onUpload,
+    required void Function(int index) onRemove,
+    required String uploadLabel,
+  }) {
+    return _inputCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.collections_outlined,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
                       style: Theme.of(context)
                           .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
+                          .titleSmall
+                          ?.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                          ),
                     ),
-                    if (_serviceImageFileName.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        _serviceImageFileName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.sm),
-                    OutlinedButton.icon(
-                      onPressed: _pickServiceImage,
-                      icon: const Icon(Icons.upload_outlined),
-                      label: Text(
-                        _editingServiceId.isEmpty
-                            ? 'Upload Service Image'
-                            : 'Change Service Image',
-                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${dataUrls.length}/3 uploaded',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            subtitle,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.45,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (dataUrls.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFF8F4FF), Color(0xFFFFFFFF)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE7DDF7)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.add_photo_alternate_outlined,
+                      color: AppColors.primary,
+                      size: 34,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    emptyLabel,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Add sharp, clear files to improve your listing quality.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: dataUrls.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: AppSpacing.sm,
+                crossAxisSpacing: AppSpacing.sm,
+                childAspectRatio: 0.92,
+              ),
+              itemBuilder: (context, index) {
+                final url = dataUrls[index];
+                final isPdf = url.startsWith('data:application/pdf');
+                final fileName = index < fileNames.length ? fileNames[index] : '';
+                return Container(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE7DDF7)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0D0F0B1F),
+                        blurRadius: 16,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: isPdf
+                                  ? Container(
+                                      width: double.infinity,
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Color(0xFFF8F4FF),
+                                            Color(0xFFFFFFFF),
+                                          ],
+                                        ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: const Icon(
+                                        Icons.picture_as_pdf_outlined,
+                                        color: AppColors.primary,
+                                        size: 42,
+                                      ),
+                                    )
+                                  : Image.network(
+                                      url,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          _imagePlaceholder(),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            fileName.isEmpty ? 'Uploaded file' : fileName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ],
+                      ),
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => onRemove(index),
+                            borderRadius: BorderRadius.circular(999),
+                            child: Ink(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.92),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.error.withValues(alpha: 0.20),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: AppColors.error,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onUpload,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(
+                  color: AppColors.primary.withValues(alpha: 0.24),
+                ),
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                backgroundColor: const Color(0xFFFCFAFF),
+              ),
+              icon: const Icon(Icons.cloud_upload_outlined),
+              label: Text(uploadLabel),
+            ),
+          ),
+          if (dataUrls.length >= 3) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Maximum 3 files reached. Remove one to upload a new file.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
         ],
       ),
     );
@@ -1255,3 +1866,5 @@ String _toTitleCase(String value) {
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
       .join(' ');
 }
+
+

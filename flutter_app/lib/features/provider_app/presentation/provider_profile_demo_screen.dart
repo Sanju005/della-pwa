@@ -10,19 +10,34 @@ import '../../../widgets/loading_state.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../../widgets/swiper_status_badge.dart';
 
-class ProviderProfileDemoScreen extends StatelessWidget {
+class ProviderProfileDemoScreen extends StatefulWidget {
   const ProviderProfileDemoScreen({
     super.key,
     required this.repository,
   });
 
   final DemoRepository repository;
+
+  @override
+  State<ProviderProfileDemoScreen> createState() =>
+      _ProviderProfileDemoScreenState();
+}
+
+class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
   static const _workspaceService = ProviderWorkspaceService();
+
+  late Future<ProviderWorkspaceSnapshot> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _workspaceService.fetchWorkspace();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<ProviderWorkspaceProfile>(
-      future: _workspaceService.fetchProfile(),
+    return FutureBuilder<ProviderWorkspaceSnapshot>(
+      future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const LoadingState(label: 'Loading provider profile...');
@@ -35,108 +50,79 @@ class ProviderProfileDemoScreen extends StatelessWidget {
           );
         }
 
-        final provider = snapshot.data!;
-        final name = provider.marketingName.isEmpty
-            ? provider.fullName
-            : provider.marketingName;
+        final workspace = snapshot.data!;
+        final profile = workspace.profile;
+        final serviceCount = profile.services.length;
+        final displayName = profile.marketingName.trim().isEmpty
+            ? profile.fullName.trim().isEmpty
+                ? 'Provider'
+                : profile.fullName.trim()
+            : profile.marketingName.trim();
+        final location = profile.serviceLocation.trim().isEmpty
+            ? 'Set your service area'
+            : profile.serviceLocation.trim();
+        final verificationPendingCount = [
+          !profile.emailVerified,
+          !profile.phoneVerified,
+          !profile.identityVerified,
+        ].where((item) => item).length;
+        final verificationTone = verificationPendingCount == 0
+            ? SwiperStatusTone.success
+            : SwiperStatusTone.warning;
+        final verificationLabel = verificationPendingCount == 0
+            ? 'Verified'
+            : 'Pending';
 
         return ListView(
-          padding: AppSpacing.screenPadding,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.md,
+            112,
+          ),
           children: [
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.border),
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.shadow,
-                    blurRadius: 24,
-                    offset: Offset(0, 10),
-                  ),
-                ],
+            _profileCard(
+              context,
+              title: 'Personal Card',
+              subtitle: 'Profile picture, provider name, and live location',
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.providerPersonalDetails,
+              ),
+              leading: ProfileAvatar(
+                name: displayName,
+                imageUrl: profile.avatarUrl,
+                radius: 28,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ProfileAvatar(
-                        name: name,
-                        imageUrl: provider.avatarUrl,
-                        radius: 32,
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name.isEmpty ? 'Provider' : name,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                    color: AppColors.textPrimary,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              provider.fullName.isEmpty
-                                  ? 'Your provider profile'
-                                  : provider.fullName,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(color: AppColors.textSecondary),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                SwiperStatusBadge(
-                                  label: provider.approvalStatus,
-                                  tone: provider.identityVerified
-                                      ? SwiperStatusTone.success
-                                      : SwiperStatusTone.warning,
-                                ),
-                                SwiperStatusBadge(
-                                  label: provider.isVisible
-                                      ? 'Visible to customers'
-                                      : 'Availability paused',
-                                  tone: provider.isVisible
-                                      ? SwiperStatusTone.success
-                                      : SwiperStatusTone.info,
-                                ),
-                              ],
-                            ),
-                          ],
+                  Text(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
                         ),
-                      ),
-                    ],
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      Expanded(
-                        child: _metricCard(
-                          context,
-                          value: provider.averageRating.toStringAsFixed(1),
-                          label: 'Average rating',
-                          subtitle: '${provider.totalReviews} reviews',
-                        ),
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: AppColors.textSecondary,
                       ),
-                      const SizedBox(width: AppSpacing.sm),
+                      const SizedBox(width: 6),
                       Expanded(
-                        child: _metricCard(
-                          context,
-                          value: '${provider.services.length}',
-                          label: 'Live services',
-                          subtitle: '${provider.serviceRadiusKm.toStringAsFixed(0)} km radius',
+                        child: Text(
+                          location,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ],
@@ -144,126 +130,135 @@ class ProviderProfileDemoScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            _sectionCard(
+            const SizedBox(height: AppSpacing.md),
+            _profileCard(
               context,
               title: 'Verification',
-              subtitle: 'Email, phone, and identity verification status',
-              child: Column(
-                children: [
-                  _verificationRow(
-                    'Email',
-                    provider.emailVerified ? 'Verified' : 'Pending',
-                    provider.emailVerified,
-                  ),
-                  _verificationRow(
-                    'Phone',
-                    provider.phoneVerified ? 'Verified' : 'Pending',
-                    provider.phoneVerified,
-                  ),
-                  _verificationRow(
-                    'Identity',
-                    provider.identityVerified
-                        ? 'Verified'
-                        : _toTitleCase(provider.identityVerificationStatus),
-                    provider.identityVerified,
-                    isLast: true,
-                  ),
+              subtitle: 'Check which items are verified or pending',
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.providerVerificationHub,
+              ),
+              leading: _iconBadge(
+                icon: Icons.verified_user_outlined,
+                colors: const [
+                  Color(0xFFB88CFF),
+                  Color(0xFF8E5EB5),
                 ],
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _sectionCard(
-              context,
-              title: 'Provider Workspace',
-              subtitle: 'Open the live subpages used to manage your listing',
-              child: Column(
-                children: [
-                  _navTile(
-                    context,
-                    icon: Icons.work_outline_rounded,
-                    title: 'My Services',
-                    subtitle: 'Manage service types, pricing, and specialties',
-                    onTap: () => Navigator.of(context)
-                        .pushNamed(AppRoutes.providerServices),
-                  ),
-                  _navTile(
-                    context,
-                    icon: Icons.calendar_month_outlined,
-                    title: 'Availability',
-                    subtitle: 'Set booking days and working hours',
-                    onTap: () => Navigator.of(context)
-                        .pushNamed(AppRoutes.providerAvailability),
-                  ),
-                  _navTile(
-                    context,
-                    icon: Icons.star_outline_rounded,
-                    title: 'Reviews',
-                    subtitle: 'Read customer feedback from completed work',
-                    onTap: () =>
-                        Navigator.of(context).pushNamed(AppRoutes.providerReviews),
-                  ),
-                  _navTile(
-                    context,
-                    icon: Icons.calendar_view_month_outlined,
-                    title: 'Calendar',
-                    subtitle: 'See provider bookings by date',
-                    onTap: () => Navigator.of(context)
-                        .pushNamed(AppRoutes.providerCalendar),
-                  ),
-                  _navTile(
-                    context,
-                    icon: Icons.chat_bubble_outline_rounded,
-                    title: 'Messages',
-                    subtitle: 'Open live booking conversations',
-                    onTap: () => Navigator.of(context)
-                        .pushNamed(AppRoutes.providerMessages),
-                  ),
-                  _navTile(
-                    context,
-                    icon: Icons.more_horiz_rounded,
-                    title: 'More',
-                    subtitle: 'Settings, verification, and support',
-                    onTap: () =>
-                        Navigator.of(context).pushNamed(AppRoutes.providerMore),
-                    isLast: true,
-                  ),
-                ],
+              trailing: SwiperStatusBadge(
+                label: verificationLabel,
+                tone: verificationTone,
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _sectionCard(
-              context,
-              title: 'Profile Details',
-              subtitle: 'Provider account and listing information',
-              child: Column(
-                children: [
-                  _infoRow('Full Name', provider.fullName),
-                  _infoRow('Email', provider.email),
-                  _infoRow('Phone', provider.phone),
-                  _infoRow('Emergency Contact', provider.emergencyContactNumber),
-                  _infoRow('Country', provider.country),
-                  _infoRow('Service Location', provider.serviceLocation),
-                  _infoRow(
-                    'Service Radius',
-                    '${provider.serviceRadiusKm.toStringAsFixed(0)} km',
-                  ),
-                  _infoRow('Account Status', provider.accountStatus, isLast: true),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _sectionCard(
-              context,
-              title: 'About',
-              subtitle: 'Public provider description shown in the app',
               child: Text(
-                provider.bio.isEmpty
-                    ? 'No provider bio has been added yet.'
-                    : provider.bio,
+                verificationPendingCount == 0
+                    ? 'Phone, email, and identity are verified.'
+                    : '$verificationPendingCount item${verificationPendingCount == 1 ? '' : 's'} still need attention.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      height: 1.6,
+                      color: AppColors.textSecondary,
+                      height: 1.45,
                     ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _profileCard(
+              context,
+              title: 'Services',
+              subtitle: 'Manage service items, photos, specialties, and rates',
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.providerServices,
+              ),
+              leading: _iconBadge(
+                icon: Icons.work_outline_rounded,
+                colors: const [
+                  Color(0xFFC8F1DE),
+                  Color(0xFF7ED7AF),
+                ],
+                iconColor: const Color(0xFF146B48),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$serviceCount live service${serviceCount == 1 ? '' : 's'}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    serviceCount == 0
+                        ? 'Add your first provider service with image, pricing, and specialties.'
+                        : 'Open the service workspace to edit rates, specialties, images, and add new services.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.45,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _profileCard(
+              context,
+              title: 'Availability',
+              subtitle: 'Edit working days and time presets',
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.providerAvailability,
+              ),
+              leading: _iconBadge(
+                icon: Icons.calendar_month_rounded,
+                colors: const [
+                  Color(0xFFE5EEFF),
+                  Color(0xFFC4D6FF),
+                ],
+                iconColor: const Color(0xFF264E9B),
+              ),
+              child: Text(
+                'Update weekly schedule and availability slots from your live provider workspace.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.45,
+                    ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _profileCard(
+              context,
+              title: 'Service Area',
+              subtitle: 'Radius slider, location pin, and service coverage',
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.providerServiceArea,
+              ),
+              leading: _iconBadge(
+                icon: Icons.map_outlined,
+                colors: const [
+                  Color(0xFFFFE9C8),
+                  Color(0xFFFFD89B),
+                ],
+                iconColor: const Color(0xFF9B5D00),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${profile.serviceRadiusKm.toStringAsFixed(0)} km radius',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    location,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.45,
+                        ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -272,198 +267,123 @@ class ProviderProfileDemoScreen extends StatelessWidget {
     );
   }
 
-  Widget _metricCard(
+  Widget _profileCard(
     BuildContext context, {
-    required String value,
-    required String label,
-    required String subtitle,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primary,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required Widget child,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          child,
-        ],
-      ),
-    );
-  }
-
-  Widget _verificationRow(
-    String label,
-    String value,
-    bool verified, {
-    bool isLast = false,
-  }) {
-    return _infoRow(
-      label,
-      value,
-      isLast: isLast,
-      trailing: SwiperStatusBadge(
-        label: verified ? 'Verified' : 'Pending',
-        tone: verified ? SwiperStatusTone.success : SwiperStatusTone.warning,
-      ),
-    );
-  }
-
-  Widget _infoRow(
-    String label,
-    String value, {
-    bool isLast = false,
-    Widget? trailing,
-  }) {
-    return Container(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.md),
-      margin: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.md),
-      decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : const Border(
-                bottom: BorderSide(color: Color(0xFFF0EAF8)),
-              ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(color: AppColors.textSecondary),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          if (trailing != null) trailing,
-          if (trailing == null)
-            Flexible(
-              child: Text(
-                value.isEmpty ? '-' : value,
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _navTile(
-    BuildContext context, {
-    required IconData icon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
-    bool isLast = false,
+    required Widget leading,
+    required Widget child,
+    Widget? trailing,
   }) {
-    return Container(
-      margin: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.sm),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: isLast
-              ? BorderSide.none
-              : const BorderSide(color: Color(0xFFF0EAF8)),
-        ),
-      ),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.96, end: 1),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, widgetChild) {
+        return Transform.scale(
+          scale: value,
+          child: widgetChild,
+        );
+      },
+      child: InkWell(
+        borderRadius: BorderRadius.circular(26),
         onTap: onTap,
-        leading: Container(
-          width: 46,
-          height: 46,
-          decoration: const BoxDecoration(
-            color: AppColors.primarySoft,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: AppColors.primary),
-        ),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
+        child: Ink(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFFFFFFFF),
+                Color(0xFFFDFBFF),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: const Color(0xFFEAE2F6)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14562687),
+                blurRadius: 24,
+                offset: Offset(0, 12),
               ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: AppColors.textSecondary),
-        ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.primary,
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  leading,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  trailing ??
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF6F0FF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              child,
+            ],
+          ),
         ),
       ),
     );
   }
-}
 
-String _toTitleCase(String value) {
-  return value
-      .replaceAll('_', ' ')
-      .split(' ')
-      .where((part) => part.isNotEmpty)
-      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
-      .join(' ');
+  Widget _iconBadge({
+    required IconData icon,
+    required List<Color> colors,
+    Color iconColor = Colors.white,
+  }) {
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: colors,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Icon(icon, color: iconColor, size: 28),
+    );
+  }
 }

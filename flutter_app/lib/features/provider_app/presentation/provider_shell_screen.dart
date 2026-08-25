@@ -41,7 +41,7 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
     final pages = [
       ProviderDashboardScreen(repository: widget.repository),
       ProviderJobsScreen(repository: widget.repository),
-      const ProviderEarningsScreen(),
+      ProviderEarningsScreen(onLogOut: _logOut),
       ProviderProfileDemoScreen(repository: widget.repository),
     ];
 
@@ -58,11 +58,12 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
       title: titles[_currentIndex],
       subtitle: subtitles[_currentIndex],
       pages: pages,
+      showAppBar: _currentIndex != 0 && _currentIndex != 2,
       items: const [
         SwiperBottomNavItem(label: 'Home', icon: Icons.home_work_rounded),
         SwiperBottomNavItem(label: 'Bookings', icon: Icons.calendar_month_rounded),
-        SwiperBottomNavItem(label: 'Payments', icon: Icons.payments_rounded),
-        SwiperBottomNavItem(label: 'Profile', icon: Icons.badge_outlined),
+        SwiperBottomNavItem(label: 'Payments', icon: Icons.account_balance_outlined),
+        SwiperBottomNavItem(label: 'Profile', icon: Icons.person_outline_rounded),
       ],
       onTabSelected: (index) => setState(() => _currentIndex = index),
       actions: [

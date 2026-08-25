@@ -60,12 +60,21 @@ class ProviderWorkspaceProfile {
   const ProviderWorkspaceProfile({
     required this.providerId,
     required this.fullName,
+    required this.firstName,
+    required this.lastName,
+    required this.dateOfBirth,
+    required this.gender,
     required this.email,
     required this.phone,
     required this.emergencyContactNumber,
     required this.avatarUrl,
     required this.accountStatus,
     required this.marketingName,
+    required this.addressLine1,
+    required this.addressLine2,
+    required this.postcode,
+    required this.city,
+    required this.state,
     required this.serviceLocation,
     required this.serviceRadiusKm,
     required this.country,
@@ -88,12 +97,21 @@ class ProviderWorkspaceProfile {
 
   final String providerId;
   final String fullName;
+  final String firstName;
+  final String lastName;
+  final String dateOfBirth;
+  final String gender;
   final String email;
   final String phone;
   final String emergencyContactNumber;
   final String avatarUrl;
   final String accountStatus;
   final String marketingName;
+  final String addressLine1;
+  final String addressLine2;
+  final String postcode;
+  final String city;
+  final String state;
   final String serviceLocation;
   final double serviceRadiusKm;
   final String country;
@@ -117,6 +135,10 @@ class ProviderWorkspaceProfile {
     return ProviderWorkspaceProfile(
       providerId: json['providerId'] as String? ?? '',
       fullName: json['fullName'] as String? ?? '',
+      firstName: json['firstName'] as String? ?? '',
+      lastName: json['lastName'] as String? ?? '',
+      dateOfBirth: json['dateOfBirth'] as String? ?? '',
+      gender: json['gender'] as String? ?? '',
       email: json['email'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       emergencyContactNumber:
@@ -124,6 +146,11 @@ class ProviderWorkspaceProfile {
       avatarUrl: json['avatarUrl'] as String? ?? '',
       accountStatus: json['accountStatus'] as String? ?? 'Pending',
       marketingName: json['marketingName'] as String? ?? '',
+      addressLine1: json['addressLine1'] as String? ?? '',
+      addressLine2: json['addressLine2'] as String? ?? '',
+      postcode: json['postcode'] as String? ?? '',
+      city: json['city'] as String? ?? '',
+      state: json['state'] as String? ?? '',
       serviceLocation: json['serviceLocation'] as String? ?? '',
       serviceRadiusKm: (json['serviceRadiusKm'] as num?)?.toDouble() ?? 0,
       country: json['country'] as String? ?? 'Malaysia',
@@ -180,6 +207,24 @@ class ProviderWorkspaceBooking {
     required this.companyCommissionAmount,
     required this.providerNetAmount,
     required this.createdAt,
+    required this.baseAmount,
+    required this.additionalCharge,
+    required this.additionalChargeDescription,
+    required this.paymentNote,
+    required this.companyPaymentStatus,
+    required this.acceptedAt,
+    required this.onTheWayAt,
+    required this.arrivedAt,
+    required this.completedAt,
+    required this.paidAt,
+    required this.reviewRequestedAt,
+    required this.providerReviewedAt,
+    required this.reviewedAt,
+    required this.providerReviewStatus,
+    required this.providerReviewRating,
+    required this.providerReviewComment,
+    required this.workFinishedImages,
+    required this.customerPaymentProofDataUrl,
   });
 
   final String id;
@@ -205,6 +250,24 @@ class ProviderWorkspaceBooking {
   final double companyCommissionAmount;
   final double providerNetAmount;
   final String createdAt;
+  final double baseAmount;
+  final double additionalCharge;
+  final String additionalChargeDescription;
+  final String paymentNote;
+  final String companyPaymentStatus;
+  final String acceptedAt;
+  final String onTheWayAt;
+  final String arrivedAt;
+  final String completedAt;
+  final String paidAt;
+  final String reviewRequestedAt;
+  final String providerReviewedAt;
+  final String reviewedAt;
+  final String providerReviewStatus;
+  final int providerReviewRating;
+  final String providerReviewComment;
+  final List<String> workFinishedImages;
+  final String customerPaymentProofDataUrl;
 
   factory ProviderWorkspaceBooking.fromJson(Map<String, dynamic> json) {
     return ProviderWorkspaceBooking(
@@ -232,6 +295,29 @@ class ProviderWorkspaceBooking {
           (json['companyCommissionAmount'] as num?)?.toDouble() ?? 0,
       providerNetAmount: (json['providerNetAmount'] as num?)?.toDouble() ?? 0,
       createdAt: json['createdAt'] as String? ?? '',
+      baseAmount: (json['baseAmount'] as num?)?.toDouble() ??
+          (json['quotedAmount'] as num?)?.toDouble() ??
+          0,
+      additionalCharge: (json['additionalCharge'] as num?)?.toDouble() ?? 0,
+      additionalChargeDescription:
+          json['additionalChargeDescription'] as String? ?? '',
+      paymentNote: json['paymentNote'] as String? ?? '',
+      companyPaymentStatus: json['companyPaymentStatus'] as String? ?? '',
+      acceptedAt: json['acceptedAt'] as String? ?? '',
+      onTheWayAt: json['onTheWayAt'] as String? ?? '',
+      arrivedAt: json['arrivedAt'] as String? ?? '',
+      completedAt: json['completedAt'] as String? ?? '',
+      paidAt: json['paidAt'] as String? ?? '',
+      reviewRequestedAt: json['reviewRequestedAt'] as String? ?? '',
+      providerReviewedAt: json['providerReviewedAt'] as String? ?? '',
+      reviewedAt: json['reviewedAt'] as String? ?? '',
+      providerReviewStatus: json['providerReviewStatus'] as String? ?? '',
+      providerReviewRating: (json['providerReviewRating'] as num?)?.toInt() ?? 0,
+      providerReviewComment: json['providerReviewComment'] as String? ?? '',
+      workFinishedImages:
+          _providerWorkspaceStringList(json['workFinishedImages']),
+      customerPaymentProofDataUrl:
+          json['customerPaymentProofDataUrl'] as String? ?? '',
     );
   }
 }
@@ -612,8 +698,19 @@ class ProviderWorkspaceService {
 
   Future<ProviderWorkspaceProfile> updateProfile({
     String? fullName,
+    String? firstName,
+    String? lastName,
+    String? dateOfBirth,
+    String? gender,
+    String? email,
+    String? phone,
     String? avatarUrl,
     String? marketingName,
+    String? addressLine1,
+    String? addressLine2,
+    String? postcode,
+    String? city,
+    String? state,
     String? serviceLocation,
     double? serviceRadiusKm,
     String? bio,
@@ -626,30 +723,47 @@ class ProviderWorkspaceService {
     String? identityFrontImageUrl,
     String? identityBackImageUrl,
   }) async {
+    final payload = <String, dynamic>{};
+    if (fullName != null) payload['fullName'] = fullName;
+    if (firstName != null) payload['firstName'] = firstName;
+    if (lastName != null) payload['lastName'] = lastName;
+    if (dateOfBirth != null) payload['dateOfBirth'] = dateOfBirth;
+    if (gender != null) payload['gender'] = gender;
+    if (email != null) payload['email'] = email;
+    if (phone != null) payload['phone'] = phone;
+    if (avatarUrl != null) payload['avatarUrl'] = avatarUrl;
+    if (marketingName != null) payload['marketingName'] = marketingName;
+    if (addressLine1 != null) payload['addressLine1'] = addressLine1;
+    if (addressLine2 != null) payload['addressLine2'] = addressLine2;
+    if (postcode != null) payload['postcode'] = postcode;
+    if (city != null) payload['city'] = city;
+    if (state != null) payload['state'] = state;
+    if (serviceLocation != null) payload['serviceLocation'] = serviceLocation;
+    if (serviceRadiusKm != null) payload['serviceRadiusKm'] = serviceRadiusKm;
+    if (bio != null) payload['bio'] = bio;
+    if (country != null) payload['country'] = country;
+    if (emergencyContactNumber != null) {
+      payload['emergencyContactNumber'] = emergencyContactNumber;
+    }
+    if (phoneVerified != null) payload['phoneVerified'] = phoneVerified;
+    if (identityVerified != null) payload['identityVerified'] = identityVerified;
+    if (identityVerificationStatus != null) {
+      payload['identityVerificationStatus'] = identityVerificationStatus;
+    }
+    if (identityDocumentType != null) {
+      payload['identityDocumentType'] = identityDocumentType;
+    }
+    if (identityFrontImageUrl != null) {
+      payload['identityFrontImageUrl'] = identityFrontImageUrl;
+    }
+    if (identityBackImageUrl != null) {
+      payload['identityBackImageUrl'] = identityBackImageUrl;
+    }
+
     final response = await _request(
       'PATCH',
       '/api/provider/me',
-      body: {
-        if (fullName != null) 'fullName': fullName,
-        if (avatarUrl != null) 'avatarUrl': avatarUrl,
-        if (marketingName != null) 'marketingName': marketingName,
-        if (serviceLocation != null) 'serviceLocation': serviceLocation,
-        if (serviceRadiusKm != null) 'serviceRadiusKm': serviceRadiusKm,
-        if (bio != null) 'bio': bio,
-        if (country != null) 'country': country,
-        if (emergencyContactNumber != null)
-          'emergencyContactNumber': emergencyContactNumber,
-        if (phoneVerified != null) 'phoneVerified': phoneVerified,
-        if (identityVerified != null) 'identityVerified': identityVerified,
-        if (identityVerificationStatus != null)
-          'identityVerificationStatus': identityVerificationStatus,
-        if (identityDocumentType != null)
-          'identityDocumentType': identityDocumentType,
-        if (identityFrontImageUrl != null)
-          'identityFrontImageUrl': identityFrontImageUrl,
-        if (identityBackImageUrl != null)
-          'identityBackImageUrl': identityBackImageUrl,
-      },
+      body: payload,
     );
     final body = _decodeMap(response.body);
     if (_isSuccess(response.statusCode)) {
@@ -666,6 +780,8 @@ class ProviderWorkspaceService {
     required List<String> specialties,
     required List<String> imageDataUrls,
     required List<String> imageCaptions,
+    List<String> certificateDataUrls = const [],
+    List<String> certificateCaptions = const [],
   }) async {
     final response = await _request(
       'POST',
@@ -678,6 +794,8 @@ class ProviderWorkspaceService {
         'specialties': specialties,
         'imageDataUrls': imageDataUrls,
         'imageCaptions': imageCaptions,
+        'certificateDataUrls': certificateDataUrls,
+        'certificateCaptions': certificateCaptions,
       },
     );
     final data = _decodeMap(response.body);
@@ -694,6 +812,8 @@ class ProviderWorkspaceService {
     required List<String> specialties,
     required List<String> imageDataUrls,
     required List<String> imageCaptions,
+    List<String> certificateDataUrls = const [],
+    List<String> certificateCaptions = const [],
   }) async {
     final response = await _request(
       'PATCH',
@@ -705,11 +825,95 @@ class ProviderWorkspaceService {
         'specialties': specialties,
         'imageDataUrls': imageDataUrls,
         'imageCaptions': imageCaptions,
+        'certificateDataUrls': certificateDataUrls,
+        'certificateCaptions': certificateCaptions,
       },
     );
     final data = _decodeMap(response.body);
     if (!_isSuccess(response.statusCode)) {
       throw Exception(_readError(data, 'Unable to update provider service.'));
+    }
+  }
+
+  Future<void> updateBookingStatus({
+    required String bookingId,
+    required String status,
+    String note = '',
+    double? finalAmount,
+    List<String>? workFinishedImages,
+    List<Map<String, dynamic>>? paymentBreakdown,
+  }) async {
+    final payload = <String, dynamic>{
+      'status': status,
+      'note': note,
+    };
+    if (finalAmount != null) payload['finalAmount'] = finalAmount;
+    if (workFinishedImages != null) {
+      payload['workFinishedImages'] = workFinishedImages;
+    }
+    if (paymentBreakdown != null) {
+      payload['paymentBreakdown'] = paymentBreakdown;
+    }
+
+    final response = await _request(
+      'PATCH',
+      '/api/provider/bookings/$bookingId',
+      body: payload,
+    );
+    final body = _decodeMap(response.body);
+    if (!_isSuccess(response.statusCode) || body['success'] != true) {
+      throw Exception(_readError(body, 'Unable to update booking.'));
+    }
+  }
+
+  Future<void> submitProviderReview({
+    required String bookingId,
+    required int rating,
+    required String comment,
+    List<String> photos = const [],
+  }) async {
+    final response = await _request(
+      'POST',
+      '/api/provider/bookings/$bookingId/review',
+      body: {
+        'rating': rating,
+        'comment': comment,
+        'photos': photos,
+      },
+    );
+    final body = _decodeMap(response.body);
+    if (!_isSuccess(response.statusCode) || body['success'] != true) {
+      throw Exception(_readError(body, 'Unable to submit provider review.'));
+    }
+  }
+
+  Future<void> submitCompanyPayment({
+    required double amount,
+    String note = '',
+    String attachmentDataUrl = '',
+    String attachmentFileName = '',
+    String attachmentMimeType = '',
+  }) async {
+    final response = await _request(
+      'POST',
+      '/api/provider/company-payments',
+      body: {
+        'amount': amount,
+        'amountPaid': amount,
+        'note': note,
+        'attachmentDataUrl': attachmentDataUrl,
+        'attachmentFileName': attachmentFileName,
+        'attachmentMimeType': attachmentMimeType,
+        'paymentSlipDataUrl': attachmentDataUrl,
+        'paymentSlipFileName': attachmentFileName,
+        'paymentSlipMimeType': attachmentMimeType,
+      },
+    );
+    final body = _decodeMap(response.body);
+    if (!_isSuccess(response.statusCode) || body['success'] != true) {
+      throw Exception(
+        _readError(body, 'Unable to submit company payment.'),
+      );
     }
   }
 

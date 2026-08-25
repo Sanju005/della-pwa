@@ -167,6 +167,21 @@ class AppRouter {
           builder: (_) => const ProviderMoreScreen(),
           settings: settings,
         );
+      case AppRoutes.providerPersonalDetails:
+        return buildAppPageRoute<void>(
+          builder: (_) => const ProviderPersonalDetailsScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerVerificationHub:
+        return buildAppPageRoute<void>(
+          builder: (_) => const ProviderVerificationHubScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerServiceArea:
+        return buildAppPageRoute<void>(
+          builder: (_) => const ProviderServiceAreaScreen(),
+          settings: settings,
+        );
       case AppRoutes.providerVerificationEmail:
         return buildAppPageRoute<void>(
           builder: (_) => const ProviderEmailVerificationScreen(),

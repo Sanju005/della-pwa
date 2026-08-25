@@ -9,6 +9,7 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/loading_state.dart';
+import '../../../widgets/malaysia_state_autocomplete_field.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../../widgets/swiper_app_bar.dart';
 import '../../../widgets/swiper_status_badge.dart';
@@ -704,7 +705,7 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
           height: 120,
           width: 180,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (context, error, stackTrace) => Container(
             height: 80,
             width: 180,
             color: Colors.white,
@@ -749,138 +750,1179 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
   }
 }
 
-class ProviderMoreScreen extends StatelessWidget {
-  const ProviderMoreScreen({super.key});
+class ProviderPersonalDetailsScreen extends StatefulWidget {
+  const ProviderPersonalDetailsScreen({super.key});
+
+  @override
+  State<ProviderPersonalDetailsScreen> createState() =>
+      _ProviderPersonalDetailsScreenState();
+}
+
+class _ProviderPersonalDetailsScreenState
+    extends State<ProviderPersonalDetailsScreen> {
+  static const _service = ProviderWorkspaceService();
+
+  late Future<ProviderWorkspaceProfile> _future;
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _dobController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _marketingNameController = TextEditingController();
+  final _addressLine1Controller = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
+  final _postcodeController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _countryController = TextEditingController();
+  final _emergencyController = TextEditingController();
+  final _bioController = TextEditingController();
+  PickedBrowserFile? _avatarFile;
+  String _gender = 'Female';
+  String _seed = '';
+  bool _saving = false;
+  String _message = '';
+  String _error = '';
+
+  InputDecoration _personalFieldDecoration({
+    required String label,
+    IconData? prefixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: prefixIcon == null
+          ? null
+          : Icon(prefixIcon, size: 20, color: AppColors.primary),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.lg),
+        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.14)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.lg),
+        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.14)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.lg),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.lg),
+        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.1)),
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _service.fetchProfile();
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _dobController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _marketingNameController.dispose();
+    _addressLine1Controller.dispose();
+    _addressLine2Controller.dispose();
+    _postcodeController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _countryController.dispose();
+    _emergencyController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  void _seedControllers(ProviderWorkspaceProfile profile) {
+    final nextSeed = [
+      profile.providerId,
+      profile.fullName,
+      profile.firstName,
+      profile.lastName,
+      profile.dateOfBirth,
+      profile.gender,
+      profile.email,
+      profile.phone,
+      profile.marketingName,
+      profile.addressLine1,
+      profile.addressLine2,
+      profile.postcode,
+      profile.city,
+      profile.state,
+      profile.country,
+      profile.emergencyContactNumber,
+      profile.bio,
+      profile.avatarUrl,
+    ].join('|');
+    if (_seed == nextSeed) {
+      return;
+    }
+    _seed = nextSeed;
+    final derivedNames = profile.fullName.trim().split(RegExp(r'\s+'));
+    _firstNameController.text = profile.firstName.isNotEmpty
+        ? profile.firstName
+        : (derivedNames.isNotEmpty ? derivedNames.first : '');
+    _lastNameController.text = profile.lastName.isNotEmpty
+        ? profile.lastName
+        : (derivedNames.length > 1 ? derivedNames.skip(1).join(' ') : '');
+    _dobController.text = profile.dateOfBirth;
+    _emailController.text = profile.email;
+    _phoneController.text = profile.phone;
+    _gender = profile.gender.isNotEmpty ? profile.gender : 'Female';
+    _marketingNameController.text = profile.marketingName;
+    _addressLine1Controller.text = profile.addressLine1;
+    _addressLine2Controller.text = profile.addressLine2;
+    _postcodeController.text = profile.postcode;
+    _cityController.text = profile.city;
+    _stateController.text = profile.state;
+    _countryController.text = profile.country;
+    _emergencyController.text = profile.emergencyContactNumber;
+    _bioController.text = profile.bio;
+  }
+
+  Future<void> _pickAvatar() async {
+    final picked = await pickSingleBrowserFile(accept: 'image/*');
+    if (!mounted || picked == null) {
+      return;
+    }
+    setState(() {
+      _avatarFile = picked;
+      _message = '';
+      _error = '';
+    });
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final now = DateTime.now();
+    final initial = DateTime.tryParse(_dobController.text.trim()) ??
+        DateTime(now.year - 25, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isAfter(now) ? now : initial,
+      firstDate: DateTime(1950),
+      lastDate: now,
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    setState(() {
+      _dobController.text = DateFormat('yyyy-MM-dd').format(picked);
+    });
+  }
+
+  Future<void> _save() async {
+    final firstName = _firstNameController.text.trim();
+    final lastName = _lastNameController.text.trim();
+    final fullName = [firstName, lastName]
+        .where((item) => item.isNotEmpty)
+        .join(' ')
+        .trim();
+    if (firstName.isEmpty || lastName.isEmpty) {
+      setState(() => _error = 'First name and last name are required.');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _message = '';
+      _error = '';
+    });
+
+    try {
+      await _service.updateProfile(
+        fullName: fullName,
+        firstName: firstName,
+        lastName: lastName,
+        dateOfBirth: _dobController.text.trim(),
+        gender: _gender,
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        marketingName: _marketingNameController.text.trim(),
+        addressLine1: _addressLine1Controller.text.trim(),
+        addressLine2: _addressLine2Controller.text.trim(),
+        postcode: _postcodeController.text.trim(),
+        city: _cityController.text.trim(),
+        state: _stateController.text.trim(),
+        country: _countryController.text.trim(),
+        emergencyContactNumber: _emergencyController.text.trim(),
+        bio: _bioController.text.trim(),
+        avatarUrl: _avatarFile?.dataUrl,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _future = _service.fetchProfile();
+        _message = 'Personal details saved successfully.';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const SwiperAppBar(
-        title: 'More',
-        subtitle: 'Provider settings, support, and verification',
+        title: 'Personal Card',
+        subtitle: 'Edit provider identity and profile details',
         showBack: true,
       ),
-      body: ListView(
-        padding: AppSpacing.screenPadding,
-        children: [
-          _card(
-            child: Column(
-              children: [
-                _moreTile(
-                  context,
-                  icon: Icons.person_outline_rounded,
-                  title: 'Personal Information',
-                  subtitle: 'Open provider profile',
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-                _moreTile(
-                  context,
-                  icon: Icons.work_outline_rounded,
-                  title: 'My Services',
-                  subtitle: 'Manage services and pricing',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRoutes.providerServices),
-                ),
-                _moreTile(
-                  context,
-                  icon: Icons.calendar_month_outlined,
-                  title: 'Availability',
-                  subtitle: 'Edit provider schedule',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRoutes.providerAvailability),
-                ),
-                _moreTile(
-                  context,
-                  icon: Icons.reviews_outlined,
-                  title: 'Reviews',
-                  subtitle: 'View customer feedback',
-                  onTap: () =>
-                      Navigator.of(context).pushNamed(AppRoutes.providerReviews),
-                ),
-                _moreTile(
-                  context,
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: 'Messages',
-                  subtitle: 'Open live booking conversations',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRoutes.providerMessages),
-                ),
-                _moreTile(
-                  context,
-                  icon: Icons.calendar_view_month_outlined,
-                  title: 'Calendar',
-                  subtitle: 'See bookings by date',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRoutes.providerCalendar),
-                  isLast: true,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Verification',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
+      body: FutureBuilder<ProviderWorkspaceProfile>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const LoadingState(label: 'Loading personal details...');
+          }
+          if (snapshot.hasError || snapshot.data == null) {
+            return const EmptyState(
+              title: 'Unable to load personal details',
+              subtitle: 'Please try again.',
+              icon: Icons.error_outline_rounded,
+            );
+          }
+
+          final profile = snapshot.data!;
+          _seedControllers(profile);
+          final displayName = _marketingNameController.text.trim().isEmpty
+              ? [
+                  _firstNameController.text.trim(),
+                  _lastNameController.text.trim(),
+                ].where((item) => item.isNotEmpty).join(' ').trim()
+              : _marketingNameController.text.trim();
+
+          return ListView(
+            padding: AppSpacing.screenPadding,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(AppSpacing.xl),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.12),
                       ),
+                    ),
+                    child: Row(
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            ProfileAvatar(
+                              name: displayName.isEmpty ? 'Provider' : displayName,
+                              imageUrl: _avatarFile?.dataUrl ?? profile.avatarUrl,
+                              radius: 32,
+                            ),
+                            Positioned(
+                              right: -2,
+                              bottom: -2,
+                              child: InkWell(
+                                onTap: _pickAvatar,
+                                borderRadius: BorderRadius.circular(999),
+                                child: Ink(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.photo_camera_rounded,
+                                    size: 15,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayName.isEmpty ? 'Provider' : displayName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Update your public profile identity.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_avatarFile != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      _avatarFile!.name,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _firstNameController,
+                          decoration: _personalFieldDecoration(
+                            label: 'First Name',
+                            prefixIcon: Icons.person_outline_rounded,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: TextField(
+                          controller: _lastNameController,
+                          decoration: _personalFieldDecoration(
+                            label: 'Last Name',
+                            prefixIcon: Icons.person_outline_rounded,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  GestureDetector(
+                    onTap: _pickDateOfBirth,
+                    child: AbsorbPointer(
+                      child: TextField(
+                        controller: _dobController,
+                        decoration: _personalFieldDecoration(
+                          label: 'Date of Birth',
+                          prefixIcon: Icons.calendar_month_rounded,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  DropdownButtonFormField<String>(
+                    initialValue: _gender,
+                    items: const ['Female', 'Male']
+                        .map(
+                          (item) => DropdownMenuItem(
+                            value: item,
+                            child: Text(item),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _gender = value ?? _gender);
+                    },
+                    decoration: _personalFieldDecoration(
+                      label: 'Gender',
+                      prefixIcon: Icons.wc_rounded,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _marketingNameController,
+                    decoration: _personalFieldDecoration(
+                      label: 'Marketing Name',
+                      prefixIcon: Icons.badge_outlined,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _emailController,
+                    decoration: _personalFieldDecoration(
+                      label: 'Email Address',
+                      prefixIcon: Icons.mail_outline_rounded,
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _phoneController,
+                    decoration: _personalFieldDecoration(
+                      label: 'Phone Number',
+                      prefixIcon: Icons.call_outlined,
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _addressLine1Controller,
+                    decoration: _personalFieldDecoration(
+                      label: 'Address Line 1',
+                      prefixIcon: Icons.home_outlined,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _addressLine2Controller,
+                    decoration: _personalFieldDecoration(
+                      label: 'Address Line 2',
+                      prefixIcon: Icons.apartment_rounded,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _postcodeController,
+                          decoration: _personalFieldDecoration(
+                            label: 'Postcode',
+                            prefixIcon: Icons.markunread_mailbox_outlined,
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: TextField(
+                          controller: _cityController,
+                          decoration: _personalFieldDecoration(
+                            label: 'City',
+                            prefixIcon: Icons.location_city_outlined,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  MalaysiaStateAutocompleteField(
+                    controller: _stateController,
+                    label: 'State',
+                    hintText: 'Type first letter',
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _countryController,
+                    decoration: _personalFieldDecoration(
+                      label: 'Country',
+                      prefixIcon: Icons.public_rounded,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _emergencyController,
+                    decoration: _personalFieldDecoration(
+                      label: 'Emergency Contact Number',
+                      prefixIcon: Icons.contact_phone_outlined,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: _bioController,
+                    maxLines: 4,
+                    decoration: _personalFieldDecoration(
+                      label: 'Bio',
+                      prefixIcon: Icons.notes_rounded,
+                    ),
+                  ),
+                  if (_error.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _providerNoticeCard(
+                      _error,
+                      AppColors.error,
+                      const Color(0xFFFFF1F2),
+                    ),
+                  ],
+                  if (_message.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _providerNoticeCard(
+                      _message,
+                      AppColors.success,
+                      const Color(0xFFF0FDF4),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _save,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusMd),
+                        ),
+                      ),
+                      child: Text(_saving ? 'Saving...' : 'Save Details'),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                _moreTile(
-                  context,
-                  icon: Icons.mail_outline_rounded,
-                  title: 'Email Verification',
-                  subtitle: 'Add and verify your email address',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRoutes.providerVerificationEmail),
-                ),
-                _moreTile(
-                  context,
-                  icon: Icons.phone_outlined,
-                  title: 'Phone Verification',
-                  subtitle: 'Verify your phone number with OTP',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRoutes.providerVerificationPhone),
-                ),
-                _moreTile(
-                  context,
-                  icon: Icons.badge_outlined,
-                  title: 'IC / Passport Verification',
-                  subtitle: 'Upload identity documents for review',
-                  onTap: () => Navigator.of(context)
-                      .pushNamed(AppRoutes.providerVerificationIdentity),
-                  isLast: true,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton(
-            onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
-              if (!context.mounted) {
-                return;
-              }
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                AppRoutes.login,
-                (route) => false,
-              );
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               ),
-            ),
-            child: const Text('Log Out'),
-          ),
-        ],
+            ],
+          );
+        },
       ),
+    );
+  }
+}
+
+class ProviderVerificationHubScreen extends StatelessWidget {
+  const ProviderVerificationHubScreen({super.key});
+
+  static const _service = ProviderWorkspaceService();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Verification',
+        subtitle: 'See what is pending and update verification items',
+        showBack: true,
+      ),
+      body: FutureBuilder<ProviderWorkspaceProfile>(
+        future: _service.fetchProfile(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const LoadingState(label: 'Loading verification...');
+          }
+          if (snapshot.hasError || snapshot.data == null) {
+            return const EmptyState(
+              title: 'Unable to load verification',
+              subtitle: 'Please try again.',
+              icon: Icons.error_outline_rounded,
+            );
+          }
+
+          final profile = snapshot.data!;
+          return ListView(
+            padding: AppSpacing.screenPadding,
+            children: [
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Verification Status',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Open each section to complete pending items.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _moreTile(
+                      context,
+                      icon: Icons.mail_outline_rounded,
+                      title: 'Email Verification',
+                      subtitle: profile.emailVerified
+                          ? 'Verified email address'
+                          : 'Pending email verification',
+                      onTap: () => Navigator.of(context)
+                          .pushNamed(AppRoutes.providerVerificationEmail),
+                    ),
+                    _moreTile(
+                      context,
+                      icon: Icons.phone_outlined,
+                      title: 'Phone Verification',
+                      subtitle: profile.phoneVerified
+                          ? 'Verified phone number'
+                          : 'Pending phone verification',
+                      onTap: () => Navigator.of(context)
+                          .pushNamed(AppRoutes.providerVerificationPhone),
+                    ),
+                    _moreTile(
+                      context,
+                      icon: Icons.badge_outlined,
+                      title: 'IC / Passport',
+                      subtitle: profile.identityVerified
+                          ? 'Verified identity documents'
+                          : 'Pending identity review',
+                      onTap: () => Navigator.of(context)
+                          .pushNamed(AppRoutes.providerVerificationIdentity),
+                      isLast: true,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class ProviderServiceAreaScreen extends StatefulWidget {
+  const ProviderServiceAreaScreen({super.key});
+
+  @override
+  State<ProviderServiceAreaScreen> createState() =>
+      _ProviderServiceAreaScreenState();
+}
+
+class _ProviderServiceAreaScreenState extends State<ProviderServiceAreaScreen> {
+  static const _service = ProviderWorkspaceService();
+
+  late Future<ProviderWorkspaceProfile> _future;
+  final _areaController = TextEditingController();
+  String _seed = '';
+  double _radiusKm = 15;
+  bool _saving = false;
+  String _message = '';
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _service.fetchProfile();
+  }
+
+  @override
+  void dispose() {
+    _areaController.dispose();
+    super.dispose();
+  }
+
+  void _seedState(ProviderWorkspaceProfile profile) {
+    final nextSeed = [
+      profile.providerId,
+      profile.serviceLocation,
+      profile.serviceRadiusKm.toStringAsFixed(2),
+    ].join('|');
+    if (_seed == nextSeed) {
+      return;
+    }
+    _seed = nextSeed;
+    _areaController.text = profile.serviceLocation;
+    _radiusKm = profile.serviceRadiusKm > 0
+        ? profile.serviceRadiusKm.clamp(1, 100).toDouble()
+        : 15;
+  }
+
+  Future<void> _save() async {
+    if (_areaController.text.trim().isEmpty) {
+      setState(() => _error = 'Service area is required.');
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _message = '';
+      _error = '';
+    });
+
+    try {
+      await _service.updateProfile(
+        serviceLocation: _areaController.text.trim(),
+        serviceRadiusKm: _radiusKm.roundToDouble(),
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _future = _service.fetchProfile();
+        _message = 'Service area updated successfully.';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Service Area',
+        subtitle: 'Adjust coverage radius and area location',
+        showBack: true,
+      ),
+      body: FutureBuilder<ProviderWorkspaceProfile>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const LoadingState(label: 'Loading service area...');
+          }
+          if (snapshot.hasError || snapshot.data == null) {
+            return const EmptyState(
+              title: 'Unable to load service area',
+              subtitle: 'Please try again.',
+              icon: Icons.error_outline_rounded,
+            );
+          }
+
+          _seedState(snapshot.data!);
+
+          return ListView(
+            padding: AppSpacing.screenPadding,
+            children: [
+              _card(
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 210,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFFF7F1FF),
+                                  Color(0xFFEFF7FF),
+                                ],
+                              ),
+                            ),
+                          ),
+                          for (final size in [160.0, 112.0, 64.0])
+                            Container(
+                              width: size,
+                              height: size,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.location_on_rounded,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                          Positioned(
+                            left: 18,
+                            top: 18,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                '${_radiusKm.round()} km radius',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _providerFormField(
+                      controller: _areaController,
+                      label: 'Service Area',
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDFBFF),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE9E0F5)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Service Radius',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: AppColors.primary,
+                              inactiveTrackColor: const Color(0xFFE7DDF7),
+                              thumbColor: AppColors.primary,
+                              overlayColor:
+                                  AppColors.primary.withValues(alpha: 0.14),
+                              trackHeight: 5,
+                            ),
+                            child: Slider(
+                              value: _radiusKm,
+                              min: 1,
+                              max: 100,
+                              divisions: 99,
+                              label: '${_radiusKm.round()} km',
+                              onChanged: (value) {
+                                setState(() => _radiusKm = value);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_error.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _providerNoticeCard(
+                        _error,
+                        AppColors.error,
+                        const Color(0xFFFFF1F2),
+                      ),
+                    ],
+                    if (_message.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _providerNoticeCard(
+                        _message,
+                        AppColors.success,
+                        const Color(0xFFF0FDF4),
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _saving ? null : _save,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppSpacing.radiusMd),
+                          ),
+                        ),
+                        child: Text(_saving ? 'Saving...' : 'Save Area'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+Widget _providerFormField({
+  required TextEditingController controller,
+  required String label,
+  int maxLines = 1,
+}) {
+  return Container(
+    padding: const EdgeInsets.all(AppSpacing.sm),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFBFFFC),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE7EEE8)),
+    ),
+    child: TextField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        border: InputBorder.none,
+        contentPadding: EdgeInsets.zero,
+      ),
+    ),
+  );
+}
+
+Widget _providerNoticeCard(String message, Color color, Color background) {
+  return Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.md,
+      vertical: AppSpacing.sm,
+    ),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: color.withValues(alpha: 0.3)),
+    ),
+    child: Text(
+      message,
+      style: TextStyle(
+        color: color,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+}
+
+class ProviderMoreScreen extends StatelessWidget {
+  const ProviderMoreScreen({
+    super.key,
+    this.onLogOut,
+    this.onOpenProfile,
+  });
+
+  final VoidCallback? onLogOut;
+  final VoidCallback? onOpenProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.md,
+        AppSpacing.md,
+        112,
+      ),
+      children: [
+        _paymentsHeader(context),
+        const SizedBox(height: AppSpacing.md),
+        _sectionTitle(
+          icon: Icons.chevron_left_rounded,
+          title: 'More',
+          subtitle: 'Provider settings, support, and verification',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _card(
+          child: Column(
+            children: [
+              _moreTile(
+                context,
+                icon: Icons.person_outline_rounded,
+                title: 'Personal Information',
+                subtitle: 'Open provider profile',
+                onTap: onOpenProfile ?? () {},
+              ),
+              _moreTile(
+                context,
+                icon: Icons.work_outline_rounded,
+                title: 'My Services',
+                subtitle: 'Manage services and pricing',
+                onTap: () =>
+                    Navigator.of(context).pushNamed(AppRoutes.providerServices),
+              ),
+              _moreTile(
+                context,
+                icon: Icons.calendar_month_outlined,
+                title: 'Availability',
+                subtitle: 'Edit provider schedule',
+                onTap: () => Navigator.of(context)
+                    .pushNamed(AppRoutes.providerAvailability),
+              ),
+              _moreTile(
+                context,
+                icon: Icons.reviews_outlined,
+                title: 'Reviews',
+                subtitle: 'View customer feedback',
+                onTap: () =>
+                    Navigator.of(context).pushNamed(AppRoutes.providerReviews),
+              ),
+              _moreTile(
+                context,
+                icon: Icons.chat_bubble_outline_rounded,
+                title: 'Messages',
+                subtitle: 'Open live booking conversations',
+                onTap: () =>
+                    Navigator.of(context).pushNamed(AppRoutes.providerMessages),
+              ),
+              _moreTile(
+                context,
+                icon: Icons.calendar_view_month_outlined,
+                title: 'Calendar',
+                subtitle: 'See bookings by date',
+                onTap: () =>
+                    Navigator.of(context).pushNamed(AppRoutes.providerCalendar),
+                isLast: true,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        _card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Verification',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _moreTile(
+                context,
+                icon: Icons.mail_outline_rounded,
+                title: 'Email Verification',
+                subtitle: 'Add and verify your email address',
+                onTap: () => Navigator.of(context)
+                    .pushNamed(AppRoutes.providerVerificationEmail),
+              ),
+              _moreTile(
+                context,
+                icon: Icons.phone_outlined,
+                title: 'Phone Verification',
+                subtitle: 'Verify your phone number with OTP',
+                onTap: () => Navigator.of(context)
+                    .pushNamed(AppRoutes.providerVerificationPhone),
+              ),
+              _moreTile(
+                context,
+                icon: Icons.badge_outlined,
+                title: 'IC / Passport Verification',
+                subtitle: 'Upload identity documents for review',
+                onTap: () => Navigator.of(context)
+                    .pushNamed(AppRoutes.providerVerificationIdentity),
+                isLast: true,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _paymentsHeader(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Payments',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Banking, services, and support',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onLogOut ??
+              () async {
+                await Supabase.instance.client.auth.signOut();
+                if (!context.mounted) {
+                  return;
+                }
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  AppRoutes.login,
+                  (route) => false,
+                );
+              },
+          child: Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: const Color(0xFFE8E3F3)),
+            ),
+            child: const Icon(
+              Icons.logout_rounded,
+              size: 18,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionTitle({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2, right: AppSpacing.sm),
+          child: Icon(icon, color: AppColors.textPrimary, size: 22),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1341,7 +2383,7 @@ class _ProviderIdentityVerificationScreenState
                     width: 110,
                     height: 90,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (context, error, stackTrace) => Container(
                       width: 110,
                       height: 90,
                       color: const Color(0xFFF8F4FF),
