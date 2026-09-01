@@ -102,39 +102,6 @@ type ProviderAccountRow = {
   emergency_contact_number?: string | null;
 };
 
-function isMissingColumnError(message?: string | null) {
-  const normalized = message?.toLowerCase() ?? "";
-  return normalized.includes("column") || normalized.includes("schema cache");
-}
-
-function cleanEditableValue(value?: string) {
-  const trimmed = value?.trim() ?? "";
-  return trimmed && trimmed.toLowerCase() !== "not provided" ? trimmed : undefined;
-}
-
-function normalizeDateInput(value?: string) {
-  const cleaned = cleanEditableValue(value)?.replace(/\s*\([^)]*\)\s*$/, "");
-
-  if (!cleaned) {
-    return undefined;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
-    return cleaned;
-  }
-
-  const parsed = new Date(cleaned);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return cleaned;
-  }
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 type ProviderRegistrationSnapshot = {
   id: string;
   created_at?: string | null;
@@ -1443,6 +1410,7 @@ async function buildProviderMediaItemsFromServices(
             `${kind}-${serviceIndex + 1}-${index + 1}`,
           ),
           rawValue: trimmed,
+          serviceLabel,
         };
       })
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -1457,6 +1425,7 @@ async function buildProviderMediaItemsFromServices(
       label: item.label,
       fileName: item.fileName,
       previewUrl: await resolveAdminMediaUrl(bucket, item.rawValue, visibility),
+      serviceLabel: item.serviceLabel,
     })),
   );
 
@@ -1858,16 +1827,25 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     serviceAreas,
     skills:
       (liveProfile.provider_services ?? [])
-        .flatMap((service) => [
-          service.service_type ? { id: `skill-service-${service.service_type}`, label: humanizeService(service.service_type) } : null,
-          ...(service.provider_service_specialties ?? []).map((specialty, index) =>
-            specialty.specialty?.trim()
-              ? { id: `skill-specialty-${service.service_type ?? "service"}-${index + 1}`, label: specialty.specialty.trim() }
-              : null,
-          ),
-        ])
-        .filter((item): item is { id: string; label: string } => Boolean(item))
-        .slice(0, 8),
+        .flatMap((service) => {
+          const serviceLabel = service.service_type ? humanizeService(service.service_type) : undefined;
+          return [
+            service.service_type ? { id: `skill-service-${service.service_type}`, label: serviceLabel!, serviceLabel } : null,
+            ...(service.provider_service_specialties ?? []).map((specialty, index) =>
+              specialty.specialty?.trim()
+                ? {
+                    id: `skill-specialty-${service.service_type ?? "service"}-${index + 1}`,
+                    label: specialty.specialty.trim(),
+                    serviceLabel,
+                  }
+                : null,
+            ),
+          ];
+        })
+        .filter(
+          (item): item is { id: string; label: string; serviceLabel?: string } => Boolean(item),
+        )
+        .slice(0, 24),
     documents: [
       {
         id: "live-doc-1",
@@ -1928,94 +1906,37 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
   return { detail };
 }
 
-export async function updateProviderProfile(
-  providerId: string,
-  updates: {
-    full_name?: string;
-    email?: string;
-    phone?: string;
-    status?: string;
-    emergency_contact?: string;
-    date_of_birth?: string;
-    gender?: string;
-    language?: string;
-    national_id?: string;
-    address?: string;
-    marketing_name?: string;
-    service_location?: string;
-    bio?: string;
-  }
-) {
+export async function suspendProvider(providerId: string, reason: string) {
   if (!supabase) {
     return { error: "Supabase is not configured." };
   }
 
-  const profilePayload = Object.fromEntries(
-    Object.entries({
-      full_name: updates.full_name,
-      email: updates.email,
-      phone: updates.phone,
-      status: updates.status,
-      emergency_contact: updates.emergency_contact,
-      emergency_contact_number: updates.emergency_contact,
-    }).map(([key, value]) => [key, cleanEditableValue(value)])
-      .filter(([, value]) => typeof value === "string" && value.trim() !== "")
-  );
+  const { error } = await supabase.rpc("admin_suspend_provider", {
+    p_provider_id: providerId,
+    p_reason: reason,
+  });
 
-  const providerPayload = Object.fromEntries(
-    Object.entries({
-      marketing_name: updates.marketing_name,
-      service_location: updates.service_location,
-      date_of_birth: normalizeDateInput(updates.date_of_birth),
-      sex: updates.gender,
-      languages: updates.language,
-      national_id: updates.national_id,
-      residential_address: updates.address,
-      formatted_address: updates.address,
-      bio: updates.bio,
-    }).map(([key, value]) => [key, cleanEditableValue(value)])
-      .filter(([, value]) => typeof value === "string" && value.trim() !== "")
-  );
-
-  if (Object.keys(profilePayload).length) {
-    const { error } = await supabase.from("profiles").update(profilePayload).eq("id", providerId);
-    if (error) {
-      return { error: error.message || "Unable to update provider profile." };
-    }
-  }
-
-  if (Object.keys(providerPayload).length) {
-    const { error } = await supabase.from("provider_profiles").update(providerPayload).eq("id", providerId);
-    if (error && isMissingColumnError(error.message)) {
-      const safeProviderPayload = Object.fromEntries(
-        Object.entries({
-          marketing_name: updates.marketing_name,
-          service_location: updates.service_location,
-          date_of_birth: normalizeDateInput(updates.date_of_birth),
-          sex: updates.gender,
-          residential_address: updates.address,
-          formatted_address: updates.address,
-          bio: updates.bio,
-        }).map(([key, value]) => [key, cleanEditableValue(value)])
-          .filter(([, value]) => typeof value === "string" && value.trim() !== "")
-      );
-      const fallback = await supabase.from("provider_profiles").update(safeProviderPayload).eq("id", providerId);
-
-      if (fallback.error) {
-        return { error: fallback.error.message || "Unable to update provider listing." };
-      }
-    } else if (error) {
-      return { error: error.message || "Unable to update provider listing." };
-    }
+  if (error) {
+    return { error: error.message || "Unable to suspend provider." };
   }
 
   return { error: null };
 }
 
-export async function setProviderSuspended(providerId: string, suspended: boolean) {
-  return updateProviderProfile(providerId, {
-    status: suspended ? "suspended" : "active",
+export async function reactivateProvider(providerId: string) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const { error } = await supabase.rpc("admin_reactivate_provider", {
+    p_provider_id: providerId,
   });
+
+  if (error) {
+    return { error: error.message || "Unable to reactivate provider." };
+  }
+
+  return { error: null };
 }
 
 export async function setProviderVisibility(providerId: string, active: boolean) {
@@ -2023,13 +1944,30 @@ export async function setProviderVisibility(providerId: string, active: boolean)
     return { error: "Supabase is not configured." };
   }
 
-  const { error } = await supabase
-    .from("provider_profiles")
-    .update({ is_visible: active })
-    .eq("id", providerId);
+  const { error } = await supabase.rpc("admin_set_provider_visibility", {
+    p_provider_id: providerId,
+    p_visible: active,
+  });
 
   if (error) {
     return { error: error.message || "Unable to update provider visibility." };
+  }
+
+  return { error: null };
+}
+
+export async function rejectProviderRegistration(providerId: string, reason: string) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const { error } = await supabase.rpc("admin_reject_provider_registration", {
+    p_provider_id: providerId,
+    p_reason: reason,
+  });
+
+  if (error) {
+    return { error: error.message || "Unable to reject provider registration." };
   }
 
   return { error: null };
@@ -2226,7 +2164,7 @@ export async function markCompanyPaymentReceived(
 
     const { data: paymentRow, error: paymentReadError } = await supabase
       .from("payments")
-      .select("id, provider_id")
+      .select("id, provider_id, company_payment_submission_id")
       .eq("id", paymentId)
       .eq("provider_id", providerId)
       .maybeSingle();
@@ -2247,6 +2185,34 @@ export async function markCompanyPaymentReceived(
 
     if (paymentUpdateError) {
       return { error: paymentUpdateError.message || "Unable to mark company payment as received." };
+    }
+
+    // Modern rows carry a link back to the submission the provider created
+    // in Flutter. Keep that row in sync so Flutter's GET (which reads only
+    // provider_company_payment_submissions) reflects the verified state
+    // instead of staying stuck on "processing" forever. Legacy rows have no
+    // link — leave them on the payments-only behavior above.
+    const linkedSubmissionId = (paymentRow as { company_payment_submission_id?: string | null })
+      .company_payment_submission_id;
+
+    if (linkedSubmissionId) {
+      const { error: linkedSubmissionUpdateError } = await supabase
+        .from("provider_company_payment_submissions")
+        .update({
+          status: "paid",
+          admin_received_amount: safeAmount,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", linkedSubmissionId)
+        .eq("provider_id", providerId);
+
+      if (linkedSubmissionUpdateError) {
+        return {
+          error:
+            linkedSubmissionUpdateError.message ||
+            "Payment was recorded but the linked submission could not be updated.",
+        };
+      }
     }
 
     await supabase.from("notifications").insert({

@@ -22,8 +22,6 @@ class ProviderSummary {
     this.avatarUrl = '',
     this.workMode = '',
     this.availabilityLabel = '',
-    this.latitude,
-    this.longitude,
   });
 
   final String id;
@@ -48,8 +46,6 @@ class ProviderSummary {
   final String avatarUrl;
   final String workMode;
   final String availabilityLabel;
-  final double? latitude;
-  final double? longitude;
 
   factory ProviderSummary.fromJson(Map<String, dynamic> json) {
     return ProviderSummary(
@@ -85,8 +81,6 @@ class ProviderSummary {
       avatarUrl: json['avatarUrl'] as String? ?? '',
       workMode: json['workMode'] as String? ?? '',
       availabilityLabel: json['availabilityLabel'] as String? ?? '',
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -108,7 +102,9 @@ class ProviderSummary {
       dailyRate: (json['dailyRate'] as num?)?.toInt() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
       reviewCount: (json['reviews'] as num?)?.toInt() ?? 0,
-      distanceLabel: _buildDistanceLabel((json['distanceKm'] as num?)?.toDouble()),
+      distanceLabel: _buildDistanceLabel(
+        (json['distanceKm'] as num?)?.toDouble(),
+      ),
       description: json['bio'] as String? ?? '',
       phoneVerified: json['phoneVerified'] as bool? ?? false,
       identityVerified: json['identityVerified'] as bool? ?? false,
@@ -128,8 +124,6 @@ class ProviderSummary {
       avatarUrl: json['profileImageUrl'] as String? ?? '',
       workMode: json['workMode'] as String? ?? '',
       availabilityLabel: json['availabilityLabel'] as String? ?? '',
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -139,6 +133,33 @@ class ProviderSummary {
     }
 
     return '${distanceKm.toStringAsFixed(distanceKm < 10 ? 1 : 0)} km away';
+  }
+
+  ProviderSummary copyWith({bool? isFavorite}) {
+    return ProviderSummary(
+      id: id,
+      name: name,
+      providerName: providerName,
+      serviceKey: serviceKey,
+      service: service,
+      hourlyRate: hourlyRate,
+      dailyRate: dailyRate,
+      rating: rating,
+      reviewCount: reviewCount,
+      distanceLabel: distanceLabel,
+      description: description,
+      phoneVerified: phoneVerified,
+      identityVerified: identityVerified,
+      isFavorite: isFavorite ?? this.isFavorite,
+      location: location,
+      specialties: specialties,
+      services: services,
+      yearsExperience: yearsExperience,
+      approvalStatus: approvalStatus,
+      avatarUrl: avatarUrl,
+      workMode: workMode,
+      availabilityLabel: availabilityLabel,
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -165,8 +186,6 @@ class ProviderSummary {
       'avatarUrl': avatarUrl,
       'workMode': workMode,
       'availabilityLabel': availabilityLabel,
-      'latitude': latitude,
-      'longitude': longitude,
     };
   }
 }

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../core/config/app_config.dart';
@@ -29,6 +32,22 @@ class ProfileAvatar extends StatelessWidget {
     return '${AppConfig.appBaseUrl}/$trimmed';
   }
 
+  /// A freshly-picked avatar (not yet saved) is a `data:<mime>;base64,...`
+  /// URL, not a real network path — decodes to bytes for [MemoryImage].
+  /// Returns null for anything that isn't a data URL.
+  Uint8List? _decodeDataUrlBytes(String value) {
+    final trimmed = value.trim();
+    final commaIndex = trimmed.indexOf(',');
+    if (!trimmed.startsWith('data:') || commaIndex == -1) {
+      return null;
+    }
+    try {
+      return base64Decode(trimmed.substring(commaIndex + 1));
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final initials = name
@@ -37,21 +56,25 @@ class ProfileAvatar extends StatelessWidget {
         .take(2)
         .map((part) => part.characters.first.toUpperCase())
         .join();
-    final resolvedImageUrl = _resolveImageUrl(imageUrl);
+    final dataUrlBytes = _decodeDataUrlBytes(imageUrl);
+    final resolvedImageUrl = dataUrlBytes == null
+        ? _resolveImageUrl(imageUrl)
+        : '';
+    final ImageProvider? backgroundImage = dataUrlBytes != null
+        ? MemoryImage(dataUrlBytes)
+        : (resolvedImageUrl.isNotEmpty ? NetworkImage(resolvedImageUrl) : null);
 
     return CircleAvatar(
       radius: radius,
       backgroundColor: AppColors.primarySoft,
-      backgroundImage: resolvedImageUrl.isNotEmpty
-          ? NetworkImage(resolvedImageUrl)
-          : null,
-      child: resolvedImageUrl.isNotEmpty
+      backgroundImage: backgroundImage,
+      child: backgroundImage != null
           ? null
           : Text(
               initials.isEmpty ? 'S' : initials,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.primary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: AppColors.primary),
             ),
     );
   }

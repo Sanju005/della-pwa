@@ -4,36 +4,77 @@ import '../../../services/browser_file_picker.dart';
 import '../../../services/provider_workspace_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
+import '../../../widgets/app_reveal.dart';
 import '../../../widgets/empty_state.dart';
-import '../../../widgets/loading_state.dart';
+import '../../../widgets/swiper_button.dart';
+import 'widgets/provider_earnings_skeleton.dart';
 
 class ProviderEarningsScreen extends StatefulWidget {
-  const ProviderEarningsScreen({
-    super.key,
-    this.onLogOut,
-  });
-
-  final VoidCallback? onLogOut;
+  const ProviderEarningsScreen({super.key});
 
   @override
   State<ProviderEarningsScreen> createState() => _ProviderEarningsScreenState();
 }
 
+class _ProviderEarningsData {
+  const _ProviderEarningsData({
+    required this.bookings,
+    required this.companySummary,
+  });
+
+  final List<ProviderWorkspaceBooking> bookings;
+  final ProviderCompanyPaymentSummary companySummary;
+}
+
 class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
   static const _workspaceService = ProviderWorkspaceService();
+  static const _cardRadius = 20.0;
+  static const _tileRadius = 16.0;
+
+  late Future<_ProviderEarningsData> _future;
   _PaymentsView _selectedView = _PaymentsView.cash;
   _PaymentsDateFilter _selectedDateFilter = _PaymentsDateFilter.today;
   DateTimeRange? _customRange;
-  double? _submittedCompanyAmount;
-  PickedBrowserFile? _submittedCompanySlip;
+  // Backend-returned summary from the most recent successful submission.
+  // Used so the UI reflects the real settlement state immediately without
+  // an extra GET round-trip — still backend data, never fabricated.
+  ProviderCompanyPaymentSummary? _companySummaryOverride;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _loadData();
+  }
+
+  Future<_ProviderEarningsData> _loadData() async {
+    final results = await Future.wait<Object>([
+      _workspaceService.fetchBookings(),
+      _workspaceService.fetchCompanyPaymentSummary(),
+    ]);
+    return _ProviderEarningsData(
+      bookings: results[0] as List<ProviderWorkspaceBooking>,
+      companySummary: results[1] as ProviderCompanyPaymentSummary,
+    );
+  }
+
+  Future<void> _reload() async {
+    // Only path (besides the initial load) that creates a new fetch.
+    // Selecting a tab or date filter never touches _future.
+    final future = _loadData();
+    setState(() {
+      _future = future;
+      _companySummaryOverride = null;
+    });
+    await future;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<ProviderWorkspaceBooking>>(
-      future: _workspaceService.fetchBookings(),
+    return FutureBuilder<_ProviderEarningsData>(
+      future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const LoadingState(label: 'Loading provider payments...');
+          return const ProviderEarningsSkeleton();
         }
         if (snapshot.hasError) {
           return const EmptyState(
@@ -43,7 +84,16 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
           );
         }
 
-        final bookings = snapshot.data ?? const [];
+        final data = snapshot.data;
+        final bookings = data?.bookings ?? const [];
+        // Backend is authoritative: prefer the freshest server-confirmed
+        // summary (set right after a successful submission) over the one
+        // loaded with this fetch, but never fall back to fabricated data.
+        final companySummary =
+            _companySummaryOverride ??
+            data?.companySummary ??
+            ProviderCompanyPaymentSummary.empty;
+
         final ledgerBookings = _ledgerBookings(bookings);
         final viewBookings = ledgerBookings
             .where((booking) => _selectedView.matches(booking.paymentOption))
@@ -51,12 +101,6 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
         final filteredBookings = viewBookings
             .where(_matchesSelectedDateFilter)
             .toList(growable: false);
-        final totalCashCommission = ledgerBookings
-            .where((booking) => _PaymentsView.cash.matches(booking.paymentOption))
-            .fold<double>(
-              0,
-              (sum, booking) => sum + booking.companyCommissionAmount,
-            );
 
         final gross = filteredBookings.fold<double>(
           0,
@@ -71,113 +115,60 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
           (sum, booking) => sum + booking.companyCommissionAmount,
         );
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.md,
-            AppSpacing.md,
-            112,
-          ),
-          children: [
-            _header(),
-            const SizedBox(height: AppSpacing.md),
-            _viewTabs(),
-            const SizedBox(height: AppSpacing.md),
-            _dateFilterRow(),
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: _metricCard(
-                    label: 'Gross',
-                    value: _currency(gross),
-                    background: const Color(0xFFF2ECFD),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _metricCard(
-                    label: 'Net',
-                    value: _currency(net),
-                    background: const Color(0xFFE8F6F5),
-                  ),
-                ),
-              ],
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: _reload,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              112,
             ),
-            const SizedBox(height: AppSpacing.md),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE8E3F3)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x100F0B1F),
-                    blurRadius: 20,
-                    offset: Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _selectedView == _PaymentsView.cash
-                        ? 'Cash Payments'
-                        : 'Other Payments',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _selectedView == _PaymentsView.cash
-                        ? 'Cash bookings collected by provider. Company commission must be paid by the provider.'
-                        : 'Online or other payment types recorded on your provider account.',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _summaryRow('Gross Received', _currency(gross)),
-                  _summaryRow(
-                    _selectedView == _PaymentsView.cash
-                        ? 'Commission Payable To Company'
-                        : 'Company Commission',
-                    _currency(commission),
-                  ),
-                  _summaryRow('Net To Provider', _currency(net)),
-                  const SizedBox(height: AppSpacing.md),
-                  if (filteredBookings.isEmpty)
-                    EmptyState(
-                      title: _selectedView == _PaymentsView.cash
-                          ? 'No cash payment records yet'
-                          : 'No other payment records yet',
-                      subtitle: _selectedView == _PaymentsView.cash
-                          ? 'Cash jobs will appear here once completed.'
-                          : 'Online and other payments will appear here once completed.',
-                      icon: Icons.payments_outlined,
-                    )
-                  else
-                    ...filteredBookings.map(
-                      (booking) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: _paymentRow(booking),
-                      ),
-                    ),
-                  if (_selectedView == _PaymentsView.cash) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    _companyPayableCard(totalCashCommission),
+            children: [
+              AppReveal(child: _header()),
+              const SizedBox(height: AppSpacing.lg),
+              AppReveal(
+                delay: const Duration(milliseconds: 40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _viewTabs(),
+                    const SizedBox(height: AppSpacing.md),
+                    _dateFilterRow(),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.lg),
+              AppReveal(
+                delay: const Duration(milliseconds: 80),
+                child: _financialSummaryCard(
+                  gross: gross,
+                  net: net,
+                  commission: commission,
+                ),
+              ),
+              if (_selectedView == _PaymentsView.cash) ...[
+                const SizedBox(height: AppSpacing.md),
+                AppReveal(
+                  delay: const Duration(milliseconds: 120),
+                  child: _companyPayableCard(companySummary),
+                ),
+                if (companySummary.history.any((s) => s.status == 'paid')) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  AppReveal(
+                    delay: const Duration(milliseconds: 140),
+                    child: _settlementHistorySection(companySummary.history),
+                  ),
+                ],
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              AppReveal(
+                delay: const Duration(milliseconds: 160),
+                child: _transactionsSection(filteredBookings),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -186,20 +177,30 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
   List<ProviderWorkspaceBooking> _ledgerBookings(
     List<ProviderWorkspaceBooking> bookings,
   ) {
-    final filtered = bookings.where((booking) {
-      final hasMoney =
-          booking.providerNetAmount > 0 ||
-          booking.quotedAmount > 0 ||
-          booking.baseAmount > 0;
-      return hasMoney &&
-          (booking.paidAt.isNotEmpty ||
-              booking.companyPaymentStatus.isNotEmpty ||
-              _isCompletedStatus(booking.bookingStatus));
-    }).toList(growable: true);
+    final filtered = bookings
+        .where((booking) {
+          final hasMoney =
+              booking.providerNetAmount > 0 ||
+              booking.quotedAmount > 0 ||
+              booking.baseAmount > 0;
+          // Only surface amounts once the payment is actually confirmed
+          // received. paidAt is the real signal (set only when the provider
+          // confirms cash receipt, or by a verified online payment).
+          // _isCompletedStatus's set also includes 'final_payment_sent' and
+          // 'cash_paid_by_user' — both pre-confirmation states in the cash
+          // flow (the provider has only requested/the customer has only
+          // claimed payment) — so those two are explicitly excluded here
+          // rather than trusted as "show the money" on their own.
+          final isConfirmedPaid =
+              booking.paidAt.isNotEmpty ||
+              (_isCompletedStatus(booking.bookingStatus) &&
+                  booking.bookingStatus != 'final_payment_sent' &&
+                  booking.bookingStatus != 'cash_paid_by_user');
+          return hasMoney && isConfirmedPaid;
+        })
+        .toList(growable: true);
 
-    filtered.sort(
-      (a, b) => _sortStampFor(b).compareTo(_sortStampFor(a)),
-    );
+    filtered.sort((a, b) => _sortStampFor(b).compareTo(_sortStampFor(a)));
     return filtered;
   }
 
@@ -233,50 +234,21 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
   }
 
   Widget _header() {
-    return Row(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Payments',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'Ledger and provider earnings',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
+        Text(
+          'Payments',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
           ),
         ),
-        InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: widget.onLogOut,
-          child: Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFFE8E3F3)),
-            ),
-            child: const Icon(
-              Icons.logout_rounded,
-              size: 18,
-              color: AppColors.textPrimary,
-            ),
-          ),
+        SizedBox(height: 2),
+        Text(
+          'Ledger and provider earnings',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -286,9 +258,9 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE8E3F3)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -326,7 +298,7 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
               });
             },
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           _filterChip(
             label: 'This Week',
             selected: _selectedDateFilter == _PaymentsDateFilter.thisWeek,
@@ -336,7 +308,7 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
               });
             },
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           _filterChip(
             label: _customRange == null
                 ? 'Custom Date'
@@ -361,12 +333,12 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEDE3FF) : Colors.white,
+          color: selected ? AppColors.primarySurface : AppColors.surface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected ? AppColors.primary : const Color(0xFFE8E3F3),
+            color: selected ? AppColors.primary : AppColors.border,
           ),
         ),
         child: Row(
@@ -375,17 +347,19 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
             if (icon != null) ...[
               Icon(
                 icon,
-                size: 15,
+                size: 14,
                 color: selected ? AppColors.primary : AppColors.textSecondary,
               ),
               const SizedBox(width: 6),
             ],
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: selected ? AppColors.primary : AppColors.textPrimary,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
               ),
             ),
           ],
@@ -400,14 +374,15 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(_tileRadius - 2),
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         height: 42,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : const Color(0xFFF7F4FC),
-          borderRadius: BorderRadius.circular(14),
+          color: selected ? AppColors.primary : AppColors.surfaceSoft,
+          borderRadius: BorderRadius.circular(_tileRadius - 2),
         ),
         child: Text(
           label,
@@ -421,152 +396,231 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
     );
   }
 
-  Widget _metricCard({
-    required String label,
-    required String value,
-    required Color background,
+  Widget _financialSummaryCard({
+    required double gross,
+    required double net,
+    required double commission,
   }) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(_cardRadius),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _paymentRow(ProviderWorkspaceBooking booking) {
-    final customerName = booking.customerName.trim().isEmpty
-        ? 'Customer'
-        : booking.customerName.trim();
-    final subtitle = booking.serviceLabel.trim().isEmpty
-        ? booking.statusLabel
-        : booking.serviceLabel.trim();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 12,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFCFCFE),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE9E3F5)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customerName,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _paymentOptionLabel(booking.paymentOption),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _selectedView == _PaymentsView.cash
-                        ? AppColors.warning
-                        : AppColors.success,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            _currency(booking.providerNetAmount),
+            _selectedView == _PaymentsView.cash
+                ? 'Cash Payments'
+                : 'Other Payments',
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
-              color: AppColors.primary,
+              color: AppColors.textPrimary,
             ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _selectedView == _PaymentsView.cash
+                ? 'Cash collected by you. Commission is payable to the company.'
+                : 'Online or other payment types recorded on your account.',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'Gross',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _currency(gross),
+              maxLines: 1,
+              style: const TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Container(height: 1, color: AppColors.divider),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _summaryStat(
+                  label: 'Net to you',
+                  value: _currency(net),
+                  color: AppColors.success,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _summaryStat(
+                  label: _selectedView == _PaymentsView.cash
+                      ? 'Commission Payable'
+                      : 'Company Commission',
+                  value: _currency(commission),
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _companyPayableCard(double commission) {
-    final hasSubmission =
-        _submittedCompanyAmount != null && _submittedCompanySlip != null;
+  Widget _summaryStat({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _transactionsSection(List<ProviderWorkspaceBooking> filteredBookings) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(_cardRadius),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Transactions',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (filteredBookings.isEmpty)
+            EmptyState(
+              title: _emptyTitle(),
+              subtitle: _emptySubtitle(),
+              icon: Icons.payments_outlined,
+            )
+          else
+            Column(
+              children: [
+                for (var i = 0; i < filteredBookings.length; i++)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: i == filteredBookings.length - 1
+                          ? 0
+                          : AppSpacing.sm,
+                    ),
+                    child: _paymentRow(filteredBookings[i]),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _emptyTitle() {
+    return _selectedView == _PaymentsView.cash
+        ? 'No cash payments'
+        : 'No other payments';
+  }
+
+  String _emptySubtitle() {
+    final view = _selectedView == _PaymentsView.cash ? 'cash' : 'other';
+    return 'No $view payments for ${_dateFilterDescription()}.';
+  }
+
+  String _dateFilterDescription() {
+    switch (_selectedDateFilter) {
+      case _PaymentsDateFilter.today:
+        return 'today';
+      case _PaymentsDateFilter.thisWeek:
+        return 'this week';
+      case _PaymentsDateFilter.custom:
+        final range = _customRange;
+        return range == null
+            ? 'the selected range'
+            : 'the selected range (${_formatRange(range)})';
+    }
+  }
+
+  Widget _companyPayableCard(ProviderCompanyPaymentSummary summary) {
+    final latest = summary.latestSubmission;
+    final isProcessing = latest != null && latest.status == 'processing';
+    final showProcessing = summary.processingAmount > 0 || isProcessing;
+    final showVerified = summary.verifiedAmount > 0;
+    final isSettled = summary.payableAmount <= 0 && !isProcessing;
+    final canSubmit = summary.payableAmount > 0 && !isProcessing;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFFF7F1FF),
-            Color(0xFFFCFAFF),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE6DAFB)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(_cardRadius),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,8 +631,8 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEDE3FF),
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.primarySurface,
+                  borderRadius: BorderRadius.circular(_tileRadius - 2),
                 ),
                 child: const Icon(
                   Icons.account_balance_wallet_rounded,
@@ -591,7 +645,9 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Total Payable To Company',
+                      'Payable to Company',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -600,7 +656,9 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Cash booking commission due from provider.',
+                      'Cash booking commission due from you.',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -612,77 +670,381 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(
-            _currency(hasSubmission ? _submittedCompanyAmount! : commission),
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _currency(summary.payableAmount),
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                color: isSettled ? AppColors.success : AppColors.textPrimary,
+              ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 2),
           Text(
-            hasSubmission
-                ? 'Slip sent to admin. Waiting for manual bank check and balance update.'
-                : 'Upload your bank slip and amount paid. Admin will verify it manually.',
-            style: const TextStyle(
+            isSettled ? "You're all settled" : 'Outstanding commission',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSettled ? FontWeight.w700 : FontWeight.w500,
+              color: isSettled ? AppColors.success : AppColors.textSecondary,
+            ),
+          ),
+          if (showProcessing) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _settlementLineItem(
+              icon: Icons.schedule_rounded,
+              tone: AppColors.warning,
+              toneSurface: AppColors.warningSurface,
+              badgeLabel: 'Processing',
+              description:
+                  '${_currency(latest?.submittedAmount ?? summary.processingAmount)} awaiting admin verification',
+            ),
+          ],
+          if (showVerified) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _settlementLineItem(
+              icon: Icons.verified_rounded,
+              tone: AppColors.success,
+              toneSurface: AppColors.successSurface,
+              badgeLabel: 'Verified',
+              description:
+                  '${_currency(summary.verifiedAmount)} received by company',
+            ),
+          ],
+          if (isProcessing) ...[
+            const SizedBox(height: AppSpacing.md),
+            _processingSubmissionDetail(latest),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: SwiperButton(
+              label: 'Pay to Company',
+              onPressed: canSubmit
+                  ? () => _openCompanyPaymentDialog(summary.payableAmount)
+                  : null,
+            ),
+          ),
+          if (!canSubmit) ...[
+            const SizedBox(height: 6),
+            Text(
+              isProcessing
+                  ? 'A payment is already submitted and awaiting admin review.'
+                  : 'No outstanding commission right now.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _settlementLineItem({
+    required IconData icon,
+    required Color tone,
+    required Color toneSurface,
+    required String badgeLabel,
+    required String description,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: toneSurface,
+        borderRadius: BorderRadius.circular(_tileRadius - 2),
+        border: Border.all(color: tone.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: tone),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: tone.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              badgeLabel,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: tone,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: tone,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _processingSubmissionDetail(ProviderCompanySubmission submission) {
+    final submittedDate = DateTime.tryParse(submission.submittedAt);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(_tileRadius - 2),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Payment submitted and awaiting admin verification.',
+            style: TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
               height: 1.4,
             ),
           ),
-          if (hasSubmission) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E8),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFFFE3A3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.schedule_rounded,
-                    size: 18,
-                    color: Color(0xFFB7791F),
+          const SizedBox(height: 4),
+          const Text(
+            'The official outstanding balance will update after verification.',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.textMuted,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              if (submittedDate != null)
+                Text(
+                  'Submitted ${_shortDate(submittedDate)}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Pending admin review • ${_submittedCompanySlip!.name}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF8A5A12),
+                ),
+              if (submission.proofFileName.isNotEmpty)
+                Text(
+                  submission.proofFileName,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _settlementHistorySection(List<ProviderCompanySubmission> history) {
+    final verified = history
+        .where((item) => item.status == 'paid')
+        .toList(growable: false);
+    if (verified.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(_cardRadius),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Recent Company Payments',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (var i = 0; i < verified.length; i++)
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: i == verified.length - 1 ? 0 : 8,
+              ),
+              child: _historyRow(verified[i]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _historyRow(ProviderCompanySubmission submission) {
+    final amount = submission.adminReceivedAmount ?? submission.submittedAmount;
+    final rawDate = submission.reviewedAt.isNotEmpty
+        ? submission.reviewedAt
+        : submission.submittedAt;
+    final date = DateTime.tryParse(rawDate);
+
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: const BoxDecoration(
+            color: AppColors.success,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            _currency(amount),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.successSurface,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: const Text(
+            'Verified',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: AppColors.success,
+            ),
+          ),
+        ),
+        if (date != null) ...[
+          const SizedBox(width: 8),
+          Text(
+            _shortDate(date),
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _paymentRow(ProviderWorkspaceBooking booking) {
+    final customerName = booking.customerName.trim().isEmpty
+        ? 'Customer'
+        : booking.customerName.trim();
+    final subtitle = booking.serviceLabel.trim().isEmpty
+        ? booking.statusLabel
+        : booking.serviceLabel.trim();
+    final isCash = _PaymentsView.cash.matches(booking.paymentOption);
+    final date = DateTime.tryParse(_sortStampFor(booking));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(_tileRadius),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  customerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (date != null) ...[
+                      Text(
+                        _shortDate(date),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isCash
+                            ? AppColors.successSurface
+                            : AppColors.infoSurface,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _paymentOptionLabel(booking.paymentOption),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isCash ? AppColors.success : AppColors.info,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
-          ],
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => _openCompanyPaymentDialog(commission),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'Send Payment Slip',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            _currency(booking.providerNetAmount),
+            maxLines: 1,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
             ),
           ),
         ],
@@ -709,16 +1071,13 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
       lastDate: DateTime(now.year + 2),
       initialDateRange:
           _customRange ??
-          DateTimeRange(
-            start: now.subtract(const Duration(days: 6)),
-            end: now,
-          ),
+          DateTimeRange(start: now.subtract(const Duration(days: 6)), end: now),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: AppColors.primary,
-            ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppColors.primary),
           ),
           child: child!,
         );
@@ -735,23 +1094,18 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
     });
   }
 
-  Future<void> _openCompanyPaymentDialog(double commission) async {
-    if (commission <= 0) {
+  // Amount is fixed to the exact current payable amount — the backend
+  // rejects any deposited amount that doesn't match exactly, so the form
+  // never invites the provider to type an arbitrary figure.
+  Future<void> _openCompanyPaymentDialog(double payableAmount) async {
+    if (payableAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No company payment is due right now.'),
-        ),
+        const SnackBar(content: Text('No company payment is due right now.')),
       );
       return;
     }
 
-    final amountController = TextEditingController(
-      text: _submittedCompanyAmount != null
-          ? _submittedCompanyAmount!.toStringAsFixed(2)
-          : commission.toStringAsFixed(2),
-    );
-    final noteController = TextEditingController();
-    PickedBrowserFile? slip = _submittedCompanySlip;
+    PickedBrowserFile? slip;
     String error = '';
     var submitting = false;
 
@@ -780,13 +1134,13 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                 vertical: AppSpacing.lg,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(24),
               ),
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF9F6FF),
-                  borderRadius: BorderRadius.circular(28),
+                  color: AppColors.surfaceSoft,
+                  borderRadius: BorderRadius.circular(24),
                 ),
                 child: SingleChildScrollView(
                   child: Column(
@@ -794,57 +1148,71 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'Send Payment Slip',
+                        'Pay to Company',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
                           color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        'Upload the slip and enter the amount paid to the company. Admin will verify it manually.',
-                        style: const TextStyle(
+                      const Text(
+                        'Upload proof of the transfer for the exact amount below. Admin will verify it manually.',
+                        style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                           height: 1.45,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                      _dialogLabel('Amount Paid'),
+                      _dialogLabel('Amount to Company'),
                       const SizedBox(height: 8),
-                      TextField(
-                        controller: amountController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: 14,
                         ),
-                        decoration: _dialogInputDecoration(
-                          hint: 'Enter paid amount',
-                          prefixText: 'RM ',
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySurface,
+                          borderRadius: BorderRadius.circular(_tileRadius),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          _currency(payableAmount),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      _dialogLabel('Payment Slip'),
+                      _dialogLabel('Payment Proof'),
                       const SizedBox(height: 8),
                       InkWell(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(_tileRadius),
                         onTap: pickSlip,
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(AppSpacing.md),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFFDCCFF3)),
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(_tileRadius),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Row(
                             children: [
                               Container(
-                                width: 48,
-                                height: 48,
+                                width: 44,
+                                height: 44,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF1E8FF),
-                                  borderRadius: BorderRadius.circular(16),
+                                  color: AppColors.primarySurface,
+                                  borderRadius: BorderRadius.circular(
+                                    _tileRadius - 2,
+                                  ),
                                 ),
                                 child: const Icon(
                                   Icons.receipt_long_rounded,
@@ -857,9 +1225,7 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      slip == null
-                                          ? 'Attach bank slip'
-                                          : slip!.name,
+                                      slip == null ? 'Choose File' : slip!.name,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
@@ -873,6 +1239,8 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                                       slip == null
                                           ? 'Tap to upload image or PDF'
                                           : 'Tap to change attachment',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: AppColors.textSecondary,
@@ -883,16 +1251,6 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      _dialogLabel('Note'),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: noteController,
-                        maxLines: 3,
-                        decoration: _dialogInputDecoration(
-                          hint: 'Optional note for admin',
                         ),
                       ),
                       if (error.isNotEmpty) ...[
@@ -914,10 +1272,15 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                               onPressed: () =>
                                   Navigator.of(dialogContext).pop(false),
                               style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
+                                foregroundColor: AppColors.primary,
+                                side: const BorderSide(color: AppColors.border),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(
+                                    _tileRadius,
+                                  ),
                                 ),
                               ),
                               child: const Text('Cancel'),
@@ -925,23 +1288,16 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
-                            child: FilledButton(
+                            child: SwiperButton(
+                              label: 'Submit Payment',
+                              isLoading: submitting,
                               onPressed: submitting
                                   ? null
                                   : () async {
-                                      final amount = double.tryParse(
-                                        amountController.text.trim(),
-                                      );
-                                      if (amount == null || amount <= 0) {
-                                        setDialogState(() {
-                                          error = 'Enter a valid paid amount.';
-                                        });
-                                        return;
-                                      }
                                       if (slip == null) {
                                         setDialogState(() {
                                           error =
-                                              'Attach the payment slip first.';
+                                              'Attach the payment proof first.';
                                         });
                                         return;
                                       }
@@ -951,16 +1307,17 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                                         error = '';
                                       });
 
+                                      ProviderCompanyPaymentSummary?
+                                      refreshedSummary;
                                       try {
-                                        await _workspaceService
-                                            .submitCompanyPayment(
-                                              amount: amount,
-                                              note: noteController.text.trim(),
-                                              attachmentDataUrl: slip!.dataUrl,
-                                              attachmentFileName: slip!.name,
-                                              attachmentMimeType:
-                                                  slip!.mimeType,
-                                            );
+                                        refreshedSummary =
+                                            await _workspaceService
+                                                .submitCompanyPayment(
+                                                  amount: payableAmount,
+                                                  proofDataUrl: slip!.dataUrl,
+                                                  proofFileName: slip!.name,
+                                                  proofMimeType: slip!.mimeType,
+                                                );
                                       } catch (requestError) {
                                         setDialogState(() {
                                           submitting = false;
@@ -975,27 +1332,14 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
                                         return;
                                       }
 
-                                      setState(() {
-                                        _submittedCompanyAmount = amount;
-                                        _submittedCompanySlip = slip;
-                                      });
+                                      if (refreshedSummary != null) {
+                                        setState(() {
+                                          _companySummaryOverride =
+                                              refreshedSummary;
+                                        });
+                                      }
                                       Navigator.of(dialogContext).pop(true);
                                     },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: Text(
-                                submitting ? 'Sending...' : 'Send',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
                             ),
                           ),
                         ],
@@ -1010,14 +1354,13 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
       },
     );
 
-    amountController.dispose();
-    noteController.dispose();
-
     if (submitted == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Payment slip sent to admin. Waiting for manual verification.',
+            'Payment submitted. Status: Processing — waiting for admin '
+            'verification. The official outstanding balance will update '
+            'after verification.',
           ),
         ),
       );
@@ -1031,34 +1374,6 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
         fontSize: 13,
         fontWeight: FontWeight.w800,
         color: AppColors.textPrimary,
-      ),
-    );
-  }
-
-  InputDecoration _dialogInputDecoration({
-    required String hint,
-    String? prefixText,
-  }) {
-    return InputDecoration(
-      hintText: hint,
-      prefixText: prefixText,
-      filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 16,
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFFDCCFF3)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFFDCCFF3)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
       ),
     );
   }
@@ -1094,11 +1409,7 @@ class _ProviderEarningsScreenState extends State<ProviderEarningsScreen> {
           range.start.month,
           range.start.day,
         );
-        final end = DateTime(
-          range.end.year,
-          range.end.month,
-          range.end.day,
-        );
+        final end = DateTime(range.end.year, range.end.month, range.end.day);
         return !dateOnly.isBefore(start) && !dateOnly.isAfter(end);
     }
   }
@@ -1145,8 +1456,4 @@ enum _PaymentsView {
   }
 }
 
-enum _PaymentsDateFilter {
-  today,
-  thisWeek,
-  custom,
-}
+enum _PaymentsDateFilter { today, thisWeek, custom }

@@ -1,6 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
-import '../../../core/routing/app_routes.dart';
 import '../../../services/browser_file_picker.dart';
 import '../../../services/provider_workspace_service.dart';
 import '../../../theme/app_colors.dart';
@@ -54,9 +56,13 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
   List<String> _certificateDataUrls = const [];
   List<String> _certificateCaptions = const [];
   List<String> _certificateFileNames = const [];
+  bool _showServiceForm = false;
   bool _saving = false;
   String _message = '';
   String _error = '';
+  // Id of the service currently being deleted, if any — lets just that
+  // card's delete button show a spinner without disabling the whole screen.
+  String _deleting = '';
 
   @override
   void initState() {
@@ -81,6 +87,27 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
 
   void _startNewService() {
     setState(() {
+      _showServiceForm = false;
+      _editingServiceId = '';
+      _serviceType = '';
+      _yearsController.clear();
+      _hourlyController.clear();
+      _dailyController.clear();
+      _specialtiesController.clear();
+      _serviceImageDataUrls = const [];
+      _serviceImageCaptions = const [];
+      _serviceImageFileNames = const [];
+      _certificateDataUrls = const [];
+      _certificateCaptions = const [];
+      _certificateFileNames = const [];
+      _message = '';
+      _error = '';
+    });
+  }
+
+  void _openNewServiceForm() {
+    setState(() {
+      _showServiceForm = true;
       _editingServiceId = '';
       _serviceType = '';
       _yearsController.clear();
@@ -100,6 +127,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
 
   void _editService(ProviderWorkspaceServiceModel service) {
     setState(() {
+      _showServiceForm = true;
       _editingServiceId = service.id;
       _serviceType = _toTitleCase(service.serviceType);
       _yearsController.text = service.yearsExperience;
@@ -292,6 +320,63 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     }
   }
 
+  Future<void> _confirmDeleteService(
+    ProviderWorkspaceServiceModel service,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this service?'),
+        content: Text(
+          'This removes "${_toTitleCase(service.serviceType)}" and its photos and certificates from your live listing. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    await _deleteService(service);
+  }
+
+  Future<void> _deleteService(ProviderWorkspaceServiceModel service) async {
+    setState(() {
+      _deleting = service.id;
+      _error = '';
+      _message = '';
+    });
+    try {
+      await _workspaceService.deleteService(serviceId: service.id);
+      await _reload();
+      if (_editingServiceId == service.id) {
+        _startNewService();
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() => _message = 'Service deleted.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _deleting = '');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -322,50 +407,6 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Need to edit days and time?',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                'Booking days and working hours are managed in your availability settings.',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: AppColors.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        FilledButton(
-                          onPressed: () => Navigator.of(context).pushNamed(
-                            AppRoutes.providerAvailability,
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.success,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusSm),
-                            ),
-                          ),
-                          child: const Text('Availability'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.md),
                       decoration: BoxDecoration(
@@ -421,69 +462,89 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              _reactSection(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFFF8F4FF), Colors.white],
-                        ),
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.10),
+              if (!_showServiceForm && _editingServiceId.isEmpty)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _openNewServiceForm,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Add Service +'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.22),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _editingServiceId.isEmpty
-                                      ? 'Add New Service'
-                                      : 'Edit Service',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.w900),
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text(
-                                  _editingServiceId.isEmpty
-                                      ? 'Create another listing with pricing, specialties, photos, and certificates.'
-                                      : 'Update this service and save changes directly to your live provider listing.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color: AppColors.textSecondary,
-                                        height: 1.45,
-                                      ),
-                                ),
-                              ],
-                            ),
+                    ),
+                  ),
+                )
+              else
+                _reactSection(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFF8F4FF), Colors.white],
                           ),
-                          if (_editingServiceId.isNotEmpty)
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.10),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _editingServiceId.isEmpty
+                                        ? 'Add New Service'
+                                        : 'Edit Service',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w900),
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    _editingServiceId.isEmpty
+                                        ? 'Create another listing with pricing, specialties, photos, and certificates.'
+                                        : 'Update this service and save changes directly to your live provider listing.',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: AppColors.textSecondary,
+                                          height: 1.45,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             TextButton(
                               onPressed: _startNewService,
                               child: const Text('Cancel'),
                             ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _inputCard(
-                      child: DropdownButtonFormField<String>(
+                      const SizedBox(height: AppSpacing.md),
+                      DropdownButtonFormField<String>(
                         value: _serviceType.isEmpty ? null : _serviceType,
-                        decoration:
-                            _fieldDecoration('Service Type', compact: true),
+                        decoration: _cleanFieldDecoration(
+                          'Service Type',
+                          prefixIcon: Icons.work_outline_rounded,
+                        ),
                         items: _providerServiceOptions
                             .map(
                               (option) => DropdownMenuItem<String>(
@@ -494,111 +555,133 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                             .toList(growable: false),
                         onChanged: _editingServiceId.isNotEmpty
                             ? null
-                            : (value) => setState(() => _serviceType = value ?? ''),
+                            : (value) =>
+                                  setState(() => _serviceType = value ?? ''),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _textField(
-                            controller: _hourlyController,
-                            label: 'Hourly Rate',
-                            hint: '40',
-                            keyboardType: TextInputType.number,
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _hourlyController,
+                              keyboardType: TextInputType.number,
+                              decoration: _cleanFieldDecoration(
+                                'Hourly Rate',
+                                prefixIcon: Icons.payments_outlined,
+                                hint: '40',
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: TextField(
+                              controller: _dailyController,
+                              keyboardType: TextInputType.number,
+                              decoration: _cleanFieldDecoration(
+                                'Daily Rate',
+                                prefixIcon: Icons.calendar_today_outlined,
+                                hint: '250',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextField(
+                        controller: _yearsController,
+                        decoration: _cleanFieldDecoration(
+                          'Experience',
+                          prefixIcon: Icons.timeline_rounded,
+                          hint: '5 Years',
                         ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: _textField(
-                            controller: _dailyController,
-                            label: 'Daily Rate',
-                            hint: '250',
-                            keyboardType: TextInputType.number,
-                          ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextField(
+                        controller: _specialtiesController,
+                        decoration: _cleanFieldDecoration(
+                          'Specialties',
+                          prefixIcon: Icons.star_outline_rounded,
+                          hint: 'Deep tissue, Prenatal, Sports massage',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Separate each specialty with a comma — e.g. Deep tissue, Prenatal, Sports massage.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      _uploadCard(
+                        context,
+                        title: 'Service Images',
+                        subtitle:
+                            'Upload up to 3 service images. Remove old images and upload new images anytime.',
+                        dataUrls: _serviceImageDataUrls,
+                        fileNames: _serviceImageFileNames,
+                        emptyLabel: 'No service images selected',
+                        onUpload: _pickServiceImages,
+                        onRemove: _removeServiceImage,
+                        uploadLabel: 'Upload Photos',
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      _uploadCard(
+                        context,
+                        title: 'Certificates',
+                        subtitle:
+                            'Upload up to 3 certificates or proof files. Remove old files and upload new ones anytime.',
+                        dataUrls: _certificateDataUrls,
+                        fileNames: _certificateFileNames,
+                        emptyLabel: 'No certificates selected',
+                        onUpload: _pickCertificates,
+                        onRemove: _removeCertificate,
+                        uploadLabel: 'Upload Certificates',
+                      ),
+                      if (_error.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        _noticeCard(
+                          _error,
+                          AppColors.error,
+                          const Color(0xFFFFF1F2),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _textField(
-                      controller: _yearsController,
-                      label: 'Experience',
-                      hint: '5 Years',
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _textField(
-                      controller: _specialtiesController,
-                      label: 'Specialties',
-                      hint: 'Malay, Arabic, Event catering',
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _uploadCard(
-                      context,
-                      title: 'Service Images',
-                      subtitle:
-                          'Upload up to 3 service images. Remove old images and upload new images anytime.',
-                      dataUrls: _serviceImageDataUrls,
-                      fileNames: _serviceImageFileNames,
-                      emptyLabel: 'No service images selected',
-                      onUpload: _pickServiceImages,
-                      onRemove: _removeServiceImage,
-                      uploadLabel: _serviceImageDataUrls.isEmpty
-                          ? 'Upload Service Images'
-                          : 'Add More Images',
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _uploadCard(
-                      context,
-                      title: 'Certificates',
-                      subtitle:
-                          'Upload up to 3 certificates or proof files. Remove old files and upload new ones anytime.',
-                      dataUrls: _certificateDataUrls,
-                      fileNames: _certificateFileNames,
-                      emptyLabel: 'No certificates selected',
-                      onUpload: _pickCertificates,
-                      onRemove: _removeCertificate,
-                      uploadLabel: _certificateDataUrls.isEmpty
-                          ? 'Upload Certificates'
-                          : 'Add More Certificates',
-                    ),
-                    if (_error.isNotEmpty) ...[
+                      if (_message.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        _noticeCard(
+                          _message,
+                          AppColors.success,
+                          const Color(0xFFF0FDF4),
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.md),
-                      _noticeCard(_error, AppColors.error, const Color(0xFFFFF1F2)),
-                    ],
-                    if (_message.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      _noticeCard(
-                        _message,
-                        AppColors.success,
-                        const Color(0xFFF0FDF4),
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _saving ? null : _saveService,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppSpacing.radiusMd),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _saving ? null : _saveService,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMd,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            _saving
+                                ? 'Saving...'
+                                : _editingServiceId.isEmpty
+                                ? 'Add New Service'
+                                : 'Save Changes',
                           ),
                         ),
-                        child: Text(
-                          _saving
-                              ? 'Saving...'
-                              : _editingServiceId.isEmpty
-                                  ? 'Add New Service'
-                                  : 'Save Changes',
-                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              const SizedBox(height: AppSpacing.lg),
+              const _AvailabilitySection(),
             ],
           );
         },
@@ -630,17 +713,17 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                     Text(
                       _toTitleCase(service.serviceType),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'RM${service.hourlyRate.toStringAsFixed(0)}/hr - RM${service.dailyRate.toStringAsFixed(0)}/day',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -662,10 +745,9 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
             service.specialties.isEmpty
                 ? 'No specialties added yet.'
                 : service.specialties.join(', '),
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppColors.textSecondary),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
           if (service.imageDataUrls.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
@@ -674,7 +756,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: service.imageDataUrls.length,
-                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, index) => ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: Image.network(
@@ -692,10 +775,9 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
             const SizedBox(height: AppSpacing.sm),
             Text(
               '${service.certificateDataUrls.length} certificate file${service.certificateDataUrls.length == 1 ? '' : 's'} attached',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -708,9 +790,9 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     ProviderWorkspaceServiceModel service,
   ) {
     final chipStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppColors.textSecondary,
-          fontWeight: FontWeight.w700,
-        );
+      color: AppColors.textSecondary,
+      fontWeight: FontWeight.w700,
+    );
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -742,21 +824,38 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                     Text(
                       _toTitleCase(service.serviceType),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                          ),
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'RM${service.hourlyRate.toStringAsFixed(0)}/hr - RM${service.dailyRate.toStringAsFixed(0)}/day',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
               ),
+              IconButton(
+                onPressed: _deleting == service.id
+                    ? null
+                    : () => _confirmDeleteService(service),
+                icon: _deleting == service.id
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(
+                        Icons.delete_outline_rounded,
+                        color: AppColors.error,
+                      ),
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 4),
               FilledButton.tonal(
                 onPressed: () => _editService(service),
                 style: FilledButton.styleFrom(
@@ -831,7 +930,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: service.imageDataUrls.length,
-                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, index) => ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: Image.network(
@@ -849,10 +949,9 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
             const SizedBox(height: AppSpacing.sm),
             Text(
               '${service.certificateDataUrls.length} certificate file${service.certificateDataUrls.length == 1 ? '' : 's'} attached',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -879,17 +978,17 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           Text(
             value,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: tint,
-                  fontWeight: FontWeight.w900,
-                ),
+              color: tint,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -955,21 +1054,18 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${dataUrls.length}/3 uploaded',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
@@ -979,13 +1075,10 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           const SizedBox(height: AppSpacing.sm),
           Text(
             subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.45,
-                ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.45,
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           if (dataUrls.isEmpty)
@@ -1020,22 +1113,18 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                   Text(
                     emptyLabel,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Add sharp, clear files to improve your listing quality.',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppColors.textSecondary),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -1054,7 +1143,9 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
               itemBuilder: (context, index) {
                 final url = dataUrls[index];
                 final isPdf = url.startsWith('data:application/pdf');
-                final fileName = index < fileNames.length ? fileNames[index] : '';
+                final fileName = index < fileNames.length
+                    ? fileNames[index]
+                    : '';
                 return Container(
                   padding: const EdgeInsets.all(AppSpacing.xs),
                   decoration: BoxDecoration(
@@ -1097,13 +1188,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                                         size: 42,
                                       ),
                                     )
-                                  : Image.network(
-                                      url,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) =>
-                                          _imagePlaceholder(),
-                                    ),
+                                  : _uploadPreviewImage(url),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -1111,9 +1196,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                             fileName.isEmpty ? 'Uploaded file' : fileName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w700,
@@ -1135,7 +1218,9 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                                 color: Colors.white.withValues(alpha: 0.92),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: AppColors.error.withValues(alpha: 0.20),
+                                  color: AppColors.error.withValues(
+                                    alpha: 0.20,
+                                  ),
                                 ),
                               ),
                               child: const Icon(
@@ -1156,7 +1241,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: onUpload,
+              onPressed: dataUrls.length >= 3 ? null : onUpload,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: BorderSide(
@@ -1176,10 +1261,9 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
             const SizedBox(height: AppSpacing.xs),
             Text(
               'Maximum 3 files reached. Remove one to upload a new file.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -1188,19 +1272,21 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
   }
 }
 
-class ProviderAvailabilityScreen extends StatefulWidget {
-  const ProviderAvailabilityScreen({super.key});
+/// The availability editor embedded at the bottom of the Services screen —
+/// previously its own screen/route, merged in so providers manage services
+/// and their working days/hours in one continuous flow, matching
+/// registration.
+class _AvailabilitySection extends StatefulWidget {
+  const _AvailabilitySection();
 
   @override
-  State<ProviderAvailabilityScreen> createState() =>
-      _ProviderAvailabilityScreenState();
+  State<_AvailabilitySection> createState() => _AvailabilitySectionState();
 }
 
-class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen> {
+class _AvailabilitySectionState extends State<_AvailabilitySection> {
   static const _workspaceService = ProviderWorkspaceService();
 
   late Future<ProviderAvailabilitySnapshot> _future;
-  bool _enabled = true;
   final Map<String, _DaySetting> _daySettings = {
     for (final day in _availabilityDays)
       day: const _DaySetting(
@@ -1214,6 +1300,11 @@ class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen>
   String _message = '';
   String _error = '';
 
+  // Availability is now automatic — once a provider sets at least one day
+  // and time, they're considered available. No separate on/off toggle.
+  bool get _isAvailable =>
+      _daySettings.values.any((setting) => setting.selected);
+
   @override
   void initState() {
     super.initState();
@@ -1224,7 +1315,6 @@ class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen>
     if (_initialized) {
       return;
     }
-    _enabled = snapshot.enabled;
     for (final day in _availabilityDays) {
       _daySettings[day] = const _DaySetting(
         selected: false,
@@ -1263,13 +1353,13 @@ class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen>
           )
           .toList(growable: false);
       await _workspaceService.saveAvailability(
-        enabled: _enabled,
+        enabled: _isAvailable,
         entries: entries,
       );
       setState(() {
-        _message = _enabled
+        _message = _isAvailable
             ? 'Availability saved to your live provider profile.'
-            : 'Provider visibility is now paused.';
+            : 'Add at least one day and time to become available for bookings.';
       });
     } catch (error) {
       setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
@@ -1282,158 +1372,138 @@ class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const SwiperAppBar(
-        title: 'Availability',
-        subtitle: 'Set days and hours for customer bookings',
-        showBack: true,
-      ),
-      body: FutureBuilder<ProviderAvailabilitySnapshot>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const LoadingState(label: 'Loading provider availability...');
-          }
-          if (snapshot.hasError || snapshot.data == null) {
-            return const EmptyState(
-              title: 'Unable to load availability',
-              subtitle: 'Please try again.',
-              icon: Icons.error_outline_rounded,
-            );
-          }
+    return FutureBuilder<ProviderAvailabilitySnapshot>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            child: LoadingState(label: 'Loading availability...'),
+          );
+        }
+        if (snapshot.hasError || snapshot.data == null) {
+          return const EmptyState(
+            title: 'Unable to load availability',
+            subtitle: 'Please try again.',
+            icon: Icons.error_outline_rounded,
+          );
+        }
 
-          _applySnapshot(snapshot.data!);
+        _applySnapshot(snapshot.data!);
 
-          return ListView(
-            padding: AppSpacing.screenPadding,
+        return _reactSection(
+          child: Column(
             children: [
-              _reactSection(
-                child: Column(
-                  children: [
-                    Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Availability',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  RichText(
+                    text: TextSpan(
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              RichText(
-                                text: TextSpan(
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                  children: [
-                                    const TextSpan(text: 'You are '),
-                                    TextSpan(
-                                      text: _enabled ? 'Available' : 'Offline',
-                                      style: const TextStyle(
-                                        color: AppColors.success,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                'Customers can book you only when availability is enabled.',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: AppColors.textSecondary),
-                              ),
-                            ],
+                        const TextSpan(text: 'You are currently '),
+                        TextSpan(
+                          text: _isAvailable ? 'Available' : 'Offline',
+                          style: const TextStyle(
+                            color: AppColors.success,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        Switch(
-                          value: _enabled,
-                          activeColor: AppColors.success,
-                          onChanged: (value) => setState(() => _enabled = value),
+                        const TextSpan(
+                          text:
+                              '. Set at least one day and time below to become available for bookings.',
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Row(
-                      children: [
-                        Text(
-                          'Select Days',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              for (final day in _availabilityDays) {
-                                final current = _daySettings[day]!;
-                                _daySettings[day] =
-                                    current.copyWith(selected: true);
-                              }
-                            });
-                          },
-                          child: const Text('Select all'),
-                        ),
-                      ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                children: [
+                  Text(
+                    'Select Days',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    ..._availabilityDays.map(
-                      (day) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: _dayCard(context, day),
-                      ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        for (final day in _availabilityDays) {
+                          final current = _daySettings[day]!;
+                          _daySettings[day] = current.copyWith(selected: true);
+                        }
+                      });
+                    },
+                    child: const Text('Select all'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ..._availabilityDays.map(
+                (day) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: _dayCard(context, day),
+                ),
+              ),
+              if (_error.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _noticeCard(_error, AppColors.error, const Color(0xFFFFF1F2)),
+              ],
+              if (_message.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _noticeCard(
+                  _message,
+                  AppColors.success,
+                  const Color(0xFFF0FDF4),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                     ),
-                    if (_error.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      _noticeCard(_error, AppColors.error, const Color(0xFFFFF1F2)),
-                    ],
-                    if (_message.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      _noticeCard(
-                        _message,
-                        AppColors.success,
-                        const Color(0xFFF0FDF4),
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _saving ? null : _save,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppSpacing.radiusMd),
-                          ),
-                        ),
-                        child: Text(_saving ? 'Saving...' : 'Save Availability'),
-                      ),
-                    ),
-                  ],
+                  ),
+                  child: Text(_saving ? 'Saving...' : 'Save Availability'),
                 ),
               ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
   Widget _dayCard(BuildContext context, String day) {
     final setting = _daySettings[day]!;
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 6,
+      ),
       decoration: BoxDecoration(
         color: setting.selected
             ? const Color(0xFFF6FFF8)
             : const Color(0xFFFBFFFC),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: setting.selected
               ? const Color(0xFFB7E4C4)
@@ -1447,25 +1517,31 @@ class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen>
               Expanded(
                 child: Text(
                   day,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
-              Checkbox(
-                value: setting.selected,
-                activeColor: AppColors.success,
-                onChanged: (value) {
-                  setState(() {
-                    _daySettings[day] =
-                        setting.copyWith(selected: value ?? false);
-                  });
-                },
+              Transform.scale(
+                scale: 0.85,
+                child: Checkbox(
+                  value: setting.selected,
+                  activeColor: AppColors.success,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  onChanged: (value) {
+                    setState(() {
+                      _daySettings[day] = setting.copyWith(
+                        selected: value ?? false,
+                      );
+                    });
+                  },
+                ),
               ),
             ],
           ),
           if (setting.selected) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -1500,13 +1576,16 @@ class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen>
     required VoidCallback onTap,
   }) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Ink(
-        padding: const EdgeInsets.all(AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: 6,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFFDBEEE2)),
         ),
         child: Column(
@@ -1514,17 +1593,16 @@ class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen>
           children: [
             Text(
               label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: 2),
             Text(
               value,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -1540,10 +1618,7 @@ class _ProviderAvailabilityScreenState extends State<ProviderAvailabilityScreen>
       hour: int.tryParse(pieces.first) ?? 8,
       minute: int.tryParse(pieces.last) ?? 0,
     );
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-    );
+    final picked = await showTimePicker(context: context, initialTime: initial);
     if (!mounted || picked == null) {
       return;
     }
@@ -1588,7 +1663,7 @@ class ProviderReviewsScreen extends StatelessWidget {
           final average = reviews.isEmpty
               ? 0.0
               : reviews.fold<int>(0, (sum, item) => sum + item.rating) /
-                  reviews.length;
+                    reviews.length;
 
           return ListView(
             padding: AppSpacing.screenPadding,
@@ -1608,7 +1683,8 @@ class ProviderReviewsScreen extends StatelessWidget {
                     Expanded(
                       child: _metricBox(
                         context,
-                        value: '${reviews.where((item) => item.rating >= 4).length}',
+                        value:
+                            '${reviews.where((item) => item.rating >= 4).length}',
                         label: '4★ and above',
                         subtitle: 'Strong customer satisfaction',
                       ),
@@ -1663,25 +1739,23 @@ class ProviderReviewsScreen extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primary,
-                ),
+              fontWeight: FontWeight.w900,
+              color: AppColors.primary,
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             label,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppColors.textSecondary),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -1705,30 +1779,35 @@ class ProviderReviewsScreen extends StatelessWidget {
               Expanded(
                 child: Text(
                   review.customerName,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
               ),
               Text(
-                review.createdLabel.isEmpty ? review.createdAt : review.createdLabel,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: AppColors.textSecondary),
+                review.createdLabel.isEmpty
+                    ? review.createdAt
+                    : review.createdLabel,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
           Row(
             children: [
-              const Icon(Icons.star_rounded, color: Color(0xFFF5B301), size: 18),
+              const Icon(
+                Icons.star_rounded,
+                color: Color(0xFFF5B301),
+                size: 18,
+              ),
               const SizedBox(width: 4),
               Text(
                 review.rating.toString(),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -1751,11 +1830,7 @@ class _DaySetting {
   final String startTime;
   final String endTime;
 
-  _DaySetting copyWith({
-    bool? selected,
-    String? startTime,
-    String? endTime,
-  }) {
+  _DaySetting copyWith({bool? selected, String? startTime, String? endTime}) {
     return _DaySetting(
       selected: selected ?? this.selected,
       startTime: startTime ?? this.startTime,
@@ -1795,26 +1870,37 @@ Widget _inputCard({required Widget child}) {
   );
 }
 
-InputDecoration _fieldDecoration(String label, {bool compact = false}) {
+/// Matches `_personalFieldDecoration` in the Personal Details screen —
+/// bordered, roomy fields with an icon prefix, rather than the compact
+/// borderless fields nested inside `_inputCard`.
+InputDecoration _cleanFieldDecoration(
+  String label, {
+  IconData? prefixIcon,
+  String? hint,
+}) {
   return InputDecoration(
     labelText: label,
-    isDense: compact,
-    border: InputBorder.none,
-    contentPadding: EdgeInsets.zero,
-  );
-}
-
-Widget _textField({
-  required TextEditingController controller,
-  required String label,
-  String hint = '',
-  TextInputType keyboardType = TextInputType.text,
-}) {
-  return _inputCard(
-    child: TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: _fieldDecoration(label).copyWith(hintText: hint),
+    hintText: hint,
+    prefixIcon: prefixIcon == null
+        ? null
+        : Icon(prefixIcon, size: 20, color: AppColors.primary),
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.md,
+      vertical: AppSpacing.md,
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppSpacing.lg),
+      borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.14)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppSpacing.lg),
+      borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.14)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppSpacing.lg),
+      borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
     ),
   );
 }
@@ -1832,10 +1918,7 @@ Widget _noticeCard(String message, Color color, Color background) {
     ),
     child: Text(
       message,
-      style: TextStyle(
-        color: color,
-        fontWeight: FontWeight.w600,
-      ),
+      style: TextStyle(color: color, fontWeight: FontWeight.w600),
     ),
   );
 }
@@ -1854,6 +1937,42 @@ Widget _imagePlaceholder() {
   );
 }
 
+/// A freshly-picked (not yet saved) service image or certificate carries a
+/// `data:<mime>;base64,...` URL, not a real network URL — rendering that
+/// through [Image.network] either fails silently or, for a large base64
+/// string, can crash the app. Only an already-saved http(s) URL goes through
+/// [Image.network]; anything else is decoded and shown via [Image.memory].
+Widget _uploadPreviewImage(String url) {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return Image.network(
+      url,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _imagePlaceholder(),
+    );
+  }
+
+  final bytes = _decodeDataUrlBytes(url);
+  if (bytes == null) {
+    return _imagePlaceholder();
+  }
+  return Image.memory(bytes, width: double.infinity, fit: BoxFit.cover);
+}
+
+/// Decodes a `data:<mime>;base64,<...>` URL into raw bytes for
+/// [Image.memory]. Returns null for anything else.
+Uint8List? _decodeDataUrlBytes(String dataUrl) {
+  final commaIndex = dataUrl.indexOf(',');
+  if (!dataUrl.startsWith('data:') || commaIndex == -1) {
+    return null;
+  }
+  try {
+    return base64Decode(dataUrl.substring(commaIndex + 1));
+  } catch (_) {
+    return null;
+  }
+}
+
 String _normalizeServiceType(String value) {
   return value.trim().toLowerCase().replaceAll(' ', '_');
 }
@@ -1866,5 +1985,3 @@ String _toTitleCase(String value) {
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
       .join(' ');
 }
-
-

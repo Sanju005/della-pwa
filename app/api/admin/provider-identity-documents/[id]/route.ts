@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+import { sendPushNotificationToUser } from "@/lib/push-notifications";
 import { uploadStoredMedia } from "@/lib/server-media-storage";
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
 
@@ -264,14 +265,23 @@ export async function POST(
           .eq("id", providerId);
       }
 
+      const notificationTitle = isVerified ? "IC / Passport verified" : "Identity review updated";
+      const notificationBody = isVerified
+        ? "Admin has approved your IC / Passport verification."
+        : "Admin changed your IC / Passport verification back to pending review.";
+
       await verified.adminClient.from("notifications").insert({
         user_id: providerId,
         booking_id: null,
         notification_type: isVerified ? "identity_verified" : "identity_review_pending",
-        title: isVerified ? "IC / Passport verified" : "Identity review updated",
-        body: isVerified
-          ? "Admin has approved your IC / Passport verification."
-          : "Admin changed your IC / Passport verification back to pending review.",
+        title: notificationTitle,
+        body: notificationBody,
+      });
+
+      await sendPushNotificationToUser(providerId, {
+        title: notificationTitle,
+        body: notificationBody,
+        path: "/provider/profile/identity-verification",
       });
 
       return NextResponse.json({ ok: true }, { headers: corsHeaders });

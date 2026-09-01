@@ -6,8 +6,15 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "./supabase-env";
-import { getProviderCatalog, type ProviderCategoryKey } from "./provider-catalog";
+import {
+  computeAvailabilityLabel,
+  fetchProviderAvailabilityByProviderId,
+  getProviderCatalog,
+  type CustomerLocation,
+  type ProviderCategoryKey,
+} from "./provider-catalog";
 import { buildProviderPortraitSrc } from "./provider-catalog-shared";
+import { calculateDistanceKm } from "./provider-distance";
 
 type HomeCustomerRow = {
   id: string;
@@ -79,11 +86,9 @@ export type HomeProviderCard = {
   name: string;
   fullName: string;
   service: string;
-  providerLatitude: number | null;
-  providerLongitude: number | null;
   rating: number;
   reviews: number;
-  distanceKm: number;
+  distanceKm: number | null;
   priceLabel: string;
   statusLabel: string;
   specialties: string[];
@@ -177,7 +182,7 @@ function getProviderNode<T>(value: T | T[] | null | undefined) {
   return value ?? null;
 }
 
-export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
+export const getHomeFeedData = cache(async (customerLocation?: CustomerLocation | null): Promise<HomeFeedData> => {
   const adminSupabase = buildAdminSupabaseClient();
 
   if (!adminSupabase) {
@@ -265,16 +270,22 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
       .order("scheduled_date", { ascending: true })
       .limit(1)
       .maybeSingle(),
-    getProviderCatalog("chef"),
-    getProviderCatalog("electrician"),
-    getProviderCatalog("maid"),
+    getProviderCatalog("chef", customerLocation),
+    getProviderCatalog("electrician", customerLocation),
+    getProviderCatalog("maid", customerLocation),
   ]);
 
   const customerRow = customerResult.data as HomeCustomerRow | null;
   const customerProfile = getProviderNode(customerRow?.customer_profiles);
 
-  const providers = ((providerResult.data ?? []) as HomeProviderRow[]).map(
-    (provider, index) => {
+  const providerRows = (providerResult.data ?? []) as HomeProviderRow[];
+  const availabilityMap = await fetchProviderAvailabilityByProviderId(
+    adminSupabase,
+    providerRows.map((row) => row.id),
+  );
+
+  const providers = providerRows.map(
+    (provider) => {
       const firstService = provider.provider_services?.[0];
       const specialties =
         firstService?.provider_service_specialties
@@ -282,7 +293,17 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
           .filter((item): item is string => Boolean(item))
           .slice(0, 2) ?? [];
 
-      const distanceKm = [2.4, 1.8, 3.1, 2.7, 2.2, 4.0, 3.6, 2.9][index] ?? 2.5;
+      const distanceKm =
+        customerLocation &&
+        typeof provider.latitude === "number" &&
+        typeof provider.longitude === "number"
+          ? calculateDistanceKm(
+              customerLocation.latitude,
+              customerLocation.longitude,
+              provider.latitude,
+              provider.longitude,
+            )
+          : null;
 
       return {
         id: provider.id,
@@ -290,15 +311,13 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
         name: provider.marketing_name ?? "DELLA Provider",
         fullName: provider.marketing_name ?? "DELLA Provider",
         service: humanizeService(firstService?.service_type ?? "other"),
-        providerLatitude:
-          typeof provider.latitude === "number" ? provider.latitude : null,
-        providerLongitude:
-          typeof provider.longitude === "number" ? provider.longitude : null,
         rating: Number(provider.average_rating ?? 4.8),
         reviews: provider.total_reviews ?? 0,
         distanceKm,
         priceLabel: `RM${Number(firstService?.hourly_rate ?? 25)}/hr`,
-        statusLabel: "Available Today",
+        statusLabel: computeAvailabilityLabel(
+          availabilityMap.get(provider.id) ?? [],
+        ),
         specialties,
         phoneVerified: false,
         identityVerified: false,
@@ -321,8 +340,6 @@ export const getHomeFeedData = cache(async (): Promise<HomeFeedData> => {
       name: listing.name,
       fullName: listing.providerName || listing.name,
       service: listing.serviceLabel,
-      providerLatitude: listing.latitude,
-      providerLongitude: listing.longitude,
       rating: listing.rating,
       reviews: listing.reviews,
       distanceKm: listing.distanceKm,

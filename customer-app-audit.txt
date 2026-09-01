@@ -1,0 +1,573 @@
+DELLA SWIPER — CUSTOMER / USER APP AUDIT
+==========================================
+A full structural, data-source, journey, UX, performance, and security review
+of the customer-facing app, so redesign work can be sequenced against what's
+actually real, mocked, or broken today.
+
+Scope note: Read-only pass — no code, Supabase queries, or booking logic was
+touched.
+
+
+EXECUTIVE SUMMARY
+==========================================
+The customer app's core booking loop — browse providers, create a booking,
+track it, pay, review — is genuinely LIVE end to end, backed by real Supabase
+tables and a consistent Next.js API layer shared with the provider app.
+That's the good news: this isn't a demo shell.
+
+What needs attention is a layer of leftover demo/mock scaffolding sitting on
+top of that real system — a shared DemoRepository feeding hardcoded
+categories/notifications/messages, a wallet balance that's a literal
+hardcoded number in two places, a customer chat UI that looks real but never
+sends a network request, and an OTP verification flow (both registration and
+profile email/phone verification) that accepts any 6 digits without a real
+check. None of these are "the backend is broken" — they're "the UI promises
+something the wiring behind it doesn't yet deliver," which is a more
+dangerous kind of gap because it's invisible to a customer until they notice
+their wallet balance never changes.
+
+The booking status/timeline is consistent at the data layer (one canonical
+enum, shared by both apps) but diverges in the wording shown to each side —
+worth reconciling into one shared label source. The booking price is
+customer-device-computed and stored by the backend without server-side
+recalculation against the provider's real rate — flagged in detail under
+Security.
+
+Already real & working (build on these, don't rebuild them):
+  - Provider discovery — listing, detail, and booking creation all hit real
+    Supabase-backed API routes
+  - Booking lifecycle — creation, provider response, cash payment, and
+    reviews are fully wired end to end
+  - Auth (email/password) & role resolution — real Supabase sessions
+  - Hero image transition (list → detail) — already implemented, and more
+    advanced than anything currently in the Provider app
+  - Provider-card skeleton loading — already shared correctly between Home
+    and the provider list screen
+
+
+1. APP STRUCTURE
+==========================================
+Every customer-facing screen, and what's legacy, duplicated, or dead.
+
+Shell & navigation — customer_shell_screen.dart -> NativeTabScaffold
+  4 tabs, all kept mounted via the shared IndexedStack-based
+  NativeTabScaffold (same shell primitive as the Provider app): Home,
+  Bookings (BookingOverviewScreen, embedded), Ongoing Task (same screen,
+  activeOnly: true), Profile. There is no dedicated "Messages" tab —
+  messaging is not a first-class navigation destination on the customer
+  side at all (see Data map).
+
+Home — customer_home_screen.dart
+  Greeting/profile, location card, wallet card, service-category grid, 3x
+  "Popular near you" provider sections, safety banner, notifications sheet.
+  Mixed real/mock — see Data map.
+
+Provider listing — provider_list_screen.dart
+  Real catalog fetch, client-side distance sort, proper skeleton + empty
+  states. Constructor takes an unused DemoRepository — dead parameter.
+
+Provider detail — provider_profile_screen.dart
+  Real detail fetch; participates in a genuine Hero transition from
+  provider_card.dart. Same unused DemoRepository parameter as above.
+
+Booking creation — provider_booking_screen.dart
+  Misleadingly named (it's the customer's own booking form, not a provider
+  screen). Mode/date/time/address/notes, client-computed price, real submit.
+
+My Bookings — booking_overview_screen.dart
+  Real list fetch; date-based filter chips (All/Today/Month/Custom), not
+  status tabs. Unused DemoRepository parameter again.
+
+Booking detail / tracking — booking_detail_screen.dart
+  Real data + 5s polling (no realtime). Contains an in-memory-only "Live
+  message" chat that never touches the network, plus payment and review
+  sub-flows.
+
+Payments — no dedicated screen
+  Cash-pay + proof upload live inside booking detail. A separate
+  CustomerPaymentsScreen profile subpage shows real transaction history,
+  but reuses the same hardcoded wallet-balance figure as Home.
+
+Messages — no real screen  [CRITICAL GAP]
+  messages_demo_screen.dart exists but is never routed anywhere — dead
+  code. A real backend endpoint (/api/profile/messages/[bookingId]) exists
+  but nothing in the Flutter customer app calls it.
+
+Profile / More — profile_demo_screen.dart + customer_profile_subpages.dart
+  Core overview is real; Favourites/Payment-methods/Notifications/Coupons
+  cards on the main profile screen are static placeholders even where a
+  real backing subpage already exists (see Data map).
+
+Registration / login — customer_register_*.dart, login_screen.dart  [HIGH]
+  Real account creation, but the OTP step is hardcoded to 123456, and the
+  login screen's "Phone OTP" toggle is entirely local/fake and does not
+  produce a real Supabase session.
+
+Legacy / duplicated / dead code inventory:
+  Orphaned routes/screens: CustomerRegisterSuccessScreen (route defined,
+  never navigated to — real flow jumps straight to the shell instead);
+  CustomerIdentityVerificationScreen (route defined, but its own
+  Verification Hub never links to it).
+
+  Dead widget files (zero references anywhere in lib/): rating_badge.dart,
+  service_category_chip.dart, verified_badge.dart, booking_card.dart,
+  booking_timeline.dart, messages_demo_screen.dart (plus
+  swiper_section_card.dart/message_bubble.dart, only used by that dead
+  screen).
+
+  Demo scaffolding still wired into real flows: DemoRepository (hardcoded
+  categories/notifications/messages, instantiated once in app_router.dart,
+  threaded as a dead constructor param into 4 customer screens that never
+  use it) and DemoCustomerAuthStore (local-only fake auth, used as the
+  phone-OTP login path and a redundant write during real registration).
+
+
+2. BACKEND / DATA-SOURCE MAP
+==========================================
+Every major screen or section, labeled by where its data actually comes
+from. Status legend: LIVE / PARTIAL / MOCK / BROKEN
+
+Screen / section                              Status    Source
+--------------------------------------------------------------------------
+Home — greeting/profile                       LIVE      CurrentCustomerService -> Supabase customer_profiles/profiles (demo fallback only if unauthenticated)
+Home — location card                          LIVE      CustomerAddressService -> Supabase addresses
+Home — wallet balance                         MOCK      Hardcoded 128.40, duplicated in customer_profile_subpages.dart
+Home — service categories                     MOCK      DemoDataService.customerCategories() — const list of 6
+Home — "Popular near you" sections            LIVE      ProviderMarketplaceService -> GET /api/providers
+Home — notifications sheet                    MOCK      DemoDataService.notifications()
+Provider listing                              LIVE      GET /api/providers
+Provider detail                               LIVE      GET /api/providers/:id
+Booking creation                              LIVE      POST /api/bookings -> bookings table (price is client-computed, see Security)
+My Bookings                                   LIVE      GET /api/bookings filtered by customer_id
+Booking tracking / timeline                   LIVE      Server-built activitySteps, app/api/bookings/route.ts
+Booking detail — in-app chat                  MOCK      Local List only — no HTTP call on send at all
+Cash payment                                  LIVE      POST /api/bookings/:id/cash-pay -> payments table
+Review submission                             LIVE      POST /api/bookings/:id/review -> reviews table
+Customer messaging (real endpoint)            BROKEN    Backend route exists (/api/profile/messages/[bookingId]); zero Flutter customer screens call it
+Profile — Favourites card (on main profile)   MOCK      Static placeholder text, ignores the real favorites API entirely
+Profile — Favourites subpage                  LIVE      CustomerProfileApiService.fetchFavorites() — inconsistent with the card above
+Profile — Payment methods card                MOCK      Hardcoded "Primary Method: Cash" text
+Profile — Payments subpage (transactions)     PARTIAL   Real transaction history + the same hardcoded wallet-balance figure
+Profile — Notifications subpage               MOCK      DemoDataService.notifications() (same list shown 3 places)
+Profile — Coupons                             MOCK      Hardcoded const list; UI badge literally reads "Demo"
+Profile — Addresses                           LIVE      CustomerAddressService / CustomerProfileApiService
+Email / phone verification                    PARTIAL   Writes real profile fields, but the OTP check itself is local-only (any 6 digits) — see Security
+Identity verification                         BROKEN    Screen exists but is unreachable from its own hub (orphaned route)
+Registration — account creation               LIVE      POST /api/auth/register/customer + real Supabase sign-in
+Registration — OTP step                       MOCK      Hardcoded 123456 check, no real OTP send/verify
+Login — email/password                        LIVE      Real Supabase signInWithPassword
+Login — phone OTP toggle                      BROKEN    DemoCustomerAuthStore only — does not create a real session
+
+
+3. USER JOURNEY AUDIT
+==========================================
+The full flow as it exists today, with where it holds and where it breaks.
+
+[CRITICAL] Login
+  Email/password works against real Supabase. The "Phone OTP" toggle is a
+  fully local fake — it never authenticates a real session, but presents
+  identically to the real option.
+
+Home -> Find service/provider
+  Works, real data. Screen carries several hardcoded sections alongside
+  the real ones (wallet, categories, notifications) that don't break the
+  journey but sit inside it.
+
+Provider profile -> Select service
+  Works, real data. Detail screen re-fetches data the list screen already
+  had in memory — a duplication, not a break.
+
+[HIGH] Create booking
+  Works end to end. Price is computed on-device and stored by the backend
+  as sent, with no server-side recalculation against the provider's real
+  rate.
+
+[MEDIUM] Provider responds -> Track booking
+  Works; customer polls every 5s (no realtime). The customer's 9-step
+  timeline and the provider's own 6-label timeline describe the same
+  underlying status differently — a wording/grouping mismatch, not a
+  functional break (the raw status values agree).
+
+Provider arrives -> Service completed
+  Works. A dead "Review This Service" card (index == 9) can never render
+  because the backend only ever returns 9 timeline steps — latent,
+  currently harmless.
+
+Final amount -> Payment
+  Provider can add to the final amount; still no backend recomputation
+  from a rate. Cash-pay flow itself is fully real and correctly gated on
+  booking status.
+
+Review
+  Fully wired, real submission, correctly gated on booking status
+  server-side.
+
+What's missing:
+  Real customer<->provider messaging — the backend route exists but
+  nothing in the customer app calls it; the only chat UI customers see is
+  fully fake.
+
+What's duplicated:
+  DemoCustomerAuthStore bookkeeping alongside real account creation;
+  provider-detail re-fetch of list-known data; the entire bookings list
+  re-fetched every 5s just to render one booking's detail.
+
+Where the flow breaks:
+  Identity verification is unreachable from its own hub; the registration
+  success screen is unreachable; phone-OTP login doesn't produce a real
+  session.
+
+Where User & Provider disagree:
+  Only in step wording/grouping (see Tracking section) — not in the
+  underlying status values, which are shared and consistent.
+
+
+4. UI/UX AUDIT
+==========================================
+Findings by screen — not a redesign, just what's currently working against
+the "premium native" goal.
+
+Home — card density
+  Hero, location, wallet, categories, three provider rows, and a safety
+  banner all stack in one scroll — the highest card density of any
+  customer screen. Worth a hierarchy pass on what belongs above the fold.
+
+My Bookings / Profile — blocking loaders
+  Both replace the entire screen with a full-page spinner on refresh, even
+  for small updates (confirmed directly in profile_demo_screen.dart) —
+  reads as "boring/blocking" exactly where a partial update or skeleton
+  would feel lighter.
+
+Login — visible placeholder copy
+  The phone-OTP field's own hint text reads "Use OTP code 123456" — a
+  debug affordance shipped as real, user-facing copy.
+
+Coupons — visible "Demo" label
+  The screen's own UI badge literally reads "Demo," and its subtitle says
+  these are placeholder coupons — unpolished copy in a shipped screen.
+
+Forgot password / Contact support
+  Both show a snackbar admitting "...is not connected in Flutter yet." —
+  same category as above, visible-to-the-user placeholder state.
+
+Wallet balance — silent staleness
+  Shown with full "real" styling in two places but is a literal constant —
+  worse than an explicit "demo" label, because nothing visually signals it
+  isn't live, so a customer has no way to know their balance never
+  updates.
+
+Provider list/detail — no upfront availability signal
+  Nothing surfaced confirms whether "available today" or next-slot info is
+  shown before opening the booking form — worth confirming directly, as it
+  wasn't ruled in or out by this pass.
+
+Booking form — validation via snackbar only
+  Required-field errors (address, time slot) show as a transient snackbar
+  rather than inline field state — easy to miss, doesn't point at the
+  specific field.
+
+
+5. COMPARE WITH THE PROVIDER APP
+==========================================
+What to reuse, what to send back the other way, and what not to force.
+
+Bring from Provider -> Customer
+  A single shared card component (Provider audit already found
+  radius/shadow drift there — the same ad hoc per-screen _card pattern
+  shows up in customer_profile_subpages.dart); consistent PressableScale
+  coverage on every primary button; the Provider app's polished
+  success-dialog pattern, for a proper "Booking Sent" moment.
+
+Send from Customer -> Provider
+  The Hero list->detail transition already built here doesn't exist
+  anywhere in the Provider app yet — worth porting the other direction
+  (e.g. avatar -> full preview), as already flagged in the Provider
+  audit's Phase 4.
+
+Already shared correctly
+  ProviderSkeletonCard, SwiperButton/PressableScale, SwiperStatusBadge,
+  SwiperAppBar, and the bottom-nav/tab-shell primitives are already used
+  by both apps — good foundation, no change needed.
+
+Don't force the comparison
+  Provider's Dashboard density was itself flagged as excessive in the
+  Provider audit — Customer's Home shouldn't inherit that pattern.
+  Provider's service-management forms and Customer's
+  address/date/time-heavy booking form serve different jobs and shouldn't
+  be forced into identical layouts.
+
+
+6. HOME SCREEN AUDIT
+==========================================
+Should remain
+  Greeting header, location card (with its add/change-address flow), the
+  3 "nearby X" discovery sections, and the safety banner as a trust
+  signal.
+
+Should change
+  Wallet balance (fake, risks trust once noticed); notifications (fake,
+  shown 3 places); service categories (hardcoded — fine short-term, but
+  should eventually come from a real config so new services don't need an
+  app release).
+
+Missing
+  No compact "active booking" summary on Home itself — it's fully
+  delegated to the separate "Ongoing Task" tab. Worth deciding
+  deliberately whether that's the intended IA or Home should surface a
+  quick glance too.
+
+Map / scroll behavior
+  The map is a location preview, not a live dispatch/search map —
+  consistent with this being a scheduled-booking product, not on-demand.
+  Plain ListView, no pull-to-refresh (Provider's Dashboard has the
+  identical gap).
+
+
+7. PROVIDER DISCOVERY AUDIT
+==========================================
+Confirmed present across list card + detail screen: photo (with Hero),
+name, rating, distance, completed-jobs/recommended% stats, work-photo
+gallery, hourly/daily pricing, specialties, about/description, reviews,
+verification flags, and a Book Now action.
+
+Worth confirming, not ruled in or out by this pass: an upfront "available
+today / next slot" signal before a customer opens the booking form;
+whether the detail screen's distance figure is computed from the same
+location logic as the list screen's sort, or independently.
+
+Nothing found shown too early or duplicated in the information order
+itself (photo/rating/distance -> stats -> gallery -> pricing -> about ->
+reviews -> book is a reasonable, conventional structure).
+
+
+8. BOOKING CREATION UX AUDIT
+==========================================
+[HIGH] Pricing is frontend-computed, backend-trusted
+  Direct answer to the question asked: _totalAmount() computes
+  hourlyRate x selectedHours (or the flat daily rate) entirely in Dart,
+  sent as totalAmount, and the backend persists it verbatim into
+  quoted_amount, booking_price, and final_amount with no server-side
+  recalculation from the provider's actual stored rate. Covered again
+  under Security.
+
+Present & working
+  Service context, hourly/daily mode, date picker, time+duration, address
+  (required), notes (optional), a real submit to POST /api/bookings.
+
+Duplicate-submission protection
+  Confirmed present — submit button disables and shows a spinner for the
+  full request duration.
+
+Validation
+  Present but snackbar-only for required fields (address, time slot) — no
+  inline per-field error state.
+
+Success state
+  Minimal — a snackbar plus a banner on the next screen. No dedicated
+  confirmation moment, unlike the polished success-dialog pattern already
+  built on the Provider side.
+
+
+9. BOOKING TRACKING AUDIT
+==========================================
+Actual statuses found in code, verbatim.
+
+Canonical backend enum (lib/booking-workflow.ts):
+  pending_provider_response · declined_by_provider · accepted ·
+  on_the_way · arrived · work_finished_by_provider ·
+  work_confirmed_by_user · final_payment_sent · cash_paid_by_user ·
+  payment_received_by_provider · completed · cancelled
+
+This is the single source of truth both apps ultimately key off. Legacy
+"pending" is still normalized into pending_provider_response for old rows.
+
+Customer sees (booking_detail_screen.dart)   | Provider sees (provider_jobs_screen.dart)
+--------------------------------------------------------------------------------------
+Booking Sent                                 | Confirmed        [1 step covers 2]
+Provider Accepted                            | (same as above)
+Provider On The Way                          | On The Way
+Provider Arrived                             | Arrived
+Job Completed by Provider                    | — [no equivalent]
+Payment Requested                            | Payment Requested
+Paid by Cash                                 | Payment Completed [1 step covers 2]
+Waiting Provider Payment Confirmation        | (same as above)
+Task Completed                               | — [no equivalent]
+— [no equivalent]                            | Review
+
+The disagreement is purely in wording/grouping — the underlying raw status
+values are identical and consistent between both apps. Also found: a dead
+index == 9 branch in booking_detail_screen.dart that can never trigger
+(backend array is 9 items, 0–8); and provider_jobs_screen.dart still
+defensively checks legacy strings (pending, declined, paid,
+review_requested, reviewed) outside the current canonical enum, reflecting
+old DB rows rather than current logic.
+
+
+10. PERFORMANCE AUDIT
+==========================================
+[HIGH] Futures built inline in build()
+  Home's profile fetch and all 3 "nearby" sections, the provider
+  list/detail fetches, and the verification hub all construct their
+  future: directly inside build() rather than caching it in state —
+  combined with IndexedStack keeping every tab mounted, switching tabs
+  silently re-fires all of these.
+
+[HIGH] Entire booking list re-fetched every 5s
+  Booking detail's polling calls the same endpoint that returns ALL of a
+  customer's bookings, then filters client-side for one id — the full
+  list is re-downloaded every 5 seconds to show a single booking.
+
+[MEDIUM] Controller leaks in profile edit sheets
+  profile_demo_screen.dart's edit/add-address sheets create up to 8
+  TextEditingControllers each, never disposed — one is even recreated on
+  every setState inside the sheet.
+
+[MEDIUM] Eager list building
+  booking_overview_screen.dart builds all booking cards via a plain for
+  loop in a ListView rather than .builder; smaller instances of the same
+  pattern appear in a few profile subpages.
+
+[MEDIUM] Full-screen blocking spinner on minor updates
+  profile_demo_screen.dart blanks the entire profile screen on every
+  refresh, including after small edits — contrast with booking detail's
+  correct "silent" partial-refresh pattern.
+
+[LOW] Unsized network images
+  Provider card thumbnails and the profile gallery render Image.network
+  without cacheWidth/cacheHeight — full-resolution decode for small
+  thumbnails.
+
+
+11. SECURITY / BACKEND SAFETY
+==========================================
+Reported for awareness — nothing here was changed.
+
+[CRITICAL] Booking price is client-computed and stored without server
+recalculation
+  A modified/rogue client could submit an artificially low totalAmount and
+  have it persisted as the real charge — the backend never re-reads the
+  provider's actual rate to validate it.
+
+[CRITICAL] Email/phone "verified" flags are client-asserted and trusted
+directly
+  Both verification screens only check a locally-typed 6-digit string with
+  no server round-trip, then send emailVerified: true/phoneVerified: true
+  — which the backend persists as sent. The app's own
+  OtpService.verifyOtp() abstraction exists but is never called from these
+  screens.
+
+[MEDIUM] Internal commission/payout fields returned to the customer app
+  companyCommissionAmount, providerNetAmount, and companyPaymentStatus are
+  present in the bookings payload sent to the customer app — internal
+  figures between Della and the provider, not customer-relevant, though
+  not independently exploitable for money movement.
+
+[LOW — likely intentional] Public, unauthenticated provider catalog/detail
+endpoints
+  Noted as fact for awareness — reasonable for a public browse experience,
+  worth an explicit confirmation with the team rather than treating as a
+  defect.
+
+[Confirmed safe] Booking creation & review submission are correctly
+protected
+  Both verify the Bearer token and customer role server-side, and derive
+  customer_id from the verified token rather than trusting a
+  client-supplied id.
+
+[Needs confirmation] Direct client-side Supabase queries rely on
+unverified RLS
+  customer_account_service.dart queries addresses/bookings/payments/
+  provider_profiles directly via the Supabase SDK — correctness depends
+  entirely on RLS policies not visible to this application-level audit.
+
+
+13. RECOMMENDED IMPLEMENTATION ORDER
+==========================================
+Each phase is independently reviewable and shippable.
+
+PHASE 0 — Fix broken/incorrect functionality
+  Goal: Only the items that are actively misleading or unsafe today —
+  everything else can wait for its proper phase below.
+  - Wire real OTP verification (or clearly gate the feature) instead of
+    client-asserted email/phone-verified flags
+  - Fix or hide the phone-OTP login toggle — it doesn't create a real
+    session today
+  - Decide the fate of the orphaned identity-verification route and
+    register-success screen
+  Backend touched: Yes, auth-adjacent   |   Risk: Backend-sensitive
+
+PHASE 1 — User App foundation
+  Goal: Shared theme/components, and the performance anti-patterns that
+  make everything downstream harder to build on.
+  - Cache futures in state instead of building them inline in build()
+  - Fix the TextEditingController leaks in profile edit sheets
+  - Consolidate ad hoc card helpers into one shared component (with
+    Provider)
+  - Add pull-to-refresh where missing
+  Backend touched: No   |   Risk: Local Flutter logic
+
+PHASE 2 — Home + Provider Discovery
+  Goal: Replace or clearly relabel the mock sections; tighten the
+  discovery-to-detail path.
+  - Real (or removed) wallet balance, notifications, categories
+  - Avoid re-fetching detail data the list screen already had
+  - Add cacheWidth/cacheHeight to network images
+  - Home density/hierarchy pass
+  Backend touched: Only for new real data sources   |   Risk: Mostly
+  local, some backend-sensitive
+
+PHASE 3 — Booking Creation
+  Goal: Complete the request UX and close the pricing-trust gap.
+  - Inline field validation instead of snackbar-only
+  - A real success moment (reuse Provider's success-dialog pattern)
+  - Server-side price recalculation from the provider's stored rate —
+    pending explicit sign-off
+  Backend touched: Yes, for pricing fix   |   Risk: Backend-sensitive
+  (pricing); local (UX)
+
+PHASE 4 — Active Booking / Tracking
+  Goal: User <-> Provider state synchronization and messaging.
+  - One shared label source for the timeline, instead of two
+    independently-worded lists
+  - Remove the dead index == 9 review-card branch
+  - Wire real messaging to the existing backend endpoint, or remove the
+    fake chat until it's real
+  - Fetch a booking by id directly instead of re-pulling the full list
+    every poll
+  Backend touched: Only if adding endpoints (additive)   |   Risk:
+  Backend-sensitive (new endpoints); functional (labels)
+
+PHASE 5 — Payment + Review
+  Goal: Close the wallet-balance gap and tidy the payload the customer
+  app receives.
+  - Real wallet-balance source, or remove the figure until one exists
+  - Trim internal commission/payout fields out of the customer-facing
+    bookings response
+  - Presentation polish on the payment-proof/cash-pay UI (already
+    functionally real)
+  Backend touched: Yes, response shape only   |   Risk: Safe UI-only +
+  low-risk backend trim
+
+PHASE 6 — Messages / Profile / More
+  Goal: Secondary screens — consistency and cleanup.
+  - Point the profile's Favourites card at the real API the subpage
+    already uses
+  - Replace or clearly relabel the Coupons screen
+  - Confirm with the team, then remove the dead widget/screen files
+    listed in Structure
+  - Wire or remove the "Forgot password"/"Contact support" stubs
+  Backend touched: Only if Coupons gets real logic   |   Risk: Local
+  Flutter logic
+
+PHASE 7 — Final polish
+  Goal: Only after the above is stable.
+  - Full radius/shadow/spacing/typography consistency pass, shared with
+    Provider's own Phase 1
+  - Bring Provider's animated success-dialog/timeline polish into
+    Customer's equivalents
+  - Port Customer's Hero pattern into the Provider app
+  Backend touched: No   |   Risk: Safe UI-only
+
+
+Audit only — no files were modified. Tell me which screen to start with
+and I'll scope that phase in detail before touching anything.

@@ -2,13 +2,15 @@ import { CircleDollarSign, CreditCard, FileText, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { SurfaceCard, InfoRow, MiniStatus } from "../components/user-detail-ui";
-import { getPaymentDetailWithFallback } from "../lib/admin-payments";
+import { getPaymentDetailWithFallback, rejectCompanyPayment } from "../lib/admin-payments";
 import type { PaymentRow } from "../types";
 
 export function PaymentDetailPage() {
   const { paymentId = "" } = useParams();
   const [payment, setPayment] = useState<PaymentRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -31,6 +33,32 @@ export function PaymentDetailPage() {
       active = false;
     };
   }, [paymentId]);
+
+  async function handleRejectPayment() {
+    if (!payment?.rawId || saving) {
+      return;
+    }
+
+    const reason = window.prompt("Enter a reason for rejecting this company payment (e.g. not credited to account):");
+    if (!reason || !reason.trim()) {
+      setMessage("A rejection reason is required.");
+      return;
+    }
+
+    setSaving(true);
+    const result = await rejectCompanyPayment(payment.rawId, reason.trim());
+    setSaving(false);
+
+    if (result.error) {
+      setMessage(result.error);
+      return;
+    }
+
+    setPayment((current) =>
+      current ? { ...current, settlementStatus: "Rejected", settlementStatusRaw: "rejected" } : current,
+    );
+    setMessage("Company payment rejected.");
+  }
 
   if (loading) {
     return (
@@ -88,6 +116,25 @@ export function PaymentDetailPage() {
               <p className="mt-2 text-sm text-slate-500">No company slip attached.</p>
             )}
           </div>
+
+          {payment.settlementStatusRaw !== "paid" && payment.settlementStatusRaw !== "rejected" ? (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleRejectPayment()}
+                disabled={saving || !payment.rawId}
+                className="rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+              >
+                Reject Company Payment
+              </button>
+            </div>
+          ) : null}
+
+          {message ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+              {message}
+            </div>
+          ) : null}
         </div>
       </SurfaceCard>
     </div>

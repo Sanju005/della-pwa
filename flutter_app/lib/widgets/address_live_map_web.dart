@@ -10,12 +10,20 @@ class AddressLiveMap extends StatelessWidget {
     this.latitude,
     this.longitude,
     this.height = 180,
+    this.interactive = false,
+    this.onLocationSelected,
   });
 
   final String address;
   final double? latitude;
   final double? longitude;
   final double height;
+  // Dragging to fine-tune the pin isn't available on the web preview (the
+  // key-less Google Maps embed doesn't expose drag events to the host page
+  // without a Maps JS API key) — kept here only so both platform
+  // implementations share one constructor.
+  final bool interactive;
+  final void Function(double latitude, double longitude)? onLocationSelected;
 
   @override
   Widget build(BuildContext context) {

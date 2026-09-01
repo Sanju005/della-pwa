@@ -166,9 +166,13 @@ export async function POST(
     amount: Number(bookingRow.quoted_amount ?? 0),
     payment_provider: "manual",
     payment_option: "cash",
-    status: "paid",
+    // Not "paid" yet — this is only the customer's own claim that they
+    // handed over cash. The payment only becomes authoritative once the
+    // provider actually confirms receipt (payment_received_by_provider in
+    // app/api/provider/bookings/[id]/route.ts), which is the only place
+    // that sets status to "paid" and paid_at.
+    status: "pending",
     payment_method: "Cash",
-    paid_at: timestamp,
     customer_confirmed_at: timestamp,
     customer_payment_proof_data_url: storedProofDataUrl || null,
     customer_payment_proof_file_name: payload.proofFileName?.trim() || null,

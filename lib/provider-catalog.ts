@@ -4,6 +4,7 @@ import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseServiceKey, getSupabaseUrl } from "./supabase-env";
 import { resolveStoredMediaUrl } from "./server-media-storage";
+import { calculateDistanceKm } from "./provider-distance";
 import {
   buildProviderPortraitSrc,
   serviceOrder,
@@ -27,12 +28,18 @@ type ProviderVerificationRow = {
   identity_verified: boolean | null;
 };
 
+export type CustomerLocation = {
+  latitude: number;
+  longitude: number;
+};
+
 type ProviderCatalogRow = {
   id: string;
   marketing_name: string | null;
   service_location: string | null;
   latitude: number | null;
   longitude: number | null;
+  service_radius_km: number | null;
   average_rating: number | null;
   total_reviews: number | null;
   bio: string | null;
@@ -78,9 +85,7 @@ export type ProviderListing = {
   title: string;
   workMode: "Live-in" | "Part-time" | "Full-time";
   location: string;
-  latitude: number | null;
-  longitude: number | null;
-  distanceKm: number;
+  distanceKm: number | null;
   rating: number;
   reviews: number;
   hourlyRate: number;
@@ -143,6 +148,106 @@ function isProviderCategoryKey(value: string): value is ProviderCategoryKey {
   return serviceOrder.includes(value as ProviderCategoryKey);
 }
 
+type ProviderAvailabilityRow = {
+  provider_id: string;
+  day_of_week: string;
+  start_time: string | null;
+  end_time: string | null;
+};
+
+function nowInKualaLumpur() {
+  const now = new Date();
+  const dayKey = now
+    .toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" })
+    .trim()
+    .toLowerCase();
+  const timeParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const hour = Number(timeParts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = Number(timeParts.find((part) => part.type === "minute")?.value ?? "0");
+
+  return { dayKey, minutesSinceMidnight: hour * 60 + minute };
+}
+
+function timeStringToMinutes(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const [hour, minute] = value.slice(0, 5).split(":").map(Number);
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+}
+
+function timeStringToLabel(value: string | null | undefined) {
+  const minutes = timeStringToMinutes(value);
+
+  if (minutes === null) {
+    return "";
+  }
+
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+
+  return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+export async function fetchProviderAvailabilityByProviderId(
+  supabase: NonNullable<ReturnType<typeof buildSupabaseAdminClient>>,
+  providerIds: string[],
+) {
+  const uniqueIds = [...new Set(providerIds.filter(Boolean))];
+
+  if (uniqueIds.length === 0) {
+    return new Map<string, ProviderAvailabilityRow[]>();
+  }
+
+  const { data, error } = await supabase
+    .from("provider_availability")
+    .select("provider_id, day_of_week, start_time, end_time")
+    .in("provider_id", uniqueIds);
+
+  if (error || !data) {
+    return new Map<string, ProviderAvailabilityRow[]>();
+  }
+
+  const map = new Map<string, ProviderAvailabilityRow[]>();
+  for (const row of data as ProviderAvailabilityRow[]) {
+    const existing = map.get(row.provider_id) ?? [];
+    existing.push(row);
+    map.set(row.provider_id, existing);
+  }
+
+  return map;
+}
+
+export function computeAvailabilityLabel(rows: ProviderAvailabilityRow[]) {
+  const { dayKey, minutesSinceMidnight } = nowInKualaLumpur();
+  const todayRow = rows.find((row) => row.day_of_week?.trim().toLowerCase() === dayKey);
+  const startMinutes = timeStringToMinutes(todayRow?.start_time);
+  const endMinutes = timeStringToMinutes(todayRow?.end_time);
+
+  if (startMinutes === null || endMinutes === null) {
+    return "Unavailable Today";
+  }
+
+  if (minutesSinceMidnight >= endMinutes) {
+    return `Last call ended at ${timeStringToLabel(todayRow?.end_time)}`;
+  }
+
+  return "Available Today";
+}
+
 function humanizeService(serviceKey: ProviderCategoryKey) {
   return serviceLabels[serviceKey];
 }
@@ -153,6 +258,7 @@ const providerCatalogSelectWithMedia = `
   service_location,
   latitude,
   longitude,
+  service_radius_km,
   average_rating,
   total_reviews,
   bio,
@@ -181,6 +287,7 @@ const providerCatalogSelectBase = `
   service_location,
   latitude,
   longitude,
+  service_radius_km,
   average_rating,
   total_reviews,
   bio,
@@ -258,7 +365,10 @@ async function fetchProviderProfileMediaMap(
 }
 
 export const getProviderCatalog = cache(
-  async (service: string | null): Promise<ProviderCatalogData> => {
+  async (
+    service: string | null,
+    customerLocation?: CustomerLocation | null,
+  ): Promise<ProviderCatalogData> => {
     const serviceKey = service && isProviderCategoryKey(service) ? service : null;
     const supabase = buildSupabaseAdminClient();
 
@@ -292,6 +402,10 @@ export const getProviderCatalog = cache(
       supabase,
       rows.map((row) => row.id),
     );
+    const availabilityMap = await fetchProviderAvailabilityByProviderId(
+      supabase,
+      rows.map((row) => row.id),
+    );
 
     const realListings = (
       await Promise.all(
@@ -311,6 +425,27 @@ export const getProviderCatalog = cache(
 
             const profileMedia = profileMediaMap.get(row.id);
 
+            const distanceKm =
+              customerLocation &&
+              typeof row.latitude === "number" &&
+              typeof row.longitude === "number"
+                ? calculateDistanceKm(
+                    customerLocation.latitude,
+                    customerLocation.longitude,
+                    row.latitude,
+                    row.longitude,
+                  )
+                : null;
+
+            if (
+              customerLocation &&
+              distanceKm !== null &&
+              typeof row.service_radius_km === "number" &&
+              distanceKm > row.service_radius_km
+            ) {
+              return null;
+            }
+
             const listing: ProviderListing = {
               id: row.id,
               name: row.marketing_name ?? "DELLA Provider",
@@ -321,9 +456,7 @@ export const getProviderCatalog = cache(
               workMode: (["Live-in", "Part-time", "Full-time"][rowIndex % 3] ??
                 "Full-time") as "Live-in" | "Part-time" | "Full-time",
               location: row.service_location ?? "Kuala Lumpur",
-              latitude: typeof row.latitude === "number" ? row.latitude : null,
-              longitude: typeof row.longitude === "number" ? row.longitude : null,
-              distanceKm: [2.4, 1.8, 3.1, 2.7, 2.2, 4.0, 3.6, 2.9][rowIndex] ?? 2.5,
+              distanceKm,
               rating: Number(row.average_rating ?? 4.8),
               reviews: row.total_reviews ?? 0,
               hourlyRate: Number(serviceRow.hourly_rate ?? 25),
@@ -335,7 +468,9 @@ export const getProviderCatalog = cache(
                   .filter((item): item is string => Boolean(item))
                   .slice(0, 2) ?? [],
               bio: row.bio ?? "Trusted services available through DELLA.",
-              availabilityLabel: "Available Today",
+              availabilityLabel: computeAvailabilityLabel(
+                availabilityMap.get(row.id) ?? [],
+              ),
               imageTone: imageTones[rowIndex % imageTones.length],
               isApproved:
                 row.approval_status === "approved" &&
@@ -360,6 +495,14 @@ export const getProviderCatalog = cache(
         })
       )
     ).flat();
+
+    if (customerLocation) {
+      realListings.sort((left, right) => {
+        if (left.distanceKm === null) return 1;
+        if (right.distanceKm === null) return -1;
+        return left.distanceKm - right.distanceKm;
+      });
+    }
 
     if (!serviceKey) {
       return {

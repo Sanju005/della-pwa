@@ -64,6 +64,7 @@ class CustomerBookingDetail {
     required this.paymentReceivedByProviderAt,
     required this.completedAt,
     required this.notes,
+    required this.cancellationReason,
     required this.customerPaymentProofDataUrl,
     required this.customerPaymentProofFileName,
     required this.customerPaymentProofMimeType,
@@ -98,6 +99,7 @@ class CustomerBookingDetail {
   final String paymentReceivedByProviderAt;
   final String completedAt;
   final String notes;
+  final String cancellationReason;
   final String customerPaymentProofDataUrl;
   final String customerPaymentProofFileName;
   final String customerPaymentProofMimeType;
@@ -292,6 +294,7 @@ class BookingOverviewService {
       paymentReceivedByProviderAt: match['paymentReceivedByProviderAt']?.toString() ?? '',
       completedAt: match['completedAt']?.toString() ?? '',
       notes: match['notes']?.toString() ?? '',
+      cancellationReason: match['cancellationReason']?.toString() ?? '',
       customerPaymentProofDataUrl:
           match['customerPaymentProofDataUrl']?.toString() ?? '',
       customerPaymentProofFileName:

@@ -12,6 +12,13 @@
     }
   ],
   "keep_vars": true,
+  // TEMPORARY dev/QA aid — lets the fixed code `123456` work for phone/email
+  // OTP verification instead of requiring Twilio/a real email provider.
+  // Never leave this "true" in a real production deployment: remove this
+  // block (or set to "false") once real OTP delivery is wired up.
+  "vars": {
+    "OTP_DEV_MODE": "true"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"

@@ -53,13 +53,34 @@ class CustomerRegisterSuccessScreen extends StatelessWidget {
           ),
         ],
       ),
-      title: 'Account Created!',
-      subtitle: 'You can now search and book trusted services near you.',
-      bottom: SwiperButton(
-        label: 'Back to Login',
-        onPressed: () => Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false),
+      title: "You're all set!",
+      subtitle: 'Your Swiper account has been created successfully.',
+      bottom: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SwiperButton(
+            // The customer is already signed in by the time this screen
+            // shows (registration signs in immediately after account
+            // creation), so this continues into the app rather than sending
+            // an already-authenticated user back to the login screen.
+            label: 'Start Exploring',
+            onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(
+              AppRoutes.customerShell,
+              (route) => false,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                AppRoutes.customerShell,
+                (route) => false,
+              );
+              Navigator.of(context).pushNamed(AppRoutes.profileVerification);
+            },
+            child: const Text('Verify Profile'),
+          ),
+        ],
       ),
       child: Column(
         children: items.map((item) {

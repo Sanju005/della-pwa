@@ -200,6 +200,7 @@ export async function listPaymentsWithFallback() {
         date: formatDate(row.created_at),
         createdAt: row.created_at ?? "",
         settlementStatus: formatStatus(row.company_payment_status),
+        settlementStatusRaw: row.company_payment_status ?? null,
         companySlipName,
         companySlipUrl: await resolvePaymentProofUrl(companySlipSource),
       };
@@ -210,6 +211,23 @@ export async function listPaymentsWithFallback() {
 export async function getPaymentDetailWithFallback(paymentId: string) {
   const all = await listPaymentsWithFallback();
   return all.find((row) => row.rawId === paymentId || row.id === paymentId) ?? null;
+}
+
+export async function rejectCompanyPayment(paymentId: string, reason: string) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const { error } = await supabase.rpc("admin_reject_company_payment", {
+    p_payment_id: paymentId,
+    p_reason: reason,
+  });
+
+  if (error) {
+    return { error: error.message || "Unable to reject payment." };
+  }
+
+  return { error: null };
 }
 
 export function buildPaymentStats(rows: PaymentRow[]) {

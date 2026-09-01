@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
+import 'service_location_store.dart';
 
 class ProviderAvailabilitySlot {
   const ProviderAvailabilitySlot({
@@ -217,10 +218,14 @@ class ProviderDetailService {
     required String id,
     String? service,
   }) async {
+    final selection = ServiceLocationStore.load();
+
     final uri = Uri.parse('${AppConfig.appBaseUrl}/api/providers/$id').replace(
       queryParameters: {
         if (service != null && service.trim().isNotEmpty)
           'service': service.trim().toLowerCase(),
+        if (selection?.latitude != null) 'lat': selection!.latitude.toString(),
+        if (selection?.longitude != null) 'lng': selection!.longitude.toString(),
       },
     );
 

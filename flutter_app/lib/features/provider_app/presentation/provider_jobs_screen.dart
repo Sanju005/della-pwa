@@ -1,21 +1,28 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/animation/app_motion.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/browser_file_picker.dart';
 import '../../../services/provider_workspace_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
+import '../../../widgets/app_reveal.dart';
 import '../../../widgets/empty_state.dart';
-import '../../../widgets/loading_state.dart';
 import '../../../widgets/swiper_button.dart';
 import '../../../widgets/swiper_status_badge.dart';
+import 'widgets/provider_jobs_skeleton.dart';
+
+/// UI-only filter groups layered over the real booking statuses — no new
+/// backend statuses are introduced. Grouping reuses the same
+/// [_ProviderJobsScreenState._isCompletedStatus] /
+/// [_ProviderJobsScreenState._isCancelledStatus] helpers that already
+/// govern action-eligibility elsewhere in this screen, so the filter can
+/// never disagree with the existing workflow logic.
+enum _StatusFilter { all, pending, ongoing, completed, cancelled }
 
 class ProviderJobsScreen extends StatefulWidget {
-  const ProviderJobsScreen({
-    super.key,
-    required this.repository,
-  });
+  const ProviderJobsScreen({super.key, required this.repository});
 
   final DemoRepository repository;
 
@@ -25,10 +32,13 @@ class ProviderJobsScreen extends StatefulWidget {
 
 class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
   static const _workspaceService = ProviderWorkspaceService();
+  static const _cardRadius = 20.0;
+  static const _tileRadius = 16.0;
 
   late Future<List<ProviderWorkspaceBooking>> _future;
   late DateTime _visibleMonth;
   String _selectedDateKey = _dateKey(DateTime.now());
+  _StatusFilter _statusFilter = _StatusFilter.all;
   String _busyBookingId = '';
   String _message = '';
   String _error = '';
@@ -42,6 +52,10 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
   }
 
   Future<void> _reload() async {
+    // Reassigns the same fetch this screen already uses on load and after
+    // every booking action — no new endpoint, no new request shape.
+    // _selectedDateKey / _statusFilter / _visibleMonth are untouched, so a
+    // pull-to-refresh naturally preserves whatever the user had selected.
     setState(() {
       _future = _workspaceService.fetchBookings();
     });
@@ -53,7 +67,7 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const LoadingState(label: 'Loading provider bookings...');
+          return const ProviderJobsSkeleton();
         }
         if (snapshot.hasError) {
           return const EmptyState(
@@ -64,197 +78,329 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
         }
 
         final bookings = snapshot.data ?? const [];
+        // Computed once per build: calendar-date filter first, then the
+        // status-group filter — both purely local over the already-fetched
+        // list, no re-fetch either way.
         final selectedDateBookings = _sortBookings(
-          bookings.where((booking) => booking.scheduledDate == _selectedDateKey),
-        );
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.md,
-            AppSpacing.md,
-            112,
+          bookings.where(
+            (booking) =>
+                _normalizedDateKey(booking.scheduledDate) == _selectedDateKey,
           ),
-          children: [
-            if (_error.isNotEmpty) ...[
-              _noticeCard(_error, AppColors.error, const Color(0xFFFFF1F2)),
-            ],
-            if (_message.isNotEmpty) ...[
-              if (_error.isNotEmpty) const SizedBox(height: AppSpacing.md),
-              _noticeCard(
-                _message,
-                AppColors.success,
-                const Color(0xFFF0FDF4),
-              ),
-            ],
-            const SizedBox(height: AppSpacing.md),
-            _calendarCard(bookings),
-            const SizedBox(height: AppSpacing.md),
-            if (selectedDateBookings.isEmpty)
-              const EmptyState(
-                title: 'No bookings found',
-                subtitle: 'No bookings are scheduled for the selected date.',
-                icon: Icons.calendar_month_outlined,
-              )
-            else
-              ...selectedDateBookings.map(
-                (booking) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: _bookingListCard(context, booking),
+        );
+        final visibleBookings = _statusFilter == _StatusFilter.all
+            ? selectedDateBookings
+            : selectedDateBookings
+                  .where(
+                    (booking) =>
+                        _statusGroupFor(booking.bookingStatus) == _statusFilter,
+                  )
+                  .toList(growable: false);
+
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: _reload,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              112,
+            ),
+            children: [
+              if (_error.isNotEmpty) ...[
+                _noticeCard(_error, AppColors.error, AppColors.errorSurface),
+              ],
+              if (_message.isNotEmpty) ...[
+                if (_error.isNotEmpty) const SizedBox(height: AppSpacing.md),
+                _noticeCard(
+                  _message,
+                  AppColors.success,
+                  AppColors.successSurface,
+                ),
+              ],
+              if (_error.isNotEmpty || _message.isNotEmpty)
+                const SizedBox(height: AppSpacing.md),
+              AppReveal(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _calendarCard(bookings),
+                    const SizedBox(height: AppSpacing.md),
+                    _statusFilterRow(),
+                  ],
                 ),
               ),
-          ],
+              const SizedBox(height: AppSpacing.md),
+              AppReveal(
+                delay: const Duration(milliseconds: 60),
+                child: visibleBookings.isEmpty
+                    ? EmptyState(
+                        title: _emptyTitle(),
+                        subtitle: _emptySubtitle(),
+                        icon: Icons.calendar_month_outlined,
+                      )
+                    : Column(
+                        children: [
+                          for (final booking in visibleBookings)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.sm,
+                              ),
+                              child: _bookingListCard(context, booking),
+                            ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
         );
       },
+    );
+  }
+
+  // Reuses the SAME completed/cancelled definitions the rest of this
+  // screen already relies on for action-eligibility and flow labels, so
+  // the new filter groups can't drift from existing behavior. Any status
+  // not explicitly pending/completed/cancelled falls into "ongoing"
+  // (accepted, on_the_way, arrived, final_payment_sent, cash_paid_by_user,
+  // payment_received_by_provider) — the safest catch-all group.
+  _StatusFilter _statusGroupFor(String status) {
+    if (_isCancelledStatus(status)) {
+      return _StatusFilter.cancelled;
+    }
+    if (_isCompletedStatus(status)) {
+      return _StatusFilter.completed;
+    }
+    if (status == 'pending' || status == 'pending_provider_response') {
+      return _StatusFilter.pending;
+    }
+    return _StatusFilter.ongoing;
+  }
+
+  String _statusFilterLabel(_StatusFilter filter) {
+    return switch (filter) {
+      _StatusFilter.all => 'All',
+      _StatusFilter.pending => 'Pending',
+      _StatusFilter.ongoing => 'Ongoing',
+      _StatusFilter.completed => 'Completed',
+      _StatusFilter.cancelled => 'Cancelled',
+    };
+  }
+
+  String _emptyTitle() {
+    if (_statusFilter == _StatusFilter.all) {
+      return 'No bookings found';
+    }
+    return 'No ${_statusFilterLabel(_statusFilter).toLowerCase()} bookings';
+  }
+
+  String _emptySubtitle() {
+    if (_statusFilter == _StatusFilter.all) {
+      return 'No bookings are scheduled for the selected date.';
+    }
+    return 'No ${_statusFilterLabel(_statusFilter).toLowerCase()} bookings for the selected date.';
+  }
+
+  Widget _statusFilterRow() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final filter in _StatusFilter.values) ...[
+            _statusChip(filter),
+            if (filter != _StatusFilter.values.last)
+              const SizedBox(width: AppSpacing.xs),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _statusChip(_StatusFilter filter) {
+    final selected = filter == _statusFilter;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: () => setState(() => _statusFilter = filter),
+      child: AnimatedContainer(
+        duration: AppMotion.resolveDuration(context, AppMotion.fast),
+        curve: AppMotion.emphasizedCurve,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primarySurface : AppColors.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Text(
+          _statusFilterLabel(filter),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? AppColors.primary : AppColors.textSecondary,
+          ),
+        ),
+      ),
     );
   }
 
   Widget _calendarCard(List<ProviderWorkspaceBooking> bookings) {
     final monthLabel = _monthLabel(_visibleMonth);
     final days = _calendarDays(bookings);
+    final todayKey = _dateKey(DateTime.now());
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFEEE5F7)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(_cardRadius),
+        border: Border.all(color: AppColors.border),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x14562687),
-            blurRadius: 24,
-            offset: Offset(0, 10),
+            color: AppColors.shadow,
+            blurRadius: 20,
+            offset: Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFCFAFF),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFEEE5F7)),
-            ),
-            child: Column(
-              children: [
-                Row(
+          Row(
+            children: [
+              _monthArrow(
+                icon: Icons.chevron_left_rounded,
+                onTap: () => setState(() {
+                  _visibleMonth = DateTime(
+                    _visibleMonth.year,
+                    _visibleMonth.month - 1,
+                    1,
+                  );
+                }),
+              ),
+              Expanded(
+                child: Column(
                   children: [
-                    _monthArrow(
-                      icon: Icons.chevron_left_rounded,
-                      onTap: () => setState(() {
-                        _visibleMonth = DateTime(
-                          _visibleMonth.year,
-                          _visibleMonth.month - 1,
-                          1,
-                        );
-                      }),
-                    ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            monthLabel,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Select a date to load booking cards below.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF7B728A),
-                            ),
-                          ),
-                        ],
+                    Text(
+                      monthLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                    _monthArrow(
-                      icon: Icons.chevron_right_rounded,
-                      onTap: () => setState(() {
-                        _visibleMonth = DateTime(
-                          _visibleMonth.year,
-                          _visibleMonth.month + 1,
-                          1,
-                        );
-                      }),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Select a date to view bookings',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.md),
-                const Row(
-                  children: [
-                    Expanded(child: Center(child: Text('Sun', style: _dowStyle))),
-                    Expanded(child: Center(child: Text('Mon', style: _dowStyle))),
-                    Expanded(child: Center(child: Text('Tue', style: _dowStyle))),
-                    Expanded(child: Center(child: Text('Wed', style: _dowStyle))),
-                    Expanded(child: Center(child: Text('Thu', style: _dowStyle))),
-                    Expanded(child: Center(child: Text('Fri', style: _dowStyle))),
-                    Expanded(child: Center(child: Text('Sat', style: _dowStyle))),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                GridView.builder(
-                  itemCount: days.length,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 7,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                    childAspectRatio: 0.9,
+              ),
+              _monthArrow(
+                icon: Icons.chevron_right_rounded,
+                onTap: () => setState(() {
+                  _visibleMonth = DateTime(
+                    _visibleMonth.year,
+                    _visibleMonth.month + 1,
+                    1,
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          const Row(
+            children: [
+              Expanded(
+                child: Center(child: Text('Sun', style: _dowStyle)),
+              ),
+              Expanded(
+                child: Center(child: Text('Mon', style: _dowStyle)),
+              ),
+              Expanded(
+                child: Center(child: Text('Tue', style: _dowStyle)),
+              ),
+              Expanded(
+                child: Center(child: Text('Wed', style: _dowStyle)),
+              ),
+              Expanded(
+                child: Center(child: Text('Thu', style: _dowStyle)),
+              ),
+              Expanded(
+                child: Center(child: Text('Fri', style: _dowStyle)),
+              ),
+              Expanded(
+                child: Center(child: Text('Sat', style: _dowStyle)),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          GridView.builder(
+            itemCount: days.length,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
+              childAspectRatio: 0.9,
+            ),
+            itemBuilder: (context, index) {
+              final day = days[index];
+              if (day == null) {
+                return const SizedBox.shrink();
+              }
+              final selected = day.key == _selectedDateKey;
+              final isToday = day.key == todayKey;
+              return InkWell(
+                borderRadius: BorderRadius.circular(_tileRadius - 2),
+                onTap: () => setState(() => _selectedDateKey = day.key),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.primary : AppColors.surface,
+                    borderRadius: BorderRadius.circular(_tileRadius - 2),
+                    border: !selected && isToday
+                        ? Border.all(color: AppColors.primary, width: 1.4)
+                        : null,
                   ),
-                  itemBuilder: (context, index) {
-                    final day = days[index];
-                    if (day == null) {
-                      return const SizedBox.shrink();
-                    }
-                    final active = day.key == _selectedDateKey;
-                    return InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () => setState(() => _selectedDateKey = day.key),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: active ? AppColors.primary : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '${day.day}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: active
-                                    ? Colors.white
-                                    : AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${day.count}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: active
-                                    ? Colors.white70
-                                    : day.count > 0
-                                        ? AppColors.primary
-                                        : const Color(0xFFC4B7D8),
-                              ),
-                            ),
-                          ],
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${day.day}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected
+                              ? Colors.white
+                              : AppColors.textPrimary,
                         ),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 3),
+                      Text(
+                        '${day.count}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: selected
+                              ? Colors.white70
+                              : day.count > 0
+                              ? AppColors.primary
+                              : AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),
@@ -265,95 +411,66 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     BuildContext context,
     ProviderWorkspaceBooking booking,
   ) {
-    final action = _primaryActionFor(booking);
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFCFAFF),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEEE5F7)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D562687),
-            blurRadius: 20,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  booking.customerName.isEmpty ? 'Customer' : booking.customerName,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(_tileRadius + 2),
+      onTap: () => _showBookingDetailsSheet(context, booking),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(_tileRadius + 2),
+          border: Border.all(color: AppColors.border),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadow,
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwiperStatusBadge(
+              label: booking.statusLabel,
+              tone: _bookingTone(booking.bookingStatus),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              booking.serviceLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
               ),
-              SwiperStatusBadge(
-                label: booking.statusLabel,
-                tone: _bookingTone(booking.bookingStatus),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              booking.customerName.isEmpty ? 'Customer' : booking.customerName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _infoRow(Icons.schedule_outlined, booking.schedule),
-          const SizedBox(height: AppSpacing.xs),
-          _infoRow(Icons.place_outlined, booking.location),
-          const SizedBox(height: AppSpacing.xs),
-          _infoRow(Icons.payments_outlined, _currency(booking.quotedAmount)),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _showBookingDetailsSheet(context, booking),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: Color(0xFFD9C5F1)),
-                    minimumSize: const Size.fromHeight(44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text('View Details'),
-                ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _infoRow(Icons.schedule_outlined, booking.schedule),
+            const SizedBox(height: 4),
+            _infoRow(Icons.place_outlined, booking.location),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _currency(booking.quotedAmount),
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: action == null
-                    ? Container(
-                        height: 44,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          _flowLabelFor(booking.bookingStatus),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      )
-                    : SwiperButton(
-                        label: action.label,
-                        onPressed: _busyBookingId.isNotEmpty
-                            ? null
-                            : () => action.onPressed(context, booking),
-                      ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -365,10 +482,10 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => Scaffold(
-          backgroundColor: const Color(0xFFF7F2FB),
+          backgroundColor: AppColors.background,
           appBar: AppBar(
             title: const Text('Task Details'),
-            backgroundColor: Colors.white,
+            backgroundColor: AppColors.surface,
             foregroundColor: AppColors.textPrimary,
             elevation: 0,
           ),
@@ -397,17 +514,19 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     ProviderWorkspaceBooking booking, {
     bool showCloseButton = true,
   }) {
-    final isPending = booking.bookingStatus == 'pending' ||
+    final isPending =
+        booking.bookingStatus == 'pending' ||
         booking.bookingStatus == 'pending_provider_response';
+    final action = _primaryActionFor(booking);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFEEE5F7)),
+        border: Border.all(color: AppColors.border),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x14562687),
+            color: AppColors.shadow,
             blurRadius: 24,
             offset: Offset(0, 10),
           ),
@@ -435,8 +554,10 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                     const SizedBox(height: 8),
                     Text(
                       booking.serviceLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
                         letterSpacing: -0.5,
@@ -444,10 +565,14 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      booking.customerName.isEmpty ? 'Customer' : booking.customerName,
+                      booking.customerName.isEmpty
+                          ? 'Customer'
+                          : booking.customerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF64748B),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -458,7 +583,7 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(
                     Icons.close_rounded,
-                    color: Color(0xFF64748B),
+                    color: AppColors.textSecondary,
                   ),
                 ),
             ],
@@ -472,33 +597,32 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pushNamed(
-                    AppRoutes.providerMessages,
-                  ),
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pushNamed(AppRoutes.providerMessages),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: Color(0xFFD9C5F1)),
+                    side: const BorderSide(color: AppColors.border),
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text('Message Customer'),
+                  child: const Text(
+                    'Message Customer',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-              if (isPending) ...[
+              if (action != null) ...[
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: SwiperButton(
-                    label: 'Accept',
+                    label: action.label,
                     onPressed: _busyBookingId.isNotEmpty
                         ? null
-                        : () => _updateBookingStatus(
-                              booking.id,
-                              'accepted',
-                              notice: 'Booking accepted.',
-                              note: 'Provider accepted booking',
-                            ),
+                        : () => action.onPressed(context, booking),
                   ),
                 ),
               ],
@@ -535,13 +659,17 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
         _summaryTile(
           icon: Icons.place_outlined,
           label: 'Location',
-          value: booking.location.isEmpty ? 'Location not provided' : booking.location,
+          value: booking.location.isEmpty
+              ? 'Location not provided'
+              : booking.location,
         ),
         const SizedBox(height: AppSpacing.sm),
         _summaryTile(
           icon: Icons.schedule_outlined,
           label: 'Date & Time',
-          value: booking.schedule.isEmpty ? 'Schedule not provided' : booking.schedule,
+          value: booking.schedule.isEmpty
+              ? 'Schedule not provided'
+              : booking.schedule,
         ),
         const SizedBox(height: AppSpacing.sm),
         _summaryTile(
@@ -570,9 +698,9 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: const Color(0xFFFBF8FF),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEEE5F7)),
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(_tileRadius + 2),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -581,7 +709,7 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
             width: 36,
             height: 36,
             decoration: const BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 18, color: AppColors.primary),
@@ -639,8 +767,12 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
           ],
           current: const ['pending', 'pending_provider_response'],
         ),
-        dateLabel: _dateLabel(booking.acceptedAt.isEmpty ? booking.createdAt : booking.acceptedAt),
-        timeLabel: _timeLabel(booking.acceptedAt.isEmpty ? booking.createdAt : booking.acceptedAt),
+        dateLabel: _dateLabel(
+          booking.acceptedAt.isEmpty ? booking.createdAt : booking.acceptedAt,
+        ),
+        timeLabel: _timeLabel(
+          booking.acceptedAt.isEmpty ? booking.createdAt : booking.acceptedAt,
+        ),
       ),
       _TimelineStep(
         number: 2,
@@ -723,12 +855,13 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
       _TimelineStep(
         number: 6,
         title: 'Review',
-        state: booking.providerReviewStatus == 'submitted' ||
+        state:
+            booking.providerReviewStatus == 'submitted' ||
                 booking.providerReviewedAt.isNotEmpty
             ? _TimelineState.done
             : _isCompletedStatus(booking.bookingStatus)
-                ? _TimelineState.current
-                : _TimelineState.waiting,
+            ? _TimelineState.current
+            : _TimelineState.waiting,
         dateLabel: _dateLabel(
           booking.providerReviewedAt.isEmpty
               ? booking.reviewedAt
@@ -750,10 +883,11 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
             Container(
               width: 2,
               height: 18,
-              color: steps[index].state == _TimelineState.done ||
+              color:
+                  steps[index].state == _TimelineState.done ||
                       steps[index].state == _TimelineState.current
                   ? AppColors.primary
-                  : const Color(0xFFE5E7EB),
+                  : AppColors.divider,
             ),
         ],
       ],
@@ -770,9 +904,9 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFEEE5F7)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -782,13 +916,14 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
             height: 32,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: step.state == _TimelineState.done ||
+              color:
+                  step.state == _TimelineState.done ||
                       step.state == _TimelineState.current
                   ? AppColors.primary
-                  : Colors.white,
+                  : AppColors.surface,
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: waiting ? const Color(0xFFD1D5DB) : AppColors.primary,
+                color: waiting ? AppColors.disabled : AppColors.primary,
                 width: 3,
               ),
             ),
@@ -797,10 +932,11 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
-                color: step.state == _TimelineState.done ||
+                color:
+                    step.state == _TimelineState.done ||
                         step.state == _TimelineState.current
                     ? Colors.white
-                    : const Color(0xFF94A3B8),
+                    : AppColors.textMuted,
               ),
             ),
           ),
@@ -814,6 +950,8 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                     Expanded(
                       child: Text(
                         '${step.number}. ${step.title}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -858,7 +996,7 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                     style: const TextStyle(
                       fontSize: 13,
                       height: 1.5,
-                      color: Color(0xFF64748B),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -871,20 +1009,15 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
   }
 
   Widget _timelineStateChip(_TimelineState state) {
-    final background = switch (state) {
-      _TimelineState.done => const Color(0xFFFFFFFF),
-      _TimelineState.current => const Color(0xFFFFFFFF),
-      _TimelineState.waiting => const Color(0xFFFFFFFF),
-    };
     final border = switch (state) {
-      _TimelineState.done => const Color(0xFFBBF7D0),
-      _TimelineState.current => const Color(0xFFDCC7F7),
-      _TimelineState.waiting => const Color(0xFFE5E7EB),
+      _TimelineState.done => AppColors.success.withValues(alpha: 0.35),
+      _TimelineState.current => AppColors.primary.withValues(alpha: 0.35),
+      _TimelineState.waiting => AppColors.border,
     };
     final foreground = switch (state) {
       _TimelineState.done => AppColors.success,
       _TimelineState.current => AppColors.primary,
-      _TimelineState.waiting => const Color(0xFF6B7280),
+      _TimelineState.waiting => AppColors.textSecondary,
     };
     final label = switch (state) {
       _TimelineState.done => 'Done',
@@ -895,7 +1028,7 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: background,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: border),
       ),
@@ -914,13 +1047,17 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: const Color(0xFF64748B)),
+        Icon(icon, size: 14, color: AppColors.textSecondary),
         const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF64748B),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
       ],
@@ -935,37 +1072,48 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     final shouldDecline = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Decline Booking'),
-          content: TextField(
-            controller: controller,
-            minLines: 3,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              hintText: 'Please enter the reason for declining this booking.',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Decline'),
-            ),
-          ],
+        String? reasonError;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Decline Booking'),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                minLines: 3,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'Please enter the reason for declining this booking.',
+                  errorText: reasonError,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (controller.text.trim().isEmpty) {
+                      setDialogState(
+                        () => reasonError = 'Decline reason is required.',
+                      );
+                      return;
+                    }
+                    Navigator.of(context).pop(true);
+                  },
+                  child: const Text('Decline'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
 
     final note = controller.text.trim();
     controller.dispose();
-    if (shouldDecline != true) {
-      return;
-    }
-    if (note.isEmpty) {
-      setState(() => _error = 'Decline reason is required.');
+    if (shouldDecline != true || note.isEmpty) {
       return;
     }
 
@@ -1009,7 +1157,9 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
               }
               final remaining = 3 - images.length;
               if (remaining <= 0) {
-                setDialogState(() => localError = 'You can upload up to 3 files.');
+                setDialogState(
+                  () => localError = 'You can upload up to 3 files.',
+                );
                 return;
               }
               setDialogState(() {
@@ -1067,12 +1217,13 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                                 height: 72,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: const Color(0xFFE7DCF7),
-                                  ),
+                                  border: Border.all(color: AppColors.border),
                                 ),
                                 clipBehavior: Clip.antiAlias,
-                                child: images[index].startsWith('data:application/pdf')
+                                child:
+                                    images[index].startsWith(
+                                      'data:application/pdf',
+                                    )
                                     ? const Center(
                                         child: Text(
                                           'PDF',
@@ -1171,14 +1322,10 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     }
 
     final breakdown = <Map<String, dynamic>>[
-      {
-        'description': 'Booking Price',
-        'amount': booking.baseAmount,
-      },
+      {'description': 'Booking Price', 'amount': booking.baseAmount},
       if (additionalAmount > 0)
         {
-          'description':
-              note.isEmpty ? 'Additional Charges' : note,
+          'description': note.isEmpty ? 'Additional Charges' : note,
           'amount': additionalAmount,
         },
     ];
@@ -1200,7 +1347,9 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     BuildContext context,
     ProviderWorkspaceBooking booking,
   ) async {
-    int rating = booking.providerReviewRating > 0 ? booking.providerReviewRating : 5;
+    int rating = booking.providerReviewRating > 0
+        ? booking.providerReviewRating
+        : 5;
     final commentController = TextEditingController(
       text: booking.providerReviewComment,
     );
@@ -1218,12 +1367,16 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                 return;
               }
               setDialogState(() {
-                photos.addAll(picked.take(4 - photos.length).map((e) => e.dataUrl));
+                photos.addAll(
+                  picked.take(4 - photos.length).map((e) => e.dataUrl),
+                );
               });
             }
 
             return AlertDialog(
-              title: Text('Review ${booking.customerName.isEmpty ? 'Customer' : booking.customerName}'),
+              title: Text(
+                'Review ${booking.customerName.isEmpty ? 'Customer' : booking.customerName}',
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1233,12 +1386,13 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                       children: List.generate(
                         5,
                         (index) => IconButton(
-                          onPressed: () => setDialogState(() => rating = index + 1),
+                          onPressed: () =>
+                              setDialogState(() => rating = index + 1),
                           icon: Icon(
                             Icons.star_rounded,
                             color: index < rating
                                 ? AppColors.primary
-                                : const Color(0xFFD1D5DB),
+                                : AppColors.disabled,
                           ),
                         ),
                       ),
@@ -1298,7 +1452,9 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
                 FilledButton(
                   onPressed: () {
                     if (rating < 1) {
-                      setDialogState(() => localError = 'Please choose a rating.');
+                      setDialogState(
+                        () => localError = 'Please choose a rating.',
+                      );
                       return;
                     }
                     Navigator.of(context).pop(true);
@@ -1472,7 +1628,8 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     if (booking.bookingStatus == 'arrived') {
       return _BookingAction(
         label: 'Work Finished',
-        onPressed: (context, booking) => _showWorkFinishedDialog(context, booking),
+        onPressed: (context, booking) =>
+            _showWorkFinishedDialog(context, booking),
       );
     }
     if (_isCompletedStatus(booking.bookingStatus) &&
@@ -1484,19 +1641,6 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
       );
     }
     return null;
-  }
-
-  String _flowLabelFor(String status) {
-    if (_isCompletedStatus(status)) {
-      return 'Completed flow';
-    }
-    if (_isCancelledStatus(status)) {
-      return 'Canceled flow';
-    }
-    if (status == 'declined' || status == 'declined_by_provider') {
-      return 'Declined flow';
-    }
-    return 'Live task';
   }
 
   List<_CalendarDay?> _calendarDays(List<ProviderWorkspaceBooking> bookings) {
@@ -1514,7 +1658,9 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     for (var day = 1; day <= daysInMonth; day++) {
       final date = DateTime(_visibleMonth.year, _visibleMonth.month, day);
       final key = _dateKey(date);
-      final count = bookings.where((booking) => booking.scheduledDate == key).length;
+      final count = bookings
+          .where((booking) => _normalizedDateKey(booking.scheduledDate) == key)
+          .length;
       days.add(_CalendarDay(day: day, key: key, count: count));
     }
     return days;
@@ -1525,8 +1671,9 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
   ) {
     final list = bookings.toList(growable: false);
     list.sort(
-      (a, b) => '${a.scheduledDate}T${a.scheduledStartTime}'
-          .compareTo('${b.scheduledDate}T${b.scheduledStartTime}'),
+      (a, b) => '${a.scheduledDate}T${a.scheduledStartTime}'.compareTo(
+        '${b.scheduledDate}T${b.scheduledStartTime}',
+      ),
     );
     return list;
   }
@@ -1545,29 +1692,38 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     return _TimelineState.waiting;
   }
 
-  bool _shouldShowStepAction(_TimelineStep step, ProviderWorkspaceBooking booking) {
+  bool _shouldShowStepAction(
+    _TimelineStep step,
+    ProviderWorkspaceBooking booking,
+  ) {
     return switch (step.title) {
       'On The Way' => booking.bookingStatus == 'accepted',
       'Arrived' => booking.bookingStatus == 'on_the_way',
       'Payment Requested' => booking.bookingStatus == 'arrived',
-      'Payment Completed' => booking.bookingStatus == 'final_payment_sent' ||
-          booking.bookingStatus == 'cash_paid_by_user' ||
-          booking.bookingStatus == 'payment_received_by_provider',
-      'Review' => _isCompletedStatus(booking.bookingStatus) &&
-          booking.providerReviewStatus != 'submitted' &&
-          booking.providerReviewedAt.isEmpty,
+      'Payment Completed' =>
+        booking.bookingStatus == 'final_payment_sent' ||
+            booking.bookingStatus == 'cash_paid_by_user' ||
+            booking.bookingStatus == 'payment_received_by_provider',
+      'Review' =>
+        _isCompletedStatus(booking.bookingStatus) &&
+            booking.providerReviewStatus != 'submitted' &&
+            booking.providerReviewedAt.isEmpty,
       _ => false,
     };
   }
 
-  String _stepActionLabel(_TimelineStep step, ProviderWorkspaceBooking booking) {
+  String _stepActionLabel(
+    _TimelineStep step,
+    ProviderWorkspaceBooking booking,
+  ) {
     return switch (step.title) {
       'On The Way' => 'Mark As On The Way',
       'Arrived' => 'Mark As Arrived',
       'Payment Requested' => 'Mark Job Completed & Send Payment Request',
-      'Payment Completed' => booking.bookingStatus == 'final_payment_sent'
-          ? 'Payment Received'
-          : 'Complete Job',
+      'Payment Completed' =>
+        booking.bookingStatus == 'final_payment_sent'
+            ? 'Payment Received'
+            : 'Complete Job',
       'Review' => 'Review User',
       _ => 'Continue',
     };
@@ -1618,7 +1774,9 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     if (date == null) {
       return '';
     }
-    final hour = date.hour == 0 ? 12 : (date.hour > 12 ? date.hour - 12 : date.hour);
+    final hour = date.hour == 0
+        ? 12
+        : (date.hour > 12 ? date.hour - 12 : date.hour);
     final minutes = date.minute.toString().padLeft(2, '0');
     final suffix = date.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minutes $suffix';
@@ -1656,10 +1814,7 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
     return SwiperStatusTone.info;
   }
 
-  Widget _monthArrow({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
+  Widget _monthArrow({required IconData icon, required VoidCallback onTap}) {
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
@@ -1667,7 +1822,7 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
         width: 36,
         height: 36,
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColors.surfaceSoft,
           shape: BoxShape.circle,
         ),
         child: Icon(icon, color: AppColors.primary),
@@ -1683,9 +1838,11 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
         Expanded(
           child: Text(
             label.isEmpty ? '-' : label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 13,
-              color: Color(0xFF475569),
+              color: AppColors.textSecondary,
             ),
           ),
         ),
@@ -1695,10 +1852,7 @@ class _ProviderJobsScreenState extends State<ProviderJobsScreen> {
 }
 
 class _BookingAction {
-  const _BookingAction({
-    required this.label,
-    required this.onPressed,
-  });
+  const _BookingAction({required this.label, required this.onPressed});
 
   final String label;
   final Future<void> Function(BuildContext, ProviderWorkspaceBooking) onPressed;
@@ -1736,14 +1890,28 @@ enum _TimelineState { done, current, waiting }
 
 const TextStyle _dowStyle = TextStyle(
   fontSize: 11,
-  fontWeight: FontWeight.w500,
-  color: Color(0xFF94A3B8),
+  fontWeight: FontWeight.w600,
+  color: AppColors.textMuted,
 );
 
 String _dateKey(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
   final day = date.day.toString().padLeft(2, '0');
   return '${date.year}-$month-$day';
+}
+
+/// Normalizes a booking's raw `scheduledDate` value to a plain `yyyy-MM-dd`
+/// key so the calendar's per-day count and the selected-date list filter
+/// always compare the same shape of value — even if the backend returns a
+/// full timestamp (e.g. "2026-08-15T00:00:00.000Z") for some bookings and a
+/// plain date (e.g. "2026-08-15") for others. Pure string slicing, no
+/// DateTime parsing or timezone conversion, so it can't shift the date.
+String _normalizedDateKey(String rawDate) {
+  final trimmed = rawDate.trim();
+  if (trimmed.length >= 10) {
+    return trimmed.substring(0, 10);
+  }
+  return trimmed;
 }
 
 Widget _noticeCard(String message, Color color, Color background) {
@@ -1759,10 +1927,7 @@ Widget _noticeCard(String message, Color color, Color background) {
     ),
     child: Text(
       message,
-      style: TextStyle(
-        color: color,
-        fontWeight: FontWeight.w600,
-      ),
+      style: TextStyle(color: color, fontWeight: FontWeight.w600),
     ),
   );
 }

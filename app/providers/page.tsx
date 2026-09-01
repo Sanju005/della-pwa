@@ -4,14 +4,16 @@ import {
   buildProviderDetailHref,
   getProviderCatalog,
 } from "@/lib/provider-catalog";
+import { parseCustomerLocation } from "@/lib/customer-location";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProvidersPage(props: {
-  searchParams: Promise<{ service?: string }>;
+  searchParams: Promise<{ service?: string; lat?: string; lng?: string }>;
 }) {
   const searchParams = await props.searchParams;
-  const data = await getProviderCatalog(searchParams.service ?? null);
+  const customerLocation = parseCustomerLocation(new URLSearchParams(searchParams));
+  const data = await getProviderCatalog(searchParams.service ?? null, customerLocation);
   const screenData = {
     ...data,
     bannerSrc: buildCategoryBannerSrc(data.service),

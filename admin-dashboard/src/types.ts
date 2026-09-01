@@ -119,6 +119,7 @@ export type PaymentRow = {
   date: string;
   createdAt?: string;
   settlementStatus?: string;
+  settlementStatusRaw?: string | null;
   companySlipName?: string;
   companySlipUrl?: string;
 };
@@ -280,6 +281,7 @@ export type ProviderServiceArea = {
 export type ProviderSkill = {
   id: string;
   label: string;
+  serviceLabel?: string;
 };
 
 export type ProviderDocumentItem = {
@@ -302,6 +304,7 @@ export type ProviderMediaItem = {
   label: string;
   fileName: string;
   previewUrl: string;
+  serviceLabel?: string;
 };
 
 export type ProviderTaskRow = {

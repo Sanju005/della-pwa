@@ -453,11 +453,7 @@ export function BookingFormScreen({
                 <div className="mt-1.5 flex items-center gap-1 text-[13px] text-[#475467]">
                   <MapPin className="h-3.5 w-3.5 text-[#8E5EB5]" />
                   <span>
-                    <ProviderDistanceText
-                      providerLatitude={detail.latitude}
-                      providerLongitude={detail.longitude}
-                      fallbackDistanceKm={detail.distanceKm}
-                    />
+                    <ProviderDistanceText distanceKm={detail.distanceKm} />
                   </span>
                 </div>
 

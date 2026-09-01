@@ -27,8 +27,11 @@ function toSignupErrorMessage(errorMessage?: string) {
     return "Too many verification emails were requested. Please wait a few minutes and try again.";
   }
 
-  if (normalizedMessage.includes("user already registered")) {
-    return "An account with this email already exists. Try logging in instead.";
+  if (
+    normalizedMessage.includes("already registered") ||
+    normalizedMessage.includes("already exists")
+  ) {
+    return "An account with this phone number already exists. Try logging in instead.";
   }
 
   return errorMessage || "Unable to create provider account.";
@@ -494,9 +497,25 @@ export async function POST(request: Request) {
       ? payload.basicProfile.sex
       : "";
 
-    if (!payload.basicProfile.firstName || !payload.basicProfile.lastName || !sex || !payload.account.email) {
+    if (!payload.basicProfile.firstName || !payload.basicProfile.lastName || !sex) {
       return NextResponse.json(
         { error: "Missing required registration fields." },
+        { status: 400 }
+      );
+    }
+
+    // Providers authenticate by verified phone number, not email — email is
+    // collected and verified later from Profile. The phone must already be
+    // normalized (e.g. +60123456789) by the time it reaches this endpoint;
+    // Flutter only calls this after the phone OTP step succeeds.
+    const normalizedPhone = normalizePhone(
+      payload.account.phoneCountryCode,
+      payload.account.phoneNumber,
+    );
+
+    if (normalizedPhone.replace(/[^\d]/g, "").length < 8) {
+      return NextResponse.json(
+        { error: "A verified phone number is required." },
         { status: 400 }
       );
     }
@@ -553,9 +572,9 @@ export async function POST(request: Request) {
     }
 
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
-      email: payload.account.email.trim().toLowerCase(),
+      phone: normalizedPhone,
       password: payload.account.password,
-      email_confirm: true,
+      phone_confirm: true,
       user_metadata: {
         full_name: fullName,
         first_name: payload.basicProfile.firstName.trim(),
@@ -564,6 +583,12 @@ export async function POST(request: Request) {
         role: PROVIDER_ROLE,
         marketing_name: payload.basicProfile.marketingName.trim(),
         country: payload.basicProfile.country.trim(),
+        // provider_profiles.residential_address stores these joined into one
+        // string (see buildResidentialAddress) — the Flutter Profile screen
+        // edits them as two separate lines, so they're kept here too rather
+        // than adding new provider_profiles columns for them.
+        address_line_1: payload.basicProfile.addressLine1.trim(),
+        address_line_2: payload.basicProfile.addressLine2.trim(),
         emergency_contact: emergencyContact,
         emergency_contact_number: emergencyContact,
         identity_verification_status:
@@ -587,27 +612,23 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!authData.user.email_confirmed_at) {
+    if (!authData.user.phone_confirmed_at) {
       const { error: confirmError } = await adminClient.auth.admin.updateUserById(
         authData.user.id,
         {
-          email_confirm: true,
+          phone_confirm: true,
         }
       );
 
       if (confirmError) {
         return NextResponse.json(
-          { error: "Account created, but email confirmation setup failed." },
+          { error: "Account created, but phone confirmation setup failed." },
           { status: 500 }
         );
       }
     }
 
     const providerId = authData.user.id;
-    const normalizedPhone = normalizePhone(
-      payload.account.phoneCountryCode,
-      payload.account.phoneNumber,
-    );
     const storedAvatarUrl = payload.basicProfile.avatarDataUrl?.trim()
       ? await uploadStoredMedia(adminClient, {
           bucket: "profile-images",
@@ -654,7 +675,8 @@ export async function POST(request: Request) {
     const baseProfilePayload = {
       id: providerId,
       full_name: fullName,
-      email: payload.account.email.trim().toLowerCase(),
+      // No email at registration — collected and verified later in Profile.
+      email: null,
       role: PROVIDER_ROLE,
       phone: normalizedPhone,
       avatar_url: storedAvatarUrl || null,
@@ -791,7 +813,7 @@ export async function POST(request: Request) {
       adminClient,
       providerId,
       phoneVerified,
-      true,
+      false,
       identityVerified,
       {
         documentType: payload.verification.documentType,
@@ -924,7 +946,7 @@ export async function POST(request: Request) {
 
     const record = await createProviderRegistration(registrationPayload, providerId, {
       phoneVerified,
-      emailVerified: true,
+      emailVerified: false,
       identityVerified,
     });
 

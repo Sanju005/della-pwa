@@ -4,7 +4,6 @@ class AppRoutes {
   static const login = '/';
   static const signupEntry = '/signup';
   static const registerCustomer = '/register/customer';
-  static const registerCustomerVerify = '/register/customer/verify';
   static const registerCustomerSuccess = '/register/customer/success';
   static const registerProvider = '/register/provider';
   static const customerShell = '/customer';
@@ -23,7 +22,6 @@ class AppRoutes {
   static const profileFavorites = '/profile/favourites';
   static const profileNotifications = '/profile/notifications';
   static const providerShell = '/provider-workspace';
-  static const providerAvailability = '/provider/availability';
   static const providerServices = '/provider/services';
   static const providerReviews = '/provider/reviews';
   static const providerCalendar = '/provider/calendar';
@@ -32,7 +30,14 @@ class AppRoutes {
   static const providerPersonalDetails = '/provider/profile/personal-details';
   static const providerVerificationHub = '/provider/profile/verification';
   static const providerServiceArea = '/provider/profile/service-area';
-  static const providerVerificationEmail = '/provider/profile/email-verification';
-  static const providerVerificationPhone = '/provider/profile/phone-verification';
-  static const providerVerificationIdentity = '/provider/profile/identity-verification';
+  static const providerEmergencyContact = '/provider/profile/emergency-contact';
+  static const providerWallet = '/provider/profile/wallet';
+  static const providerRewards = '/provider/profile/rewards';
+  static const providerHelpCentre = '/provider/profile/help-centre';
+  static const providerVerificationEmail =
+      '/provider/profile/email-verification';
+  static const providerVerificationPhone =
+      '/provider/profile/phone-verification';
+  static const providerVerificationIdentity =
+      '/provider/profile/identity-verification';
 }

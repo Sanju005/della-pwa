@@ -182,7 +182,10 @@ class CustomerFavoriteProviderModel {
   final String portraitSrc;
 
   ProviderSummary toProviderSummary() {
-    final serviceLabel = role.replaceFirst(RegExp(r'\s+Provider$', caseSensitive: false), '');
+    final serviceLabel = role.replaceFirst(
+      RegExp(r'\s+Provider$', caseSensitive: false),
+      '',
+    );
     return ProviderSummary(
       id: id,
       name: name,
@@ -228,7 +231,8 @@ class CustomerProfileApiService {
   Future<CustomerProfileApiModel> fetchProfile() async {
     final response = await _get('/api/profile/me');
     final body = _decodeMap(response.body);
-    if (_isSuccess(response.statusCode) && body['profile'] is Map<String, dynamic>) {
+    if (_isSuccess(response.statusCode) &&
+        body['profile'] is Map<String, dynamic>) {
       return CustomerProfileApiModel.fromJson(
         body['profile'] as Map<String, dynamic>,
       );
@@ -245,7 +249,8 @@ class CustomerProfileApiService {
       body: payload,
     );
     final body = _decodeMap(response.body);
-    if (_isSuccess(response.statusCode) && body['profile'] is Map<String, dynamic>) {
+    if (_isSuccess(response.statusCode) &&
+        body['profile'] is Map<String, dynamic>) {
       return CustomerProfileApiModel.fromJson(
         body['profile'] as Map<String, dynamic>,
       );
@@ -260,9 +265,7 @@ class CustomerProfileApiService {
       final items = (body['addresses'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map(
-            (item) => item.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ),
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)),
           )
           .map(CustomerProfileAddressModel.fromJson)
           .toList();
@@ -280,7 +283,8 @@ class CustomerProfileApiService {
       body: payload,
     );
     final body = _decodeMap(response.body);
-    if (_isSuccess(response.statusCode) && body['address'] is Map<String, dynamic>) {
+    if (_isSuccess(response.statusCode) &&
+        body['address'] is Map<String, dynamic>) {
       return CustomerProfileAddressModel.fromJson(
         body['address'] as Map<String, dynamic>,
       );
@@ -295,9 +299,7 @@ class CustomerProfileApiService {
       return (body['payments'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map(
-            (item) => item.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ),
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)),
           )
           .map(CustomerPaymentHistoryModel.fromJson)
           .toList();
@@ -312,14 +314,28 @@ class CustomerProfileApiService {
       return (body['favoriteProviders'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map(
-            (item) => item.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ),
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)),
           )
           .map(CustomerFavoriteProviderModel.fromJson)
           .toList();
     }
     throw Exception(_readError(body));
+  }
+
+  Future<void> addFavorite(String providerId, {String? serviceKey}) async {
+    final response = await _send(
+      '/api/profile/favorites',
+      method: 'POST',
+      body: {
+        'providerId': providerId,
+        if (serviceKey != null && serviceKey.isNotEmpty)
+          'serviceKey': serviceKey,
+      },
+    );
+    if (_isSuccess(response.statusCode)) {
+      return;
+    }
+    throw Exception(_readError(_decodeMap(response.body)));
   }
 
   Future<void> removeFavorite(String providerId) async {

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 import {
@@ -335,19 +335,40 @@ async function verifyCustomerRequest(request: Request) {
     return { error: NextResponse.json({ error: "This account is a provider account." }, { status: 403 }) };
   }
 
+  // The JWT claims above don't include custom user_metadata, so it must be
+  // fetched fresh via the admin API — using an empty object here previously
+  // meant every PATCH silently wiped email_verified/phone_verified (and any
+  // other metadata) back to their defaults unless the caller happened to
+  // resend them, which is exactly the client-trust hole this route is being
+  // fixed to close.
+  let userMetadata: Record<string, unknown> = {};
+
+  try {
+    const userResult = await retrySupabaseRequest(() => adminClient.auth.admin.getUserById(userId));
+    if (
+      userResult.data?.user?.user_metadata &&
+      typeof userResult.data.user.user_metadata === "object"
+    ) {
+      userMetadata = userResult.data.user.user_metadata as Record<string, unknown>;
+    }
+  } catch {
+    // Fall through with empty metadata rather than failing the whole request.
+  }
+
   return {
     adminClient,
     authUser: {
       id: userId,
       email: authEmail,
       phone: authPhone,
-      user_metadata: {},
+      user_metadata: userMetadata,
     },
     profile: profileRow,
   } satisfies VerifiedCustomerRequest;
 }
 
-function buildCustomerProfile(
+async function buildCustomerProfile(
+  adminClient: SupabaseClient,
   profile: ProfileRow,
   customerProfile: CustomerProfileRow | null,
   metadata?: Record<string, unknown>,
@@ -380,7 +401,17 @@ function buildCustomerProfile(
           ? fallbackSex
           : "Male",
     dateOfBirth: customerProfile?.date_of_birth?.trim() || "",
-    avatarUrl: getSafeAvatarUrl(profile.avatar_url),
+    // getSafeAvatarUrl only ever returned the raw stored value (a data URL,
+    // or a bare Supabase Storage object path like "profile-images/x.jpg").
+    // A raw storage path is not a loadable image URL on its own — the
+    // Flutter client has no way to turn it into one — so this must resolve
+    // to a real public URL the same way every other stored image in this
+    // codebase already does.
+    avatarUrl: await resolveStoredMediaUrl(adminClient, {
+      bucket: "profile-images",
+      value: getSafeAvatarUrl(profile.avatar_url),
+      visibility: "public",
+    }),
     email: profile.email?.trim() || (typeof metadata?.email === "string" ? metadata.email.trim() : ""),
     phoneNumber: phoneParts.phoneNumber,
     countryCode: phoneParts.countryCode,
@@ -517,7 +548,8 @@ export async function GET(request: Request) {
     const bookingRows = (bookingsResult.data ?? []) as BookingAggregateRow[];
     const paymentRows = (paymentsResult.data ?? []) as PaymentAggregateRow[];
 
-    const profile = buildCustomerProfile(
+    const profile = await buildCustomerProfile(
+        verified.adminClient,
         verified.profile,
         customerProfile,
         {
@@ -566,8 +598,10 @@ type UpdatePayload = {
   city?: string;
   region?: string;
   country?: string;
-  emailVerified?: boolean;
-  phoneVerified?: boolean;
+  // emailVerified/phoneVerified are intentionally NOT accepted here — a
+  // client can never assert its own verified status. The only way these
+  // flip to true is server-side, via a successful call to
+  // /api/auth/otp/verify (see lib/otp-verification.ts).
   identityVerificationStatus?: "pending" | "processing" | "verified" | "rejected";
   identityDocumentType?: "ic" | "passport";
   identityFrontImageUrl?: string;
@@ -584,14 +618,69 @@ export async function PATCH(request: Request) {
   }
 
   const payload = (await request.json()) as UpdatePayload;
-  const firstName = payload.firstName?.trim() ?? "";
-  const lastName = payload.lastName?.trim() ?? "";
-  const sex = payload.sex === "Male" || payload.sex === "Female" ? payload.sex : "";
+
+  // This endpoint is called with many different partial payloads (Personal
+  // Details sends name/DOB/sex; the Phone Verification screen sends only
+  // phoneNumber/countryCode; the Emergency Contact card sends only
+  // emergencyContactNumber; etc). Every field below MUST fall back to the
+  // current stored value when the caller's payload doesn't mention it —
+  // otherwise a narrow update (e.g. "just change my emergency contact")
+  // silently blanks out everything else (name, DOB, address, identity
+  // documents...) on the next upsert. This was a real bug: the previous
+  // version rebuilt the whole customer_profiles row from `payload.field ||
+  // null` for every field, with no merge against what was already stored.
+  let currentCustomerProfile: CustomerProfileRow | null = null;
+  try {
+    currentCustomerProfile = await fetchCustomerProfileRow(verified.adminClient, verified.profile.id);
+  } catch {
+    currentCustomerProfile = null;
+  }
+
+  const firstName = payload.firstName !== undefined
+    ? payload.firstName.trim()
+    : (currentCustomerProfile?.first_name ?? "");
+  const lastName = payload.lastName !== undefined
+    ? payload.lastName.trim()
+    : (currentCustomerProfile?.last_name ?? "");
+  const sex = payload.sex !== undefined
+    ? (payload.sex === "Male" || payload.sex === "Female" ? payload.sex : "")
+    : (currentCustomerProfile?.sex === "Male" || currentCustomerProfile?.sex === "Female"
+        ? currentCustomerProfile.sex
+        : "");
+  const dateOfBirth = payload.dateOfBirth !== undefined
+    ? payload.dateOfBirth.trim()
+    : (currentCustomerProfile?.date_of_birth ?? "");
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const email = payload.email?.trim().toLowerCase() ?? "";
-  const countryCode = payload.countryCode?.trim() || "+60";
-  const phoneNumber = payload.phoneNumber?.trim() ?? "";
-  const emergencyContactNumber = payload.emergencyContactNumber?.trim() ?? "";
+  const countryCode = payload.countryCode !== undefined
+    ? (payload.countryCode.trim() || "+60")
+    : (currentCustomerProfile?.country_code || "+60");
+  const phoneNumber = payload.phoneNumber !== undefined
+    ? payload.phoneNumber.trim()
+    : (currentCustomerProfile?.phone_number ?? "");
+  const emergencyContactNumber = payload.emergencyContactNumber !== undefined
+    ? payload.emergencyContactNumber.trim()
+    : (currentCustomerProfile?.emergency_contact_number ?? "");
+  const city = payload.city !== undefined
+    ? payload.city.trim()
+    : (currentCustomerProfile?.city ?? "");
+  const region = payload.region !== undefined
+    ? payload.region.trim()
+    : (currentCustomerProfile?.region ?? "");
+  const country = payload.country !== undefined
+    ? (payload.country.trim() || "Malaysia")
+    : (currentCustomerProfile?.country || "Malaysia");
+  const identityDocumentType = payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
+    ? payload.identityDocumentType
+    : (currentCustomerProfile?.identity_document_type === "ic" || currentCustomerProfile?.identity_document_type === "passport"
+        ? currentCustomerProfile.identity_document_type
+        : null);
+  const verifiedFlag = payload.verified !== undefined
+    ? payload.verified
+    : (currentCustomerProfile?.verified ?? false);
+  const completion = typeof payload.completion === "number" && Number.isFinite(payload.completion)
+    ? payload.completion
+    : (currentCustomerProfile?.completion ?? 80);
   const normalizedPhone = phoneNumber
     ? `${countryCode}${phoneNumber}`.replace(/\s+/g, "")
     : null;
@@ -628,6 +717,12 @@ export async function PATCH(request: Request) {
         visibility: "private",
       })
     : "";
+  const identityFrontImageUrl = payload.identityFrontImageUrl !== undefined
+    ? storedIdentityFrontImageUrl
+    : (currentCustomerProfile?.identity_front_image_url ?? "");
+  const identityBackImageUrl = payload.identityBackImageUrl !== undefined
+    ? storedIdentityBackImageUrl
+    : (currentCustomerProfile?.identity_back_image_url ?? "");
 
   const profilePayload = Object.fromEntries(
     Object.entries({
@@ -654,70 +749,81 @@ export async function PATCH(request: Request) {
       ? (verified.authUser.user_metadata as Record<string, unknown>)
       : {};
 
+  // The Phone Verification screen already confirmed the new number via a
+  // real OTP challenge before calling this endpoint — so once phoneNumber
+  // is actually present in the payload (and different from what's on
+  // file), the Supabase Auth identity's phone must move with it. Otherwise
+  // customer_profiles.phone_number and auth.users.phone silently diverge:
+  // the profile shows the new number but phone-based login still only
+  // recognizes the old one.
+  const phoneNumberChanging =
+    payload.phoneNumber !== undefined &&
+    normalizedPhone !== null &&
+    normalizedPhone !== verified.authUser.phone;
+
+  const authUpdatePayload: {
+    user_metadata: Record<string, unknown>;
+    phone?: string;
+    phone_confirm?: boolean;
+  } = {
+    user_metadata: {
+      ...currentMetadata,
+      full_name: fullName,
+      first_name: firstName,
+      last_name: lastName,
+      sex,
+      country,
+      emergency_contact_number: emergencyContactNumber,
+      // Always carried forward from the freshly-fetched current metadata —
+      // never taken from the client payload (see UpdatePayload above).
+      email_verified: Boolean(currentMetadata.email_verified),
+      phone_verified: Boolean(currentMetadata.phone_verified),
+      identity_verification_status:
+        typeof payload.identityVerificationStatus === "string"
+          ? payload.identityVerificationStatus
+          : typeof currentMetadata.identity_verification_status === "string"
+            ? currentMetadata.identity_verification_status
+            : "pending",
+      identity_document_type: identityDocumentType ?? "",
+      identity_front_image_url: null,
+      identity_back_image_url: null,
+    },
+  };
+
+  if (phoneNumberChanging) {
+    authUpdatePayload.phone = normalizedPhone;
+    authUpdatePayload.phone_confirm = true;
+  }
+
   const { error: authUpdateError } = await verified.adminClient.auth.admin.updateUserById(
     verified.profile.id,
-    {
-      user_metadata: {
-        ...currentMetadata,
-        full_name: fullName,
-        first_name: firstName,
-        last_name: lastName,
-        sex,
-        country: payload.country?.trim() || "Malaysia",
-        emergency_contact_number: emergencyContactNumber,
-        email_verified:
-          typeof payload.emailVerified === "boolean"
-            ? payload.emailVerified
-            : Boolean(currentMetadata.email_verified),
-        phone_verified:
-          typeof payload.phoneVerified === "boolean"
-            ? payload.phoneVerified
-            : Boolean(currentMetadata.phone_verified),
-        identity_verification_status:
-          typeof payload.identityVerificationStatus === "string"
-            ? payload.identityVerificationStatus
-            : typeof currentMetadata.identity_verification_status === "string"
-              ? currentMetadata.identity_verification_status
-              : "pending",
-        identity_document_type:
-          payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
-            ? payload.identityDocumentType
-            : typeof currentMetadata.identity_document_type === "string"
-              ? currentMetadata.identity_document_type
-              : "",
-        identity_front_image_url: null,
-        identity_back_image_url: null,
-      },
-    },
+    authUpdatePayload,
   );
 
   if (authUpdateError) {
-    return NextResponse.json({ error: authUpdateError.message || "Unable to update profile." }, { status: 500 });
+    const message = /already|duplicate|exists/i.test(authUpdateError.message || "")
+      ? "This phone number is already registered to another account."
+      : authUpdateError.message || "Unable to update profile.";
+    return NextResponse.json({ error: message }, { status: /already|duplicate|exists/i.test(authUpdateError.message || "") ? 409 : 500 });
   }
 
   const customerProfilePayload = {
     id: verified.profile.id,
     first_name: firstName || null,
     last_name: lastName || null,
-    date_of_birth: payload.dateOfBirth?.trim() || null,
+    date_of_birth: dateOfBirth || null,
     sex: sex || null,
     phone_number: phoneNumber || null,
     country_code: countryCode,
     emergency_contact_number: emergencyContactNumber || null,
-    identity_document_type:
-      payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
-        ? payload.identityDocumentType
-        : null,
-    identity_front_image_url: storedIdentityFrontImageUrl || null,
-    identity_back_image_url: storedIdentityBackImageUrl || null,
-    city: payload.city?.trim() || null,
-    region: payload.region?.trim() || null,
-    country: payload.country?.trim() || "Malaysia",
-    verified: payload.verified ?? false,
-    completion:
-      typeof payload.completion === "number" && Number.isFinite(payload.completion)
-        ? payload.completion
-        : 80,
+    identity_document_type: identityDocumentType,
+    identity_front_image_url: identityFrontImageUrl || null,
+    identity_back_image_url: identityBackImageUrl || null,
+    city: city || null,
+    region: region || null,
+    country,
+    verified: verifiedFlag,
+    completion,
     updated_at: new Date().toISOString(),
   };
 
@@ -789,55 +895,40 @@ export async function PATCH(request: Request) {
   }
 
   const profile = {
-    ...buildCustomerProfile(
+    ...(await buildCustomerProfile(
+        verified.adminClient,
         refreshedProfileResult.data as ProfileRow,
         refreshedCustomerProfile,
         verified.authUser.user_metadata && typeof verified.authUser.user_metadata === "object"
           ? ({
               ...verified.authUser.user_metadata,
-              country: payload.country?.trim() || "Malaysia",
+              country,
               emergency_contact_number: emergencyContactNumber,
-              email_verified:
-                typeof payload.emailVerified === "boolean"
-                  ? payload.emailVerified
-                  : Boolean(currentMetadata.email_verified),
-              phone_verified:
-                typeof payload.phoneVerified === "boolean"
-                  ? payload.phoneVerified
-                  : Boolean(currentMetadata.phone_verified),
+              email_verified: Boolean(currentMetadata.email_verified),
+              phone_verified: Boolean(currentMetadata.phone_verified),
               identity_verification_status:
                 typeof payload.identityVerificationStatus === "string"
                   ? payload.identityVerificationStatus
                   : typeof currentMetadata.identity_verification_status === "string"
                     ? currentMetadata.identity_verification_status
                     : "pending",
-              identity_document_type:
-                payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
-                  ? payload.identityDocumentType
-                  : typeof currentMetadata.identity_document_type === "string"
-                    ? currentMetadata.identity_document_type
-                    : "",
+              identity_document_type: identityDocumentType ?? "",
             } as Record<string, unknown>)
           : {
-              country: payload.country?.trim() || "Malaysia",
+              country,
               emergency_contact_number: emergencyContactNumber,
-              email_verified:
-                typeof payload.emailVerified === "boolean" ? payload.emailVerified : false,
-              phone_verified:
-                typeof payload.phoneVerified === "boolean" ? payload.phoneVerified : false,
+              email_verified: false,
+              phone_verified: false,
               identity_verification_status:
                 typeof payload.identityVerificationStatus === "string"
                   ? payload.identityVerificationStatus
                   : "pending",
-              identity_document_type:
-                payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
-                  ? payload.identityDocumentType
-                  : "",
+              identity_document_type: identityDocumentType ?? "",
             },
         firstName,
         lastName,
         sex,
-      ),
+      )),
   };
 
   profile.identityFrontImageUrl = await resolveStoredMediaUrl(verified.adminClient, {

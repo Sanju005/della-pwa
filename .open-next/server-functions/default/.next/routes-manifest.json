@@ -256,6 +256,18 @@
       "namedRegex": "^/api/admin/media\\-sign(?:/)?$"
     },
     {
+      "page": "/api/auth/otp/send",
+      "regex": "^/api/auth/otp/send(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/otp/send(?:/)?$"
+    },
+    {
+      "page": "/api/auth/otp/verify",
+      "regex": "^/api/auth/otp/verify(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/otp/verify(?:/)?$"
+    },
+    {
       "page": "/api/auth/register/customer",
       "regex": "^/api/auth/register/customer(?:/)?$",
       "routeKeys": {},
@@ -266,6 +278,12 @@
       "regex": "^/api/bookings(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/bookings(?:/)?$"
+    },
+    {
+      "page": "/api/customer/login/phone",
+      "regex": "^/api/customer/login/phone(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/customer/login/phone(?:/)?$"
     },
     {
       "page": "/api/home",
@@ -344,6 +362,12 @@
       "regex": "^/api/provider/company\\-payments(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/provider/company\\-payments(?:/)?$"
+    },
+    {
+      "page": "/api/provider/login/phone",
+      "regex": "^/api/provider/login/phone(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/provider/login/phone(?:/)?$"
     },
     {
       "page": "/api/provider/me",

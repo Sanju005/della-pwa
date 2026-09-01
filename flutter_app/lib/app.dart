@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'core/app_navigator.dart';
 import 'core/routing/app_router.dart';
 import 'core/routing/app_routes.dart';
 import 'theme/app_theme.dart';
@@ -20,6 +21,7 @@ class SwiperApp extends StatelessWidget {
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: MaterialApp(
+        navigatorKey: rootNavigatorKey,
         title: 'Swiper Flutter Demo',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,

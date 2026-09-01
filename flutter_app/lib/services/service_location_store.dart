@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-
-import 'customer_signup_draft_store_stub.dart'
-    if (dart.library.html) 'service_location_store_web.dart' as storage;
+import 'service_location_store_stub.dart'
+    if (dart.library.io) 'service_location_store_io.dart'
+    if (dart.library.js_interop) 'service_location_store_web.dart'
+    as storage;
 
 class ServiceLocationSelection {
   const ServiceLocationSelection({
@@ -26,14 +26,10 @@ class ServiceLocationSelection {
   final double? latitude;
   final double? longitude;
 
-  List<String> get searchTokens => [
-        city,
-        state,
-        country,
-      ]
-          .map((item) => item.trim().toLowerCase())
-          .where((item) => item.isNotEmpty)
-          .toList();
+  List<String> get searchTokens => [city, state, country]
+      .map((item) => item.trim().toLowerCase())
+      .where((item) => item.isNotEmpty)
+      .toList();
 
   Map<String, dynamic> toJson() {
     return {
@@ -68,17 +64,14 @@ class ServiceLocationStore {
   static const _storageKey = 'active_service_location';
 
   static Future<void> save(ServiceLocationSelection selection) async {
-    if (!kIsWeb) {
-      return;
-    }
     storage.write(_storageKey, jsonEncode(selection.toJson()));
   }
 
+  /// Best-effort synchronous read — reflects whatever [storage] has primed
+  /// so far. On native, that's only guaranteed after [loadAsync] (or
+  /// [ensureLoaded]) has resolved at least once this app run; on web it's
+  /// always immediately available (backed by `localStorage`).
   static ServiceLocationSelection? load() {
-    if (!kIsWeb) {
-      return null;
-    }
-
     final raw = storage.read(_storageKey);
     if (raw == null || raw.isEmpty) {
       return null;
@@ -96,10 +89,16 @@ class ServiceLocationStore {
     return null;
   }
 
+  /// Primes native's on-disk cache (a no-op on web) then returns [load]'s
+  /// result — use this for the first read after a screen mounts, so a
+  /// previously-saved location survives an app restart instead of only
+  /// reappearing after the next [save].
+  static Future<ServiceLocationSelection?> loadAsync() async {
+    await storage.ensureLoaded();
+    return load();
+  }
+
   static Future<void> clear() async {
-    if (!kIsWeb) {
-      return;
-    }
     storage.remove(_storageKey);
   }
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/customer_register_screen.dart';
 import '../../features/auth/presentation/customer_register_success_screen.dart';
-import '../../features/auth/presentation/customer_register_verify_screen.dart';
 import '../../features/auth/presentation/provider_register_screen.dart';
 import '../../features/booking/presentation/booking_detail_screen.dart';
 import '../../features/auth/presentation/signup_entry_screen.dart';
@@ -11,6 +10,7 @@ import '../../features/booking/presentation/booking_overview_screen.dart';
 import '../../features/booking/presentation/provider_booking_screen.dart';
 import '../../features/home/presentation/customer_shell_screen.dart';
 import '../../features/profile/presentation/customer_profile_subpages.dart';
+import '../../features/provider_app/presentation/provider_extra_cards_screens.dart';
 import '../../features/provider_app/presentation/provider_more_screens.dart';
 import '../../features/provider_app/presentation/provider_workspace_subpages.dart';
 import '../../features/provider_app/presentation/provider_shell_screen.dart';
@@ -40,11 +40,6 @@ class AppRouter {
       case AppRoutes.registerCustomer:
         return buildAppPageRoute<void>(
           builder: (_) => const CustomerRegisterScreen(),
-          settings: settings,
-        );
-      case AppRoutes.registerCustomerVerify:
-        return buildAppPageRoute<void>(
-          builder: (_) => const CustomerRegisterVerifyScreen(),
           settings: settings,
         );
       case AppRoutes.registerCustomerSuccess:
@@ -137,11 +132,6 @@ class AppRouter {
           builder: (_) => ProviderShellScreen(repository: _repository),
           settings: settings,
         );
-      case AppRoutes.providerAvailability:
-        return buildAppPageRoute<void>(
-          builder: (_) => const ProviderAvailabilityScreen(),
-          settings: settings,
-        );
       case AppRoutes.providerServices:
         return buildAppPageRoute<void>(
           builder: (_) => const ProviderServicesScreen(),
@@ -180,6 +170,26 @@ class AppRouter {
       case AppRoutes.providerServiceArea:
         return buildAppPageRoute<void>(
           builder: (_) => const ProviderServiceAreaScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerEmergencyContact:
+        return buildAppPageRoute<void>(
+          builder: (_) => const ProviderEmergencyContactScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerWallet:
+        return buildAppPageRoute<void>(
+          builder: (_) => const ProviderWalletScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerRewards:
+        return buildAppPageRoute<void>(
+          builder: (_) => const ProviderRewardsScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerHelpCentre:
+        return buildAppPageRoute<void>(
+          builder: (_) => const ProviderHelpCentreScreen(),
           settings: settings,
         );
       case AppRoutes.providerVerificationEmail:

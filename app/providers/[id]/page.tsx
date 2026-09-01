@@ -22,16 +22,18 @@ import { notFound } from "next/navigation";
 import { BookNowButton } from "./book-now-button";
 import { ProviderDistanceText } from "@/app/_components/provider-distance";
 import { getProviderDetail } from "@/lib/provider-detail";
+import { parseCustomerLocation } from "@/lib/customer-location";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProviderDetailPage(props: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ service?: string }>;
+  searchParams: Promise<{ service?: string; lat?: string; lng?: string }>;
 }) {
   const params = await props.params;
   const searchParams = await props.searchParams;
-  const detail = await getProviderDetail(params.id, searchParams.service ?? null);
+  const customerLocation = parseCustomerLocation(new URLSearchParams(searchParams));
+  const detail = await getProviderDetail(params.id, searchParams.service ?? null, customerLocation);
 
   if (!detail) {
     notFound();
@@ -106,9 +108,7 @@ export default async function ProviderDetailPage(props: {
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#8E5EB5]" />
                 <span>
                   <ProviderDistanceText
-                    providerLatitude={detail.latitude}
-                    providerLongitude={detail.longitude}
-                    fallbackDistanceKm={detail.distanceKm}
+                    distanceKm={detail.distanceKm}
                     suffix=" from you"
                   />
                 </span>

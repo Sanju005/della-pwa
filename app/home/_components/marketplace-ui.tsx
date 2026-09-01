@@ -425,8 +425,6 @@ function ProviderSliderSection({
                 rating={provider.rating.toFixed(1)}
                 reviews={`${provider.reviews} reviews`}
                 distanceKm={provider.distanceKm}
-                providerLatitude={provider.providerLatitude}
-                providerLongitude={provider.providerLongitude}
                 portraitSrc={provider.portraitSrc}
                 phoneVerified={provider.phoneVerified}
                 identityVerified={provider.identityVerified}
@@ -450,8 +448,6 @@ function PopularProviderCard({
   rating,
   reviews,
   distanceKm,
-  providerLatitude,
-  providerLongitude,
   portraitSrc,
   phoneVerified,
   identityVerified,
@@ -462,9 +458,7 @@ function PopularProviderCard({
   priceLabel: string;
   rating: string;
   reviews: string;
-  distanceKm: number;
-  providerLatitude: number | null;
-  providerLongitude: number | null;
+  distanceKm: number | null;
   portraitSrc: string;
   phoneVerified: boolean;
   identityVerified: boolean;
@@ -521,11 +515,7 @@ function PopularProviderCard({
           <div className="flex items-center gap-2 text-[0.8rem] font-medium text-[#1f2c44]">
             <MapPin className="h-5.5 w-5.5 text-[#667085]" />
             <span>
-              <ProviderDistanceText
-                providerLatitude={providerLatitude}
-                providerLongitude={providerLongitude}
-                fallbackDistanceKm={distanceKm}
-              />
+              <ProviderDistanceText distanceKm={distanceKm} />
             </span>
           </div>
         </div>

@@ -5,29 +5,32 @@ import {
   getSupabaseUrl,
 } from "@/lib/supabase-env";
 import { uploadStoredMedia } from "@/lib/server-media-storage";
+import { isChallengeRecentlyVerified } from "@/lib/otp-verification";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Customer registration is phone-first, mirroring the already-working
+// Provider registration (app/api/provider/register/route.ts): Supabase Auth
+// accounts here are created with `phone` + a password, no email at all.
+// Unlike Provider, the customer never types/sees this password — it's
+// generated here and handed back once in the response so the Flutter client
+// can immediately call signInWithPhone, exactly like the returning-customer
+// login flow in app/api/customer/login/phone/route.ts. Email and address are
+// intentionally not collected here — email is added later via Verification,
+// address later via Profile.
 type CustomerSignupPayload = {
   firstName?: string;
   lastName?: string;
   dateOfBirth?: string;
   sex?: string;
   avatarDataUrl?: string;
-  email?: string;
+  phoneCountryCode?: string;
   phoneNumber?: string;
-  password?: string;
-  confirmPassword?: string;
-  emergencyContactNumber?: string;
-  addressLabel?: string;
-  unitNumber?: string;
-  addressLine1?: string;
-  addressLine2?: string;
-  postcode?: string;
-  city?: string;
-  state?: string;
-  country?: string;
+  // Proof the phone was actually verified through /api/auth/otp/verify — a
+  // missing or stale id just leaves phone_verified false, it never fails
+  // registration outright (see isChallengeRecentlyVerified).
+  phoneVerificationChallengeId?: string;
 };
 
 function getCorsOrigin(request: Request) {
@@ -54,7 +57,6 @@ function withCors(request: Request, response: NextResponse) {
   response.headers.set("Vary", "Origin");
   response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   response.headers.set("Access-Control-Allow-Headers", "Content-Type");
-  response.headers.set("X-Debug-Cors", "customer-route-v2");
 
   return response;
 }
@@ -62,12 +64,11 @@ function withCors(request: Request, response: NextResponse) {
 function toSignupErrorMessage(errorMessage?: string) {
   const normalizedMessage = errorMessage?.trim().toLowerCase() ?? "";
 
-  if (normalizedMessage.includes("email rate limit exceeded")) {
-    return "Too many verification emails were requested. Please wait a few minutes and try again.";
-  }
-
-  if (normalizedMessage.includes("user already registered")) {
-    return "An account with this email already exists. Try logging in instead.";
+  if (
+    normalizedMessage.includes("already registered") ||
+    normalizedMessage.includes("already exists")
+  ) {
+    return "An account already exists with this phone number.";
   }
 
   return errorMessage || "Unable to create your account.";
@@ -89,22 +90,44 @@ function getAdminSupabaseClient() {
   });
 }
 
-function normalizePhone(phoneNumber: string) {
+function normalizePhone(countryCode: string, phoneNumber: string) {
   const digits = phoneNumber.replace(/[^\d]/g, "");
+  const normalizedCountryCode = countryCode.trim() || "+60";
 
   if (!digits) {
-    return "";
+    return normalizedCountryCode;
   }
 
   if (digits.startsWith("60")) {
     return `+${digits}`;
   }
 
-  return `+60${digits}`;
+  const countryDigits = normalizedCountryCode.replace(/[^\d]/g, "");
+
+  return `+${countryDigits}${digits}`;
 }
 
-function buildAddressLine1(unitNumber: string, addressLine1: string) {
-  return [unitNumber.trim(), addressLine1.trim()].filter(Boolean).join(", ");
+// Same complexity contract used by the provider/customer phone-login
+// password reset — must satisfy Supabase's password-strength rules.
+function generateOneTimePassword() {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "!@#$%^&*";
+  const all = upper + lower + digits + symbols;
+  const pick = (source: string) =>
+    source[Math.floor(Math.random() * source.length)];
+
+  const required = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+  const rest = Array.from({ length: 8 }, () => pick(all));
+  const combined = [...required, ...rest];
+
+  for (let i = combined.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [combined[i], combined[j]] = [combined[j], combined[i]];
+  }
+
+  return combined.join("");
 }
 
 export async function OPTIONS(request: Request) {
@@ -120,35 +143,8 @@ export async function POST(request: Request) {
   const sex = payload.sex === "Male" || payload.sex === "Female" ? payload.sex : "";
   const avatarDataUrl = payload.avatarDataUrl?.trim() ?? "";
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
-  const email = payload.email?.trim().toLowerCase() ?? "";
-  const phoneNumber = payload.phoneNumber?.trim() ?? "";
-  const password = payload.password ?? "";
-  const confirmPassword = payload.confirmPassword ?? "";
-  const emergencyContactNumber = payload.emergencyContactNumber?.trim() ?? "";
-  const addressLabel = payload.addressLabel?.trim() || "Address 1";
-  const unitNumber = payload.unitNumber?.trim() ?? "";
-  const addressLine1 = payload.addressLine1?.trim() ?? "";
-  const addressLine2 = payload.addressLine2?.trim() ?? "";
-  const postcode = payload.postcode?.trim() ?? "";
-  const city = payload.city?.trim() ?? "";
-  const state = payload.state?.trim() ?? "";
-  const country = payload.country?.trim() || "Malaysia";
 
-  if (
-    !firstName ||
-    !lastName ||
-    !dateOfBirth ||
-    !sex ||
-    !email ||
-    !phoneNumber ||
-    !emergencyContactNumber ||
-    !password ||
-    !confirmPassword ||
-    !addressLine1 ||
-    !postcode ||
-    !city ||
-    !state
-  ) {
+  if (!firstName || !lastName || !dateOfBirth || !sex) {
     return withCors(
       request,
       NextResponse.json(
@@ -158,21 +154,16 @@ export async function POST(request: Request) {
     );
   }
 
-  if (password !== confirmPassword) {
-    return withCors(
-      request,
-      NextResponse.json(
-        { error: "Passwords do not match." },
-        { status: 400 }
-      )
-    );
-  }
+  const normalizedPhone = normalizePhone(
+    payload.phoneCountryCode ?? "+60",
+    payload.phoneNumber ?? "",
+  );
 
-  if (password.length < 8) {
+  if (normalizedPhone.replace(/[^\d]/g, "").length < 8) {
     return withCors(
       request,
       NextResponse.json(
-        { error: "Password must be at least 8 characters long." },
+        { error: "A valid phone number is required." },
         { status: 400 }
       )
     );
@@ -190,20 +181,46 @@ export async function POST(request: Request) {
     );
   }
 
+  // Prevent duplicate customer accounts on the same phone number before
+  // ever touching Supabase Auth.
+  const { data: existingProfile } = await adminClient
+    .from("profiles")
+    .select("id")
+    .eq("phone", normalizedPhone)
+    .maybeSingle();
+
+  if (existingProfile) {
+    return withCors(
+      request,
+      NextResponse.json(
+        { error: "An account already exists with this phone number." },
+        { status: 409 }
+      )
+    );
+  }
+
+  const phoneVerified = payload.phoneVerificationChallengeId
+    ? await isChallengeRecentlyVerified(adminClient, {
+        challengeId: payload.phoneVerificationChallengeId,
+        purpose: "phone",
+        target: normalizedPhone,
+      })
+    : false;
+
+  const generatedPassword = generateOneTimePassword();
+
   const { data, error } = await adminClient.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
+    phone: normalizedPhone,
+    password: generatedPassword,
+    phone_confirm: true,
     user_metadata: {
       full_name: fullName,
       first_name: firstName,
       last_name: lastName,
       sex,
       role: "customer",
-      country,
-      emergency_contact_number: emergencyContactNumber,
       email_verified: false,
-      phone_verified: false,
+      phone_verified: phoneVerified,
       identity_verification_status: "pending",
     },
   });
@@ -228,11 +245,11 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!data.user.email_confirmed_at) {
+  if (!data.user.phone_confirmed_at) {
     const { error: confirmError } = await adminClient.auth.admin.updateUserById(
       data.user.id,
       {
-        email_confirm: true,
+        phone_confirm: true,
       }
     );
 
@@ -240,14 +257,13 @@ export async function POST(request: Request) {
       return withCors(
         request,
         NextResponse.json(
-          { error: "Account created, but email confirmation setup failed." },
+          { error: "Account created, but phone confirmation setup failed." },
           { status: 500 }
         )
       );
     }
   }
 
-  const normalizedPhone = normalizePhone(phoneNumber);
   const storedAvatarUrl = avatarDataUrl
     ? await uploadStoredMedia(adminClient, {
         bucket: "profile-images",
@@ -266,7 +282,7 @@ export async function POST(request: Request) {
       {
         id: data.user.id,
         full_name: fullName,
-        email,
+        email: null,
         role: "customer",
         phone: normalizedPhone,
         avatar_url: storedAvatarUrl || null,
@@ -294,10 +310,6 @@ export async function POST(request: Request) {
         last_name: lastName,
         date_of_birth: dateOfBirth,
         sex,
-        city,
-        region: state,
-        state,
-        country,
         verified: false,
       },
       { onConflict: "id" }
@@ -313,34 +325,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: addressError } = await adminClient.from("addresses").insert({
-    user_id: data.user.id,
-    label: addressLabel,
-    address_line_1: buildAddressLine1(unitNumber, addressLine1),
-    address_line_2: addressLine2 || null,
-    city,
-    state,
-    postcode,
-    country,
-    is_default: true,
-  });
-
-  if (addressError) {
-    return withCors(
-      request,
-      NextResponse.json(
-        { error: "Account created, but address setup failed." },
-        { status: 500 }
-      )
-    );
-  }
-
   return withCors(
     request,
     NextResponse.json({
       success: true,
-      email,
-      requiresEmailVerification: false,
+      phone: normalizedPhone,
+      password: generatedPassword,
     })
   );
 }

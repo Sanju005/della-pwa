@@ -178,6 +178,35 @@ async function loadCompanyPaymentSummary(
 
   const activeSubmission = (submissionRows ?? []).find((row) => row.status === "processing") ?? null;
 
+  // Verified total is only ever built from persisted, admin-reviewed
+  // submissions (status === "paid"), using the admin-confirmed amount —
+  // never assuming the provider's submitted amount was what was actually
+  // received.
+  const verifiedAmount = toCurrency(
+    (submissionRows ?? [])
+      .filter((row) => row.status === "paid")
+      .reduce(
+        (sum, row) => sum + Number(row.admin_received_amount ?? row.submitted_amount ?? 0),
+        0,
+      ),
+  );
+
+  // Provider-facing history — same rows already fetched above, no new
+  // query. Only exposes fields useful to the provider (no internal/admin
+  // metadata such as the raw proof data URL).
+  const history = (submissionRows ?? []).map((row) => ({
+    id: row.id,
+    submittedAmount: toCurrency(row.submitted_amount ?? 0),
+    adminReceivedAmount:
+      row.admin_received_amount === null || row.admin_received_amount === undefined
+        ? null
+        : toCurrency(row.admin_received_amount),
+    status: row.status,
+    proofFileName: row.proof_file_name ?? "",
+    submittedAt: row.submitted_at ?? "",
+    reviewedAt: row.reviewed_at ?? "",
+  }));
+
   return {
     error: null,
     summary: {
@@ -189,6 +218,7 @@ async function loadCompanyPaymentSummary(
         : toCurrency(
             processingRows.reduce((sum, row) => sum + Number(row.company_commission_amount ?? 0), 0),
           ),
+      verifiedAmount,
       latestSubmission: activeSubmission
         ? {
             id: activeSubmission.id,
@@ -201,6 +231,7 @@ async function loadCompanyPaymentSummary(
             reviewedAt: activeSubmission.reviewed_at ?? "",
           }
         : null,
+      history,
     },
   };
 }
@@ -373,7 +404,9 @@ export async function POST(request: Request) {
       summary: {
         payableAmount: 0,
         processingAmount: summary?.payableAmount ?? 0,
+        verifiedAmount: 0,
         latestSubmission: null,
+        history: [],
       },
     });
   }

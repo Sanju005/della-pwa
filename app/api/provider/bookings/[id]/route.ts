@@ -777,6 +777,34 @@ export async function PATCH(
     }
   }
 
+  // The payment only becomes authoritative here — the customer's own
+  // cash-pay claim (app/api/bookings/[id]/cash-pay/route.ts) intentionally
+  // leaves payments.status as "pending" so nothing downstream (commission
+  // settlement, earnings) treats money as received until the provider who
+  // actually held the cash confirms it.
+  const providerConfirmedPayment =
+    nextStatus === "payment_received_by_provider" ||
+    (nextStatus === "completed" && current.booking_status === "cash_paid_by_user");
+
+  if (providerConfirmedPayment) {
+    const { error: paymentConfirmError } = await verified.adminClient
+      .from("payments")
+      .update({
+        status: "paid",
+        paid_at: new Date().toISOString(),
+      })
+      .eq("booking_id", current.id)
+      .eq("provider_id", verified.profile.id);
+
+    if (paymentConfirmError) {
+      console.error("[Provider booking update] Failed to confirm payment:", paymentConfirmError);
+      return NextResponse.json(
+        { error: paymentConfirmError.message || "Booking updated but payment could not be confirmed." },
+        { status: 500 }
+      );
+    }
+  }
+
   const nextNotificationType = notificationTypeForStatus(nextStatus);
   const nextNotificationContent = notificationContent(
     nextStatus,

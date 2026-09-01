@@ -226,3 +226,47 @@ export async function PATCH(
 
   return NextResponse.json({ success: true });
 }
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const verified = await verifyProviderRequest(request);
+
+  if ("error" in verified) {
+    return verified.error;
+  }
+
+  const params = await context.params;
+
+  const serviceLookup = await verified.adminClient
+    .from("provider_services")
+    .select("id")
+    .eq("id", params.id)
+    .eq("provider_id", verified.profile.id)
+    .maybeSingle();
+
+  if (serviceLookup.error || !serviceLookup.data) {
+    return NextResponse.json({ error: "Service was not found." }, { status: 404 });
+  }
+
+  await verified.adminClient
+    .from("provider_service_specialties")
+    .delete()
+    .eq("provider_service_id", params.id);
+
+  const deleteResult = await verified.adminClient
+    .from("provider_services")
+    .delete()
+    .eq("id", params.id)
+    .eq("provider_id", verified.profile.id);
+
+  if (deleteResult.error) {
+    return NextResponse.json(
+      { error: deleteResult.error.message || "Unable to delete service." },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ success: true });
+}

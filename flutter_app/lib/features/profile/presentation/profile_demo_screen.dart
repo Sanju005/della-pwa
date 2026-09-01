@@ -11,7 +11,6 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/loading_state.dart';
-import '../../../widgets/notification_card.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../../widgets/address_live_map.dart';
 import '../../../widgets/malaysia_state_autocomplete_field.dart';
@@ -20,10 +19,7 @@ import '../../../widgets/swiper_button.dart';
 import '../../../widgets/swiper_status_badge.dart';
 
 class ProfileDemoScreen extends StatefulWidget {
-  const ProfileDemoScreen({
-    super.key,
-    required this.repository,
-  });
+  const ProfileDemoScreen({super.key, required this.repository});
 
   final DemoRepository repository;
 
@@ -48,16 +44,20 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
     });
   }
 
+  ({String firstName, String lastName}) _splitFullName(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) {
+      return (firstName: '', lastName: '');
+    }
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      return (firstName: parts.first, lastName: parts.first);
+    }
+    return (firstName: parts.first, lastName: parts.sublist(1).join(' '));
+  }
+
   Future<void> _openEditDetailsSheet(CustomerAccountOverview overview) async {
-    final firstNameController = TextEditingController(text: overview.firstName);
-    final lastNameController = TextEditingController(text: overview.lastName);
-    final phoneController = TextEditingController(text: overview.phoneNumber);
-    final emergencyController = TextEditingController(
-      text: overview.emergencyContactNumber,
-    );
-    final cityController = TextEditingController(text: overview.city);
-    final regionController = TextEditingController(text: overview.region);
-    final countryController = TextEditingController(text: overview.country);
+    final nameController = TextEditingController(text: overview.fullName);
     final dateOfBirthController = TextEditingController(
       text: overview.dateOfBirth == '-' ? '' : overview.dateOfBirth,
     );
@@ -72,40 +72,41 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
         builder: (context, setSheetState) {
           return Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextField(
-                controller: firstNameController,
-                decoration: const InputDecoration(labelText: 'First name'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: lastNameController,
-                decoration: const InputDecoration(labelText: 'Last name'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Phone number',
-                  helperText: 'Country code: ${overview.countryCode}',
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: emergencyController,
-                keyboardType: TextInputType.phone,
+                controller: nameController,
+                textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
-                  labelText: 'Emergency contact',
+                  labelText: 'Name (as per IC / Passport)',
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: dateOfBirthController,
+                readOnly: true,
                 decoration: const InputDecoration(
                   labelText: 'Date of birth',
                   hintText: '15 Aug 1996',
                 ),
+                onTap: () async {
+                  final now = DateTime.now();
+                  final initial =
+                      DateTime.tryParse(overview.dateOfBirth) ??
+                      DateTime(now.year - 25);
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initial,
+                    firstDate: DateTime(1930),
+                    lastDate: now,
+                  );
+                  if (picked != null) {
+                    dateOfBirthController.text = picked
+                        .toIso8601String()
+                        .split('T')
+                        .first;
+                  }
+                },
               ),
               const SizedBox(height: AppSpacing.sm),
               DropdownButtonFormField<String>(
@@ -117,31 +118,64 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                 onChanged: (value) {
                   setSheetState(() => selectedSex = value ?? '');
                 },
-                decoration: const InputDecoration(labelText: 'Sex'),
+                decoration: const InputDecoration(labelText: 'Gender'),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: cityController,
-                decoration: const InputDecoration(labelText: 'City'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: regionController,
-                decoration: const InputDecoration(labelText: 'State / region'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: countryController,
-                decoration: const InputDecoration(labelText: 'Country'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                enabled: false,
-                controller: TextEditingController(text: overview.email),
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  helperText: 'Email editing is kept read-only for now.',
+              const SizedBox(height: AppSpacing.md),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
                 ),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.verified_rounded,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Verified mobile number',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            '${overview.countryCode} ${overview.phoneNumber}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(
+                          context,
+                        ).pushNamed(AppRoutes.profileVerificationPhone);
+                      },
+                      child: const Text('Change'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              const Text(
+                'Changing your phone number requires verifying the new number again.',
+                style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
               ),
               const SizedBox(height: AppSpacing.md),
               SwiperButton(
@@ -154,20 +188,14 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                           final isoDate = _normalizeDateForSave(
                             dateOfBirthController.text,
                           );
+                          final split = _splitFullName(nameController.text);
                           setSheetState(() => saving = true);
                           await _accountService.updatePersonalDetails(
                             CustomerPersonalDetailsInput(
-                              firstName: firstNameController.text.trim(),
-                              lastName: lastNameController.text.trim(),
-                              phoneNumber: phoneController.text.trim(),
-                              countryCode: overview.countryCode,
-                              emergencyContactNumber:
-                                  emergencyController.text.trim(),
+                              firstName: split.firstName,
+                              lastName: split.lastName,
                               dateOfBirth: isoDate,
                               sex: selectedSex,
-                              city: cityController.text.trim(),
-                              region: regionController.text.trim(),
-                              country: countryController.text.trim(),
                             ),
                           );
                           if (!mounted) {
@@ -182,7 +210,9 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                           );
                         } catch (error, stackTrace) {
                           if (kDebugMode) {
-                            debugPrint('Update personal details failed: $error');
+                            debugPrint(
+                              'Update personal details failed: $error',
+                            );
                             debugPrintStack(stackTrace: stackTrace);
                           }
                           if (!mounted) {
@@ -193,10 +223,90 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                               content: Text(
                                 error is Exception
                                     ? error.toString().replaceFirst(
-                                          'Exception: ',
-                                          '',
-                                        )
+                                        'Exception: ',
+                                        '',
+                                      )
                                     : 'Unable to update details.',
+                              ),
+                            ),
+                          );
+                        } finally {
+                          if (mounted) {
+                            setSheetState(() => saving = false);
+                          }
+                        }
+                      },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _openEditEmergencyContactSheet(
+    CustomerAccountOverview overview,
+  ) async {
+    final controller = TextEditingController(
+      text: overview.emergencyContactNumber,
+    );
+    var saving = false;
+
+    await SwiperBottomSheet.show<void>(
+      context,
+      title: 'Emergency contact',
+      subtitle:
+          'Who should we contact in case of an emergency during a booking?',
+      child: StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Emergency contact number',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              SwiperButton(
+                label: 'Save',
+                isLoading: saving,
+                onPressed: saving
+                    ? null
+                    : () async {
+                        setSheetState(() => saving = true);
+                        try {
+                          await _accountService.updatePersonalDetails(
+                            CustomerPersonalDetailsInput(
+                              emergencyContactNumber: controller.text.trim(),
+                            ),
+                          );
+                          if (!mounted) {
+                            return;
+                          }
+                          Navigator.of(context).pop();
+                          _refresh();
+                        } catch (error, stackTrace) {
+                          if (kDebugMode) {
+                            debugPrint(
+                              'Update emergency contact failed: $error',
+                            );
+                            debugPrintStack(stackTrace: stackTrace);
+                          }
+                          if (!mounted) {
+                            return;
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                error is Exception
+                                    ? error.toString().replaceFirst(
+                                        'Exception: ',
+                                        '',
+                                      )
+                                    : 'Unable to update emergency contact.',
                               ),
                             ),
                           );
@@ -224,9 +334,9 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
       return DateTime.parse(trimmed).toIso8601String().split('T').first;
     } catch (_) {
       try {
-        final parsed = MaterialLocalizations.of(context).parseCompactDate(
-          trimmed,
-        );
+        final parsed = MaterialLocalizations.of(
+          context,
+        ).parseCompactDate(trimmed);
         if (parsed != null) {
           return parsed.toIso8601String().split('T').first;
         }
@@ -246,6 +356,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
     final countryController = TextEditingController(text: 'Malaysia');
     final stateController = TextEditingController();
     var isDefault = false;
+    double? pinLatitude;
+    double? pinLongitude;
 
     await SwiperBottomSheet.show<void>(
       context,
@@ -265,7 +377,18 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _AddressPreviewMap(address: previewAddress),
+              _AddressPreviewMap(
+                address: previewAddress,
+                onLocationSelected: (lat, lng) {
+                  pinLatitude = lat;
+                  pinLongitude = lng;
+                },
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              const Text(
+                'Drag the map to fine-tune the exact pin location.',
+                style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+              ),
               const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: labelController,
@@ -295,8 +418,9 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                 controller: stateController,
                 hintText: 'Type first letter',
                 onChanged: (_) => setSheetState(() {}),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? 'Enter state' : null,
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Enter state'
+                    : null,
               ),
               const SizedBox(height: AppSpacing.sm),
               TextField(
@@ -334,6 +458,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                         postcode: postcodeController.text.trim(),
                         country: countryController.text.trim(),
                         isDefault: isDefault,
+                        latitude: pinLatitude,
+                        longitude: pinLongitude,
                       ),
                     );
                     if (!mounted) {
@@ -391,8 +517,6 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final notifications = widget.repository.getNotifications();
-
     return FutureBuilder<CustomerAccountOverview?>(
       future: _overviewFuture,
       builder: (context, snapshot) {
@@ -417,8 +541,9 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
           );
         }
 
-        final displayName =
-            overview.fullName.trim().isNotEmpty ? overview.fullName : 'Customer';
+        final displayName = overview.fullName.trim().isNotEmpty
+            ? overview.fullName
+            : 'Customer';
 
         return ListView(
           padding: AppSpacing.screenPadding,
@@ -432,9 +557,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                       const Spacer(),
                       RichText(
                         text: TextSpan(
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.textSecondary),
                           children: [
                             TextSpan(
                               text: '${overview.completion}%',
@@ -473,9 +597,9 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             const SizedBox(height: AppSpacing.lg),
             InkWell(
               borderRadius: BorderRadius.circular(26),
-              onTap: () => Navigator.of(context).pushNamed(
-                AppRoutes.profileVerification,
-              ),
+              onTap: () => Navigator.of(
+                context,
+              ).pushNamed(AppRoutes.profileVerification),
               child: _VerificationHubCard(
                 verified: overview.verification.verified,
               ),
@@ -483,9 +607,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             const SizedBox(height: AppSpacing.lg),
             InkWell(
               borderRadius: BorderRadius.circular(26),
-              onTap: () => Navigator.of(context).pushNamed(
-                AppRoutes.profilePayments,
-              ),
+              onTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.profilePayments),
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 decoration: BoxDecoration(
@@ -493,10 +616,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF1B103E),
-                      AppColors.primary,
-                    ],
+                    colors: [Color(0xFF1B103E), AppColors.primary],
                   ),
                   boxShadow: const [
                     BoxShadow(
@@ -528,7 +648,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                         children: [
                           Text(
                             'Wallet',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -536,7 +657,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'Open your wallet, check balance, and top up anytime.',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
                                   color: Colors.white.withValues(alpha: 0.82),
                                   height: 1.4,
                                 ),
@@ -556,9 +678,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             const SizedBox(height: AppSpacing.lg),
             InkWell(
               borderRadius: BorderRadius.circular(26),
-              onTap: () => Navigator.of(context).pushNamed(
-                AppRoutes.profileCoupons,
-              ),
+              onTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.profileCoupons),
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 decoration: BoxDecoration(
@@ -566,10 +687,7 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFFFF7ED),
-                      Color(0xFFFFEDD5),
-                    ],
+                    colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
                   ),
                   border: Border.all(color: const Color(0xFFF4D6A8)),
                 ),
@@ -595,7 +713,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                         children: [
                           Text(
                             'Coupons',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
                                   color: const Color(0xFF7C2D12),
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -603,7 +722,8 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'See available demo coupons and use them later during booking.',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
                                   color: const Color(0xFF9A3412),
                                   height: 1.4,
                                 ),
@@ -624,31 +744,52 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             _OverviewSectionCard(
               title: 'My Bookings',
               actionLabel: 'View All',
-              onActionTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.bookingOverview),
+              onActionTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.bookingOverview),
               child: Column(
                 children: [
-                  _InfoActionRow(
-                    icon: Icons.calendar_today_rounded,
-                    label: 'Pending Bookings',
-                    value: '${overview.bookingSummary.pending}',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _BookingStatChip(
+                          icon: Icons.calendar_today_rounded,
+                          value: overview.bookingSummary.pending,
+                          label: 'Pending',
+                          color: const Color(0xFFB67617),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _BookingStatChip(
+                          icon: Icons.directions_run_rounded,
+                          value: overview.bookingSummary.ongoing,
+                          label: 'Ongoing',
+                          color: const Color(0xFF3E7A8C),
+                        ),
+                      ),
+                    ],
                   ),
-                  _InfoActionRow(
-                    icon: Icons.check_circle_outline_rounded,
-                    label: 'On Going Bookings',
-                    value: '${overview.bookingSummary.ongoing}',
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.task_alt_rounded,
-                    label: 'Completed Bookings',
-                    value: '${overview.bookingSummary.completed}',
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.cancel_outlined,
-                    label: 'Cancelled Bookings',
-                    value: '${overview.bookingSummary.cancelled}',
-                    isLast: true,
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _BookingStatChip(
+                          icon: Icons.task_alt_rounded,
+                          value: overview.bookingSummary.completed,
+                          label: 'Completed',
+                          color: const Color(0xFF1FA971),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _BookingStatChip(
+                          icon: Icons.cancel_outlined,
+                          value: overview.bookingSummary.cancelled,
+                          label: 'Cancelled',
+                          color: const Color(0xFFC1484F),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -657,23 +798,43 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             _OverviewSectionCard(
               title: 'Favourite Providers',
               actionLabel: 'View All',
-              onActionTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.profileFavorites),
-              child: const _PlaceholderPanel(
-                icon: Icons.favorite_border_rounded,
-                title: 'No favourite providers saved yet.',
-                subtitle:
-                    'Providers you save in the app will appear here for quick access.',
+              onActionTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.profileFavorites),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primarySoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.favorite_border_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  const Expanded(
+                    child: Text(
+                      'Providers you save will appear here for quick access.',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12.5,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
             _OverviewSectionCard(
               title: 'Saved Address',
               actionLabel: 'Open',
-              onActionTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.profileAddresses),
+              onActionTap: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.profileAddresses),
               child: overview.addresses.isEmpty
                   ? _SavedAddressPrompt(onOpen: _openAddAddressSheet)
                   : _SavedAddressSection(
@@ -688,96 +849,62 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
             ),
             const SizedBox(height: AppSpacing.lg),
             _OverviewSectionCard(
-              title: 'Payment Methods',
-              actionLabel: 'Manage',
-              child: Column(
-                children: const [
-                  _InfoActionRow(
-                    icon: Icons.payments_outlined,
-                    label: 'Primary Method',
-                    value: 'Cash',
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.info_outline_rounded,
-                    label: 'Setup',
-                    value: 'Managed during booking',
-                    isLast: true,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            if (false) _OverviewSectionCard(
-              title: 'Payment',
-              actionLabel: 'View All',
-              onActionTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.profilePayments),
-              child: Column(
+              title: 'Emergency Contact',
+              actionLabel: 'Edit',
+              onActionTap: () => _openEditEmergencyContactSheet(overview),
+              child: Row(
                 children: [
-                  _InfoActionRow(
-                    icon: Icons.account_balance_wallet_outlined,
-                    label: 'Total Paid',
-                    value: overview.paymentSummary.totalPaidLabel,
-                  ),
-                  _InfoActionRow(
-                    icon: Icons.calendar_today_outlined,
-                    label: 'Latest Payment',
-                    value: overview.paymentSummary.lastPaymentLabel,
-                    isLast: overview.paymentSummary.recentPayments.isEmpty,
-                  ),
-                  for (var index = 0;
-                      index < overview.paymentSummary.recentPayments.length;
-                      index++)
-                    _InfoActionRow(
-                      icon: Icons.receipt_long_outlined,
-                      label: overview
-                          .paymentSummary.recentPayments[index].serviceTitle,
-                      value:
-                          '${overview.paymentSummary.recentPayments[index].amountLabel} • ${overview.paymentSummary.recentPayments[index].statusLabel}',
-                      isLast: index ==
-                          overview.paymentSummary.recentPayments.length - 1,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primarySoft,
+                      shape: BoxShape.circle,
                     ),
+                    child: const Icon(
+                      Icons.phone_forwarded_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      overview.emergencyContactNumber.isEmpty
+                          ? 'Add a number we can call in an emergency.'
+                          : overview.emergencyContactNumber,
+                      style: TextStyle(
+                        color: overview.emergencyContactNumber.isEmpty
+                            ? AppColors.textSecondary
+                            : AppColors.textPrimary,
+                        fontWeight: overview.emergencyContactNumber.isEmpty
+                            ? FontWeight.w400
+                            : FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            _OverviewSectionCard(
-              title: 'Recent notifications',
-              actionLabel: 'Open',
-              onActionTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.profileNotifications),
-              child: Column(
-                children: [
-                  for (final notification in notifications) ...[
-                    NotificationCard(notification: notification),
-                    const SizedBox(height: AppSpacing.sm),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton(
-              onPressed: () async {
-                await Supabase.instance.client.auth.signOut();
-                if (!context.mounted) {
-                  return;
-                }
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  AppRoutes.login,
-                  (route) => false,
-                );
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(52),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            Center(
+              child: TextButton.icon(
+                onPressed: () async {
+                  await Supabase.instance.client.auth.signOut();
+                  if (!context.mounted) {
+                    return;
+                  }
+                  Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
+                },
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('Log Out'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
                 ),
               ),
-              child: const Text('Log Out'),
             ),
             const SizedBox(height: 120),
           ],
@@ -800,11 +927,6 @@ class _ProfileSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final location = [
-      overview.city,
-      overview.region,
-    ].where((item) => item.trim().isNotEmpty).join(', ');
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -844,35 +966,11 @@ class _ProfileSummaryCard extends StatelessWidget {
                             children: [
                               Text(
                                 displayName,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
+                                style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
                                       color: const Color(0xFF111827),
                                     ),
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.place_outlined,
-                                    size: 14,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      location.isEmpty ? 'Malaysia' : location,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: AppColors.textSecondary,
-                                          ),
-                                    ),
-                                  ),
-                                ],
                               ),
                             ],
                           ),
@@ -963,10 +1061,10 @@ class _OverviewSectionCard extends StatelessWidget {
                 child: Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF111827),
-                      ),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF111827),
+                  ),
                 ),
               ),
               if (actionLabel != null)
@@ -992,9 +1090,7 @@ class _OverviewSectionCard extends StatelessWidget {
 }
 
 class _VerificationHubCard extends StatelessWidget {
-  const _VerificationHubCard({
-    required this.verified,
-  });
+  const _VerificationHubCard({required this.verified});
 
   final bool verified;
 
@@ -1022,10 +1118,7 @@ class _VerificationHubCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: const LinearGradient(
-                colors: [
-                  Color(0xFFC18EFF),
-                  AppColors.primary,
-                ],
+                colors: [Color(0xFFC18EFF), AppColors.primary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1051,17 +1144,17 @@ class _VerificationHubCard extends StatelessWidget {
                 Text(
                   'Verification',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF1F1630),
-                      ),
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF1F1630),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Open phone and email verification',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF7B728A),
-                        height: 1.5,
-                      ),
+                    color: const Color(0xFF7B728A),
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),
@@ -1087,120 +1180,74 @@ class _VerificationHubCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: Color(0xFF98A2B3),
-          ),
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF98A2B3)),
         ],
       ),
     );
   }
 }
 
-class _InfoActionRow extends StatelessWidget {
-  const _InfoActionRow({
+/// Compact stat tile used in the "My Bookings" summary card — a colored
+/// count + label pair, replacing the old 4-row vertical list.
+class _BookingStatChip extends StatelessWidget {
+  const _BookingStatChip({
     required this.icon,
-    required this.label,
     required this.value,
-    this.isLast = false,
+    required this.label,
+    required this.color,
   });
 
   final IconData icon;
+  final int value;
   final String label;
-  final String value;
-  final bool isLast;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.md),
-      margin: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : const Border(
-                bottom: BorderSide(color: Color(0xFFEDF1EF)),
-              ),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.textSecondary),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF111827),
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlaceholderPanel extends StatelessWidget {
-  const _PlaceholderPanel({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD9E2DD)),
-        color: const Color(0xFFFBFEFC),
-      ),
-      child: Column(
-        children: [
           Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              color: AppColors.primarySoft,
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.16),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: AppColors.primary),
+            child: Icon(icon, size: 17, color: color),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF111827),
-                  fontWeight: FontWeight.w700,
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$value',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF111827),
+                  ),
                 ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.5,
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1209,11 +1256,10 @@ class _PlaceholderPanel extends StatelessWidget {
 }
 
 class _AddressPreviewMap extends StatelessWidget {
-  const _AddressPreviewMap({
-    required this.address,
-  });
+  const _AddressPreviewMap({required this.address, this.onLocationSelected});
 
   final String address;
+  final void Function(double latitude, double longitude)? onLocationSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -1229,10 +1275,7 @@ class _AddressPreviewMap extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFF8F3FF),
-            Color(0xFFEDE5FF),
-          ],
+          colors: [Color(0xFFF8F3FF), Color(0xFFEDE5FF)],
         ),
         border: Border.all(color: const Color(0xFFE4D7F5)),
       ),
@@ -1241,13 +1284,13 @@ class _AddressPreviewMap extends StatelessWidget {
         children: [
           Text(
             'Location Preview',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.sm),
           Container(
-            height: 136,
+            height: 190,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.78),
               borderRadius: BorderRadius.circular(16),
@@ -1259,7 +1302,9 @@ class _AddressPreviewMap extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     child: AddressLiveMap(
                       address: displayAddress,
-                      height: 136,
+                      height: 190,
+                      interactive: true,
+                      onLocationSelected: onLocationSelected,
                     ),
                   ),
                 ),
@@ -1281,8 +1326,8 @@ class _AddressPreviewMap extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ),
@@ -1296,72 +1341,62 @@ class _AddressPreviewMap extends StatelessWidget {
 }
 
 class _SavedAddressPrompt extends StatelessWidget {
-  const _SavedAddressPrompt({
-    required this.onOpen,
-  });
+  const _SavedAddressPrompt({required this.onOpen});
 
   final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD9E2DD)),
-        color: const Color(0xFFFBFEFC),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: AppColors.primarySoft,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.place_outlined, color: AppColors.primary),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: const BoxDecoration(
+            color: AppColors.primarySoft,
+            shape: BoxShape.circle,
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Manage your saved addresses',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF111827),
+          child: const Icon(Icons.place_outlined, color: AppColors.primary),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'No saved address yet',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'Add an address for faster booking.',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextButton(
+                onPressed: onOpen,
+                style: TextButton.styleFrom(
+                  backgroundColor: AppColors.primarySoft,
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                const Text(
-                  'View saved addresses and add a new address for faster booking.',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextButton(
-                  onPressed: onOpen,
-                  style: TextButton.styleFrom(
-                    backgroundColor: AppColors.primarySoft,
-                    foregroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                  ),
-                  child: const Text('Open Saved Addresses'),
-                ),
-              ],
-            ),
+                child: const Text('Add Address'),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -1383,26 +1418,33 @@ class _SavedAddressSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final primary = addresses.first;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFD9E2DD)),
-            color: const Color(0xFFFBFEFC),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColors.primarySoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.place_outlined,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       primary.label,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   if (primary.isDefault)
@@ -1412,41 +1454,47 @@ class _SavedAddressSection extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(primary.formattedAddress),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  SwiperButton(
-                    label: 'Use for services',
-                    isSecondary: true,
-                    onPressed: () => onUseForServices(primary),
-                  ),
-                  if (!primary.isDefault)
-                    SwiperButton(
-                      label: 'Set default',
-                      isSecondary: true,
-                      onPressed: () => onSetDefault(primary.label),
-                    ),
-                  SwiperButton(
-                    label: 'Add new',
-                    isSecondary: true,
-                    onPressed: onAddNew,
-                  ),
-                ],
-              ),
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          primary.formattedAddress,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12.5,
           ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            SwiperButton(
+              label: 'Use for services',
+              isSecondary: true,
+              onPressed: () => onUseForServices(primary),
+            ),
+            if (!primary.isDefault)
+              SwiperButton(
+                label: 'Set default',
+                isSecondary: true,
+                onPressed: () => onSetDefault(primary.label),
+              ),
+            SwiperButton(
+              label: 'Add new',
+              isSecondary: true,
+              onPressed: onAddNew,
+            ),
+          ],
         ),
         if (addresses.length > 1) ...[
           const SizedBox(height: AppSpacing.sm),
           Text(
             '${addresses.length - 1} more saved address${addresses.length - 1 == 1 ? '' : 'es'} available',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ],

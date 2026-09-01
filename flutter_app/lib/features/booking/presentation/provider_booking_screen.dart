@@ -226,6 +226,21 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
     return _availabilityByDate(detail)[dateKey] ?? const [];
   }
 
+  bool _isToday(String? dateKey) {
+    if (dateKey == null) {
+      return false;
+    }
+    final now = DateTime.now();
+    final todayKey =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return dateKey == todayKey;
+  }
+
+  int _nowMinutes() {
+    final now = DateTime.now();
+    return now.hour * 60 + now.minute;
+  }
+
   List<String> _startOptionsForDate(
     ProviderDetailModel detail,
     String? dateKey,
@@ -236,6 +251,9 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
       return const [];
     }
 
+    final isToday = _isToday(dateKey);
+    final nowMinutes = _nowMinutes();
+
     final options = <String>{};
     if (mode == BookingMode.daily) {
       for (final slot in slots) {
@@ -243,7 +261,15 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
           options.add(slot.startTimeLabel.trim());
         }
       }
-      return options.toList()..sort(_compareTimes);
+      final dailyAvailable = options.where((option) {
+        if (!isToday) {
+          return true;
+        }
+        final start = _timeToMinutes(option);
+        return start != null && start > nowMinutes;
+      }).toList()
+        ..sort(_compareTimes);
+      return dailyAvailable;
     }
 
     for (final slot in slots) {
@@ -268,6 +294,10 @@ class _ProviderBookingScreenState extends State<ProviderBookingScreen> {
     final available = options.where((option) {
       final start = _timeToMinutes(option);
       if (start == null) {
+        return false;
+      }
+
+      if (isToday && start <= nowMinutes) {
         return false;
       }
 

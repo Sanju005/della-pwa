@@ -31,16 +31,35 @@ import {
   deleteProviderMedia,
   getProviderProfileWithFallback,
   markCompanyPaymentReceived,
-  updateProviderAvailability,
+  reactivateProvider,
+  rejectProviderRegistration,
   setProviderIdentityVerified,
-  setProviderSuspended,
   setProviderVisibility,
-  updateProviderProfile,
+  suspendProvider,
   uploadProviderIdentityDocument,
   uploadProviderMedia,
 } from "../lib/admin-providers";
-import type { ProviderAvailabilityEntry, ProviderDetailRecord, ProviderIdentityDocument } from "../types";
+import type { ProviderDetailRecord, ProviderIdentityDocument } from "../types";
 import type { DashboardBooking } from "../types";
+
+function groupByServiceLabel<T extends { serviceLabel?: string }>(items: T[]) {
+  const groups: { serviceLabel: string; items: T[] }[] = [];
+  const indexByLabel = new Map<string, number>();
+
+  for (const item of items) {
+    const label = item.serviceLabel?.trim() || "Other";
+    const existingIndex = indexByLabel.get(label);
+
+    if (existingIndex === undefined) {
+      indexByLabel.set(label, groups.length);
+      groups.push({ serviceLabel: label, items: [item] });
+    } else {
+      groups[existingIndex].items.push(item);
+    }
+  }
+
+  return groups;
+}
 
 const tabs = [
   "Overview",
@@ -58,16 +77,6 @@ type ApprovalChecklist = {
   certificate: boolean;
   identity: boolean;
 };
-
-const ALL_DAYS = [
-  { key: "monday", label: "Mon" },
-  { key: "tuesday", label: "Tue" },
-  { key: "wednesday", label: "Wed" },
-  { key: "thursday", label: "Thu" },
-  { key: "friday", label: "Fri" },
-  { key: "saturday", label: "Sat" },
-  { key: "sunday", label: "Sun" },
-] as const;
 
 const metricIcons = [
   <BriefcaseBusiness className="size-5" />,
@@ -120,14 +129,6 @@ function buildChecklistState(detail?: ProviderDetailRecord | null): ApprovalChec
     identity:
       detail?.identityVerificationStatus === "Verified" ||
       Boolean(detail?.identityDocuments?.length),
-  };
-}
-
-function buildDefaultAvailabilityDay() {
-  return {
-    selected: false,
-    startTime: "08:00",
-    endTime: "20:00",
   };
 }
 
@@ -272,30 +273,6 @@ export function ProviderProfilePage() {
   const [taskDateTo, setTaskDateTo] = useState("");
   const [approvalNote, setApprovalNote] = useState("");
   const [checklist, setChecklist] = useState<ApprovalChecklist>(buildChecklistState(null));
-  const [editing, setEditing] = useState(false);
-  const [editingAvailability, setEditingAvailability] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    dob: "",
-    gender: "",
-    language: "",
-    nationalId: "",
-    emergencyContact: "",
-    address: "",
-    serviceArea: "",
-    about: "",
-  });
-  const [availabilityForm, setAvailabilityForm] = useState<{
-    enabled: boolean;
-    entries: Record<string, { selected: boolean; startTime: string; endTime: string }>;
-  }>({
-    enabled: true,
-    entries: Object.fromEntries(
-      ALL_DAYS.map((day) => [day.key, buildDefaultAvailabilityDay()]),
-    ) as Record<string, { selected: boolean; startTime: string; endTime: string }>,
-  });
 
   useEffect(() => {
     let active = true;
@@ -312,26 +289,6 @@ export function ProviderProfilePage() {
     setTaskDateTo("");
     setApprovalNote("");
     setChecklist(buildChecklistState(null));
-    setForm({
-      name: "",
-      email: "",
-      phone: "",
-      dob: "",
-      gender: "",
-      language: "",
-      nationalId: "",
-      emergencyContact: "",
-      address: "",
-      serviceArea: "",
-      about: "",
-    });
-    setEditingAvailability(false);
-    setAvailabilityForm({
-      enabled: true,
-      entries: Object.fromEntries(
-        ALL_DAYS.map((day) => [day.key, buildDefaultAvailabilityDay()]),
-      ) as Record<string, { selected: boolean; startTime: string; endTime: string }>,
-    });
 
     async function loadProvider() {
       try {
@@ -343,33 +300,6 @@ export function ProviderProfilePage() {
 
         setProvider(payload.detail);
         setChecklist(buildChecklistState(payload.detail));
-        setForm({
-          name: payload.detail?.name ?? "",
-          email: payload.detail?.email ?? "",
-          phone: payload.detail?.phone ?? "",
-          dob: payload.detail?.dob ?? "",
-          gender: payload.detail?.gender ?? "",
-          language: payload.detail?.language ?? "",
-          nationalId: payload.detail?.nationalId ?? "",
-          emergencyContact: payload.detail?.emergencyContact ?? "",
-          address: payload.detail?.address ?? "",
-          serviceArea: payload.detail?.serviceArea ?? "",
-          about: payload.detail?.about ?? "",
-        });
-        const nextAvailabilityEntries = Object.fromEntries(
-          ALL_DAYS.map((day) => [day.key, buildDefaultAvailabilityDay()]),
-        ) as Record<string, { selected: boolean; startTime: string; endTime: string }>;
-        (payload.detail?.availabilityEntries ?? []).forEach((entry) => {
-          nextAvailabilityEntries[entry.dayKey] = {
-            selected: true,
-            startTime: entry.startTime,
-            endTime: entry.endTime,
-          };
-        });
-        setAvailabilityForm({
-          enabled: payload.detail?.availabilityEnabled ?? true,
-          entries: nextAvailabilityEntries,
-        });
       } finally {
         if (active) {
           setLoading(false);
@@ -423,33 +353,6 @@ export function ProviderProfilePage() {
     setProvider(payload.detail);
     if (payload.detail) {
       setChecklist(buildChecklistState(payload.detail));
-      setForm({
-        name: payload.detail.name,
-        email: payload.detail.email,
-        phone: payload.detail.phone,
-        dob: payload.detail.dob,
-        gender: payload.detail.gender,
-        language: payload.detail.language,
-        nationalId: payload.detail.nationalId,
-        emergencyContact: payload.detail.emergencyContact,
-        address: payload.detail.address,
-        serviceArea: payload.detail.serviceArea,
-        about: payload.detail.about,
-      });
-      const nextAvailabilityEntries = Object.fromEntries(
-        ALL_DAYS.map((day) => [day.key, buildDefaultAvailabilityDay()]),
-      ) as Record<string, { selected: boolean; startTime: string; endTime: string }>;
-      (payload.detail.availabilityEntries ?? []).forEach((entry) => {
-        nextAvailabilityEntries[entry.dayKey] = {
-          selected: true,
-          startTime: entry.startTime,
-          endTime: entry.endTime,
-        };
-      });
-      setAvailabilityForm({
-        enabled: payload.detail.availabilityEnabled ?? true,
-        entries: nextAvailabilityEntries,
-      });
     }
   }
 
@@ -591,63 +494,36 @@ export function ProviderProfilePage() {
     { gross: 0, commission: 0, net: 0, payable: 0, paid: 0 },
   );
 
-  async function handleSaveProfile() {
-    if (saving) {
-      return;
-    }
-
-    setSaving(true);
-    const result = await updateProviderProfile(detail.providerId, {
-      full_name: form.name,
-      email: form.email,
-      phone: form.phone,
-      date_of_birth: form.dob,
-      gender: form.gender,
-      language: form.language,
-      national_id: form.nationalId,
-      emergency_contact: form.emergencyContact,
-      address: form.address,
-      marketing_name: form.name,
-      service_location: form.serviceArea,
-      bio: form.about,
-    });
-    setSaving(false);
-
-    if (result.error) {
-      flash(result.error);
-      return;
-    }
-
-    setProvider((current) =>
-      current
-        ? {
-            ...current,
-            name: form.name,
-            email: form.email,
-            phone: form.phone,
-            dob: form.dob,
-            gender: form.gender,
-            language: form.language,
-            nationalId: form.nationalId,
-            emergencyContact: form.emergencyContact,
-            address: form.address,
-            serviceArea: form.serviceArea,
-            about: form.about,
-          }
-        : current
-    );
-    setEditing(false);
-    flash("Provider details updated.");
-  }
-
   async function handleSuspend() {
     if (saving) {
       return;
     }
 
     const suspended = detail.status !== "Suspended";
+
+    if (suspended) {
+      const reason = window.prompt("Enter a reason for suspending this provider:");
+      if (!reason || !reason.trim()) {
+        flash("A suspension reason is required.");
+        return;
+      }
+
+      setSaving(true);
+      const result = await suspendProvider(detail.providerId, reason.trim());
+      setSaving(false);
+
+      if (result.error) {
+        flash(result.error);
+        return;
+      }
+
+      setProvider((current) => (current ? { ...current, status: "Suspended" } : current));
+      flash("Provider suspended.");
+      return;
+    }
+
     setSaving(true);
-    const result = await setProviderSuspended(detail.providerId, suspended);
+    const result = await reactivateProvider(detail.providerId);
     setSaving(false);
 
     if (result.error) {
@@ -655,10 +531,8 @@ export function ProviderProfilePage() {
       return;
     }
 
-    setProvider((current) =>
-      current ? { ...current, status: suspended ? "Suspended" : "Active" } : current
-    );
-    flash(suspended ? "Provider suspended." : "Provider restored.");
+    setProvider((current) => (current ? { ...current, status: "Active" } : current));
+    flash("Provider restored.");
   }
 
   async function handleDeactivate() {
@@ -685,34 +559,18 @@ export function ProviderProfilePage() {
     flash("Provider disabled.");
   }
 
-  async function handleSaveAvailability() {
+  async function handleRejectProvider() {
     if (saving) {
       return;
     }
 
-    const entries = ALL_DAYS.reduce<ProviderAvailabilityEntry[]>((result, day) => {
-        const entry = availabilityForm.entries[day.key] ?? buildDefaultAvailabilityDay();
-
-        if (!entry.selected) {
-          return result;
-        }
-
-        result.push({
-          day: day.label,
-          dayKey: day.key,
-          startTime: entry.startTime,
-          endTime: entry.endTime,
-          timeMode: "custom",
-        });
-
-        return result;
-      }, []);
+    if (!approvalNote.trim()) {
+      flash("Please add a reason before rejecting this provider's registration.");
+      return;
+    }
 
     setSaving(true);
-    const result = await updateProviderAvailability(detail.providerId, {
-      enabled: availabilityForm.enabled,
-      entries,
-    });
+    const result = await rejectProviderRegistration(detail.providerId, approvalNote.trim());
     setSaving(false);
 
     if (result.error) {
@@ -721,8 +579,7 @@ export function ProviderProfilePage() {
     }
 
     await reloadProviderDetails();
-    setEditingAvailability(false);
-    flash("Provider availability updated.");
+    flash("Provider registration rejected.");
   }
 
   async function handleMarkCompanyPaymentReceived(submissionId: string) {
@@ -998,186 +855,30 @@ export function ProviderProfilePage() {
       <>
         <section className="grid gap-4 xl:grid-cols-2">
           <div className="space-y-4">
-            <SurfaceCard
-              title="Personal Details"
-              action={
-                <button
-                  type="button"
-                  onClick={() => setEditing((current) => !current)}
-                  className="rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700"
-                >
-                  {editing ? "Cancel" : "Edit"}
-                </button>
-              }
-            >
+            <SurfaceCard title="Personal Details">
               <div className="space-y-4">
-              <InfoRow
-                label="Full Name"
-                value={
-                  editing ? (
-                    <input
-                      value={form.name}
-                      onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                  ) : (
-                    detail.name
-                  )
-                }
-                icon={<UserCircle2 className="size-4" />}
-              />
-              <InfoRow
-                label="Email Address"
-                value={
-                  editing ? (
-                    <input
-                      value={form.email}
-                      onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                  ) : (
-                    detail.email
-                  )
-                }
-                icon={<Mail className="size-4" />}
-              />
-              <InfoRow
-                label="Phone Number"
-                value={
-                  editing ? (
-                    <input
-                      value={form.phone}
-                      onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                  ) : (
-                    detail.phone
-                  )
-                }
-                icon={<Phone className="size-4" />}
-              />
-              <InfoRow
-                label="Date of Birth"
-                value={
-                  editing ? (
-                    <input
-                      value={form.dob}
-                      onChange={(event) => setForm((current) => ({ ...current, dob: event.target.value }))}
-                      placeholder="YYYY-MM-DD or 6 Jul 1966"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                  ) : (
-                    detail.dob
-                  )
-                }
-                icon={<CalendarDays className="size-4" />}
-              />
-              <InfoRow
-                label="Gender"
-                value={
-                  editing ? (
-                    <select
-                      value={form.gender}
-                      onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    >
-                      <option value="">Not provided</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  ) : (
-                    detail.gender
-                  )
-                }
-                icon={<ShieldCheck className="size-4" />}
-              />
-              <InfoRow
-                label="Language"
-                value={
-                  editing ? (
-                    <input
-                      value={form.language}
-                      onChange={(event) => setForm((current) => ({ ...current, language: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                  ) : (
-                    detail.language
-                  )
-                }
-                icon={<Languages className="size-4" />}
-              />
-              <InfoRow
-                label="NRIC / ID Number"
-                value={
-                  editing ? (
-                    <input
-                      value={form.nationalId}
-                      onChange={(event) => setForm((current) => ({ ...current, nationalId: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                  ) : (
-                    detail.nationalId
-                  )
-                }
-                icon={<FileBadge2 className="size-4" />}
-              />
-              <InfoRow
-                label="Emergency Contact"
-                value={
-                  editing ? (
-                    <input
-                      value={form.emergencyContact}
-                      onChange={(event) => setForm((current) => ({ ...current, emergencyContact: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                  ) : (
-                    detail.emergencyContact
-                  )
-                }
-                icon={<Phone className="size-4" />}
-              />
-              <InfoRow
-                label="Address"
-                value={
-                  editing ? (
-                    <textarea
-                      value={form.address}
-                      onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
-                      className="min-h-[96px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                    />
-                  ) : (
-                    <span className="whitespace-pre-line">{detail.address}</span>
-                  )
-                }
-                icon={<MapPin className="size-4" />}
-              />
-            </div>
-            {editing ? (
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Save Changes"}
-                </button>
+                <InfoRow label="Full Name" value={detail.name} icon={<UserCircle2 className="size-4" />} />
+                <InfoRow label="Email Address" value={detail.email} icon={<Mail className="size-4" />} />
+                <InfoRow label="Phone Number" value={detail.phone} icon={<Phone className="size-4" />} />
+                <InfoRow label="Date of Birth" value={detail.dob} icon={<CalendarDays className="size-4" />} />
+                <InfoRow label="Gender" value={detail.gender} icon={<ShieldCheck className="size-4" />} />
+                <InfoRow label="Language" value={detail.language} icon={<Languages className="size-4" />} />
+                <InfoRow label="NRIC / ID Number" value={detail.nationalId} icon={<FileBadge2 className="size-4" />} />
+                {detail.emergencyContact ? (
+                  <InfoRow label="Emergency Contact" value={detail.emergencyContact} icon={<Phone className="size-4" />} />
+                ) : null}
+                <InfoRow
+                  label="Address"
+                  value={<span className="whitespace-pre-line">{detail.address}</span>}
+                  icon={<MapPin className="size-4" />}
+                />
               </div>
-            ) : null}
-          </SurfaceCard>
+            </SurfaceCard>
 
           </div>
 
           <div className="space-y-4">
-            <SurfaceCard
-              title="Service Areas"
-              action={
-                <button className="rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                  Edit
-                </button>
-              }
-            >
+            <SurfaceCard title="Service Areas">
               <div className="space-y-4">
                 {detail.serviceAreas.map((area) => (
                   <div key={area.id} className="flex items-center justify-between gap-3">
@@ -1201,48 +902,84 @@ export function ProviderProfilePage() {
                 <SummaryMetric label="Service Area" value={detail.serviceArea} />
               </div>
 
-              {editing ? (
-                <textarea
-                  value={form.about}
-                  onChange={(event) => setForm((current) => ({ ...current, about: event.target.value }))}
-                  className="mt-5 min-h-[132px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                />
-              ) : (
-                <p className="mt-5 text-sm leading-7 text-slate-600">{detail.about}</p>
-              )}
+              <p className="mt-5 text-sm leading-7 text-slate-600">{detail.about}</p>
 
               <div className="mt-8">
                 <h4 className="text-base font-bold text-slate-950">Skills & Services</h4>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {detail.skills.map((skill) => (
-                    <span
-                      key={skill.id}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-semibold text-slate-600"
-                    >
-                      {skill.label}
-                    </span>
-                  ))}
-                </div>
+                {(() => {
+                  const skillGroups = groupByServiceLabel(detail.skills);
+                  if (skillGroups.length > 1) {
+                    return (
+                      <div className="mt-4 space-y-4">
+                        {skillGroups.map((group) => (
+                          <div key={group.serviceLabel}>
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                              {group.serviceLabel}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {group.items
+                                .filter((skill) => skill.label !== group.serviceLabel)
+                                .map((skill) => (
+                                  <span
+                                    key={skill.id}
+                                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-semibold text-slate-600"
+                                  >
+                                    {skill.label}
+                                  </span>
+                                ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {detail.skills.map((skill) => (
+                        <span
+                          key={skill.id}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-semibold text-slate-600"
+                        >
+                          {skill.label}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="mt-8">
                 <h4 className="text-base font-bold text-slate-950">Work Images</h4>
                 {detail.workGallery?.length ? (
-                  <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
-                    {detail.workGallery.slice(0, 4).map((item) => (
-                      <a
-                        key={item.id}
-                        href={item.previewUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block min-w-[260px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200 sm:min-w-[320px]"
-                      >
-                        <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
-                          <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                  <div className="mt-4 space-y-4">
+                    {(() => {
+                      const workGroups = groupByServiceLabel(detail.workGallery);
+                      return workGroups.map((group) => (
+                        <div key={group.serviceLabel}>
+                          {workGroups.length > 1 ? (
+                            <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                              {group.serviceLabel}
+                            </p>
+                          ) : null}
+                          <div className="flex gap-4 overflow-x-auto pb-2">
+                            {group.items.slice(0, 4).map((item) => (
+                              <a
+                                key={item.id}
+                                href={item.previewUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block min-w-[260px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 transition hover:border-emerald-200 sm:min-w-[320px]"
+                              >
+                                <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                                  <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                                </div>
+                                <p className="mt-3 text-sm font-semibold text-slate-900">{item.label}</p>
+                              </a>
+                            ))}
+                          </div>
                         </div>
-                        <p className="mt-3 text-sm font-semibold text-slate-900">{item.label}</p>
-                      </a>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 ) : (
                   <p className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
@@ -1255,127 +992,11 @@ export function ProviderProfilePage() {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-2">
-          <SurfaceCard
-            title="Availability"
-            action={
-              <button
-                type="button"
-                onClick={() => setEditingAvailability((current) => !current)}
-                className="rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700"
-              >
-                {editingAvailability ? "Cancel" : "Edit"}
-              </button>
-            }
-          >
+          <SurfaceCard title="Availability">
             <div className="grid gap-4 sm:grid-cols-2">
               <SummaryMetric label="Working Days" value={detail.workingDays} />
               <SummaryMetric label="Working Hours" value={detail.workingHours} />
             </div>
-            {editingAvailability ? (
-              <div className="mt-6 space-y-4 rounded-[20px] border border-slate-200 bg-slate-50/70 p-4">
-                <label className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3 text-sm">
-                  <span className="font-semibold text-slate-900">Provider visible for booking</span>
-                  <input
-                    type="checkbox"
-                    checked={availabilityForm.enabled}
-                    onChange={(event) =>
-                      setAvailabilityForm((current) => ({
-                        ...current,
-                        enabled: event.target.checked,
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                  />
-                </label>
-                <div className="space-y-3">
-                  {ALL_DAYS.map((day) => (
-                    <div key={day.key} className="grid gap-3 rounded-2xl bg-white px-4 py-3 md:grid-cols-[90px_1fr_120px_120px] md:items-center">
-                      <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                        <input
-                          type="checkbox"
-                          checked={availabilityForm.entries[day.key]?.selected ?? false}
-                          onChange={(event) =>
-                            setAvailabilityForm((current) => {
-                              const nextDay = current.entries[day.key] ?? buildDefaultAvailabilityDay();
-
-                              return {
-                                ...current,
-                                entries: {
-                                  ...current.entries,
-                                  [day.key]: {
-                                    ...nextDay,
-                                    selected: event.target.checked,
-                                  },
-                                },
-                              };
-                            })
-                          }
-                          className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                        />
-                        {day.label}
-                      </label>
-                      <span className="text-xs text-slate-500">
-                        {availabilityForm.entries[day.key]?.selected ? "Available" : "Off"}
-                      </span>
-                      <input
-                        type="time"
-                        value={availabilityForm.entries[day.key]?.startTime ?? "08:00"}
-                        disabled={!availabilityForm.entries[day.key]?.selected}
-                        onChange={(event) =>
-                          setAvailabilityForm((current) => {
-                            const nextDay = current.entries[day.key] ?? buildDefaultAvailabilityDay();
-
-                            return {
-                              ...current,
-                              entries: {
-                                ...current.entries,
-                                [day.key]: {
-                                  ...nextDay,
-                                  startTime: event.target.value,
-                                },
-                              },
-                            };
-                          })
-                        }
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none disabled:bg-slate-100"
-                      />
-                      <input
-                        type="time"
-                        value={availabilityForm.entries[day.key]?.endTime ?? "20:00"}
-                        disabled={!availabilityForm.entries[day.key]?.selected}
-                        onChange={(event) =>
-                          setAvailabilityForm((current) => {
-                            const nextDay = current.entries[day.key] ?? buildDefaultAvailabilityDay();
-
-                            return {
-                              ...current,
-                              entries: {
-                                ...current.entries,
-                                [day.key]: {
-                                  ...nextDay,
-                                  endTime: event.target.value,
-                                },
-                              },
-                            };
-                          })
-                        }
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none disabled:bg-slate-100"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void handleSaveAvailability()}
-                    disabled={saving}
-                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {saving ? "Saving..." : "Save Availability"}
-                  </button>
-                </div>
-              </div>
-            ) : null}
           </SurfaceCard>
         </section>
       </>
@@ -1963,31 +1584,45 @@ export function ProviderProfilePage() {
               </label>
             </div>
             {detail.workGallery?.length ? (
-              <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
-                {detail.workGallery.map((item) => (
-                  <div key={item.id} className="min-w-[280px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 sm:min-w-[360px]">
-                    <a href={item.previewUrl} target="_blank" rel="noreferrer" className="block transition hover:opacity-90">
-                      <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
-                        <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+              <div className="mt-4 space-y-4">
+                {(() => {
+                  const workGroups = groupByServiceLabel(detail.workGallery);
+                  return workGroups.map((group) => (
+                    <div key={group.serviceLabel}>
+                      {workGroups.length > 1 ? (
+                        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                          {group.serviceLabel}
+                        </p>
+                      ) : null}
+                      <div className="flex gap-4 overflow-x-auto pb-2">
+                        {group.items.map((item) => (
+                          <div key={item.id} className="min-w-[280px] overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 sm:min-w-[360px]">
+                            <a href={item.previewUrl} target="_blank" rel="noreferrer" className="block transition hover:opacity-90">
+                              <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                                <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                              </div>
+                            </a>
+                            <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                                <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void handleProviderMediaDelete("work", item.id)}
+                                disabled={Boolean(mediaSaving)}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+                              >
+                                <Trash2 className="size-3.5" />
+                                {mediaSaving === `delete-work-${item.id}` ? "Deleting..." : "Delete"}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </a>
-                    <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                        <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleProviderMediaDelete("work", item.id)}
-                        disabled={Boolean(mediaSaving)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
-                      >
-                        <Trash2 className="size-3.5" />
-                        {mediaSaving === `delete-work-${item.id}` ? "Deleting..." : "Delete"}
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             ) : (
               <p className="mt-4 rounded-[20px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
@@ -2016,38 +1651,52 @@ export function ProviderProfilePage() {
               </label>
             </div>
             {detail.certificates?.length ? (
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {detail.certificates.map((item) => (
-                  <div key={item.id} className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3">
-                    <a href={item.previewUrl} target="_blank" rel="noreferrer" className="block transition hover:opacity-90">
-                      <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
-                        {isPdfAsset(item.previewUrl) ? (
-                          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
-                            <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
-                            <span className="text-[12px] font-semibold">{item.fileName}</span>
+              <div className="mt-4 space-y-4">
+                {(() => {
+                  const certificateGroups = groupByServiceLabel(detail.certificates);
+                  return certificateGroups.map((group) => (
+                    <div key={group.serviceLabel}>
+                      {certificateGroups.length > 1 ? (
+                        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                          {group.serviceLabel}
+                        </p>
+                      ) : null}
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {group.items.map((item) => (
+                          <div key={item.id} className="overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3">
+                            <a href={item.previewUrl} target="_blank" rel="noreferrer" className="block transition hover:opacity-90">
+                              <div className="relative aspect-[4/3] overflow-hidden rounded-[16px] bg-slate-100">
+                                {isPdfAsset(item.previewUrl) ? (
+                                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center text-violet-700">
+                                    <span className="rounded-full border border-current px-3 py-1 text-[11px] font-extrabold">PDF</span>
+                                    <span className="text-[12px] font-semibold">{item.fileName}</span>
+                                  </div>
+                                ) : (
+                                  <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
+                                )}
+                              </div>
+                            </a>
+                            <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                                <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void handleProviderMediaDelete("certificate", item.id)}
+                                disabled={Boolean(mediaSaving)}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
+                              >
+                                <Trash2 className="size-3.5" />
+                                {mediaSaving === `delete-certificate-${item.id}` ? "Deleting..." : "Delete"}
+                              </button>
+                            </div>
                           </div>
-                        ) : (
-                          <img src={item.previewUrl} alt={item.label} className="h-full w-full object-cover" />
-                        )}
+                        ))}
                       </div>
-                    </a>
-                    <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                        <p className="mt-1 text-[12px] text-slate-500">{item.fileName}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleProviderMediaDelete("certificate", item.id)}
-                        disabled={Boolean(mediaSaving)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 disabled:opacity-60"
-                      >
-                        <Trash2 className="size-3.5" />
-                        {mediaSaving === `delete-certificate-${item.id}` ? "Deleting..." : "Delete"}
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
             ) : (
               <p className="mt-4 rounded-[20px] border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
@@ -2189,11 +1838,11 @@ export function ProviderProfilePage() {
               ))}
             </div>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Admin approval note
+              Admin note (required to approve or reject)
               <textarea
                 value={approvalNote}
                 onChange={(event) => setApprovalNote(event.target.value)}
-                placeholder="Add a note before approving this provider..."
+                placeholder="e.g. IC/passport image unclear, information does not match identity document, service images insufficient, invalid service details, duplicate account..."
                 className="mt-2 min-h-[110px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-emerald-300"
               />
             </label>
@@ -2205,6 +1854,14 @@ export function ProviderProfilePage() {
                 className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
               >
                 {isProviderApproved ? "Approved" : "Approve Provider"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleRejectProvider()}
+                disabled={saving || isProviderApproved}
+                className="rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+              >
+                Reject Registration
               </button>
               <button
                 type="button"

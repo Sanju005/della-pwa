@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/animation/app_motion.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 
@@ -117,17 +118,60 @@ class AuthFlowScaffold extends StatelessWidget {
   }
 }
 
-class AuthCircleHero extends StatelessWidget {
+class AuthCircleHero extends StatefulWidget {
   const AuthCircleHero({super.key, required this.icon, this.size = 72});
 
   final IconData icon;
   final double size;
 
   @override
+  State<AuthCircleHero> createState() => _AuthCircleHeroState();
+}
+
+class _AuthCircleHeroState extends State<AuthCircleHero>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) {
+      return;
+    }
+    _started = true;
+    if (AppMotion.reduceMotion(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
+    final curved = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+
+    final circle = Container(
+      width: widget.size,
+      height: widget.size,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFF5F1FA), Color(0xFFEADCF6)],
@@ -136,7 +180,25 @@ class AuthCircleHero extends StatelessWidget {
         ),
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, color: AppColors.primary, size: size * 0.46),
+      child: Icon(
+        widget.icon,
+        color: AppColors.primary,
+        size: widget.size * 0.46,
+      ),
+    );
+
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.18),
+          end: Offset.zero,
+        ).animate(curved),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.82, end: 1.0).animate(curved),
+          child: circle,
+        ),
+      ),
     );
   }
 }

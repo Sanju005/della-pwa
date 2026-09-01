@@ -1,0 +1,367 @@
+CRITICAL FIX #4 — PROVIDER LOCATION PRIVACY: INVESTIGATION
+======================================================================
+Status: INVESTIGATION ONLY. Nothing has been changed. No SQL, no code
+edits. This document is the full trace + proposed architecture per your
+request (sections A-I below).
+
+======================================================================
+A. CURRENT DATA FLOW
+======================================================================
+
+1. Provider registers (app/api/provider/register/route.ts, ~line 740):
+   payload.providerLocation.{latitude,longitude} is written directly to
+   provider_profiles.latitude / provider_profiles.longitude, in the SAME
+   write as the provider's residential address fields (postcode, country,
+   house_number, formatted_address, road, suburb, city, state). This is
+   the definitive confirmation of what these columns mean: they are the
+   provider's HOME/RESIDENTIAL coordinates, captured once at registration
+   time, not a separate "service area centroid" or anything customer-safe.
+
+2. Server reads (lib/provider-catalog.ts, lib/home-feed.ts):
+   Both files SELECT provider_profiles.latitude/longitude directly and
+   copy them, unmodified, into the objects they return:
+     - ProviderListing.latitude / ProviderListing.longitude
+       (provider-catalog.ts line ~324-325)
+     - HomeProviderCard.providerLatitude / providerLongitude
+       (home-feed.ts line ~293-296, and again at ~324-325 when mapping
+       catalog listings into home cards)
+   provider-detail.ts's ProviderDetail type is `ProviderListing & {...}`,
+   so it inherits latitude/longitude with no stripping.
+
+3. API routes return these objects as raw JSON, unmodified:
+     - GET /api/providers            -> NextResponse.json(getProviderCatalog(...))
+     - GET /api/providers/[id]       -> NextResponse.json(getProviderDetail(...))
+     - GET /api/home                 -> NextResponse.json(getHomeFeedData())
+   None of these routes strip latitude/longitude before responding.
+
+4. "Distance" shown today is NOT real on the server side. Both
+   provider-catalog.ts (line 326) and home-feed.ts (line 285/299) assign
+   distanceKm from a hardcoded rotating array:
+     [2.4, 1.8, 3.1, 2.7, 2.2, 4.0, 3.6, 2.9][rowIndex] ?? 2.5
+   This is fake placeholder data, not a real calculation. There is
+   currently NO server-side distance computation happening anywhere.
+
+5. The REAL distance customers actually see is computed CLIENT-SIDE, in
+   two independent places, both using the raw lat/lng from step 3:
+     - Web: app/_components/provider-distance.tsx ("use client") takes
+       providerLatitude/providerLongitude as props, reads the customer's
+       own location from localStorage (lib/live-location.ts), and calls
+       calculateDistanceKm() (lib/provider-distance.ts, a haversine
+       implementation) entirely in the browser.
+     - Web: app/providers/providers-catalog-screen.tsx also independently
+       calls the same client-side calculation on listing.latitude/
+       listing.longitude to SORT the catalog by proximity (lines
+       ~158-165) — i.e. proximity sorting also happens in the browser
+       using exposed home coordinates.
+     - Flutter: lib/services/provider_marketplace_service.dart has its
+       own Dart haversine (_distanceKm, lines 160-176) and uses it in
+       _applyLocationFilter (lines 111-158) to both compute AND SORT the
+       marketplace listing by distance to the customer's selected
+       location — using provider.latitude/provider.longitude, which are
+       populated directly from the API's raw fields via
+       ProviderSummary.fromJson / fromProviderCatalogJson
+       (lib/models/provider_summary.dart lines 88-89, 133-134).
+
+6. A separate, distinct table exists: provider_admin_metadata. Per
+   SUPABASE_AUDIT.md (an existing audit document already in the repo,
+   not written by me this session), this table "Contains
+   current_latitude/longitude — live location" and has "No policies
+   found at all" (RLS default-deny — service-role/backend-only by
+   design). This appears to be a DIFFERENT, presumably live/real-time
+   provider location feed (10 rows per that audit), separate from the
+   registration-time home coordinates on provider_profiles. I did not
+   independently re-verify this table's current RLS state in this pass
+   (it wasn't part of your traced-files list and the audit doc already
+   covers it) — flagging that as a gap if you want it double-checked
+   before we finalize the plan below, since "no policies + default-deny"
+   is correct only for direct client access; it says nothing about
+   whether any server route reads and forwards it to a client.
+
+======================================================================
+B. EXACT EXPOSURE
+======================================================================
+
+Confirmed raw provider HOME coordinates are present in the JSON response
+of all three of these customer-facing endpoints, today, unconditionally:
+
+  - GET /api/providers          -> every listing: { latitude, longitude }
+  - GET /api/providers/[id]     -> { latitude, longitude } (inherited
+                                    from ProviderListing via the
+                                    ProviderDetail type)
+  - GET /api/home                -> every card: { providerLatitude,
+                                    providerLongitude }
+
+Any customer (or anyone, since these are unauthenticated public
+endpoints) can call these routes directly and read exact provider home
+coordinates without ever opening the app.
+
+======================================================================
+C. FILES / ENDPOINTS AFFECTED
+======================================================================
+
+Server (Next.js):
+  - lib/provider-catalog.ts        (selects + exposes latitude/longitude;
+                                     also the fake distanceKm)
+  - lib/home-feed.ts                (selects + exposes providerLatitude/
+                                     providerLongitude; also fake
+                                     distanceKm)
+  - lib/provider-detail.ts          (inherits exposure via ProviderListing)
+  - app/api/providers/route.ts      (returns catalog data unmodified)
+  - app/api/providers/[id]/route.ts (returns detail data unmodified)
+  - app/api/home/route.ts           (returns home feed data unmodified)
+  - lib/provider-distance.ts        (haversine helper — fine to keep,
+                                     just needs to move server-side only)
+
+Web client (customer-facing, Next.js "use client"):
+  - app/_components/provider-distance.tsx   (client-side haversine call)
+  - app/providers/providers-catalog-screen.tsx (client-side sort by
+    listing.latitude/longitude)
+  - app/home/_components/marketplace-ui.tsx  (renders ProviderDistanceText)
+  - app/providers/[id]/page.tsx              (renders ProviderDistanceText)
+  - app/providers/[id]/book/screen.tsx       (renders ProviderDistanceText)
+
+Flutter (customer-facing):
+  - lib/models/provider_summary.dart          (latitude/longitude fields
+                                                populated straight from
+                                                API JSON)
+  - lib/services/provider_marketplace_service.dart (Dart haversine +
+                                                proximity sort using raw
+                                                provider coordinates)
+
+NOT affected / not part of the problem (checked and ruled out):
+  - lib/live-location.ts — this is the CUSTOMER's own location
+    (browser geolocation + localStorage), not provider data. Fine as-is.
+  - app/_components/location-picker-map.tsx (Leaflet map) — used only in
+    provider/register/wizard.tsx (provider picking their OWN address)
+    and live-location-chip.tsx (customer picking their OWN location).
+    No screen was found anywhere that plots a PROVIDER's coordinates on
+    a map for a customer to see.
+  - Flutter provider_profile_screen.dart and provider_booking_screen.dart
+    — grepped for latitude/longitude/map widgets, no matches. No map
+    shows provider coordinates on these screens either.
+  - Admin dashboard (admin-providers.ts) — also selects provider_profiles
+    .latitude/longitude, but that's for ADMIN viewing, which is expected
+    and correctly gated by the RLS work already done this session
+    (admin SELECT access to provider_profiles is intentional).
+
+======================================================================
+D. RECOMMENDED ARCHITECTURE
+======================================================================
+
+Matches the model you proposed. Concretely:
+
+  1. Customer's own location is already known server-side-capable: the
+     browser/Flutter client already has it (via live-location.ts /
+     device_location_service.dart) and already sends it somewhere for
+     reverse geocoding (app/api/location/reverse). The same value needs
+     to be sent to the provider-listing endpoints as a query parameter
+     (customerLat, customerLng) — the client already possesses this
+     value today, so this is a plumbing change, not a new capability.
+
+  2. Server-side, inside provider-catalog.ts / home-feed.ts /
+     provider-detail.ts, when customerLat/customerLng are provided:
+     compute distanceKm using the EXISTING calculateDistanceKm() from
+     lib/provider-distance.ts (already correct, just needs to run on the
+     server instead of/in addition to the client) against
+     provider_profiles.latitude/longitude (read from the DB as today,
+     but never placed into the outgoing response object).
+
+  3. Strip latitude/longitude from every object that crosses the API
+     boundary. ProviderListing, HomeProviderCard, and ProviderDetail
+     should no longer carry raw coordinates at all — replace both fields
+     with a single computed distanceKm (real, not the hardcoded array).
+
+  4. If no customer location is available (e.g. permissions denied,
+     first load before geolocation resolves), distanceKm is simply
+     omitted/null and the UI already has a fallback path for that
+     ("Location unavailable" / "Distance unavailable" strings already
+     exist in both the Dart model and provider-distance.tsx) — no new
+     UI state needs inventing.
+
+  5. Nearby-provider filtering/sorting moves server-side too: since the
+     server now has both the customer's coordinates and the provider's
+     real coordinates in the same request, sorting by distanceKm and
+     filtering to providers within their own service_radius_km (already
+     a column on provider_profiles) can happen in the SQL/JS layer
+     before the response is built — the client only ever receives an
+     already-sorted, already-filtered, coordinate-free list. This also
+     answers your explicit question: yes, nearby-provider filtering can
+     be done entirely server-side, and provider_profiles already has the
+     service_radius_km column needed to do it properly (filter to
+     providers whose radius covers the customer, not just a flat
+     distance cutoff).
+
+  6. General/approximate area (if you want to show something like "~2km
+     away, Petaling Jaya" instead of just a number) can be derived from
+     the EXISTING service_location/city/state text fields already on
+     provider_profiles — no new geocoding needed, no new privacy risk,
+     since those are already city/area-level, not exact coordinates.
+
+======================================================================
+E. EXACT BACKEND CHANGES (not applied — proposal only)
+======================================================================
+
+  1. lib/provider-catalog.ts:
+     - getProviderCatalog(service, customerLocation?: {lat,lng}) — add
+       an optional second parameter.
+     - Remove latitude/longitude from the ProviderListing type; add
+       distanceKm: number | null (replacing the current always-present
+       fake distanceKm).
+     - Where the listing is built (~line 314-354), compute:
+         distanceKm: customerLocation
+           ? calculateDistanceKm(customerLocation.lat, customerLocation.lng, row.latitude, row.longitude)
+           : null
+       instead of the hardcoded array and instead of copying
+       row.latitude/row.longitude into the listing at all.
+
+  2. lib/home-feed.ts:
+     - getHomeFeedData(customerLocation?) — same optional parameter.
+     - Remove providerLatitude/providerLongitude from HomeProviderCard;
+       compute real distanceKm the same way, or null.
+
+  3. lib/provider-detail.ts:
+     - No structural change needed beyond what it inherits from
+       ProviderListing once (1) is done — ProviderDetail will
+       automatically stop carrying coordinates and will carry the real
+       distanceKm instead.
+
+  4. app/api/providers/route.ts:
+     - Read customerLat/customerLng from searchParams (optional), pass
+       through to getProviderCatalog.
+
+  5. app/api/providers/[id]/route.ts:
+     - Same — read customerLat/customerLng from searchParams, pass to
+       getProviderDetail (which passes to getProviderCatalog internally).
+
+  6. app/api/home/route.ts:
+     - Same — read customerLat/customerLng from searchParams, pass to
+       getHomeFeedData.
+
+  7. lib/provider-distance.ts:
+     - No change needed. calculateDistanceKm/formatDistanceKm are
+       already correct and become server-only utilities (still fine to
+       keep formatDistanceKm usable client-side purely for display
+       formatting of the number the server already computed — that
+       function takes a distance, not coordinates, so it carries no
+       privacy risk either way).
+
+  8. provider_admin_metadata current_latitude/current_longitude (live
+     location) — NOT touched by this plan unless you want live-tracking
+     distance too. Flagged in (A.6) as a separate, already-locked-down
+     concern; recommend leaving it out of this fix's scope unless you
+     tell me otherwise, since it wasn't shown to be exposed anywhere in
+     this trace.
+
+======================================================================
+F. EXACT FLUTTER/WEB CHANGES (not applied — proposal only)
+======================================================================
+
+Web:
+  - app/_components/provider-distance.tsx: delete the client-side
+    calculateDistanceKm() call entirely. Replace props
+    (providerLatitude, providerLongitude, fallbackDistanceKm) with a
+    single distanceKm: number | null prop that the server already
+    computed. Component becomes pure formatting (formatDistanceKm),
+    no client-side math, no dependency on provider coordinates.
+  - app/providers/providers-catalog-screen.tsx: remove the client-side
+    sort-by-listing.latitude/longitude block (~line 158-165); the list
+    arriving from the API is already sorted server-side once (E.1)/(E.4)
+    are done. Pass the customer's known location (already available via
+    live-location.ts) as a query param when calling /api/providers.
+  - app/home/_components/marketplace-ui.tsx,
+    app/providers/[id]/page.tsx,
+    app/providers/[id]/book/screen.tsx: update to the new
+    ProviderDistanceText prop shape (distanceKm instead of lat/lng).
+
+Flutter:
+  - lib/models/provider_summary.dart: remove latitude/longitude fields
+    entirely; distanceLabel already exists and is already built from
+    distanceKm in the JSON (fromProviderCatalogJson line ~111-113) — no
+    structural change needed there beyond removing the now-unused
+    lat/lng fields.
+  - lib/services/provider_marketplace_service.dart: delete
+    _applyLocationFilter's client-side haversine/sort block (~line
+    111-176) entirely, including _distanceKm/_degToRad. Pass the
+    customer's selected location (selection.latitude/longitude — this
+    part is fine, it's the customer's own chosen location) to the API
+    call as query params instead, and just consume the
+    already-sorted/already-computed distanceKm from the response.
+
+======================================================================
+G. DATABASE / RLS CHANGES NEEDED
+======================================================================
+
+None required. This is entirely an application-layer fix — the leak is
+in what the Next.js API routes choose to serialize into their JSON
+response, not in a database-level access-control gap. provider_profiles
+.latitude/longitude can (and should) remain exactly as they are in the
+database; the service-role-backed server code already has full access
+to read them for the distance calculation, it just needs to stop
+forwarding the raw values to the client. No new columns, no new tables,
+no RLS policy changes.
+
+(The one open item from A.6 — provider_admin_metadata — would only need
+DB-side attention if you want that table's live-location distance
+exposed too, which wasn't shown to be a current problem in this trace.)
+
+======================================================================
+H. ROLLBACK PLAN
+======================================================================
+
+Since G confirms no DB/RLS changes, rollback is pure code revert:
+  - Each change in E/F is a self-contained, git-revertable diff per
+    file. No migrations to undo, no data to restore.
+  - Safest rollout order if you want a staged rollback option: ship the
+    backend changes (E) first with the API still ALSO including
+    latitude/longitude temporarily (both old and new fields present),
+    verify server-side distanceKm is correct, THEN ship the client
+    changes (F) that stop reading lat/lng, THEN remove lat/lng from the
+    API response entirely as a final cleanup commit. That gives you a
+    single-file revert point at each stage instead of an all-or-nothing
+    cutover. Your call whether you want that staged approach or a
+    single combined change — I'd lean staged given this touches both
+    the web app and the Flutter app, which deploy independently.
+
+======================================================================
+I. TEST PLAN
+======================================================================
+
+Same automated-verification approach used for the earlier fixes this
+session (disposable test data, read-only + functional checks, cleanup
+after):
+
+  1. Direct API inspection (the core security check): call
+     GET /api/providers, GET /api/providers/[id], GET /api/home with no
+     auth (these are public routes) and assert the JSON response
+     contains NO latitude/longitude/providerLatitude/providerLongitude
+     keys anywhere in the payload, for every listing.
+  2. Distance correctness: call the same endpoints WITH a known
+     customerLat/customerLng query param against a disposable test
+     provider with known coordinates, and assert the returned
+     distanceKm matches an independently-computed haversine value
+     (within floating-point tolerance).
+  3. No-location fallback: call without customerLat/customerLng and
+     confirm distanceKm is null/absent rather than the old fake
+     hardcoded array, and that the web/Flutter UI's existing fallback
+     strings ("Distance unavailable" / "Location unavailable") still
+     render correctly.
+  4. Server-side sort/filter: with multiple disposable providers at
+     known distances and known service_radius_km, confirm the API
+     returns them in correct nearest-first order and correctly excludes
+     ones outside their own radius.
+  5. Regression: confirm booking flow, provider detail page, and
+     marketplace listing still render correctly end-to-end in both the
+     web app and Flutter app after the prop-shape changes in (F) — this
+     needs a manual pass since it's UI rendering, same as the admin
+     dashboard testing pattern used earlier.
+  6. Admin dashboard regression: confirm admin-providers.ts (which
+     legitimately needs lat/lng for the admin's own map/address display)
+     is unaffected, since this fix only touches the customer-facing
+     lib/provider-catalog.ts, lib/home-feed.ts, lib/provider-detail.ts
+     and their API routes, not the admin dashboard's own separate
+     Supabase queries.
+
+======================================================================
+STATUS: Investigation complete. Nothing applied. Waiting for your
+decision on the architecture in (D) before any implementation begins.
+======================================================================

@@ -1,6 +1,25 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/config/app_config.dart';
 import 'demo_customer_auth_store.dart';
+
+/// Thrown by [AuthService.signInProviderWithVerifiedPhone] when no provider
+/// account exists for the given phone number, so callers (the login screen)
+/// can fall back to the real customer phone-login path instead of surfacing
+/// a confusing "provider login failed" message for what might just be a
+/// customer signing in.
+class ProviderPhoneAccountNotFoundException implements Exception {
+  const ProviderPhoneAccountNotFoundException();
+}
+
+/// Thrown by [AuthService.signInCustomerWithVerifiedPhone] when no customer
+/// account exists for the given phone number.
+class CustomerPhoneAccountNotFoundException implements Exception {
+  const CustomerPhoneAccountNotFoundException();
+}
 
 class AuthService {
   const AuthService();
@@ -56,6 +75,137 @@ class AuthService {
     }
   }
 
+  /// Providers now register with a verified phone number as their Supabase
+  /// Auth identifier — no email exists yet at that point. Used only right
+  /// after registration to establish the session; the existing email+
+  /// password [signIn] stays as-is for the regular login screen.
+  Future<String?> signInWithPhone({
+    required String normalizedPhone,
+    required String password,
+  }) async {
+    final response = await _client.auth.signInWithPassword(
+      phone: normalizedPhone,
+      password: password,
+    );
+
+    if (response.user == null) {
+      return null;
+    }
+
+    return getCurrentUserRole();
+  }
+
+  /// Signs a returning provider in using just their phone number. Providers
+  /// never see/choose a password (a random one is generated once at
+  /// registration), so this can't be a normal password prompt — the caller
+  /// (the login screen) must already have checked the phone-OTP locally
+  /// (same dev-mode check used at registration) before calling this. The
+  /// backend resets the matched account's password to a fresh value it
+  /// knows and hands it back here so we can sign in with it immediately;
+  /// the password is never shown to the provider or stored anywhere.
+  /// Throws [ProviderPhoneAccountNotFoundException] if no provider account
+  /// exists for this phone number, so the caller can fall back to the
+  /// customer demo-phone path.
+  Future<String?> signInProviderWithVerifiedPhone({
+    required String phoneCountryCode,
+    required String phoneNumber,
+  }) async {
+    final uri = Uri.parse('${AppConfig.appBaseUrl}/api/provider/login/phone');
+    final response = await http.post(
+      uri,
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phoneCountryCode': phoneCountryCode,
+        'phoneNumber': phoneNumber,
+      }),
+    );
+
+    // The server should always answer with JSON, but a platform-level error
+    // (a route that isn't deployed yet, a gateway timeout, ...) can hand
+    // back an HTML error page instead — decode defensively so that shows up
+    // as a normal "try again" message rather than the raw HTML crashing the
+    // sign-in attempt.
+    Map<String, dynamic>? body;
+    try {
+      final decoded = jsonDecode(response.body.isEmpty ? '{}' : response.body);
+      if (decoded is Map<String, dynamic>) {
+        body = decoded;
+      }
+    } catch (_) {
+      body = null;
+    }
+
+    if (response.statusCode == 404 && body != null) {
+      throw const ProviderPhoneAccountNotFoundException();
+    }
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300 ||
+        body == null) {
+      throw Exception(
+        body?['error']?.toString() ??
+            'Unable to sign in right now. Please try again.',
+      );
+    }
+
+    final normalizedPhone = body['phone'] as String;
+    final password = body['password'] as String;
+    return signInWithPhone(
+      normalizedPhone: normalizedPhone,
+      password: password,
+    );
+  }
+
+  /// Signs a returning customer in using just their phone number — the real
+  /// replacement for the old fake `signInWithDemoPhone`/`DemoCustomerAuthStore`
+  /// path. Mirrors [signInProviderWithVerifiedPhone]'s exact trust model and
+  /// backend contract (see /api/customer/login/phone), applied to customers:
+  /// the caller must already have checked the phone-OTP locally before
+  /// calling this. Throws [CustomerPhoneAccountNotFoundException] if no
+  /// customer account exists for this phone number.
+  Future<String?> signInCustomerWithVerifiedPhone({
+    required String phoneCountryCode,
+    required String phoneNumber,
+  }) async {
+    final uri = Uri.parse('${AppConfig.appBaseUrl}/api/customer/login/phone');
+    final response = await http.post(
+      uri,
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phoneCountryCode': phoneCountryCode,
+        'phoneNumber': phoneNumber,
+      }),
+    );
+
+    Map<String, dynamic>? body;
+    try {
+      final decoded = jsonDecode(response.body.isEmpty ? '{}' : response.body);
+      if (decoded is Map<String, dynamic>) {
+        body = decoded;
+      }
+    } catch (_) {
+      body = null;
+    }
+
+    if (response.statusCode == 404 && body != null) {
+      throw const CustomerPhoneAccountNotFoundException();
+    }
+    if (response.statusCode < 200 ||
+        response.statusCode >= 300 ||
+        body == null) {
+      throw Exception(
+        body?['error']?.toString() ??
+            'Unable to sign in right now. Please try again.',
+      );
+    }
+
+    final normalizedPhone = body['phone'] as String;
+    final password = body['password'] as String;
+    return signInWithPhone(
+      normalizedPhone: normalizedPhone,
+      password: password,
+    );
+  }
+
   Future<String> signInWithDemoPhone({
     required String phoneNumber,
     required String otpCode,
@@ -98,9 +248,7 @@ class AuthService {
         data: {
           'full_name': _legacyFullName(legacyProvider),
           'role': 'provider',
-          'marketing_name': legacyProvider['marketing_name']
-              ?.toString()
-              .trim(),
+          'marketing_name': legacyProvider['marketing_name']?.toString().trim(),
           'country': legacyProvider['country']?.toString().trim(),
           'emergency_contact_number': legacyProvider['emergency_contact_number']
               ?.toString()
@@ -108,8 +256,7 @@ class AuthService {
         },
       );
 
-      final sessionUser =
-          signUpResponse.user ?? _client.auth.currentUser;
+      final sessionUser = signUpResponse.user ?? _client.auth.currentUser;
       if (sessionUser == null) {
         return null;
       }
@@ -136,9 +283,7 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>?> _findLegacyProviderByEmail(
-    String email,
-  ) async {
+  Future<Map<String, dynamic>?> _findLegacyProviderByEmail(String email) async {
     try {
       return await _client
           .from('provider_profiles')
@@ -171,8 +316,7 @@ class AuthService {
   }) async {
     final role = legacyProvider['role']?.toString().trim();
     final status = legacyProvider['status']?.toString().trim();
-    final phoneNumber =
-        legacyProvider['phone_number']?.toString().trim() ?? '';
+    final phoneNumber = legacyProvider['phone_number']?.toString().trim() ?? '';
     final fullName = _legacyFullName(legacyProvider);
 
     try {
@@ -187,11 +331,14 @@ class AuthService {
     } catch (_) {}
 
     try {
-      await _client.from('provider_profiles').update({
-        'id': userId,
-        'role': isProviderRole(role) ? role : 'provider',
-        'email': email,
-      }).eq('email', email);
+      await _client
+          .from('provider_profiles')
+          .update({
+            'id': userId,
+            'role': isProviderRole(role) ? role : 'provider',
+            'email': email,
+          })
+          .eq('email', email);
     } catch (_) {}
   }
 

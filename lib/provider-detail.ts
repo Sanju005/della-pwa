@@ -6,6 +6,7 @@ import {
   buildProviderDetailHref,
   buildProviderPortraitSrc,
   getProviderCatalog,
+  type CustomerLocation,
   type ProviderCategoryKey,
   type ProviderListing,
 } from "./provider-catalog";
@@ -430,8 +431,11 @@ function buildCalendarDates(rowByDayKey: Map<string, ProviderAvailabilityRow>): 
 }
 
 function mergeSpecialties(listing: ProviderListing) {
-  const combined = [...listing.specialties, ...specialtyDefaults[listing.serviceKey]];
-  return [...new Set(combined)].slice(0, 6);
+  const real = [...new Set(listing.specialties)];
+  if (real.length > 0) {
+    return real.slice(0, 6);
+  }
+  return specialtyDefaults[listing.serviceKey].slice(0, 6);
 }
 
 function buildCustomerReviews(listing: ProviderListing): ProviderCustomerReview[] {
@@ -743,10 +747,14 @@ function buildDetailFromListing(
 }
 
 export const getProviderDetail = cache(
-  async (id: string, service: string | null): Promise<ProviderDetail | null> => {
-    const scopedCatalog = await getProviderCatalog(service);
+  async (
+    id: string,
+    service: string | null,
+    customerLocation?: CustomerLocation | null,
+  ): Promise<ProviderDetail | null> => {
+    const scopedCatalog = await getProviderCatalog(service, customerLocation);
     const scopedMatch = scopedCatalog.listings.find((listing) => listing.id === id);
-    const allCatalog = service ? await getProviderCatalog(null) : scopedCatalog;
+    const allCatalog = service ? await getProviderCatalog(null, customerLocation) : scopedCatalog;
     const relatedListings = allCatalog.listings.filter((listing) => listing.id === id);
 
     if (scopedMatch) {

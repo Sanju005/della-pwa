@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -50,10 +49,14 @@ class ProviderMarketplaceService {
     String? service,
     ServiceLocationSelection? locationSelection,
   }) async {
+    final selection = locationSelection ?? ServiceLocationStore.load();
+
     final uri = Uri.parse('${AppConfig.appBaseUrl}/api/providers').replace(
       queryParameters: {
         if (service != null && service.trim().isNotEmpty)
           'service': service.trim().toLowerCase(),
+        if (selection?.latitude != null) 'lat': selection!.latitude.toString(),
+        if (selection?.longitude != null) 'lng': selection!.longitude.toString(),
       },
     );
 
@@ -74,10 +77,7 @@ class ProviderMarketplaceService {
         return ProviderCatalogResult(
           service: catalog.service,
           serviceLabel: catalog.serviceLabel,
-          listings: _applyLocationFilter(
-            catalog.listings,
-            locationSelection ?? ServiceLocationStore.load(),
-          ),
+          listings: _applyTextFilter(catalog.listings, selection),
           errorMessage: catalog.errorMessage,
         );
       }
@@ -108,7 +108,12 @@ class ProviderMarketplaceService {
     return catalog.listings;
   }
 
-  List<ProviderSummary> _applyLocationFilter(
+  /// Text-only search-token filtering (city/state/country tokens against
+  /// each provider's public location/description/services/specialties).
+  /// Distance is never computed here — the server already returns
+  /// nearest-first, distance-filtered results when lat/lng are sent with
+  /// the request, and providers never carry raw coordinates on the client.
+  List<ProviderSummary> _applyTextFilter(
     List<ProviderSummary> listings,
     ServiceLocationSelection? selection,
   ) {
@@ -131,51 +136,8 @@ class ProviderMarketplaceService {
       return tokens.any(haystack.contains);
     }).toList();
 
-    final visible = filtered.isEmpty ? listings : filtered;
-
-    if (selection.latitude == null || selection.longitude == null) {
-      return visible;
-    }
-
-    final withDistance = visible
-        .map(
-          (provider) => (
-            provider: provider,
-            distance: provider.latitude == null || provider.longitude == null
-                ? double.infinity
-                : _distanceKm(
-                    selection.latitude!,
-                    selection.longitude!,
-                    provider.latitude!,
-                    provider.longitude!,
-                  ),
-          ),
-        )
-        .toList()
-      ..sort((a, b) => a.distance.compareTo(b.distance));
-
-    return withDistance.map((item) => item.provider).toList();
+    return filtered.isEmpty ? listings : filtered;
   }
-
-  double _distanceKm(
-    double startLat,
-    double startLng,
-    double endLat,
-    double endLng,
-  ) {
-    const earthRadiusKm = 6371.0;
-    final dLat = _degToRad(endLat - startLat);
-    final dLng = _degToRad(endLng - startLng);
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_degToRad(startLat)) *
-            math.cos(_degToRad(endLat)) *
-            math.sin(dLng / 2) *
-            math.sin(dLng / 2);
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return earthRadiusKm * c;
-  }
-
-  double _degToRad(double value) => value * (math.pi / 180.0);
 
   Object? _decodeJson(String body) {
     if (body.isEmpty) {

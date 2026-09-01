@@ -5,12 +5,26 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
+import 'phone_utils.dart';
 
 List<String> _providerWorkspaceStringList(dynamic value) {
   return (value as List<dynamic>? ?? const [])
       .map((item) => item?.toString() ?? '')
       .where((item) => item.trim().isNotEmpty)
       .toList(growable: false);
+}
+
+Map<String, dynamic> _providerWorkspaceNestedMap(
+  Map<String, dynamic> json,
+  String key,
+) {
+  final value = json[key];
+  if (value is Map) {
+    return value.map((nestedKey, nestedValue) {
+      return MapEntry(nestedKey.toString(), nestedValue);
+    });
+  }
+  return const {};
 }
 
 class ProviderWorkspaceServiceModel {
@@ -48,10 +62,12 @@ class ProviderWorkspaceServiceModel {
       specialties: _providerWorkspaceStringList(json['specialties']),
       imageDataUrls: _providerWorkspaceStringList(json['imageDataUrls']),
       imageCaptions: _providerWorkspaceStringList(json['imageCaptions']),
-      certificateDataUrls:
-          _providerWorkspaceStringList(json['certificateDataUrls']),
-      certificateCaptions:
-          _providerWorkspaceStringList(json['certificateCaptions']),
+      certificateDataUrls: _providerWorkspaceStringList(
+        json['certificateDataUrls'],
+      ),
+      certificateCaptions: _providerWorkspaceStringList(
+        json['certificateCaptions'],
+      ),
     );
   }
 }
@@ -88,6 +104,8 @@ class ProviderWorkspaceProfile {
     required this.identityVerified,
     required this.identityVerificationStatus,
     required this.identityDocumentType,
+    required this.nationality,
+    required this.identityDocumentNumber,
     required this.identityFrontImageUrl,
     required this.identityBackImageUrl,
     required this.kycVerified,
@@ -125,6 +143,8 @@ class ProviderWorkspaceProfile {
   final bool identityVerified;
   final String identityVerificationStatus;
   final String identityDocumentType;
+  final String nationality;
+  final String identityDocumentNumber;
   final String identityFrontImageUrl;
   final String identityBackImageUrl;
   final bool kycVerified;
@@ -132,28 +152,139 @@ class ProviderWorkspaceProfile {
   final List<ProviderWorkspaceServiceModel> services;
 
   factory ProviderWorkspaceProfile.fromJson(Map<String, dynamic> json) {
+    final basicProfile = _providerWorkspaceNestedMap(json, 'basicProfile');
+    final providerLocation = _providerWorkspaceNestedMap(
+      json,
+      'providerLocation',
+    );
+
+    String topLevel(String key) => json[key]?.toString() ?? '';
+    String nested(Map<String, dynamic> source, List<String> keys) {
+      for (final key in keys) {
+        final value = source[key]?.toString() ?? '';
+        if (value.trim().isNotEmpty) {
+          return value;
+        }
+      }
+      return '';
+    }
+
+    String pickString(
+      String topLevelKey, {
+      List<String> basicKeys = const [],
+      List<String> locationKeys = const [],
+      String fallback = '',
+    }) {
+      final direct = topLevel(topLevelKey).trim();
+      if (direct.isNotEmpty) {
+        return direct;
+      }
+      final basic = nested(basicProfile, basicKeys).trim();
+      if (basic.isNotEmpty) {
+        return basic;
+      }
+      final location = nested(providerLocation, locationKeys).trim();
+      if (location.isNotEmpty) {
+        return location;
+      }
+      return fallback;
+    }
+
+    double pickDouble(
+      String topLevelKey, {
+      List<String> locationKeys = const [],
+      double fallback = 0,
+    }) {
+      final direct = (json[topLevelKey] as num?)?.toDouble();
+      if (direct != null && direct > 0) {
+        return direct;
+      }
+      for (final key in locationKeys) {
+        final raw = providerLocation[key];
+        if (raw is num) {
+          return raw.toDouble();
+        }
+        final parsed = double.tryParse(raw?.toString() ?? '');
+        if (parsed != null && parsed > 0) {
+          return parsed;
+        }
+      }
+      return fallback;
+    }
+
     return ProviderWorkspaceProfile(
       providerId: json['providerId'] as String? ?? '',
       fullName: json['fullName'] as String? ?? '',
-      firstName: json['firstName'] as String? ?? '',
-      lastName: json['lastName'] as String? ?? '',
-      dateOfBirth: json['dateOfBirth'] as String? ?? '',
-      gender: json['gender'] as String? ?? '',
-      email: json['email'] as String? ?? '',
-      phone: json['phone'] as String? ?? '',
-      emergencyContactNumber:
-          json['emergencyContactNumber'] as String? ?? '',
+      firstName: pickString(
+        'firstName',
+        basicKeys: const ['firstName', 'first_name'],
+      ),
+      lastName: pickString(
+        'lastName',
+        basicKeys: const ['lastName', 'last_name'],
+      ),
+      dateOfBirth: pickString(
+        'dateOfBirth',
+        basicKeys: const ['dateOfBirth', 'date_of_birth'],
+      ),
+      gender: pickString('gender', basicKeys: const ['gender', 'sex']),
+      email: pickString('email', fallback: ''),
+      phone: pickString(
+        'phone',
+        basicKeys: const ['phone', 'phoneNumber', 'phone_number'],
+      ),
+      emergencyContactNumber: pickString(
+        'emergencyContactNumber',
+        basicKeys: const [
+          'emergencyContactNumber',
+          'emergency_contact_number',
+          'emergencyContact',
+        ],
+      ),
       avatarUrl: json['avatarUrl'] as String? ?? '',
       accountStatus: json['accountStatus'] as String? ?? 'Pending',
-      marketingName: json['marketingName'] as String? ?? '',
-      addressLine1: json['addressLine1'] as String? ?? '',
-      addressLine2: json['addressLine2'] as String? ?? '',
-      postcode: json['postcode'] as String? ?? '',
-      city: json['city'] as String? ?? '',
-      state: json['state'] as String? ?? '',
-      serviceLocation: json['serviceLocation'] as String? ?? '',
-      serviceRadiusKm: (json['serviceRadiusKm'] as num?)?.toDouble() ?? 0,
-      country: json['country'] as String? ?? 'Malaysia',
+      marketingName: pickString(
+        'marketingName',
+        basicKeys: const ['marketingName', 'marketing_name'],
+      ),
+      addressLine1: pickString(
+        'addressLine1',
+        basicKeys: const ['addressLine1', 'address_line_1'],
+      ),
+      addressLine2: pickString(
+        'addressLine2',
+        basicKeys: const ['addressLine2', 'address_line_2'],
+      ),
+      postcode: pickString(
+        'postcode',
+        basicKeys: const ['postcode'],
+        locationKeys: const ['postcode'],
+      ),
+      city: pickString(
+        'city',
+        basicKeys: const ['city'],
+        locationKeys: const ['city'],
+      ),
+      state: pickString(
+        'state',
+        basicKeys: const ['state'],
+        locationKeys: const ['state'],
+      ),
+      serviceLocation: pickString(
+        'serviceLocation',
+        basicKeys: const ['serviceLocation', 'service_area'],
+        locationKeys: const ['areaLabel', 'formattedAddress', 'service_area'],
+      ),
+      serviceRadiusKm: pickDouble(
+        'serviceRadiusKm',
+        locationKeys: const ['radius', 'serviceRadius', 'service_radius_km'],
+      ),
+      country: pickString(
+        'country',
+        basicKeys: const ['country'],
+        locationKeys: const ['country'],
+        fallback: 'Malaysia',
+      ),
       bio: json['bio'] as String? ?? '',
       averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0,
       totalReviews: (json['totalReviews'] as num?)?.toInt() ?? 0,
@@ -165,6 +296,8 @@ class ProviderWorkspaceProfile {
       identityVerificationStatus:
           json['identityVerificationStatus'] as String? ?? 'pending',
       identityDocumentType: json['identityDocumentType'] as String? ?? '',
+      nationality: json['nationality'] as String? ?? '',
+      identityDocumentNumber: json['identityDocumentNumber'] as String? ?? '',
       identityFrontImageUrl: json['identityFrontImageUrl'] as String? ?? '',
       identityBackImageUrl: json['identityBackImageUrl'] as String? ?? '',
       kycVerified: json['kycVerified'] == true,
@@ -172,9 +305,7 @@ class ProviderWorkspaceProfile {
       services: (json['services'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map(
-            (item) => item.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ),
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)),
           )
           .map(ProviderWorkspaceServiceModel.fromJson)
           .toList(growable: false),
@@ -212,6 +343,8 @@ class ProviderWorkspaceBooking {
     required this.additionalChargeDescription,
     required this.paymentNote,
     required this.companyPaymentStatus,
+    required this.providerCompanyPaymentAmount,
+    required this.adminCompanyReceivedAmount,
     required this.acceptedAt,
     required this.onTheWayAt,
     required this.arrivedAt,
@@ -255,6 +388,8 @@ class ProviderWorkspaceBooking {
   final String additionalChargeDescription;
   final String paymentNote;
   final String companyPaymentStatus;
+  final double providerCompanyPaymentAmount;
+  final double? adminCompanyReceivedAmount;
   final String acceptedAt;
   final String onTheWayAt;
   final String arrivedAt;
@@ -295,7 +430,8 @@ class ProviderWorkspaceBooking {
           (json['companyCommissionAmount'] as num?)?.toDouble() ?? 0,
       providerNetAmount: (json['providerNetAmount'] as num?)?.toDouble() ?? 0,
       createdAt: json['createdAt'] as String? ?? '',
-      baseAmount: (json['baseAmount'] as num?)?.toDouble() ??
+      baseAmount:
+          (json['baseAmount'] as num?)?.toDouble() ??
           (json['quotedAmount'] as num?)?.toDouble() ??
           0,
       additionalCharge: (json['additionalCharge'] as num?)?.toDouble() ?? 0,
@@ -303,6 +439,10 @@ class ProviderWorkspaceBooking {
           json['additionalChargeDescription'] as String? ?? '',
       paymentNote: json['paymentNote'] as String? ?? '',
       companyPaymentStatus: json['companyPaymentStatus'] as String? ?? '',
+      providerCompanyPaymentAmount:
+          (json['providerCompanyPaymentAmount'] as num?)?.toDouble() ?? 0,
+      adminCompanyReceivedAmount: (json['adminCompanyReceivedAmount'] as num?)
+          ?.toDouble(),
       acceptedAt: json['acceptedAt'] as String? ?? '',
       onTheWayAt: json['onTheWayAt'] as String? ?? '',
       arrivedAt: json['arrivedAt'] as String? ?? '',
@@ -312,10 +452,12 @@ class ProviderWorkspaceBooking {
       providerReviewedAt: json['providerReviewedAt'] as String? ?? '',
       reviewedAt: json['reviewedAt'] as String? ?? '',
       providerReviewStatus: json['providerReviewStatus'] as String? ?? '',
-      providerReviewRating: (json['providerReviewRating'] as num?)?.toInt() ?? 0,
+      providerReviewRating:
+          (json['providerReviewRating'] as num?)?.toInt() ?? 0,
       providerReviewComment: json['providerReviewComment'] as String? ?? '',
-      workFinishedImages:
-          _providerWorkspaceStringList(json['workFinishedImages']),
+      workFinishedImages: _providerWorkspaceStringList(
+        json['workFinishedImages'],
+      ),
       customerPaymentProofDataUrl:
           json['customerPaymentProofDataUrl'] as String? ?? '',
     );
@@ -443,9 +585,7 @@ class ProviderConversationDetail {
       messages: (json['messages'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map(
-            (item) => item.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ),
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)),
           )
           .map(ProviderConversationMessage.fromJson)
           .toList(growable: false),
@@ -500,9 +640,7 @@ class ProviderAvailabilitySnapshot {
       entries: (json['entries'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map(
-            (item) => item.map(
-              (key, value) => MapEntry(key.toString(), value),
-            ),
+            (item) => item.map((key, value) => MapEntry(key.toString(), value)),
           )
           .map(ProviderAvailabilityEntry.fromJson)
           .toList(growable: false),
@@ -549,6 +687,94 @@ class ProviderWorkspaceSnapshot {
   final List<ProviderWorkspaceBooking> bookings;
 }
 
+/// One company-payment submission, as returned by
+/// `/api/provider/company-payments` (either as `latestSubmission` or as an
+/// item inside `history`). Backend status values are used verbatim —
+/// only ever `'processing'` or `'paid'`; there is no `'rejected'` value.
+class ProviderCompanySubmission {
+  const ProviderCompanySubmission({
+    required this.id,
+    required this.submittedAmount,
+    required this.adminReceivedAmount,
+    required this.status,
+    required this.proofFileName,
+    required this.submittedAt,
+    required this.reviewedAt,
+  });
+
+  final String id;
+  final double submittedAmount;
+  final double? adminReceivedAmount;
+  final String status;
+  final String proofFileName;
+  final String submittedAt;
+  final String reviewedAt;
+
+  factory ProviderCompanySubmission.fromJson(Map<String, dynamic> json) {
+    return ProviderCompanySubmission(
+      id: json['id'] as String? ?? '',
+      submittedAmount: (json['submittedAmount'] as num?)?.toDouble() ?? 0,
+      adminReceivedAmount: (json['adminReceivedAmount'] as num?)?.toDouble(),
+      status: json['status'] as String? ?? 'processing',
+      proofFileName: json['proofFileName'] as String? ?? '',
+      submittedAt: json['submittedAt'] as String? ?? '',
+      reviewedAt: json['reviewedAt'] as String? ?? '',
+    );
+  }
+}
+
+/// Authoritative company-payment settlement state, as returned by
+/// `GET /api/provider/company-payments`. This — not local widget state —
+/// is the source of truth once loaded.
+class ProviderCompanyPaymentSummary {
+  const ProviderCompanyPaymentSummary({
+    required this.payableAmount,
+    required this.processingAmount,
+    required this.verifiedAmount,
+    required this.latestSubmission,
+    required this.history,
+  });
+
+  final double payableAmount;
+  final double processingAmount;
+  final double verifiedAmount;
+  final ProviderCompanySubmission? latestSubmission;
+  final List<ProviderCompanySubmission> history;
+
+  static const empty = ProviderCompanyPaymentSummary(
+    payableAmount: 0,
+    processingAmount: 0,
+    verifiedAmount: 0,
+    latestSubmission: null,
+    history: [],
+  );
+
+  factory ProviderCompanyPaymentSummary.fromJson(Map<String, dynamic> json) {
+    final latestJson = json['latestSubmission'];
+    final historyJson = json['history'];
+    return ProviderCompanyPaymentSummary(
+      payableAmount: (json['payableAmount'] as num?)?.toDouble() ?? 0,
+      processingAmount: (json['processingAmount'] as num?)?.toDouble() ?? 0,
+      verifiedAmount: (json['verifiedAmount'] as num?)?.toDouble() ?? 0,
+      latestSubmission: latestJson is Map
+          ? ProviderCompanySubmission.fromJson(
+              latestJson.map((key, value) => MapEntry(key.toString(), value)),
+            )
+          : null,
+      history: historyJson is List
+          ? historyJson
+                .whereType<Map>()
+                .map(
+                  (item) => ProviderCompanySubmission.fromJson(
+                    item.map((key, value) => MapEntry(key.toString(), value)),
+                  ),
+                )
+                .toList(growable: false)
+          : const [],
+    );
+  }
+}
+
 class ProviderWorkspaceService {
   const ProviderWorkspaceService();
 
@@ -567,7 +793,8 @@ class ProviderWorkspaceService {
     final response = await _request('GET', '/api/provider/me');
     final body = _decodeMap(response.body);
     if (_isSuccess(response.statusCode)) {
-      return ProviderWorkspaceProfile.fromJson(body);
+      final profile = ProviderWorkspaceProfile.fromJson(body);
+      return _hydrateProfile(profile);
     }
     throw Exception(_readError(body, 'Unable to load provider profile.'));
   }
@@ -576,9 +803,9 @@ class ProviderWorkspaceService {
     final response = await _request('GET', '/api/provider/bookings');
     final body = _decodeMap(response.body);
     if (_isSuccess(response.statusCode)) {
-      return _listOfMaps(body['bookings'])
-          .map(ProviderWorkspaceBooking.fromJson)
-          .toList(growable: false);
+      return _listOfMaps(
+        body['bookings'],
+      ).map(ProviderWorkspaceBooking.fromJson).toList(growable: false);
     }
     throw Exception(_readError(body, 'Unable to load provider bookings.'));
   }
@@ -615,7 +842,9 @@ class ProviderWorkspaceService {
     );
     final data = _decodeMap(response.body);
     if (!_isSuccess(response.statusCode)) {
-      throw Exception(_readError(data, 'Unable to save provider availability.'));
+      throw Exception(
+        _readError(data, 'Unable to save provider availability.'),
+      );
     }
   }
 
@@ -623,9 +852,9 @@ class ProviderWorkspaceService {
     final response = await _request('GET', '/api/provider/reviews');
     final body = _decodeMap(response.body);
     if (_isSuccess(response.statusCode)) {
-      return _listOfMaps(body['reviews'])
-          .map(ProviderReviewItem.fromJson)
-          .toList(growable: false);
+      return _listOfMaps(
+        body['reviews'],
+      ).map(ProviderReviewItem.fromJson).toList(growable: false);
     }
     throw Exception(_readError(body, 'Unable to load provider reviews.'));
   }
@@ -634,9 +863,9 @@ class ProviderWorkspaceService {
     final response = await _request('GET', '/api/provider/messages');
     final body = _decodeMap(response.body);
     if (_isSuccess(response.statusCode)) {
-      return _listOfMaps(body['threads'])
-          .map(ProviderMessageThread.fromJson)
-          .toList(growable: false);
+      return _listOfMaps(
+        body['threads'],
+      ).map(ProviderMessageThread.fromJson).toList(growable: false);
     }
     throw Exception(_readError(body, 'Unable to load provider messages.'));
   }
@@ -687,12 +916,13 @@ class ProviderWorkspaceService {
   }
 
   Future<void> markConversationRead(String bookingId) async {
-    final response = await _request('PATCH', '/api/provider/messages/$bookingId');
+    final response = await _request(
+      'PATCH',
+      '/api/provider/messages/$bookingId',
+    );
     final body = _decodeMap(response.body);
     if (!_isSuccess(response.statusCode)) {
-      throw Exception(
-        _readError(body, 'Unable to mark conversation as read.'),
-      );
+      throw Exception(_readError(body, 'Unable to mark conversation as read.'));
     }
   }
 
@@ -703,6 +933,7 @@ class ProviderWorkspaceService {
     String? dateOfBirth,
     String? gender,
     String? email,
+    bool? emailVerified,
     String? phone,
     String? avatarUrl,
     String? marketingName,
@@ -720,6 +951,8 @@ class ProviderWorkspaceService {
     bool? identityVerified,
     String? identityVerificationStatus,
     String? identityDocumentType,
+    String? nationality,
+    String? identityDocumentNumber,
     String? identityFrontImageUrl,
     String? identityBackImageUrl,
   }) async {
@@ -730,6 +963,7 @@ class ProviderWorkspaceService {
     if (dateOfBirth != null) payload['dateOfBirth'] = dateOfBirth;
     if (gender != null) payload['gender'] = gender;
     if (email != null) payload['email'] = email;
+    if (emailVerified != null) payload['emailVerified'] = emailVerified;
     if (phone != null) payload['phone'] = phone;
     if (avatarUrl != null) payload['avatarUrl'] = avatarUrl;
     if (marketingName != null) payload['marketingName'] = marketingName;
@@ -746,12 +980,17 @@ class ProviderWorkspaceService {
       payload['emergencyContactNumber'] = emergencyContactNumber;
     }
     if (phoneVerified != null) payload['phoneVerified'] = phoneVerified;
-    if (identityVerified != null) payload['identityVerified'] = identityVerified;
+    if (identityVerified != null)
+      payload['identityVerified'] = identityVerified;
     if (identityVerificationStatus != null) {
       payload['identityVerificationStatus'] = identityVerificationStatus;
     }
     if (identityDocumentType != null) {
       payload['identityDocumentType'] = identityDocumentType;
+    }
+    if (nationality != null) payload['nationality'] = nationality;
+    if (identityDocumentNumber != null) {
+      payload['identityDocumentNumber'] = identityDocumentNumber;
     }
     if (identityFrontImageUrl != null) {
       payload['identityFrontImageUrl'] = identityFrontImageUrl;
@@ -760,16 +999,261 @@ class ProviderWorkspaceService {
       payload['identityBackImageUrl'] = identityBackImageUrl;
     }
 
-    final response = await _request(
-      'PATCH',
-      '/api/provider/me',
-      body: payload,
-    );
+    final response = await _request('PATCH', '/api/provider/me', body: payload);
     final body = _decodeMap(response.body);
     if (_isSuccess(response.statusCode)) {
-      return ProviderWorkspaceProfile.fromJson(body);
+      final profile = ProviderWorkspaceProfile.fromJson(body);
+      return _hydrateProfile(profile);
     }
     throw Exception(_readError(body, 'Unable to update provider profile.'));
+  }
+
+  Future<ProviderWorkspaceProfile> _hydrateProfile(
+    ProviderWorkspaceProfile profile,
+  ) async {
+    final providerRow = await _fetchProviderProfileRow();
+    final metadata = _providerMetadata();
+
+    String rowValue(String key) => providerRow?[key]?.toString().trim() ?? '';
+    String metadataValue(List<String> keys) {
+      for (final key in keys) {
+        final value = metadata[key]?.toString().trim() ?? '';
+        if (value.isNotEmpty) {
+          return value;
+        }
+      }
+      return '';
+    }
+
+    String pick(
+      String current,
+      String rowKey, {
+      List<String> metadataKeys = const [],
+    }) {
+      if (current.trim().isNotEmpty) {
+        return current;
+      }
+      final fallback = rowValue(rowKey);
+      if (fallback.isNotEmpty) {
+        return fallback;
+      }
+      return metadataValue(metadataKeys);
+    }
+
+    final firstName = pick(
+      profile.firstName,
+      'first_name',
+      metadataKeys: const ['firstName', 'first_name'],
+    );
+    final lastName = pick(
+      profile.lastName,
+      'last_name',
+      metadataKeys: const ['lastName', 'last_name'],
+    );
+    final marketingName = pick(
+      profile.marketingName,
+      'marketing_name',
+      metadataKeys: const ['marketingName', 'marketing_name'],
+    );
+    final fullName = profile.fullName.trim().isNotEmpty
+        ? profile.fullName
+        : [
+            firstName,
+            lastName,
+          ].where((item) => item.trim().isNotEmpty).join(' ').trim();
+
+    return ProviderWorkspaceProfile(
+      providerId: profile.providerId.isNotEmpty
+          ? profile.providerId
+          : rowValue('id'),
+      fullName: fullName,
+      firstName: firstName,
+      lastName: lastName,
+      dateOfBirth: pick(
+        profile.dateOfBirth,
+        'date_of_birth',
+        metadataKeys: const ['dateOfBirth', 'date_of_birth'],
+      ),
+      gender: pick(
+        profile.gender,
+        'gender',
+        metadataKeys: const ['gender', 'sex'],
+      ),
+      email: pick(profile.email, 'email', metadataKeys: const ['email']),
+      phone: pick(
+        profile.phone,
+        'phone_number',
+        metadataKeys: const ['phoneNumber', 'phone_number', 'phone'],
+      ),
+      emergencyContactNumber: pick(
+        profile.emergencyContactNumber,
+        'emergency_contact_number',
+        metadataKeys: const [
+          'emergencyContactNumber',
+          'emergency_contact_number',
+          'emergencyContact',
+        ],
+      ),
+      avatarUrl: profile.avatarUrl,
+      accountStatus: profile.accountStatus,
+      marketingName: marketingName,
+      addressLine1: pick(
+        profile.addressLine1,
+        'address_line_1',
+        metadataKeys: const ['addressLine1', 'address_line_1'],
+      ),
+      addressLine2: pick(
+        profile.addressLine2,
+        'address_line_2',
+        metadataKeys: const ['addressLine2', 'address_line_2'],
+      ),
+      postcode: pick(
+        profile.postcode,
+        'postcode',
+        metadataKeys: const ['postcode'],
+      ),
+      city: pick(profile.city, 'city', metadataKeys: const ['city']),
+      state: pick(profile.state, 'state', metadataKeys: const ['state']),
+      serviceLocation: pick(
+        profile.serviceLocation,
+        'service_area',
+        metadataKeys: const ['serviceLocation', 'service_area', 'areaLabel'],
+      ),
+      serviceRadiusKm: profile.serviceRadiusKm > 0
+          ? profile.serviceRadiusKm
+          : (providerRow?['service_radius_km'] as num?)?.toDouble() ??
+                double.tryParse(
+                  metadataValue(const ['serviceRadius', 'service_radius_km']),
+                ) ??
+                0,
+      country: pick(
+        profile.country,
+        'country',
+        metadataKeys: const ['country'],
+      ),
+      bio: profile.bio,
+      averageRating: profile.averageRating,
+      totalReviews: profile.totalReviews,
+      approvalStatus: profile.approvalStatus,
+      isVisible: profile.isVisible,
+      emailVerified: profile.emailVerified,
+      phoneVerified:
+          profile.phoneVerified || providerRow?['phone_verified'] == true,
+      identityVerified:
+          profile.identityVerified || providerRow?['identity_verified'] == true,
+      identityVerificationStatus: profile.identityVerificationStatus,
+      identityDocumentType: profile.identityDocumentType,
+      nationality: profile.nationality,
+      identityDocumentNumber: profile.identityDocumentNumber,
+      identityFrontImageUrl: profile.identityFrontImageUrl,
+      identityBackImageUrl: profile.identityBackImageUrl,
+      kycVerified: profile.kycVerified,
+      backgroundCheckVerified: profile.backgroundCheckVerified,
+      services: profile.services,
+    );
+  }
+
+  Future<Map<String, dynamic>?> _fetchProviderProfileRow() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    final email = user?.email?.trim().toLowerCase() ?? '';
+    final rawEmail = user?.email?.trim() ?? '';
+    final authPhone = user?.phone?.trim() ?? '';
+    final normalizedAuthPhone = normalizePhoneNumber(authPhone);
+    final normalizedMetadataPhone = normalizePhoneNumber(
+      _providerMetadata()['phoneNumber']?.toString() ??
+          _providerMetadata()['phone']?.toString() ??
+          '',
+    );
+    final candidatePhones = <String>{
+      normalizedAuthPhone,
+      normalizedMetadataPhone,
+    }.where((item) => item.isNotEmpty).toList(growable: false);
+
+    try {
+      if (user != null) {
+        final byId = await Supabase.instance.client
+            .from('provider_profiles')
+            .select(
+              'id, first_name, last_name, marketing_name, date_of_birth, gender, email, phone_number, emergency_contact_number, address_line_1, address_line_2, postcode, city, state, country, service_area, service_radius_km, phone_verified, identity_verified',
+            )
+            .eq('id', user.id)
+            .maybeSingle();
+        if (byId != null) {
+          return Map<String, dynamic>.from(byId);
+        }
+      }
+    } catch (_) {}
+
+    if (email.isEmpty) {
+      return null;
+    }
+
+    try {
+      final byEmail = await Supabase.instance.client
+          .from('provider_profiles')
+          .select(
+            'id, first_name, last_name, marketing_name, date_of_birth, gender, email, phone_number, emergency_contact_number, address_line_1, address_line_2, postcode, city, state, country, service_area, service_radius_km, phone_verified, identity_verified',
+          )
+          .eq('email', email)
+          .maybeSingle();
+      if (byEmail != null) {
+        return Map<String, dynamic>.from(byEmail);
+      }
+    } catch (_) {}
+
+    if (rawEmail.isNotEmpty && rawEmail != email) {
+      try {
+        final byRawEmail = await Supabase.instance.client
+            .from('provider_profiles')
+            .select(
+              'id, first_name, last_name, marketing_name, date_of_birth, gender, email, phone_number, emergency_contact_number, address_line_1, address_line_2, postcode, city, state, country, service_area, service_radius_km, phone_verified, identity_verified',
+            )
+            .eq('email', rawEmail)
+            .maybeSingle();
+        if (byRawEmail != null) {
+          return Map<String, dynamic>.from(byRawEmail);
+        }
+      } catch (_) {}
+    }
+
+    for (final phone in candidatePhones) {
+      try {
+        final byPhone = await Supabase.instance.client
+            .from('provider_profiles')
+            .select(
+              'id, first_name, last_name, marketing_name, date_of_birth, gender, email, phone_number, emergency_contact_number, address_line_1, address_line_2, postcode, city, state, country, service_area, service_radius_km, phone_verified, identity_verified',
+            )
+            .eq('phone_number', phone)
+            .maybeSingle();
+        if (byPhone != null) {
+          return Map<String, dynamic>.from(byPhone);
+        }
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  Map<String, dynamic> _providerMetadata() {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      return const {};
+    }
+
+    final metadata = Map<String, dynamic>.from(user.userMetadata ?? const {});
+    final basicProfile = metadata['basicProfile'];
+    if (basicProfile is Map) {
+      for (final entry in basicProfile.entries) {
+        metadata[entry.key.toString()] = entry.value;
+      }
+    }
+    final providerLocation = metadata['providerLocation'];
+    if (providerLocation is Map) {
+      for (final entry in providerLocation.entries) {
+        metadata.putIfAbsent(entry.key.toString(), () => entry.value);
+      }
+    }
+    return metadata;
   }
 
   Future<void> createService({
@@ -835,6 +1319,17 @@ class ProviderWorkspaceService {
     }
   }
 
+  Future<void> deleteService({required String serviceId}) async {
+    final response = await _request(
+      'DELETE',
+      '/api/provider/services/$serviceId',
+    );
+    final data = _decodeMap(response.body);
+    if (!_isSuccess(response.statusCode)) {
+      throw Exception(_readError(data, 'Unable to delete provider service.'));
+    }
+  }
+
   Future<void> updateBookingStatus({
     required String bookingId,
     required String status,
@@ -843,10 +1338,7 @@ class ProviderWorkspaceService {
     List<String>? workFinishedImages,
     List<Map<String, dynamic>>? paymentBreakdown,
   }) async {
-    final payload = <String, dynamic>{
-      'status': status,
-      'note': note,
-    };
+    final payload = <String, dynamic>{'status': status, 'note': note};
     if (finalAmount != null) payload['finalAmount'] = finalAmount;
     if (workFinishedImages != null) {
       payload['workFinishedImages'] = workFinishedImages;
@@ -875,11 +1367,7 @@ class ProviderWorkspaceService {
     final response = await _request(
       'POST',
       '/api/provider/bookings/$bookingId/review',
-      body: {
-        'rating': rating,
-        'comment': comment,
-        'photos': photos,
-      },
+      body: {'rating': rating, 'comment': comment, 'photos': photos},
     );
     final body = _decodeMap(response.body);
     if (!_isSuccess(response.statusCode) || body['success'] != true) {
@@ -887,34 +1375,56 @@ class ProviderWorkspaceService {
     }
   }
 
-  Future<void> submitCompanyPayment({
+  /// Submits a company commission settlement. The request body matches the
+  /// real `/api/provider/company-payments` POST contract exactly
+  /// (`depositedAmount`/`proofDataUrl`/`proofFileName`/`proofMimeType`) —
+  /// the route does not accept a note/reference field, so none is sent.
+  /// Returns the refreshed summary the backend computes right after the
+  /// insert, so callers don't need a separate GET round-trip to reflect
+  /// the new "processing" state.
+  Future<ProviderCompanyPaymentSummary?> submitCompanyPayment({
     required double amount,
-    String note = '',
-    String attachmentDataUrl = '',
-    String attachmentFileName = '',
-    String attachmentMimeType = '',
+    required String proofDataUrl,
+    required String proofFileName,
+    required String proofMimeType,
   }) async {
     final response = await _request(
       'POST',
       '/api/provider/company-payments',
       body: {
-        'amount': amount,
-        'amountPaid': amount,
-        'note': note,
-        'attachmentDataUrl': attachmentDataUrl,
-        'attachmentFileName': attachmentFileName,
-        'attachmentMimeType': attachmentMimeType,
-        'paymentSlipDataUrl': attachmentDataUrl,
-        'paymentSlipFileName': attachmentFileName,
-        'paymentSlipMimeType': attachmentMimeType,
+        'depositedAmount': amount,
+        'proofDataUrl': proofDataUrl,
+        'proofFileName': proofFileName,
+        'proofMimeType': proofMimeType,
       },
     );
     final body = _decodeMap(response.body);
     if (!_isSuccess(response.statusCode) || body['success'] != true) {
-      throw Exception(
-        _readError(body, 'Unable to submit company payment.'),
+      throw Exception(_readError(body, 'Unable to submit company payment.'));
+    }
+    final summaryJson = body['summary'];
+    if (summaryJson is Map) {
+      return ProviderCompanyPaymentSummary.fromJson(
+        summaryJson.map((key, value) => MapEntry(key.toString(), value)),
       );
     }
+    return null;
+  }
+
+  /// Reads the authoritative, backend-persisted company-payment state —
+  /// outstanding payable, the currently-processing submission (if any),
+  /// the verified (admin-confirmed) total, and recent submission history.
+  /// Reuses the existing `/api/provider/company-payments` GET endpoint;
+  /// no new endpoint involved.
+  Future<ProviderCompanyPaymentSummary> fetchCompanyPaymentSummary() async {
+    final response = await _request('GET', '/api/provider/company-payments');
+    final body = _decodeMap(response.body);
+    if (_isSuccess(response.statusCode)) {
+      return ProviderCompanyPaymentSummary.fromJson(body);
+    }
+    throw Exception(
+      _readError(body, 'Unable to load company payment summary.'),
+    );
   }
 
   Future<http.Response> _request(
@@ -946,6 +1456,8 @@ class ProviderWorkspaceService {
         return http.patch(uri, headers: headers, body: jsonEncode(body));
       case 'PUT':
         return http.put(uri, headers: headers, body: jsonEncode(body));
+      case 'DELETE':
+        return http.delete(uri, headers: headers);
       default:
         throw UnsupportedError('Unsupported request method: $method');
     }
@@ -954,11 +1466,7 @@ class ProviderWorkspaceService {
   List<Map<String, dynamic>> _listOfMaps(dynamic value) {
     return (value as List<dynamic>? ?? const [])
         .whereType<Map>()
-        .map(
-          (item) => item.map(
-            (key, data) => MapEntry(key.toString(), data),
-          ),
-        )
+        .map((item) => item.map((key, data) => MapEntry(key.toString(), data)))
         .toList(growable: false);
   }
 

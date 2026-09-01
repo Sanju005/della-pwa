@@ -3,13 +3,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/routing/app_routes.dart';
+import '../../../core/utils/phone_number.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/otp_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
-import '../../../widgets/swiper_password_field.dart';
-import '../../../widgets/swiper_text_field.dart';
+import 'auth_flow_scaffold.dart';
+import 'otp_step_view.dart';
+
+enum _LoginStep { phone, otp, signingIn }
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.repository});
@@ -22,22 +26,16 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _authService = const AuthService();
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final OtpService _otpService = const DevelopmentOtpService();
+  final _countryCodeController = TextEditingController(text: '60');
   final _phoneController = TextEditingController();
-  final _otpController = TextEditingController();
-  final _emailFocusNode = FocusNode();
-  final _passwordFocusNode = FocusNode();
-  final _phoneFocusNode = FocusNode();
-  final _otpFocusNode = FocusNode();
 
+  _LoginStep _step = _LoginStep.phone;
   bool _rememberMe = true;
-  bool _isSubmitting = false;
   bool _isCheckingSession = true;
-  bool _showValidation = false;
+  bool _sendingCode = false;
+  String? _normalizedPhone;
   String? _errorMessage;
-  bool _usePhoneOtp = false;
 
   @override
   void initState() {
@@ -47,60 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _countryCodeController.dispose();
     _phoneController.dispose();
-    _otpController.dispose();
-    _emailFocusNode.dispose();
-    _passwordFocusNode.dispose();
-    _phoneFocusNode.dispose();
-    _otpFocusNode.dispose();
     super.dispose();
-  }
-
-  String? _validatePhone(String? value) {
-    final phone = value?.trim() ?? '';
-    if (phone.isEmpty) {
-      return 'Phone number is required.';
-    }
-    if (phone.replaceAll(RegExp(r'\D'), '').length < 9) {
-      return 'Enter a valid phone number.';
-    }
-    return null;
-  }
-
-  String? _validateOtp(String? value) {
-    final otp = value?.trim() ?? '';
-    if (otp.isEmpty) {
-      return 'OTP code is required.';
-    }
-    if (otp.length != 6) {
-      return 'Enter the 6-digit OTP code.';
-    }
-    return null;
-  }
-
-  String? _validateEmail(String? value) {
-    final email = value?.trim() ?? '';
-    if (email.isEmpty) {
-      return 'Email is required.';
-    }
-
-    final emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-    if (!emailPattern.hasMatch(email)) {
-      return 'Enter a valid email address.';
-    }
-
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    final password = value ?? '';
-    if (password.isEmpty) {
-      return 'Password is required.';
-    }
-
-    return null;
   }
 
   String _nextCustomerRoute(BuildContext context) {
@@ -141,42 +88,94 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Future<void> _submit() async {
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _showValidation = true;
-      _errorMessage = null;
-    });
+  String get _heading {
+    switch (_step) {
+      case _LoginStep.phone:
+        return 'Welcome back!';
+      case _LoginStep.otp:
+        return 'Verify your phone';
+      case _LoginStep.signingIn:
+        return 'Signing you in';
+    }
+  }
 
-    if (!_formKey.currentState!.validate()) {
+  String get _subtitle {
+    switch (_step) {
+      case _LoginStep.phone:
+        return 'Log in to continue to your ${AppConstants.appName} account.';
+      case _LoginStep.otp:
+        final formatted = _normalizedPhone == null
+            ? ''
+            : formatPhoneForDisplay(_normalizedPhone!);
+        return 'Enter the 6-digit verification code sent to\n$formatted';
+      case _LoginStep.signingIn:
+        return 'Just a moment while we get your account ready.';
+    }
+  }
+
+  Future<void> _continueFromPhone() async {
+    FocusScope.of(context).unfocus();
+    final normalized = normalizePhoneNumber(
+      _countryCodeController.text,
+      _phoneController.text,
+    );
+    if (normalized == null) {
+      setState(() => _errorMessage = 'Enter a valid mobile number.');
       return;
     }
 
     setState(() {
-      _isSubmitting = true;
+      _errorMessage = null;
+      _normalizedPhone = normalized;
+      _sendingCode = true;
     });
-
+    try {
+      await _otpService.sendOtp(normalized);
+    } finally {
+      if (mounted) {
+        setState(() => _sendingCode = false);
+      }
+    }
     if (!mounted) {
       return;
     }
+    setState(() => _step = _LoginStep.otp);
+  }
+
+  /// Tries the real provider phone-login first (this phone/OTP combo is also
+  /// how providers sign back in, not just customers), then the real customer
+  /// phone-login — both produce a genuine authenticated Supabase session, no
+  /// local/fake auth store is involved. Any other failure (network error,
+  /// backend not deployed yet) surfaces as-is rather than being masked by a
+  /// confusing fallback attempt.
+  Future<void> _handleOtpVerified(String code) async {
+    setState(() => _step = _LoginStep.signingIn);
 
     try {
-      final role = _usePhoneOtp
-          ? await _authService.signInWithDemoPhone(
-              phoneNumber: _phoneController.text.trim(),
-              otpCode: _otpController.text.trim(),
-            )
-          : await _authService.signIn(
-              email: _emailController.text.trim().toLowerCase(),
-              password: _passwordController.text,
-            );
+      String? role;
+      try {
+        role = await _authService.signInProviderWithVerifiedPhone(
+          phoneCountryCode:
+              '+${_countryCodeController.text.replaceAll(RegExp(r'\D'), '')}',
+          phoneNumber: _phoneController.text.trim(),
+        );
+      } on ProviderPhoneAccountNotFoundException {
+        try {
+          role = await _authService.signInCustomerWithVerifiedPhone(
+            phoneCountryCode:
+                '+${_countryCodeController.text.replaceAll(RegExp(r'\D'), '')}',
+            phoneNumber: _phoneController.text.trim(),
+          );
+        } on CustomerPhoneAccountNotFoundException {
+          throw Exception(
+            'No account was found for this phone number. Check the number or create an account.',
+          );
+        }
+      }
+
       if (!mounted) {
         return;
       }
-
-      setState(() {
-        _isSubmitting = false;
-      });
 
       final routeName = _authService.isProviderRole(role)
           ? AppRoutes.providerShell
@@ -189,13 +188,29 @@ class _LoginScreenState extends State<LoginScreen> {
       final message = error is AuthException && error.message.isNotEmpty
           ? error.message
           : error is Exception
-              ? error.toString().replaceFirst('Exception: ', '')
-              : 'Unable to sign in. Check your details and try again.';
+          ? error.toString().replaceFirst('Exception: ', '')
+          : 'Unable to sign in. Please try again.';
+      // A failed sign-in invalidates the OTP step (same as registration's
+      // rule: returning to the phone step always requires re-verification),
+      // so the provider re-enters their number rather than being stuck on a
+      // step that's already shown its "verified" checkmark.
       setState(() {
-        _isSubmitting = false;
+        _step = _LoginStep.phone;
+        _normalizedPhone = null;
         _errorMessage = message;
       });
     }
+  }
+
+  void _back() {
+    if (_step == _LoginStep.otp) {
+      setState(() {
+        _step = _LoginStep.phone;
+        _normalizedPhone = null;
+      });
+      return;
+    }
+    Navigator.of(context).maybePop();
   }
 
   void _showDemoMessage(String message) {
@@ -207,328 +222,280 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (_isCheckingSession) {
       return const Scaffold(
         body: SafeArea(child: Center(child: CircularProgressIndicator())),
       );
     }
 
-    return Scaffold(
-      body: SafeArea(
-        child: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.xl,
-              AppSpacing.lg,
-              AppSpacing.xl,
+    final showBottomButton = _step == _LoginStep.phone;
+
+    return PopScope(
+      canPop: _step == _LoginStep.phone,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
+        _back();
+      },
+      child: AuthFlowScaffold(
+        showBack: _step == _LoginStep.otp,
+        onBack: _back,
+        hero: Image.asset('assets/logo/main_logo.png', width: 84),
+        title: _heading,
+        subtitle: _subtitle,
+        bottom: showBottomButton
+            ? SwiperButton(
+                label: 'Continue',
+                icon: const Icon(Icons.arrow_forward_rounded),
+                isLoading: _sendingCode,
+                onPressed: _sendingCode ? null : _continueFromPhone,
+              )
+            : null,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeOut,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.02, 0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
             ),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: _showValidation
-                  ? AutovalidateMode.onUserInteraction
-                  : AutovalidateMode.disabled,
-              child: AutofillGroup(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          child: KeyedSubtree(key: ValueKey(_step), child: _buildStepBody()),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepBody() {
+    switch (_step) {
+      case _LoginStep.phone:
+        return _buildPhoneStep();
+      case _LoginStep.otp:
+        return OtpStepView(
+          key: ValueKey(_normalizedPhone),
+          contactValue: _normalizedPhone ?? '',
+          otpService: _otpService,
+          onVerified: _handleOtpVerified,
+        );
+      case _LoginStep.signingIn:
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          child: Center(child: CircularProgressIndicator()),
+        );
+    }
+  }
+
+  Widget _buildPhoneStep() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Phone Number', style: theme.textTheme.labelLarge),
+        const SizedBox(height: AppSpacing.xs),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SizedBox(height: AppSpacing.sm),
-                    Center(
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.primary, AppColors.primaryDeep],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x338968CD),
-                              blurRadius: 24,
-                              offset: Offset(0, 12),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.swipe_rounded,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    Text(
-                      'Welcome back!',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontSize: 24,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Log in to continue to your ${AppConstants.appName} account.',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment<bool>(
-                          value: true,
-                          label: Text('Phone OTP'),
-                          icon: Icon(Icons.sms_outlined),
-                        ),
-                        ButtonSegment<bool>(
-                          value: false,
-                          label: Text('Email'),
-                          icon: Icon(Icons.mail_outline_rounded),
-                        ),
-                      ],
-                      selected: {_usePhoneOtp},
-                      onSelectionChanged: (selection) {
-                        setState(() {
-                          _usePhoneOtp = selection.first;
-                          _errorMessage = null;
-                        });
+                    Builder(
+                      builder: (context) {
+                        final matched = matchCountryCode(
+                          _countryCodeController.text,
+                        );
+                        if (matched == null) {
+                          return const Icon(
+                            Icons.public_rounded,
+                            size: 18,
+                            color: AppColors.textMuted,
+                          );
+                        }
+                        return Text(
+                          matched.flag,
+                          style: const TextStyle(fontSize: 18),
+                        );
                       },
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    if (_usePhoneOtp) ...[
-                      SwiperTextField(
-                        label: 'Phone Number',
-                        hintText: 'Enter your phone number',
-                        controller: _phoneController,
-                        prefixIcon: const Icon(Icons.call_outlined),
-                        keyboardType: TextInputType.phone,
-                        textInputAction: TextInputAction.next,
-                        focusNode: _phoneFocusNode,
-                        onChanged: (_) {
-                          if (_errorMessage != null) {
-                            setState(() => _errorMessage = null);
-                          }
-                        },
-                        onSubmitted: (_) {
-                          FocusScope.of(context).requestFocus(_otpFocusNode);
-                        },
-                        validator: (value) =>
-                            _usePhoneOtp ? _validatePhone(value) : null,
+                    const SizedBox(width: 6),
+                    const Text(
+                      '+',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      SwiperTextField(
-                        label: 'Phone OTP',
-                        hintText: 'Enter 123456',
-                        controller: _otpController,
-                        prefixIcon: const Icon(Icons.password_rounded),
+                    ),
+                    SizedBox(
+                      width: 34,
+                      child: TextField(
+                        controller: _countryCodeController,
                         keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                        focusNode: _otpFocusNode,
-                        onChanged: (_) {
-                          if (_errorMessage != null) {
-                            setState(() => _errorMessage = null);
-                          }
-                        },
-                        onSubmitted: (_) => _submit(),
-                        validator: (value) =>
-                            _usePhoneOtp ? _validateOtp(value) : null,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Use OTP code 123456. This signs in with the phone number used during customer signup.',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ] else ...[
-                      SwiperTextField(
-                        label: 'Email',
-                        hintText: 'Enter your email',
-                        controller: _emailController,
-                        prefixIcon: const Icon(Icons.mail_outline_rounded),
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        focusNode: _emailFocusNode,
-                        autofillHints: const [
-                          AutofillHints.username,
-                          AutofillHints.email,
-                        ],
-                        onChanged: (_) {
-                          if (_errorMessage != null) {
-                            setState(() => _errorMessage = null);
-                          }
-                        },
-                        onSubmitted: (_) {
-                          FocusScope.of(context).requestFocus(_passwordFocusNode);
-                        },
-                        validator: (value) =>
-                            _usePhoneOtp ? null : _validateEmail(value),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Password',
-                              style: theme.textTheme.labelLarge,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => _showDemoMessage(
-                              'Forgot password is not connected in Flutter yet.',
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              padding: EdgeInsets.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              minimumSize: const Size(0, 0),
-                            ),
-                            child: const Text('Forgot password?'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      SwiperPasswordField(
-                        label: 'Password',
-                        hintText: 'Enter your password',
-                        controller: _passwordController,
-                        focusNode: _passwordFocusNode,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.password],
-                        onChanged: (_) {
-                          if (_errorMessage != null) {
-                            setState(() => _errorMessage = null);
-                          }
-                        },
-                        onSubmitted: (_) => _submit(),
-                        validator: (value) =>
-                            _usePhoneOtp ? null : _validatePassword(value),
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.md),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      onTap: () => setState(() => _rememberMe = !_rememberMe),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.xs,
+                        maxLength: 4,
+                        enableInteractiveSelection: false,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 160),
-                              height: 20,
-                              width: 20,
-                              decoration: BoxDecoration(
-                                color: _rememberMe
-                                    ? AppColors.primary
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: _rememberMe
-                                      ? AppColors.primary
-                                      : AppColors.border,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.check_rounded,
-                                size: 14,
-                                color: _rememberMe
-                                    ? Colors.white
-                                    : Colors.transparent,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Text(
-                              'Remember me',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          filled: false,
+                          isCollapsed: true,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
                         ),
-                      ),
-                    ),
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: AppSpacing.md,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF6F7),
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusMd,
-                          ),
-                          border: Border.all(color: const Color(0xFFF4D8DE)),
-                        ),
-                        child: Text(
-                          _errorMessage!,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: const Color(0xFFC2415B),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.xl),
-                    SwiperButton(
-                      label: _isSubmitting ? 'Logging in...' : 'Log in',
-                      icon: const Icon(Icons.arrow_forward_rounded),
-                      isLoading: _isSubmitting,
-                      onPressed: _isSubmitting ? null : _submit,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Row(
-                      children: [
-                        const Expanded(child: Divider(height: 1)),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                          ),
-                          child: Text('or', style: theme.textTheme.labelMedium),
-                        ),
-                        const Expanded(child: Divider(height: 1)),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).pushNamed(AppRoutes.signupEntry),
-                      icon: const Icon(Icons.person_add_alt_1_rounded),
-                      label: const Text('Create account'),
-                    ),
-                    const SizedBox(height: AppSpacing.xxl),
-                    Center(
-                      child: Column(
-                        children: [
-                          Text(
-                            'Need help?',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: AppColors.textPrimary,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          TextButton(
-                            onPressed: () => _showDemoMessage(
-                              'Support is not connected in Flutter yet.',
-                            ),
-                            child: const Text('Contact support'),
-                          ),
-                        ],
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  autofocus: true,
+                  onChanged: (_) {
+                    if (_errorMessage != null) {
+                      setState(() => _errorMessage = null);
+                    }
+                  },
+                  onSubmitted: (_) => _continueFromPhone(),
+                  style: const TextStyle(fontSize: 15),
+                  decoration: const InputDecoration(
+                    hintText: 'e.g. 12 345 6789',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Use OTP code 123456 on the next screen to continue.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        InkWell(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          onTap: () => setState(() => _rememberMe = !_rememberMe),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  height: 20,
+                  width: 20,
+                  decoration: BoxDecoration(
+                    color: _rememberMe ? AppColors.primary : Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _rememberMe ? AppColors.primary : AppColors.border,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.check_rounded,
+                    size: 14,
+                    color: _rememberMe ? Colors.white : Colors.transparent,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  'Remember me',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-      ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: AppSpacing.lg),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF6F7),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(color: const Color(0xFFF4D8DE)),
+            ),
+            child: Text(
+              _errorMessage!,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: const Color(0xFFC2415B),
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.xl),
+        Row(
+          children: [
+            const Expanded(child: Divider(height: 1)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Text('or', style: theme.textTheme.labelMedium),
+            ),
+            const Expanded(child: Divider(height: 1)),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        OutlinedButton.icon(
+          onPressed: () =>
+              Navigator.of(context).pushNamed(AppRoutes.signupEntry),
+          icon: const Icon(Icons.person_add_alt_1_rounded),
+          label: const Text('Create account'),
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Center(
+          child: Column(
+            children: [
+              Text(
+                'Need help?',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              TextButton(
+                onPressed: () => _showDemoMessage(
+                  'Support is not connected in Flutter yet.',
+                ),
+                child: const Text('Contact support'),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -32,7 +32,8 @@ import {
   resolveCurrentLiveLocation,
   type StoredLiveLocation,
 } from "@/lib/live-location";
-import { calculateDistanceKm, formatDistanceKm } from "@/lib/provider-distance";
+import { formatDistanceKm } from "@/lib/provider-distance";
+import { buildProviderDetailHref } from "@/lib/provider-catalog-shared";
 
 type TabKey = "all" | "active-now";
 type SortKey = "popular" | "nearest" | "price-low";
@@ -57,9 +58,7 @@ type CatalogScreenListing = {
   workMode: WorkMode;
   bio: string;
   specialties: string[];
-  latitude: number | null;
-  longitude: number | null;
-  distanceKm: number;
+  distanceKm: number | null;
   rating: number;
   reviews: number;
   hourlyRate: number;
@@ -99,6 +98,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [sortBy, setSortBy] = useState<SortKey>("popular");
   const [searchQuery, setSearchQuery] = useState("");
+  const [listings, setListings] = useState<CatalogScreenListing[]>(data.listings);
 
   useEffect(() => {
     const initialCurrentLocation = loadCurrentLiveLocation();
@@ -152,29 +152,12 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
     };
   }, [currentLocation]);
 
-  const getListingDistanceKm = (listing: CatalogScreenListing) => {
-    if (
-      activeLocation &&
-      typeof listing.latitude === "number" &&
-      typeof listing.longitude === "number"
-    ) {
-      return calculateDistanceKm(
-        activeLocation.latitude,
-        activeLocation.longitude,
-        listing.latitude,
-        listing.longitude
-      );
-    }
-
-    return listing.distanceKm;
-  };
-
   const counts = useMemo(
     () => ({
-      all: data.listings.length,
-      "active-now": data.listings.filter((item) => item.availabilityLabel === "Available Today").length,
+      all: listings.length,
+      "active-now": listings.filter((item) => item.availabilityLabel === "Available Today").length,
     }),
-    [data.listings]
+    [listings]
   );
 
   const activeLocation = selectedPlaceId === "current"
@@ -189,8 +172,53 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
     saveSelectedProviderSearchLocation(activeLocation);
   }, [activeLocation]);
 
+  useEffect(() => {
+    if (
+      typeof activeLocation?.latitude !== "number" ||
+      typeof activeLocation?.longitude !== "number"
+    ) {
+      return;
+    }
+
+    let active = true;
+
+    const uri = new URL("/api/providers", window.location.origin);
+    if (data.service) {
+      uri.searchParams.set("service", data.service);
+    }
+    uri.searchParams.set("lat", String(activeLocation.latitude));
+    uri.searchParams.set("lng", String(activeLocation.longitude));
+
+    type FetchedListing = Omit<CatalogScreenListing, "href" | "portraitSrc"> & {
+      profileImageUrl: string;
+    };
+
+    void fetch(uri.toString())
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { listings?: FetchedListing[] } | null) => {
+        if (!active || !body?.listings) {
+          return;
+        }
+
+        setListings(
+          body.listings.map((listing) => ({
+            ...listing,
+            href: buildProviderDetailHref(listing),
+            portraitSrc: listing.profileImageUrl,
+          })),
+        );
+      })
+      .catch(() => {
+        // Keep the initial server-rendered listings on failure.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeLocation, data.service]);
+
   const filteredListings = useMemo(() => {
-    let items = data.listings.filter((listing) => {
+    let items = listings.filter((listing) => {
       const matchesTab =
         activeTab === "all" ||
         (activeTab === "active-now" && listing.availabilityLabel === "Available Today");
@@ -205,7 +233,9 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
 
     items = [...items].sort((left, right) => {
       if (sortBy === "nearest") {
-        return getListingDistanceKm(left) - getListingDistanceKm(right);
+        if (left.distanceKm === null) return 1;
+        if (right.distanceKm === null) return -1;
+        return left.distanceKm - right.distanceKm;
       }
       if (sortBy === "price-low") return left.hourlyRate - right.hourlyRate;
       if (right.rating !== left.rating) return right.rating - left.rating;
@@ -213,7 +243,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
     });
 
     return items;
-  }, [activeTab, data.listings, sortBy, activeLocation, searchQuery]);
+  }, [activeTab, listings, sortBy, searchQuery]);
 
   const serviceIconSrc = data.service ? serviceIcons[data.service] : null;
   const serviceTitle = data.serviceLabel ? `${data.serviceLabel} Services` : "Service Providers";
@@ -489,7 +519,7 @@ export function ProvidersCatalogScreen({ data }: { data: CatalogScreenData }) {
                 <ProviderCard
                   key={listing.id}
                   listing={listing}
-                  distanceKm={getListingDistanceKm(listing)}
+                  distanceKm={listing.distanceKm}
                   sortBy={sortBy}
                 />
               ))}
@@ -593,9 +623,10 @@ function ProviderCard({
   sortBy,
 }: {
   listing: CatalogScreenListing;
-  distanceKm: number;
+  distanceKm: number | null;
   sortBy: SortKey;
 }) {
+  const distanceLabel = distanceKm === null ? "Distance unavailable" : formatDistanceKm(distanceKm);
   const fullName = buildProviderFullName(listing);
   const jobsCompleted = Math.max(listing.reviews * 2 + 68, 120);
   const repeatCustomers = Math.max(Math.round(listing.reviews * 0.61), 24);
@@ -607,7 +638,7 @@ function ProviderCard({
   ];
   const rankingBadge =
     sortBy === "nearest"
-      ? `Nearby • ${formatDistanceKm(distanceKm)}`
+      ? `Nearby • ${distanceLabel}`
       : sortBy === "price-low"
         ? `Low Rate • RM${listing.hourlyRate}/hr`
         : listing.rating >= 4.8
@@ -668,7 +699,7 @@ function ProviderCard({
           />
           <InfoMetric
             icon={<MapPin className="h-4.5 w-4.5 text-[#667085]" />}
-            value={formatDistanceKm(distanceKm)}
+            value={distanceLabel}
           />
           <InfoMetric
             icon={<BriefcaseBusiness className="h-4.5 w-4.5 text-[#667085]" />}

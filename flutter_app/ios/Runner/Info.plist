@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Della Swiper needs camera access so you can take photos for your profile and documents.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Della Swiper needs photo library access so you can choose photos for your profile and documents.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

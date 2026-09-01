@@ -45,13 +45,6 @@ type UserProfilePayload = {
   relatedPayments: PaymentRow[];
 };
 
-type UserProfileUpdateInput = {
-  full_name?: string;
-  email?: string;
-  phone?: string;
-  status?: string;
-};
-
 type ProfileNameRow = {
   id: string;
   full_name: string | null;
@@ -1125,62 +1118,35 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
   };
 }
 
-export async function updateUserProfile(userId: string, updates: UserProfileUpdateInput) {
+export async function suspendCustomer(customerId: string, reason: string) {
   if (!supabase) {
     return { error: "Supabase is not configured." };
   }
 
-  const payload = Object.fromEntries(
-    Object.entries(updates).filter(([, value]) => typeof value === "string" && value.trim() !== "")
-  );
-
-  if (Object.keys(payload).length === 0) {
-    return { error: "Nothing to update." };
-  }
-
-  const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
+  const { error } = await supabase.rpc("admin_suspend_customer", {
+    p_customer_id: customerId,
+    p_reason: reason,
+  });
 
   if (error) {
-    return { error: error.message || "Unable to update user." };
+    return { error: error.message || "Unable to suspend customer." };
   }
 
   return { error: null };
 }
 
-export async function setUserSuspended(userId: string, suspended: boolean) {
-  return updateUserProfile(userId, {
-    status: suspended ? "suspended" : "active",
-  });
-}
-
-export async function deleteUserRecord(userId: string) {
+export async function reactivateCustomer(customerId: string) {
   if (!supabase) {
     return { error: "Supabase is not configured." };
   }
 
-  const customerDelete = await supabase.from("customer_profiles").delete().eq("id", userId);
-  const providerDelete = await supabase.from("provider_profiles").delete().eq("id", userId);
-  const profileDelete = await supabase.from("profiles").delete().eq("id", userId);
+  const { error } = await supabase.rpc("admin_reactivate_customer", {
+    p_customer_id: customerId,
+  });
 
-  if (!profileDelete.error) {
-    return { error: null, mode: "deleted" as const };
+  if (error) {
+    return { error: error.message || "Unable to reactivate customer." };
   }
 
-  const softDelete = await supabase
-    .from("profiles")
-    .update({ status: "deleted" })
-    .eq("id", userId);
-
-  if (softDelete.error) {
-    return {
-      error:
-        profileDelete.error.message ||
-        customerDelete.error?.message ||
-        providerDelete.error?.message ||
-        "Unable to delete user.",
-      mode: "failed" as const,
-    };
-  }
-
-  return { error: null, mode: "soft-deleted" as const };
+  return { error: null };
 }

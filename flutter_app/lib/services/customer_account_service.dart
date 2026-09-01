@@ -13,6 +13,8 @@ class CustomerAddressSummary {
     required this.postcode,
     required this.country,
     required this.isDefault,
+    this.latitude,
+    this.longitude,
   });
 
   final String label;
@@ -23,6 +25,8 @@ class CustomerAddressSummary {
   final String postcode;
   final String country;
   final bool isDefault;
+  final double? latitude;
+  final double? longitude;
 
   String get formattedAddress {
     return [
@@ -134,30 +138,27 @@ class CustomerAccountOverview {
   final CustomerVerificationSummary verification;
 }
 
+/// Every field is optional — only the ones set here are sent to
+/// `PATCH /api/profile/me`, which now merges against the current stored row
+/// (see the backend fix in app/api/profile/me/route.ts) rather than
+/// rebuilding the whole record. This lets Personal Details and the
+/// Emergency Contact card each save independently without clobbering the
+/// other's data. Phone number is intentionally not editable here at all —
+/// changing it goes through real re-verification (CustomerPhoneVerificationScreen).
 class CustomerPersonalDetailsInput {
   const CustomerPersonalDetailsInput({
-    required this.firstName,
-    required this.lastName,
-    required this.phoneNumber,
-    required this.countryCode,
-    required this.emergencyContactNumber,
-    required this.dateOfBirth,
-    required this.sex,
-    required this.city,
-    required this.region,
-    required this.country,
+    this.firstName,
+    this.lastName,
+    this.dateOfBirth,
+    this.sex,
+    this.emergencyContactNumber,
   });
 
-  final String firstName;
-  final String lastName;
-  final String phoneNumber;
-  final String countryCode;
-  final String emergencyContactNumber;
-  final String dateOfBirth;
-  final String sex;
-  final String city;
-  final String region;
-  final String country;
+  final String? firstName;
+  final String? lastName;
+  final String? dateOfBirth;
+  final String? sex;
+  final String? emergencyContactNumber;
 }
 
 class CustomerAccountService {
@@ -235,10 +236,7 @@ class CustomerAccountService {
 
     final digits = source.replaceAll(RegExp(r'[^\d+]'), '');
     if (digits.startsWith('+60')) {
-      return {
-        'countryCode': '+60',
-        'phoneNumber': digits.substring(3),
-      };
+      return {'countryCode': '+60', 'phoneNumber': digits.substring(3)};
     }
 
     return {
@@ -256,7 +254,8 @@ class CustomerAccountService {
     var cancelled = 0;
 
     for (final row in rows) {
-      final status = (row as Map<String, dynamic>)['booking_status']
+      final status =
+          (row as Map<String, dynamic>)['booking_status']
               ?.toString()
               .trim()
               .toLowerCase() ??
@@ -290,6 +289,35 @@ class CustomerAccountService {
     );
   }
 
+  // latitude/longitude are a newer, optional pair of columns (added so the
+  // saved-address map can show and persist an exact, user-dragged pin). On
+  // any project where that migration hasn't been applied yet, selecting
+  // them throws — so this falls back to the older column list rather than
+  // breaking the whole profile screen over two optional fields.
+  Future<List<dynamic>> _fetchAddressRows(String userId) async {
+    try {
+      return await _client
+                  .from('addresses')
+                  .select(
+                    'label, address_line_1, address_line_2, city, state, postcode, country, is_default, latitude, longitude',
+                  )
+                  .eq('user_id', userId)
+                  .order('is_default', ascending: false)
+              as List<dynamic>? ??
+          const [];
+    } catch (_) {
+      return await _client
+                  .from('addresses')
+                  .select(
+                    'label, address_line_1, address_line_2, city, state, postcode, country, is_default',
+                  )
+                  .eq('user_id', userId)
+                  .order('is_default', ascending: false)
+              as List<dynamic>? ??
+          const [];
+    }
+  }
+
   Future<CustomerAccountOverview?> fetchOverview() async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -297,36 +325,32 @@ class CustomerAccountService {
     }
 
     final profile = await _profileApi.fetchProfile();
-    final addressRows = await _client
-            .from('addresses')
-            .select(
-              'label, address_line_1, address_line_2, city, state, postcode, country, is_default',
-            )
-            .eq('user_id', user.id)
-            .order('is_default', ascending: false)
-        as List<dynamic>? ??
+    final addressRows = await _fetchAddressRows(user.id);
+    final bookingRows =
+        await _client
+                .from('bookings')
+                .select('booking_status')
+                .eq('customer_id', user.id)
+                .limit(200)
+            as List<dynamic>? ??
         const [];
-    final bookingRows = await _client
-            .from('bookings')
-            .select('booking_status')
-            .eq('customer_id', user.id)
-            .limit(200)
-        as List<dynamic>? ??
-        const [];
-    final paymentRows = await _client
-            .from('payments')
-            .select(
-              'provider_id, service_title, amount, payment_method, status, paid_at, created_at',
-            )
-            .eq('customer_id', user.id)
-            .order('paid_at', ascending: false, nullsFirst: false)
-            .order('created_at', ascending: false, nullsFirst: false)
-            .limit(10)
-        as List<dynamic>? ??
-        const [];
+    // Goes through the existing /api/profile/payments route (service-role,
+    // already resolves provider display names server-side) instead of a
+    // direct client-side query — this screen used to also run its own
+    // separate direct query against provider_profiles just to look up
+    // marketing_name, which is what made it depend on that table being
+    // readable by any authenticated customer. Reusing this route removes
+    // that dependency entirely.
+    final paymentHistory = await _profileApi.fetchPayments();
+    final recentPaymentHistory = paymentHistory
+        .where((item) => item.status == 'paid' || item.status == 'refunded')
+        .take(10)
+        .toList();
 
     final fullName = profile.fullName.trim();
-    final nameParts = fullName.isEmpty ? const <String>[] : fullName.split(RegExp(r'\s+'));
+    final nameParts = fullName.isEmpty
+        ? const <String>[]
+        : fullName.split(RegExp(r'\s+'));
     final firstName = profile.firstName.trim().isNotEmpty
         ? profile.firstName.trim()
         : (nameParts.isNotEmpty ? nameParts.first : 'Customer');
@@ -340,75 +364,27 @@ class CustomerAccountService {
       profile.countryCode,
     );
 
-    final providerIds = paymentRows
-        .map((row) => (row as Map<String, dynamic>)['provider_id']?.toString())
-        .where((value) => value != null && value.isNotEmpty)
-        .cast<String>()
-        .toSet()
+    final recentPayments = recentPaymentHistory
+        .map(
+          (item) => CustomerPaymentSummaryItem(
+            serviceTitle: item.serviceTitle,
+            providerName: item.provider,
+            amountLabel: _formatCurrency(item.amount),
+            paymentMethod: item.paymentMethod,
+            statusLabel: _formatStatus(item.status),
+            paidAtLabel: _formatDateTime(item.paidAt),
+          ),
+        )
         .toList();
 
-    final providerNameMap = <String, String>{};
-    if (providerIds.isNotEmpty) {
-      final providerRows = await _client
-          .from('provider_profiles')
-          .select('id, marketing_name')
-          .inFilter('id', providerIds);
-
-      for (final row in providerRows as List<dynamic>) {
-        final data = row as Map<String, dynamic>;
-        providerNameMap[data['id'].toString()] =
-            data['marketing_name']?.toString().trim().isNotEmpty == true
-                ? data['marketing_name'] as String
-                : 'DELLA Provider';
-      }
-    }
-
-    final recentPayments = paymentRows
-        .map((row) {
-          final data = row as Map<String, dynamic>;
-          final status = data['status']?.toString().trim().toLowerCase();
-          if (status != 'paid' && status != 'refunded') {
-            return null;
-          }
-
-          final providerId = data['provider_id']?.toString() ?? '';
-          return CustomerPaymentSummaryItem(
-            serviceTitle:
-                data['service_title']?.toString().trim().isNotEmpty == true
-                    ? data['service_title'] as String
-                    : 'Service Payment',
-            providerName: providerNameMap[providerId] ?? 'DELLA Provider',
-            amountLabel: _formatCurrency((data['amount'] as num?) ?? 0),
-            paymentMethod:
-                data['payment_method']?.toString().trim().isNotEmpty == true
-                    ? data['payment_method'] as String
-                    : 'Cash',
-            statusLabel: _formatStatus(status),
-            paidAtLabel: _formatDateTime(
-              data['paid_at']?.toString() ?? data['created_at']?.toString(),
-            ),
-          );
-        })
-        .whereType<CustomerPaymentSummaryItem>()
-        .toList();
-
-    final totalPaid = paymentRows.fold<num>(
+    final totalPaid = recentPaymentHistory.fold<num>(
       0,
-      (sum, row) {
-        final data = row as Map<String, dynamic>;
-        return data['status']?.toString().trim().toLowerCase() == 'paid'
-            ? sum + ((data['amount'] as num?) ?? 0)
-            : sum;
-      },
+      (sum, item) => item.status == 'paid' ? sum + item.amount : sum,
     );
 
-    final latestPaymentRow = paymentRows.isNotEmpty
-        ? paymentRows.first as Map<String, dynamic>
+    final latestPaymentDate = recentPaymentHistory.isNotEmpty
+        ? recentPaymentHistory.first.paidAt
         : null;
-    final latestPaymentDate = latestPaymentRow == null
-        ? null
-        : latestPaymentRow['paid_at']?.toString() ??
-            latestPaymentRow['created_at']?.toString();
 
     final addresses = addressRows.map((row) {
       final data = row as Map<String, dynamic>;
@@ -423,6 +399,8 @@ class CustomerAccountService {
         postcode: data['postcode']?.toString().trim() ?? '',
         country: data['country']?.toString().trim() ?? 'Malaysia',
         isDefault: data['is_default'] == true,
+        latitude: (data['latitude'] as num?)?.toDouble(),
+        longitude: (data['longitude'] as num?)?.toDouble(),
       );
     }).toList();
 
@@ -436,9 +414,10 @@ class CustomerAccountService {
     return CustomerAccountOverview(
       firstName: firstName,
       lastName: lastName,
-      fullName: [firstName, lastName]
-          .where((item) => item.trim().isNotEmpty)
-          .join(' '),
+      fullName: [
+        firstName,
+        lastName,
+      ].where((item) => item.trim().isNotEmpty).join(' '),
       avatarUrl: profile.avatarUrl,
       email: profile.email.isNotEmpty ? profile.email : user.email ?? '',
       phoneNumber: phoneParts['phoneNumber'] ?? '',
@@ -469,21 +448,27 @@ class CustomerAccountService {
       throw Exception('Please sign in again.');
     }
 
-    final firstName = input.firstName.trim();
-    final lastName = input.lastName.trim();
-    await _profileApi.updateProfile({
-      'firstName': firstName,
-      'lastName': lastName,
-      'phoneNumber': input.phoneNumber.trim(),
-      'countryCode': input.countryCode.trim().isEmpty ? '+60' : input.countryCode.trim(),
-      'emergencyContactNumber': input.emergencyContactNumber.trim(),
-      'dateOfBirth': input.dateOfBirth.trim().isEmpty ? null : input.dateOfBirth.trim(),
-      'sex': input.sex.trim(),
-      'city': input.city.trim(),
-      'region': input.region.trim(),
-      'country': input.country.trim().isEmpty ? 'Malaysia' : input.country.trim(),
-      'completion': 100,
-      'verified': false,
-    });
+    final body = <String, dynamic>{};
+    if (input.firstName != null) {
+      body['firstName'] = input.firstName!.trim();
+    }
+    if (input.lastName != null) {
+      body['lastName'] = input.lastName!.trim();
+    }
+    if (input.dateOfBirth != null) {
+      final trimmed = input.dateOfBirth!.trim();
+      body['dateOfBirth'] = trimmed.isEmpty ? null : trimmed;
+    }
+    if (input.sex != null) {
+      body['sex'] = input.sex!.trim();
+    }
+    if (input.emergencyContactNumber != null) {
+      body['emergencyContactNumber'] = input.emergencyContactNumber!.trim();
+    }
+
+    if (body.isEmpty) {
+      return;
+    }
+    await _profileApi.updateProfile(body);
   }
 }

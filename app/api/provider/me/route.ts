@@ -43,6 +43,12 @@ type ProviderProfileRow = {
   is_visible: boolean | null;
   average_rating?: number | null;
   total_reviews?: number | null;
+  residential_address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postcode?: string | null;
+  date_of_birth?: string | null;
+  sex?: string | null;
   provider_services?: ProviderServiceRow[] | null;
   provider_verifications?:
     | {
@@ -187,6 +193,20 @@ function isMissingProviderServiceMediaColumnError(message?: string) {
       normalized.includes("image_captions") ||
       normalized.includes("certificate_data_urls") ||
       normalized.includes("certificate_captions"))
+  );
+}
+
+function isMissingProviderAddressColumnError(message?: string) {
+  const normalized = message?.trim().toLowerCase() ?? "";
+
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("residential_address") ||
+      normalized.includes("city") ||
+      normalized.includes("state") ||
+      normalized.includes("postcode") ||
+      normalized.includes("date_of_birth") ||
+      normalized.includes("sex"))
   );
 }
 
@@ -341,7 +361,7 @@ async function fetchProviderSnapshot(
   adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
   providerId: string,
 ) {
-  const { data: providerProfile, error: providerProfileError } = await adminClient
+  let { data: providerProfile, error: providerProfileError } = await adminClient
     .from("provider_profiles")
     .select(`
       id,
@@ -352,10 +372,37 @@ async function fetchProviderSnapshot(
       approval_status,
       is_visible,
       average_rating,
-      total_reviews
+      total_reviews,
+      residential_address,
+      city,
+      state,
+      postcode,
+      date_of_birth,
+      sex
     `)
     .eq("id", providerId)
     .maybeSingle();
+
+  if (providerProfileError && isMissingProviderAddressColumnError(providerProfileError.message)) {
+    const fallback = await adminClient
+      .from("provider_profiles")
+      .select(`
+        id,
+        marketing_name,
+        service_location,
+        service_radius_km,
+        bio,
+        approval_status,
+        is_visible,
+        average_rating,
+        total_reviews
+      `)
+      .eq("id", providerId)
+      .maybeSingle();
+
+    providerProfile = fallback.data as typeof providerProfile;
+    providerProfileError = fallback.error;
+  }
 
   if (providerProfileError || !providerProfile) {
     return null;
@@ -505,6 +552,21 @@ async function buildResponse(
       : verification?.identity_document_type === "ic"
         ? "ic"
         : undefined;
+  const nationality =
+    metadata.nationality === "malaysian" || metadata.nationality === "foreigner"
+      ? metadata.nationality
+      : undefined;
+  const identityDocumentNumber =
+    typeof metadata.identity_document_number === "string"
+      ? metadata.identity_document_number
+      : "";
+  // The street address is stored as two lines here (Auth user_metadata) —
+  // provider_profiles.residential_address only keeps them pre-joined into a
+  // single display string (see buildResidentialAddress in register/route.ts).
+  const addressLine1 =
+    typeof metadata.address_line_1 === "string" ? metadata.address_line_1 : "";
+  const addressLine2 =
+    typeof metadata.address_line_2 === "string" ? metadata.address_line_2 : "";
   const identityFrontImageUrl = await resolveStoredMediaUrl(adminClient, {
     bucket: "identity-documents",
     value: verification?.identity_front_image_url,
@@ -524,7 +586,17 @@ async function buildResponse(
     emergencyContactNumber: getEmergencyContactNumber(metadata),
     avatarUrl: getSafeAvatarUrl(avatarUrl),
     accountStatus: toTitleCase(profile.status),
+    dateOfBirth: providerProfile.date_of_birth ?? "",
+    gender:
+      providerProfile.sex === "Male" || providerProfile.sex === "Female"
+        ? providerProfile.sex
+        : "",
     marketingName: providerProfile.marketing_name ?? "",
+    addressLine1,
+    addressLine2,
+    postcode: providerProfile.postcode ?? "",
+    city: providerProfile.city ?? "",
+    state: providerProfile.state ?? "",
     serviceLocation: providerProfile.service_location ?? "",
     serviceRadiusKm: providerProfile.service_radius_km ?? 0,
     country:
@@ -541,6 +613,8 @@ async function buildResponse(
     identityVerified,
     identityVerificationStatus,
     identityDocumentType,
+    nationality,
+    identityDocumentNumber,
     identityFrontImageUrl,
     identityBackImageUrl,
     kycVerified: Boolean(verification?.kyc_verified),
@@ -612,11 +686,36 @@ type UpdatePayload = {
   serviceRadiusKm?: number;
   bio?: string;
   country?: string;
+  // Street address lines, stored in Auth user_metadata (see addressLine1/2 in
+  // buildResponse) — postcode/city/state are separate provider_profiles
+  // columns and are persisted there instead.
+  addressLine1?: string;
+  addressLine2?: string;
+  postcode?: string;
+  city?: string;
+  state?: string;
+  // Also separate provider_profiles columns.
+  dateOfBirth?: string;
+  gender?: "Male" | "Female" | "";
   emergencyContactNumber?: string;
+  // Providers have no email at registration. `email` saves the address the
+  // provider typed (marketing/contact use) without marking it verified.
+  // `emailVerified: true` is sent only after the OTP step actually
+  // succeeds, and is what confirms the email on this same Supabase Auth
+  // user — saving `email` alone never verifies it.
+  email?: string;
+  emailVerified?: boolean;
   phoneVerified?: boolean;
   identityVerified?: boolean;
   identityVerificationStatus?: "pending" | "processing" | "verified" | "rejected";
   identityDocumentType?: "ic" | "passport";
+  // Nationality drives which document number/upload the identity screen
+  // asks for (IC for Malaysian, passport for foreigner) — stored in Auth
+  // user_metadata alongside identity_verification_status/identity_document_type
+  // rather than a new provider_verifications column, so no schema migration
+  // is needed for it.
+  nationality?: "malaysian" | "foreigner";
+  identityDocumentNumber?: string;
   identityFrontImageUrl?: string;
   identityBackImageUrl?: string;
 };
@@ -645,6 +744,8 @@ export async function PATCH(request: Request) {
       })
     : "";
 
+  const trimmedEmail = payload.email?.trim().toLowerCase();
+
   const profilePayload = Object.fromEntries(
     Object.entries({
       full_name:
@@ -652,6 +753,7 @@ export async function PATCH(request: Request) {
           ? payload.fullName.trim()
           : undefined,
       avatar_url: storedAvatarUrl || undefined,
+      email: trimmedEmail || undefined,
     }).filter(([, value]) => value !== undefined),
   );
 
@@ -666,12 +768,39 @@ export async function PATCH(request: Request) {
     }
   }
 
+  // Attach/confirm the email on this same Supabase Auth user. Saving the
+  // email alone (emailVerified not true) never confirms it — email_confirm
+  // only flips to true once the OTP step actually succeeds, so a later
+  // read of `authUser.email_confirmed_at` (used below for
+  // provider_verifications.email_verified) reflects the real state, not a
+  // client-asserted flag.
+  if (trimmedEmail) {
+    const { error: emailUpdateError } = await verified.adminClient.auth.admin.updateUserById(
+      verified.profile.id,
+      {
+        email: trimmedEmail,
+        email_confirm: payload.emailVerified === true,
+      },
+    );
+
+    if (emailUpdateError) {
+      return NextResponse.json(
+        { error: emailUpdateError.message || "Unable to update email." },
+        { status: 500 },
+      );
+    }
+  }
+
   if (
     typeof payload.fullName === "string" ||
     typeof payload.country === "string" ||
     typeof payload.emergencyContactNumber === "string" ||
     typeof payload.identityVerificationStatus === "string" ||
-    typeof payload.identityVerified === "boolean"
+    typeof payload.identityVerified === "boolean" ||
+    typeof payload.nationality === "string" ||
+    typeof payload.identityDocumentNumber === "string" ||
+    typeof payload.addressLine1 === "string" ||
+    typeof payload.addressLine2 === "string"
   ) {
     const fullName =
       typeof payload.fullName === "string" && payload.fullName.trim()
@@ -719,6 +848,30 @@ export async function PATCH(request: Request) {
               : typeof currentMetadata.identity_document_type === "string"
                 ? currentMetadata.identity_document_type
                 : "",
+          nationality:
+            payload.nationality === "malaysian" || payload.nationality === "foreigner"
+              ? payload.nationality
+              : typeof currentMetadata.nationality === "string"
+                ? currentMetadata.nationality
+                : "",
+          identity_document_number:
+            typeof payload.identityDocumentNumber === "string"
+              ? payload.identityDocumentNumber.trim()
+              : typeof currentMetadata.identity_document_number === "string"
+                ? currentMetadata.identity_document_number
+                : "",
+          address_line_1:
+            typeof payload.addressLine1 === "string"
+              ? payload.addressLine1.trim()
+              : typeof currentMetadata.address_line_1 === "string"
+                ? currentMetadata.address_line_1
+                : "",
+          address_line_2:
+            typeof payload.addressLine2 === "string"
+              ? payload.addressLine2.trim()
+              : typeof currentMetadata.address_line_2 === "string"
+                ? currentMetadata.address_line_2
+                : "",
         },
       },
     );
@@ -737,6 +890,14 @@ export async function PATCH(request: Request) {
           ? payload.serviceRadiusKm
           : undefined,
       bio: payload.bio?.trim(),
+      postcode: payload.postcode?.trim(),
+      city: payload.city?.trim(),
+      state: payload.state?.trim(),
+      date_of_birth: payload.dateOfBirth?.trim(),
+      sex:
+        payload.gender === "Male" || payload.gender === "Female"
+          ? payload.gender
+          : undefined,
     }).filter(([, value]) => value !== undefined && value !== ""),
   );
 
@@ -785,7 +946,11 @@ export async function PATCH(request: Request) {
       : payload.identityBackImageUrl?.trim();
     const verificationPayload = {
       phone_verified: payload.phoneVerified,
-      email_verified: Boolean(verified.authUser.email_confirmed_at),
+      // `payload.emailVerified` reflects an update made earlier in this same
+      // request — verified.authUser was fetched before that, so it wouldn't
+      // otherwise see it until the next request.
+      email_verified:
+        payload.emailVerified === true || Boolean(verified.authUser.email_confirmed_at),
       identity_verified: payload.identityVerified,
       kyc_verified: payload.identityVerified,
       identity_document_type: payload.identityDocumentType,
@@ -951,7 +1116,8 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const emailVerified = Boolean(verified.authUser.email_confirmed_at);
+  const emailVerified =
+    payload.emailVerified === true || Boolean(verified.authUser.email_confirmed_at);
   await syncEmailVerification(verified.adminClient, verified.profile.id, emailVerified);
 
   const refreshedProfile = await verified.adminClient

@@ -9,6 +9,7 @@ import '../../../core/animation/app_motion.dart';
 import '../../../core/config/app_config.dart';
 import '../../../services/booking_overview_service.dart';
 import '../../../services/browser_file_picker.dart';
+import '../../../services/customer_messages_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/empty_state.dart';
@@ -25,6 +26,7 @@ class BookingDetailScreen extends StatefulWidget {
 
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   static const _bookingService = BookingOverviewService();
+  static const _messagesService = CustomerMessagesService();
   static const _reviewTags = <String>[
     'Punctual',
     'Professional',
@@ -43,7 +45,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   bool _isSubmittingIssue = false;
   PickedBrowserFile? _paymentProof;
   final TextEditingController _messageController = TextEditingController();
-  final List<_BookingChatMessage> _messages = <_BookingChatMessage>[];
+  List<CustomerConversationMessage> _chatMessages = const [];
+  bool _messagesLoading = true;
+  bool _sendingMessage = false;
+  bool _didMarkRead = false;
   DateTime? _lastUpdatedAt;
   Timer? _pollTimer;
   bool _didReadRoute = false;
@@ -58,10 +63,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     _didReadRoute = true;
     _bookingId = ModalRoute.of(context)?.settings.arguments as String?;
     unawaited(_loadBooking());
-    _pollTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => unawaited(_loadBooking(silent: true)),
-    );
+    unawaited(_loadMessages());
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      unawaited(_loadBooking(silent: true));
+      unawaited(_loadMessages(silent: true));
+    });
   }
 
   @override
@@ -139,16 +145,25 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           _buildHeroCard(context, booking),
           const SizedBox(height: AppSpacing.lg),
+          if (booking.workflowStatus == 'declined_by_provider' &&
+              booking.cancellationReason.trim().isNotEmpty) ...[
+            _InlineNotice(
+              message: 'Declined by provider: ${booking.cancellationReason.trim()}',
+              tone: AppColors.error,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           _buildRefreshBanner(),
           if (_errorMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
-            _InlineNotice(
-              message: _errorMessage!,
-              tone: AppColors.error,
-            ),
+            _InlineNotice(message: _errorMessage!, tone: AppColors.error),
           ],
           const SizedBox(height: AppSpacing.md),
-          for (var index = 0; index < booking.activitySteps.length; index++) ...[
+          for (
+            var index = 0;
+            index < booking.activitySteps.length;
+            index++
+          ) ...[
             _TaskStepCard(
               number: index + 1,
               title: booking.activitySteps[index].label,
@@ -183,7 +198,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             canReview: canReview,
           ),
           const SizedBox(height: AppSpacing.md),
-          _buildMessageSection(context, booking, isTaskCompleted: isTaskCompleted),
+          _buildMessageSection(
+            context,
+            booking,
+            isTaskCompleted: isTaskCompleted,
+          ),
           if (isTaskCompleted) ...[
             const SizedBox(height: AppSpacing.md),
             _buildIssueSection(context, booking),
@@ -242,10 +261,47 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 
-  Widget _buildHeroCard(
-    BuildContext context,
-    CustomerBookingDetail booking,
-  ) {
+  /// Always replaces [_chatMessages] wholesale with the server's full
+  /// history rather than appending — the backend is the single source of
+  /// truth for a booking's messages, so this can never produce duplicates
+  /// across polls the way appending incrementally could.
+  Future<void> _loadMessages({bool silent = false}) async {
+    final bookingId = _bookingId;
+    if (bookingId == null) {
+      return;
+    }
+
+    if (mounted && !silent) {
+      setState(() => _messagesLoading = true);
+    }
+
+    try {
+      final thread = await _messagesService.fetchThreadDetail(bookingId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _chatMessages = thread.messages;
+      });
+      if (!_didMarkRead && thread.unreadCount > 0) {
+        _didMarkRead = true;
+        unawaited(_messagesService.markConversationRead(bookingId));
+      }
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Booking messages refresh failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      // Silent by design — the message panel just keeps showing whatever it
+      // last had, consistent with how _loadBooking's silent polls behave.
+    } finally {
+      if (mounted && !silent) {
+        setState(() => _messagesLoading = false);
+      }
+    }
+  }
+
+  Widget _buildHeroCard(BuildContext context, CustomerBookingDetail booking) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -346,9 +402,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       booking.cashPaidByUserAt,
       booking.paymentReceivedByProviderAt,
       booking.completedAt,
-      booking.userReviewStatus == 'submitted'
-          ? booking.completedAt
-          : '',
+      booking.userReviewStatus == 'submitted' ? booking.completedAt : '',
     ];
 
     return dates.length > index && dates[index].trim().isNotEmpty
@@ -399,15 +453,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     Text(
                       booking.providerFullName,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       booking.service,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -417,7 +471,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           const SizedBox(height: AppSpacing.md),
           _summaryTile(Icons.calendar_today_rounded, booking.schedule),
           _summaryTile(Icons.place_outlined, booking.location),
-          _summaryTile(Icons.wallet_outlined, booking.paymentAmountLabel, emphasize: true),
+          _summaryTile(
+            Icons.wallet_outlined,
+            booking.paymentAmountLabel,
+            emphasize: true,
+          ),
           _summaryTile(Icons.payments_outlined, booking.paymentMethod),
         ],
       ),
@@ -434,15 +492,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final paymentTone = canPayNow
         ? AppColors.warning
         : paymentMarkedPaid
-            ? AppColors.success
-            : AppColors.primary;
+        ? AppColors.success
+        : AppColors.primary;
     final paymentLabel = paymentMarkedPaid
         ? 'Payment Done'
         : canPayNow
-            ? 'Awaiting Customer Payment'
-            : canReview
-                ? 'Task Completed'
-                : 'Awaiting Payment';
+        ? 'Awaiting Customer Payment'
+        : canReview
+        ? 'Task Completed'
+        : 'Awaiting Payment';
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -460,8 +518,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 child: Text(
                   'Payment Proof Actions',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               Container(
@@ -472,7 +530,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 decoration: BoxDecoration(
                   color: paymentTone.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: paymentTone.withValues(alpha: 0.25)),
+                  border: Border.all(
+                    color: paymentTone.withValues(alpha: 0.25),
+                  ),
                 ),
                 child: Text(
                   paymentLabel,
@@ -505,7 +565,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               children: [
                 Expanded(
                   child: SwiperButton(
-                    label: _paymentProof == null ? 'Attach Proof' : 'Change Proof',
+                    label: _paymentProof == null
+                        ? 'Attach Proof'
+                        : 'Change Proof',
                     isSecondary: true,
                     onPressed: _pickPaymentProof,
                   ),
@@ -562,9 +624,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           Text(
             'Booking Issue Report',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
@@ -606,9 +668,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         children: [
           Text(
             'Live message',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
@@ -630,11 +692,22 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               border: Border.all(color: AppColors.border),
               color: const Color(0xFFFDFCFF),
             ),
-            child: _messages.isEmpty
+            child: _messagesLoading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                      ),
+                    ),
+                  )
+                : _chatMessages.isEmpty
                 ? Text(
                     isTaskCompleted
                         ? 'No messages were sent for this booking.'
-                        : 'Start the conversation with Maya Suri here.',
+                        : 'Start the conversation with ${booking.providerFullName} here.',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
@@ -643,19 +716,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   )
                 : Column(
                     children: [
-                      for (final message in _messages) ...[
+                      for (final message in _chatMessages) ...[
                         Align(
-                          alignment: message.isUser
+                          alignment: message.isOwnMessage
                               ? Alignment.centerRight
                               : Alignment.centerLeft,
                           child: Container(
-                            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                            margin: const EdgeInsets.only(
+                              bottom: AppSpacing.sm,
+                            ),
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.md,
                               vertical: AppSpacing.sm,
                             ),
                             decoration: BoxDecoration(
-                              color: message.isUser
+                              color: message.isOwnMessage
                                   ? AppColors.primarySoft
                                   : Colors.white,
                               borderRadius: BorderRadius.circular(18),
@@ -665,7 +740,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  message.text,
+                                  message.messageText,
                                   style: const TextStyle(
                                     color: AppColors.textPrimary,
                                     fontWeight: FontWeight.w600,
@@ -673,7 +748,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  DateFormat('h:mm a').format(message.sentAt),
+                                  _formatMessageTime(message.createdAt),
                                   style: const TextStyle(
                                     color: AppColors.textSecondary,
                                     fontSize: 11,
@@ -719,8 +794,11 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: SwiperButton(
-                  label: 'Send',
-                  onPressed: isTaskCompleted ? null : () => _sendMessage(booking),
+                  label: _sendingMessage ? 'Sending...' : 'Send',
+                  isLoading: _sendingMessage,
+                  onPressed: isTaskCompleted || _sendingMessage
+                      ? null
+                      : () => _sendMessage(booking),
                 ),
               ),
             ],
@@ -730,25 +808,50 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  void _sendMessage(CustomerBookingDetail booking) {
+  String _formatMessageTime(String createdAt) {
+    final parsed = DateTime.tryParse(createdAt);
+    if (parsed == null) {
+      return '';
+    }
+    return DateFormat('h:mm a').format(parsed.toLocal());
+  }
+
+  Future<void> _sendMessage(CustomerBookingDetail booking) async {
     final text = _messageController.text.trim();
     if (text.isEmpty) {
       _showNotice('Please type a message first.');
       return;
     }
+    final bookingId = _bookingId;
+    if (bookingId == null) {
+      return;
+    }
 
-    setState(() {
-      _messages.add(
-        _BookingChatMessage(
-          text: text,
-          sentAt: DateTime.now(),
-          isUser: true,
-        ),
+    setState(() => _sendingMessage = true);
+
+    try {
+      final thread = await _messagesService.sendMessage(
+        bookingId: bookingId,
+        messageText: text,
       );
-      _messageController.clear();
-    });
-
-    _showNotice('Message sent to ${booking.providerFullName}.');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _chatMessages = thread.messages;
+        _messageController.clear();
+      });
+      _showNotice('Message sent to ${booking.providerFullName}.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showNotice(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _sendingMessage = false);
+      }
+    }
   }
 
   Future<void> _pickPaymentProof() async {
@@ -806,7 +909,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               padding: EdgeInsets.only(
                 left: AppSpacing.md,
                 right: AppSpacing.md,
-                bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
+                bottom:
+                    MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
               ),
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
@@ -861,7 +965,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                           child: SwiperButton(
                             label: 'Cancel',
                             isSecondary: true,
-                            onPressed: () => Navigator.of(sheetContext).pop(false),
+                            onPressed: () =>
+                                Navigator.of(sheetContext).pop(false),
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
@@ -950,7 +1055,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               padding: EdgeInsets.only(
                 left: AppSpacing.md,
                 right: AppSpacing.md,
-                bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
+                bottom:
+                    MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
               ),
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
@@ -1019,22 +1125,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                       Wrap(
                         spacing: AppSpacing.xs,
                         runSpacing: AppSpacing.xs,
-                        children: _reviewTags.map((tag) {
-                          final active = selectedTags.contains(tag);
-                          return FilterChip(
-                            label: Text(tag),
-                            selected: active,
-                            onSelected: (_) {
-                              setModalState(() {
-                                if (active) {
-                                  selectedTags.remove(tag);
-                                } else {
-                                  selectedTags.add(tag);
-                                }
-                              });
-                            },
-                          );
-                        }).toList(growable: false),
+                        children: _reviewTags
+                            .map((tag) {
+                              final active = selectedTags.contains(tag);
+                              return FilterChip(
+                                label: Text(tag),
+                                selected: active,
+                                onSelected: (_) {
+                                  setModalState(() {
+                                    if (active) {
+                                      selectedTags.remove(tag);
+                                    } else {
+                                      selectedTags.add(tag);
+                                    }
+                                  });
+                                },
+                              );
+                            })
+                            .toList(growable: false),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       SwitchListTile.adaptive(
@@ -1108,7 +1216,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                             child: SwiperButton(
                               label: 'Cancel',
                               isSecondary: true,
-                              onPressed: () => Navigator.of(sheetContext).pop(false),
+                              onPressed: () =>
+                                  Navigator.of(sheetContext).pop(false),
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
@@ -1171,11 +1280,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 
-  Widget _summaryTile(
-    IconData icon,
-    String text, {
-    bool emphasize = false,
-  }) {
+  Widget _summaryTile(IconData icon, String text, {bool emphasize = false}) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: AppSpacing.sm),
@@ -1215,9 +1320,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -1296,7 +1401,8 @@ class _TaskStepCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               '$number. $title',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     height: 1.2,
                                   ),
@@ -1339,9 +1445,9 @@ class _TaskStepCard extends StatelessWidget {
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 if (child != null) child!,
               ],
@@ -1469,23 +1575,8 @@ class _TaskStepConnectorState extends State<_TaskStepConnector>
   }
 }
 
-class _BookingChatMessage {
-  const _BookingChatMessage({
-    required this.text,
-    required this.sentAt,
-    required this.isUser,
-  });
-
-  final String text;
-  final DateTime sentAt;
-  final bool isUser;
-}
-
 class _InlineNotice extends StatelessWidget {
-  const _InlineNotice({
-    required this.message,
-    required this.tone,
-  });
+  const _InlineNotice({required this.message, required this.tone});
 
   final String message;
   final Color tone;
@@ -1501,10 +1592,7 @@ class _InlineNotice extends StatelessWidget {
       ),
       child: Text(
         message,
-        style: TextStyle(
-          color: tone,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: tone, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -1612,10 +1700,7 @@ class _ProofPreviewCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: AppSpacing.sm),
-          _ProofMedia(
-            dataUrl: dataUrl,
-            mimeType: mimeType,
-          ),
+          _ProofMedia(dataUrl: dataUrl, mimeType: mimeType),
         ],
       ),
     );
@@ -1623,17 +1708,15 @@ class _ProofPreviewCard extends StatelessWidget {
 }
 
 class _ProofMedia extends StatelessWidget {
-  const _ProofMedia({
-    required this.dataUrl,
-    required this.mimeType,
-  });
+  const _ProofMedia({required this.dataUrl, required this.mimeType});
 
   final String dataUrl;
   final String mimeType;
 
   @override
   Widget build(BuildContext context) {
-    if (mimeType == 'application/pdf' || dataUrl.toLowerCase().startsWith('data:application/pdf')) {
+    if (mimeType == 'application/pdf' ||
+        dataUrl.toLowerCase().startsWith('data:application/pdf')) {
       return Container(
         height: 108,
         decoration: BoxDecoration(
@@ -1645,7 +1728,11 @@ class _ProofMedia extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.picture_as_pdf_outlined, color: AppColors.primary, size: 34),
+              Icon(
+                Icons.picture_as_pdf_outlined,
+                color: AppColors.primary,
+                size: 34,
+              ),
               SizedBox(height: AppSpacing.xs),
               Text(
                 'PDF proof uploaded',

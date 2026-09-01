@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import type { Booking } from "@/lib/profile-types";
 import { normalizeBookingWorkflowStatus } from "@/lib/booking-workflow";
+import { roundCurrency } from "@/lib/payments";
 import { parsePaymentAdjustmentNote } from "@/lib/payment-adjustment";
 import { sendPushNotificationToUser } from "@/lib/push-notifications";
 import { buildProviderPortraitSrc, type ProviderCategoryKey } from "@/lib/provider-catalog";
@@ -153,6 +154,8 @@ type BookingRow = {
 type ProviderServiceRow = {
   id: string;
   service_type: string | null;
+  hourly_rate: number | null;
+  daily_rate: number | null;
 };
 
 type ProviderAvailabilityRow = {
@@ -788,20 +791,15 @@ async function mapLiveBookingToUi(
       paymentRecord?.status === "refunded"
         ? paymentRecord.status
         : "pending",
-    companyCommissionAmount:
-      typeof paymentRecord?.company_commission_amount === "number"
-        ? Number(paymentRecord.company_commission_amount)
-        : 0,
-    providerNetAmount:
-      typeof paymentRecord?.provider_net_amount === "number"
-        ? Number(paymentRecord.provider_net_amount)
-        : 0,
-    companyPaymentStatus:
-      paymentRecord?.company_payment_status === "paid"
-        ? "paid"
-        : paymentRecord?.company_payment_status === "payment_process"
-          ? "payment_process"
-          : "pending",
+    // These three fields are internal Della<->provider commission/payout
+    // figures — not the customer's business. This route is customer-only
+    // (verifyCustomerRequest above), so redacting them here has no effect on
+    // the separate provider (app/api/provider/bookings/[id]/route.ts) or
+    // admin-dashboard code paths, which read the real values directly off
+    // the `payments` table instead of through this response shape.
+    companyCommissionAmount: 0,
+    providerNetAmount: 0,
+    companyPaymentStatus: "pending",
     customerPaymentProofDataUrl: await resolveStoredMediaUrl(adminClient, {
       bucket: "payment-proofs",
       value: cashPaymentProofValue,
@@ -1118,17 +1116,65 @@ export async function POST(request: Request) {
 
   const { data: providerService } = await verified.adminClient
     .from("provider_services")
-    .select("id, service_type")
+    .select("id, service_type, hourly_rate, daily_rate")
     .eq("provider_id", payload.providerId)
     .eq("service_type", payload.serviceKey)
     .maybeSingle();
 
   const providerServiceRow = providerService as ProviderServiceRow | null;
 
+  // The client-computed hourlyRate/dailyRate/totalAmount in `payload` are
+  // display-only from here on — they are NEVER written to the booking. The
+  // provider's actual stored rate for this exact service is the only source
+  // of truth for what gets charged. A service that doesn't belong to this
+  // provider is rejected outright rather than silently falling back to
+  // whatever number the client happened to send.
+  if (!providerServiceRow) {
+    return NextResponse.json(
+      { error: "This service is no longer offered by this provider. Please refresh and try again." },
+      { status: 400 },
+    );
+  }
+
+  if (payload.durationHours <= 0 || payload.durationHours > 24) {
+    return NextResponse.json(
+      { error: "Booking duration must be between 1 and 24 hours." },
+      { status: 400 },
+    );
+  }
+
+  const serverHourlyRate = Number(providerServiceRow.hourly_rate);
+  const serverDailyRate = Number(providerServiceRow.daily_rate);
+
+  if (
+    payload.bookingMode === "hourly" &&
+    (!Number.isFinite(serverHourlyRate) || serverHourlyRate <= 0)
+  ) {
+    return NextResponse.json(
+      { error: "This provider hasn't set an hourly rate for this service yet." },
+      { status: 400 },
+    );
+  }
+
+  if (
+    payload.bookingMode === "daily" &&
+    (!Number.isFinite(serverDailyRate) || serverDailyRate <= 0)
+  ) {
+    return NextResponse.json(
+      { error: "This provider hasn't set a daily rate for this service yet." },
+      { status: 400 },
+    );
+  }
+
+  const authoritativeAmount =
+    payload.bookingMode === "hourly"
+      ? roundCurrency(serverHourlyRate * payload.durationHours)
+      : roundCurrency(serverDailyRate);
+
   const bookingInsertPayload = {
     customer_id: verified.profile.id,
     provider_id: payload.providerId,
-    provider_service_id: providerServiceRow?.id ?? null,
+    provider_service_id: providerServiceRow.id,
     booking_status: "pending_provider_response",
     booking_mode: payload.bookingMode,
     service_key: payload.serviceKey,
@@ -1139,11 +1185,11 @@ export async function POST(request: Request) {
     scheduled_end_time: scheduledEndTime,
     duration_hours: payload.durationHours,
     customer_note: payload.notes,
-    hourly_rate: payload.hourlyRate,
-    daily_rate: payload.dailyRate,
-    quoted_amount: payload.totalAmount,
-    booking_price: payload.totalAmount,
-    final_amount: payload.totalAmount,
+    hourly_rate: Number.isFinite(serverHourlyRate) ? serverHourlyRate : 0,
+    daily_rate: Number.isFinite(serverDailyRate) ? serverDailyRate : 0,
+    quoted_amount: authoritativeAmount,
+    booking_price: authoritativeAmount,
+    final_amount: authoritativeAmount,
   };
 
   let { data: insertedBooking, error: bookingError } = await verified.adminClient

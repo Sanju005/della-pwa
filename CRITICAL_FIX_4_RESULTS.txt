@@ -1,0 +1,249 @@
+CRITICAL FIX #4 — PROVIDER LOCATION PRIVACY: RESULTS
+======================================================================
+Status: IMPLEMENTED AND TESTED. All required checks passed. Nothing
+failed. Database/RLS was NOT touched (confirmed unnecessary by the
+final read-only check below). Admin location access was NOT touched.
+Provider registration location storage was NOT touched.
+
+======================================================================
+PART 1 — FINAL READ-ONLY CHECK (provider_admin_metadata)
+======================================================================
+Performed before any implementation, as requested, to rule out a
+second leak before proceeding.
+
+1. Inspected provider_admin_metadata (service-role, read-only):
+   11 rows. Columns: provider_id, availability_days,
+   availability_time_preset, availability_start_time,
+   availability_end_time, service_image_captions,
+   certificate_image_captions, service_image_files,
+   certificate_image_files, emergency_contact, profile_image_name,
+   current_latitude, current_longitude, created_at, updated_at.
+
+2. RLS confirmed empirically (no raw-SQL/catalog access available, same
+   limitation as earlier this session): anonymous SELECT returns 0 rows
+   despite 11 real rows existing; anonymous INSERT is explicitly
+   blocked with "new row violates row-level security policy" (the
+   RLS-specific error, proving RLS is genuinely enabled and enforced,
+   not just coincidentally empty). This matches what SUPABASE_AUDIT.md
+   (a pre-existing document, not written this session) already claimed
+   about this table.
+
+3. Codebase-wide search for current_latitude, current_longitude,
+   provider_admin_metadata across app/, lib/, admin-dashboard/, and
+   flutter_app/: found exactly ONE real code reference, in
+   app/api/provider/register/route.ts (~line 290-370) — a function that
+   upserts a review_status/approval_status stub row into
+   provider_admin_metadata during provider registration. It never reads
+   or writes current_latitude/current_longitude, and its result is
+   never returned to any client. No other reference exists anywhere,
+   including zero references anywhere in the Flutter app.
+
+4. Conclusion: NO second leak. current_latitude/current_longitude are
+   never read by, or exposed through, any customer-facing API, Flutter
+   screen, web page, or realtime subscription. Cleared to proceed
+   without any additional database/RLS changes, per your instruction.
+
+======================================================================
+PART 2 — IMPLEMENTATION
+======================================================================
+
+Backend (Next.js), matching the approved architecture exactly:
+  - lib/provider-catalog.ts — getProviderCatalog() now accepts an
+    optional customerLocation. ProviderListing no longer has
+    latitude/longitude fields at all. distanceKm is computed via the
+    existing calculateDistanceKm() (lib/provider-distance.ts, unchanged
+    — it was already correct, it just runs server-side now) against
+    provider_profiles.latitude/longitude, which are still read from the
+    DB internally but never placed on the output object. Nearest-first
+    sort applied when a customer location is provided. service_radius_km
+    (already an existing column) now filters out providers whose
+    distance exceeds their own declared radius; providers with no
+    radius set are treated as unlimited. The hardcoded fake distanceKm
+    array is gone.
+  - lib/home-feed.ts — same treatment: HomeProviderCard no longer
+    carries providerLatitude/providerLongitude; real distanceKm
+    computed the same way; fake array removed.
+  - lib/provider-detail.ts — threads customerLocation through to
+    getProviderCatalog(); ProviderDetail automatically stops carrying
+    coordinates since it inherits from the now-fixed ProviderListing.
+  - lib/customer-location.ts (new) — small shared helper,
+    parseCustomerLocation(searchParams), used identically by all three
+    routes and both SSR pages to avoid duplicating the same parsing
+    logic three times.
+  - app/api/providers/route.ts, app/api/providers/[id]/route.ts,
+    app/api/home/route.ts — all three now read optional lat/lng from
+    the query string and pass them through.
+  - app/providers/page.tsx, app/home/page.tsx, app/providers/[id]/page.tsx
+    — the server-rendered pages also accept lat/lng via their own
+    searchParams for consistency (e.g. a shared/reloaded link that
+    already carries a location).
+
+Web client (customer-facing):
+  - app/_components/provider-distance.tsx — rewritten as a pure
+    formatter. No more client-side haversine call, no more
+    providerLatitude/providerLongitude props, no more localStorage
+    lookup inside the component. Takes distanceKm: number | null and
+    formats it (or shows "Distance unavailable").
+  - app/providers/providers-catalog-screen.tsx — this was the file with
+    the real client-side privacy problem (calculateDistanceKm import,
+    a getListingDistanceKm() that computed from raw coordinates, and a
+    sort using it). Fixed: removed the calculateDistanceKm import and
+    the coordinate-based calculation entirely. The screen still fully
+    supports its existing "Nearest" sort tab and its existing
+    saved-place/current-location picker UI (both unchanged) — but once
+    a location is known, it now fetches /api/providers with
+    lat/lng query params and replaces its listings with the server's
+    already-sorted, already-distance-computed, coordinate-free
+    response. The "nearest" sort tab now just orders by the real
+    server-provided distanceKm number (sorting an already-public number
+    client-side is not a privacy concern — the fix was removing access
+    to raw coordinates, not removing all client-side array sorting).
+  - app/home/_components/marketplace-ui.tsx, app/providers/[id]/page.tsx,
+    app/providers/[id]/book/screen.tsx — updated to the new
+    ProviderDistanceText(distanceKm) prop shape. These three did not
+    have their own coordinate-based math (they relied on the old
+    component's internal calculation), so removing the coordinates from
+    their data is the correct, complete fix for them.
+  - NOT done: a live client-side re-fetch-on-location-resolve for the
+    home page and the provider detail/booking pages, mirroring what the
+    catalog screen now does. These three already correctly show a real,
+    server-computed distanceKm whenever one is available (e.g. arriving
+    via a lat/lng-carrying link) and correctly fall back to "Distance
+    unavailable" otherwise — that fallback is the already-designed,
+    already-existing state, not a new gap. Adding a live refetch to
+    these three as well is a reasonable follow-up UX enhancement, not a
+    privacy requirement — flagging it as intentionally out of scope for
+    this pass rather than silently deciding it didn't matter.
+
+Flutter (customer-facing):
+  - lib/models/provider_summary.dart — latitude/longitude fields
+    removed entirely (field declarations, fromJson, fromProviderCatalogJson,
+    copyWith, toJson). distanceLabel already came from the API's
+    distanceKm value, so no other change was needed there.
+  - lib/services/provider_marketplace_service.dart — fetchCatalog() now
+    sends lat/lng as query params (from the customer's own selected
+    location, same as before — that value was never the problem).
+    _applyLocationFilter() — the function that ran the Dart haversine
+    (_distanceKm/_degToRad) and re-sorted by it — is gone. What's left
+    is _applyTextFilter(), which keeps ONLY the pre-existing text-token
+    matching against each provider's already-public location/
+    description/services/specialties fields; it does no coordinate math
+    and never did anything privacy-sensitive on its own.
+  - lib/services/provider_detail_service.dart — fetchProviderDetail()
+    now also sends the customer's stored lat/lng as query params, so
+    the provider detail screen gets a real server-computed distance too.
+
+NOT touched, by design, exactly as instructed:
+  - Admin dashboard (admin-providers.ts) — still reads
+    provider_profiles.latitude/longitude directly, which is correct and
+    expected for admin use, and was never part of this fix's scope.
+  - Provider registration (app/api/provider/register/route.ts) — still
+    writes latitude/longitude to provider_profiles exactly as before.
+  - Database schema and RLS — nothing changed, confirmed unnecessary in
+    Part 1 and consistent with the original investigation's finding
+    that this was purely an application-layer response-shaping problem.
+  - provider_admin_metadata / current_latitude / current_longitude —
+    confirmed in Part 1 to be already properly locked down and never
+    exposed; left untouched.
+
+======================================================================
+PART 3 — TEST RESULTS
+======================================================================
+
+1. flutter analyze — PASS (exit code 0). 36 issues found, all
+   pre-existing info/warning-level lints in files this fix never
+   touched (booking_detail_screen.dart, booking_overview_screen.dart,
+   provider_booking_screen.dart, customer_home_screen.dart,
+   profile_demo_screen.dart, provider_workspace_subpages.dart,
+   customer_signup_service.dart, provider_workspace_service.dart,
+   booking_card.dart). Zero issues in provider_summary.dart,
+   provider_marketplace_service.dart, or provider_detail_service.dart.
+
+2. Flutter Android debug build — PASS. `flutter build apk --debug`
+   completed successfully: "Built build\app\outputs\flutter-apk\
+   app-debug.apk" (exit code 0).
+
+3. Next.js build/typecheck — PASS. `npx tsc --noEmit` on the whole
+   project: clean, exit code 0. `npm run build` (next build --webpack):
+   compiled successfully, TypeScript passed, all 58 static pages and
+   all API routes (including /api/providers, /api/providers/[id],
+   /api/home) built successfully, exit code 0.
+
+4. Direct public API inspection, /api/providers — PASS. Ran a
+   recursive scanner (not a shallow key check — it walks every nested
+   object/array in the full JSON response) against the live response
+   from a locally-started production server (next start), searching
+   for latitude, longitude, providerLatitude, providerLongitude,
+   current_latitude, current_longitude anywhere in the payload for
+   every listing. Zero matches.
+
+5. Direct public API inspection, /api/providers/[id] — PASS. Same
+   recursive scanner against a real disposable test provider's detail
+   response. Zero matches.
+
+6. Direct public API inspection, /api/home — PASS. Same recursive
+   scanner against the full home feed response (all four provider
+   card lists). Zero matches.
+
+   (Additionally, as a stronger check beyond what was asked: fetched
+   the fully-rendered HTML of /providers, /providers/[id], and /home —
+   including Next.js's embedded hydration/RSC payload, which is where a
+   naive "just check the JSON API" test could miss a leak if a page
+   embedded raw provider data directly — and grepped for "latitude"/
+   "longitude" as raw strings. Zero matches in all three rendered
+   pages.)
+
+7. Real distanceKm against known coordinates — PASS. Created a
+   disposable test provider at a known coordinate (3.149, 101.6869,
+   ~1.11km from a fixed Kuala Lumpur test point), requested
+   /api/providers with that test point as lat/lng, and compared the
+   server's returned distanceKm against a haversine computed
+   independently in the test script itself (not by importing the app's
+   own function — a genuinely separate calculation). Server value:
+   1.111949266445613 km. Independent value: 1.112 km. Match within
+   50m tolerance.
+
+8. Nearest-first sorting — PASS. With a "near" test provider
+   (~1.1km away) and a "mid" test provider (~11.1km away), the server
+   response placed near before mid (index 0 vs 1) when a customer
+   location was supplied.
+
+9. Service-radius filtering — PASS. A "far" test provider (~55.5km
+   away, service_radius_km set to 10) was correctly excluded from the
+   results entirely. The near and mid providers (within their own
+   50km radius) were correctly still included — confirming the filter
+   is per-provider-radius, not a single global cutoff.
+
+10. No-location fallback — PASS. Called /api/providers with no lat/lng
+    query params: the test provider's distanceKm came back as null
+    (not a number, not omitted-and-defaulting-to-something-fake).
+    Called /api/home with no lat/lng: every popularProviders entry's
+    distanceKm was null, and explicitly confirmed none of them matched
+    the old hardcoded fake array values ([2.4, 1.8, 3.1, 2.7, 2.2, 4.0,
+    3.6, 2.9]) — proving the fake data path is actually gone, not just
+    unreachable.
+
+11. Provider detail still works — PASS. /api/providers/[id] for the
+    disposable test provider returned a complete detail payload (name,
+    about, and the rest of the ProviderDetail shape) with status 200.
+    Also smoke-tested against a real, already-existing approved
+    provider in the database: /providers/[id] page returned 200 and
+    rendered correctly with no coordinate leakage in the output HTML.
+
+12. Booking still works — PASS (structural/typecheck level; no full
+    booking-creation E2E was run). /providers/[id]/book returned 200
+    against a real approved provider, rendered correctly, and typechecks
+    clean end-to-end through the updated ProviderDetailText usage. The
+    booking screen consumes the same ProviderDetail/ProviderDetailModel
+    shape validated in test 11, so its data path is covered by the same
+    evidence. A full "create an actual booking" flow test was not run —
+    flagging that distinction rather than overstating this result.
+
+All disposable test providers, their auth users, profiles, and
+provider_services rows were deleted after testing. The local test
+server was stopped after use. No temporary scripts were left behind.
+
+======================================================================
+NOTHING FAILED. Nothing was silently patched with a fake fallback —
+every no-location case returns null, exactly as required.
+======================================================================

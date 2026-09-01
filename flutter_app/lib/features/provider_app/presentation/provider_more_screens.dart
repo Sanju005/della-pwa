@@ -1,9 +1,16 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
+import '../../../core/animation/app_motion.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../services/browser_file_picker.dart';
+import '../../../services/device_location_service.dart';
+import '../../../services/image_crop_service.dart';
+import '../../../services/otp_service.dart';
 import '../../../services/provider_workspace_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
@@ -11,6 +18,7 @@ import '../../../widgets/empty_state.dart';
 import '../../../widgets/loading_state.dart';
 import '../../../widgets/malaysia_state_autocomplete_field.dart';
 import '../../../widgets/profile_avatar.dart';
+import '../../../widgets/service_radius_map.dart';
 import '../../../widgets/swiper_app_bar.dart';
 import '../../../widgets/swiper_status_badge.dart';
 
@@ -61,15 +69,17 @@ class _ProviderCalendarScreenState extends State<ProviderCalendarScreen> {
               .where((booking) => booking.scheduledDate == _selectedDate)
               .toList(growable: false);
           final monthLabel = DateFormat('MMMM yyyy').format(_month);
-          final firstWeekday = DateTime(_month.year, _month.month, 1).weekday % 7;
+          final firstWeekday =
+              DateTime(_month.year, _month.month, 1).weekday % 7;
           final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
           final cells = <_CalendarCell>[
             for (var i = 0; i < firstWeekday; i++) const _CalendarCell.empty(),
             for (var day = 1; day <= daysInMonth; day++)
               _CalendarCell(
                 day: day,
-                key: DateFormat('yyyy-MM-dd')
-                    .format(DateTime(_month.year, _month.month, day)),
+                key: DateFormat(
+                  'yyyy-MM-dd',
+                ).format(DateTime(_month.year, _month.month, day)),
               ),
           ];
 
@@ -85,7 +95,11 @@ class _ProviderCalendarScreenState extends State<ProviderCalendarScreen> {
                           icon: Icons.chevron_left_rounded,
                           onTap: () {
                             setState(() {
-                              _month = DateTime(_month.year, _month.month - 1, 1);
+                              _month = DateTime(
+                                _month.year,
+                                _month.month - 1,
+                                1,
+                              );
                             });
                           },
                         ),
@@ -93,17 +107,19 @@ class _ProviderCalendarScreenState extends State<ProviderCalendarScreen> {
                           child: Text(
                             monthLabel,
                             textAlign: TextAlign.center,
-                            style:
-                                Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w900,
-                                    ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w900),
                           ),
                         ),
                         _circleIconButton(
                           icon: Icons.chevron_right_rounded,
                           onTap: () {
                             setState(() {
-                              _month = DateTime(_month.year, _month.month + 1, 1);
+                              _month = DateTime(
+                                _month.year,
+                                _month.month + 1,
+                                1,
+                              );
                             });
                           },
                         ),
@@ -125,24 +141,29 @@ class _ProviderCalendarScreenState extends State<ProviderCalendarScreen> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: cells.map((cell) {
-                        final count = cell.key == null
-                            ? 0
-                            : bookings
-                                .where(
-                                  (booking) => booking.scheduledDate == cell.key,
-                                )
-                                .length;
-                        final active = cell.key == _selectedDate;
-                        return _CalendarDateCell(
-                          cell: cell,
-                          active: active,
-                          count: count,
-                          onTap: cell.key == null
-                              ? null
-                              : () => setState(() => _selectedDate = cell.key!),
-                        );
-                      }).toList(growable: false),
+                      children: cells
+                          .map((cell) {
+                            final count = cell.key == null
+                                ? 0
+                                : bookings
+                                      .where(
+                                        (booking) =>
+                                            booking.scheduledDate == cell.key,
+                                      )
+                                      .length;
+                            final active = cell.key == _selectedDate;
+                            return _CalendarDateCell(
+                              cell: cell,
+                              active: active,
+                              count: count,
+                              onTap: cell.key == null
+                                  ? null
+                                  : () => setState(
+                                      () => _selectedDate = cell.key!,
+                                    ),
+                            );
+                          })
+                          .toList(growable: false),
                     ),
                   ],
                 ),
@@ -160,25 +181,22 @@ class _ProviderCalendarScreenState extends State<ProviderCalendarScreen> {
                             children: [
                               Text(
                                 _formatDisplayDate(_selectedDate),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
+                                style: Theme.of(context).textTheme.titleLarge
                                     ?.copyWith(fontWeight: FontWeight.w900),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 'Jobs scheduled for the selected day.',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
+                                style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(color: AppColors.textSecondary),
                               ),
                             ],
                           ),
                         ),
                         TextButton(
-                          onPressed: () => Navigator.of(context)
-                              .pushNamed(AppRoutes.providerAvailability),
+                          onPressed: () => Navigator.of(
+                            context,
+                          ).pushNamed(AppRoutes.providerServices),
                           child: const Text('Availability'),
                         ),
                       ],
@@ -207,7 +225,10 @@ class _ProviderCalendarScreenState extends State<ProviderCalendarScreen> {
     );
   }
 
-  Widget _bookingDayCard(BuildContext context, ProviderWorkspaceBooking booking) {
+  Widget _bookingDayCard(
+    BuildContext context,
+    ProviderWorkspaceBooking booking,
+  ) {
     final tone = _bookingTone(booking.bookingStatus);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -228,15 +249,15 @@ class _ProviderCalendarScreenState extends State<ProviderCalendarScreen> {
                     Text(
                       booking.serviceLabel,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       booking.customerName,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -245,7 +266,10 @@ class _ProviderCalendarScreenState extends State<ProviderCalendarScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          _infoLine(Icons.schedule_outlined, _timeOnly(booking.scheduledDate, booking.scheduledStartTime)),
+          _infoLine(
+            Icons.schedule_outlined,
+            _timeOnly(booking.scheduledDate, booking.scheduledStartTime),
+          ),
         ],
       ),
     );
@@ -355,14 +379,17 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: SwiperAppBar(
-        title: _selectedThread == null ? 'Messages' : _selectedThread!.counterpartName,
+        title: _selectedThread == null
+            ? 'Messages'
+            : _selectedThread!.counterpartName,
         subtitle: _selectedThread == null
             ? 'Live booking updates and provider alerts'
             : _selectedThread!.serviceLabel,
         showBack: true,
         actions: [
           IconButton(
-            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.providerMore),
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppRoutes.providerMore),
             icon: const Icon(Icons.settings_outlined),
           ),
         ],
@@ -438,17 +465,13 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                               Expanded(
                                 child: Text(
                                   thread.counterpartName,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleSmall
+                                  style: Theme.of(context).textTheme.titleSmall
                                       ?.copyWith(fontWeight: FontWeight.w800),
                                 ),
                               ),
                               Text(
                                 _relativeTime(thread.lastMessageAt),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
+                                style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(color: AppColors.textSecondary),
                               ),
                             ],
@@ -456,9 +479,7 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                           const SizedBox(height: 4),
                           Text(
                             thread.serviceLabel,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w700,
@@ -469,9 +490,7 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                             thread.preview,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
+                            style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 6),
@@ -479,9 +498,7 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                             thread.schedule,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: AppColors.textSecondary),
                           ),
                         ],
@@ -525,11 +542,16 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
           child: ListView(
             padding: AppSpacing.screenPadding,
             children: [
-              if (_loadingThread) const LoadingState(label: 'Loading conversation...'),
+              if (_loadingThread)
+                const LoadingState(label: 'Loading conversation...'),
               if (_error.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: _notice(_error, AppColors.error, const Color(0xFFFFF1F2)),
+                  child: _notice(
+                    _error,
+                    AppColors.error,
+                    const Color(0xFFFFF1F2),
+                  ),
                 ),
               _card(
                 child: Column(
@@ -537,26 +559,23 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                   children: [
                     Text(
                       thread.counterpartName,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w900),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       thread.schedule,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       thread.location,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -595,7 +614,10 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                   padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                   child: Row(
                     children: [
-                      const Icon(Icons.attach_file_rounded, color: AppColors.primary),
+                      const Icon(
+                        Icons.attach_file_rounded,
+                        color: AppColors.primary,
+                      ),
                       const SizedBox(width: AppSpacing.xs),
                       Expanded(child: Text(_attachment!.name)),
                       IconButton(
@@ -616,7 +638,8 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                       minLines: 1,
                       maxLines: 4,
                       enabled: thread.canSendMessages && !_sending,
-                      onChanged: (value) => setState(() => _composerText = value),
+                      onChanged: (value) =>
+                          setState(() => _composerText = value),
                       controller: TextEditingController(text: _composerText)
                         ..selection = TextSelection.fromPosition(
                           TextPosition(offset: _composerText.length),
@@ -628,8 +651,9 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                         filled: true,
                         fillColor: const Color(0xFFF8F4FF),
                         border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                           borderSide: BorderSide.none,
                         ),
                       ),
@@ -637,12 +661,16 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   FilledButton(
-                    onPressed: thread.canSendMessages && !_sending ? _sendMessage : null,
+                    onPressed: thread.canSendMessages && !_sending
+                        ? _sendMessage
+                        : null,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                       ),
                     ),
                     child: Text(_sending ? '...' : 'Send'),
@@ -667,8 +695,9 @@ class _ProviderMessagesScreenState extends State<ProviderMessagesScreen> {
         border: own ? null : Border.all(color: const Color(0xFFBBF7D0)),
       ),
       child: Column(
-        crossAxisAlignment:
-            own ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: own
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           if (message.messageText.trim().isNotEmpty)
             Text(
@@ -775,7 +804,6 @@ class _ProviderPersonalDetailsScreenState
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _countryController = TextEditingController();
-  final _emergencyController = TextEditingController();
   final _bioController = TextEditingController();
   PickedBrowserFile? _avatarFile;
   String _gender = 'Female';
@@ -801,11 +829,15 @@ class _ProviderPersonalDetailsScreenState
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppSpacing.lg),
-        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.14)),
+        borderSide: BorderSide(
+          color: AppColors.primary.withValues(alpha: 0.14),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppSpacing.lg),
-        borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.14)),
+        borderSide: BorderSide(
+          color: AppColors.primary.withValues(alpha: 0.14),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppSpacing.lg),
@@ -838,7 +870,6 @@ class _ProviderPersonalDetailsScreenState
     _cityController.dispose();
     _stateController.dispose();
     _countryController.dispose();
-    _emergencyController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -886,12 +917,11 @@ class _ProviderPersonalDetailsScreenState
     _cityController.text = profile.city;
     _stateController.text = profile.state;
     _countryController.text = profile.country;
-    _emergencyController.text = profile.emergencyContactNumber;
     _bioController.text = profile.bio;
   }
 
   Future<void> _pickAvatar() async {
-    final picked = await pickSingleBrowserFile(accept: 'image/*');
+    final picked = await pickAndCropImage(toolbarTitle: 'Crop Profile Photo');
     if (!mounted || picked == null) {
       return;
     }
@@ -904,7 +934,8 @@ class _ProviderPersonalDetailsScreenState
 
   Future<void> _pickDateOfBirth() async {
     final now = DateTime.now();
-    final initial = DateTime.tryParse(_dobController.text.trim()) ??
+    final initial =
+        DateTime.tryParse(_dobController.text.trim()) ??
         DateTime(now.year - 25, now.month, now.day);
     final picked = await showDatePicker(
       context: context,
@@ -923,10 +954,10 @@ class _ProviderPersonalDetailsScreenState
   Future<void> _save() async {
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
-    final fullName = [firstName, lastName]
-        .where((item) => item.isNotEmpty)
-        .join(' ')
-        .trim();
+    final fullName = [
+      firstName,
+      lastName,
+    ].where((item) => item.isNotEmpty).join(' ').trim();
     if (firstName.isEmpty || lastName.isEmpty) {
       setState(() => _error = 'First name and last name are required.');
       return;
@@ -954,7 +985,6 @@ class _ProviderPersonalDetailsScreenState
         city: _cityController.text.trim(),
         state: _stateController.text.trim(),
         country: _countryController.text.trim(),
-        emergencyContactNumber: _emergencyController.text.trim(),
         bio: _bioController.text.trim(),
         avatarUrl: _avatarFile?.dataUrl,
       );
@@ -1025,36 +1055,51 @@ class _ProviderPersonalDetailsScreenState
                     ),
                     child: Row(
                       children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            ProfileAvatar(
-                              name: displayName.isEmpty ? 'Provider' : displayName,
-                              imageUrl: _avatarFile?.dataUrl ?? profile.avatarUrl,
-                              radius: 32,
-                            ),
-                            Positioned(
-                              right: -2,
-                              bottom: -2,
-                              child: InkWell(
-                                onTap: _pickAvatar,
-                                borderRadius: BorderRadius.circular(999),
-                                child: Ink(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.photo_camera_rounded,
-                                    size: 15,
-                                    color: Colors.white,
+                        SizedBox(
+                          width: 112,
+                          height: 112,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Positioned(
+                                left: 4,
+                                top: 4,
+                                child: ProfileAvatar(
+                                  name: displayName.isEmpty
+                                      ? 'Provider'
+                                      : displayName,
+                                  imageUrl:
+                                      _avatarFile?.dataUrl ?? profile.avatarUrl,
+                                  radius: 52,
+                                ),
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: InkWell(
+                                  onTap: _pickAvatar,
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: Ink(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFF645394),
+                                        width: 1.4,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.photo_camera_rounded,
+                                      size: 17,
+                                      color: Color(0xFF645394),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
@@ -1063,17 +1108,13 @@ class _ProviderPersonalDetailsScreenState
                             children: [
                               Text(
                                 displayName.isEmpty ? 'Provider' : displayName,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
+                                style: Theme.of(context).textTheme.titleLarge
                                     ?.copyWith(fontWeight: FontWeight.w900),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 'Update your public profile identity.',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
+                                style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(color: AppColors.textSecondary),
                               ),
                             ],
@@ -1087,9 +1128,9 @@ class _ProviderPersonalDetailsScreenState
                     Text(
                       _avatarFile!.name,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                   const SizedBox(height: AppSpacing.lg),
@@ -1134,10 +1175,8 @@ class _ProviderPersonalDetailsScreenState
                     initialValue: _gender,
                     items: const ['Female', 'Male']
                         .map(
-                          (item) => DropdownMenuItem(
-                            value: item,
-                            child: Text(item),
-                          ),
+                          (item) =>
+                              DropdownMenuItem(value: item, child: Text(item)),
                         )
                         .toList(),
                     onChanged: (value) {
@@ -1231,14 +1270,6 @@ class _ProviderPersonalDetailsScreenState
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
-                    controller: _emergencyController,
-                    decoration: _personalFieldDecoration(
-                      label: 'Emergency Contact Number',
-                      prefixIcon: Icons.contact_phone_outlined,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextField(
                     controller: _bioController,
                     maxLines: 4,
                     decoration: _personalFieldDecoration(
@@ -1265,21 +1296,22 @@ class _ProviderPersonalDetailsScreenState
                   const SizedBox(height: AppSpacing.md),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton(
+                    child: OutlinedButton(
                       onPressed: _saving ? null : _save,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
                         minimumSize: const Size.fromHeight(52),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusLg,
+                          ),
                         ),
                       ),
                       child: Text(_saving ? 'Saving...' : 'Save Details'),
                     ),
                   ),
-                ),
+                ],
               ),
             ],
           );
@@ -1289,10 +1321,34 @@ class _ProviderPersonalDetailsScreenState
   }
 }
 
-class ProviderVerificationHubScreen extends StatelessWidget {
+class ProviderVerificationHubScreen extends StatefulWidget {
   const ProviderVerificationHubScreen({super.key});
 
+  @override
+  State<ProviderVerificationHubScreen> createState() =>
+      _ProviderVerificationHubScreenState();
+}
+
+class _ProviderVerificationHubScreenState
+    extends State<ProviderVerificationHubScreen> {
   static const _service = ProviderWorkspaceService();
+  late Future<ProviderWorkspaceProfile> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _service.fetchProfile();
+  }
+
+  void _refresh() {
+    if (!mounted) return;
+    setState(() => _future = _service.fetchProfile());
+  }
+
+  Future<void> _openAndRefresh(String route) async {
+    await Navigator.of(context).pushNamed(route);
+    _refresh();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1303,7 +1359,7 @@ class ProviderVerificationHubScreen extends StatelessWidget {
         showBack: true,
       ),
       body: FutureBuilder<ProviderWorkspaceProfile>(
-        future: _service.fetchProfile(),
+        future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const LoadingState(label: 'Loading verification...');
@@ -1326,49 +1382,60 @@ class ProviderVerificationHubScreen extends StatelessWidget {
                   children: [
                     Text(
                       'Verification Status',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w900),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Open each section to complete pending items.',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     _moreTile(
                       context,
                       icon: Icons.mail_outline_rounded,
                       title: 'Email Verification',
+                      statusLabel: profile.emailVerified
+                          ? 'Verified'
+                          : 'Pending',
+                      statusColor: profile.emailVerified
+                          ? AppColors.success
+                          : AppColors.warning,
                       subtitle: profile.emailVerified
                           ? 'Verified email address'
                           : 'Pending email verification',
-                      onTap: () => Navigator.of(context)
-                          .pushNamed(AppRoutes.providerVerificationEmail),
+                      onTap: () =>
+                          _openAndRefresh(AppRoutes.providerVerificationEmail),
                     ),
                     _moreTile(
                       context,
                       icon: Icons.phone_outlined,
                       title: 'Phone Verification',
+                      statusLabel: profile.phoneVerified
+                          ? 'Verified'
+                          : 'Pending',
+                      statusColor: profile.phoneVerified
+                          ? AppColors.success
+                          : AppColors.warning,
                       subtitle: profile.phoneVerified
                           ? 'Verified phone number'
                           : 'Pending phone verification',
-                      onTap: () => Navigator.of(context)
-                          .pushNamed(AppRoutes.providerVerificationPhone),
+                      onTap: () =>
+                          _openAndRefresh(AppRoutes.providerVerificationPhone),
                     ),
                     _moreTile(
                       context,
                       icon: Icons.badge_outlined,
                       title: 'IC / Passport',
-                      subtitle: profile.identityVerified
-                          ? 'Verified identity documents'
-                          : 'Pending identity review',
-                      onTap: () => Navigator.of(context)
-                          .pushNamed(AppRoutes.providerVerificationIdentity),
+                      statusLabel: _identityStatusLabel(profile),
+                      statusColor: _identityStatusColor(profile),
+                      subtitle: _identityStatusSubtitle(profile),
+                      onTap: () => _openAndRefresh(
+                        AppRoutes.providerVerificationIdentity,
+                      ),
                       isLast: true,
                     ),
                   ],
@@ -1379,6 +1446,39 @@ class ProviderVerificationHubScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  String _identityStatusLabel(ProviderWorkspaceProfile profile) {
+    if (profile.identityVerified) {
+      return 'Verified';
+    }
+    return switch (profile.identityVerificationStatus) {
+      'processing' => 'Processing',
+      'rejected' => 'Rejected',
+      _ => 'Pending',
+    };
+  }
+
+  Color _identityStatusColor(ProviderWorkspaceProfile profile) {
+    if (profile.identityVerified) {
+      return AppColors.success;
+    }
+    return switch (profile.identityVerificationStatus) {
+      'processing' => AppColors.info,
+      'rejected' => AppColors.error,
+      _ => AppColors.warning,
+    };
+  }
+
+  String _identityStatusSubtitle(ProviderWorkspaceProfile profile) {
+    if (profile.identityVerified) {
+      return 'Verified identity documents';
+    }
+    return switch (profile.identityVerificationStatus) {
+      'processing' => 'Your documents are under review',
+      'rejected' => 'Previous submission was rejected',
+      _ => 'Pending identity review',
+    };
   }
 }
 
@@ -1398,19 +1498,45 @@ class _ProviderServiceAreaScreenState extends State<ProviderServiceAreaScreen> {
   String _seed = '';
   double _radiusKm = 15;
   bool _saving = false;
+  bool _fetchingLocation = false;
   String _message = '';
   String _error = '';
+  LatLng? _providerLatLng;
 
   @override
   void initState() {
     super.initState();
     _future = _service.fetchProfile();
+    _fetchCurrentLocation();
   }
 
   @override
   void dispose() {
     _areaController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    setState(() => _fetchingLocation = true);
+    try {
+      final result = await fetchDeviceLocation();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _providerLatLng = LatLng(result.latitude, result.longitude);
+        if (_areaController.text.trim().isEmpty) {
+          _areaController.text = result.label;
+        }
+      });
+    } catch (_) {
+      // Silently keep the map's default centre if location isn't
+      // available/permitted — the provider can still edit the area by hand.
+    } finally {
+      if (mounted) {
+        setState(() => _fetchingLocation = false);
+      }
+    }
   }
 
   void _seedState(ProviderWorkspaceProfile profile) {
@@ -1423,7 +1549,9 @@ class _ProviderServiceAreaScreenState extends State<ProviderServiceAreaScreen> {
       return;
     }
     _seed = nextSeed;
-    _areaController.text = profile.serviceLocation;
+    if (profile.serviceLocation.trim().isNotEmpty) {
+      _areaController.text = profile.serviceLocation;
+    }
     _radiusKm = profile.serviceRadiusKm > 0
         ? profile.serviceRadiusKm.clamp(1, 100).toDouble()
         : 15;
@@ -1498,45 +1626,17 @@ class _ProviderServiceAreaScreenState extends State<ProviderServiceAreaScreen> {
                     SizedBox(
                       height: 210,
                       child: Stack(
-                        alignment: Alignment.center,
                         children: [
-                          Container(
-                            decoration: BoxDecoration(
+                          Positioned.fill(
+                            child: ClipRRect(
                               borderRadius: BorderRadius.circular(24),
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFFF7F1FF),
-                                  Color(0xFFEFF7FF),
-                                ],
+                              child: ServiceRadiusMap(
+                                center:
+                                    _providerLatLng ??
+                                    const LatLng(3.1390, 101.6869),
+                                radiusKm: _radiusKm,
+                                height: 210,
                               ),
-                            ),
-                          ),
-                          for (final size in [160.0, 112.0, 64.0])
-                            Container(
-                              width: size,
-                              height: size,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.location_on_rounded,
-                              color: Colors.white,
-                              size: 30,
                             ),
                           ),
                           Positioned(
@@ -1552,7 +1652,9 @@ class _ProviderServiceAreaScreenState extends State<ProviderServiceAreaScreen> {
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
-                                '${_radiusKm.round()} km radius',
+                                _fetchingLocation
+                                    ? 'Locating…'
+                                    : '${_radiusKm.round()} km radius',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.primary,
@@ -1567,6 +1669,7 @@ class _ProviderServiceAreaScreenState extends State<ProviderServiceAreaScreen> {
                     _providerFormField(
                       controller: _areaController,
                       label: 'Service Area',
+                      onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Container(
@@ -1592,8 +1695,9 @@ class _ProviderServiceAreaScreenState extends State<ProviderServiceAreaScreen> {
                               activeTrackColor: AppColors.primary,
                               inactiveTrackColor: const Color(0xFFE7DDF7),
                               thumbColor: AppColors.primary,
-                              overlayColor:
-                                  AppColors.primary.withValues(alpha: 0.14),
+                              overlayColor: AppColors.primary.withValues(
+                                alpha: 0.14,
+                              ),
                               trackHeight: 5,
                             ),
                             child: Slider(
@@ -1636,8 +1740,9 @@ class _ProviderServiceAreaScreenState extends State<ProviderServiceAreaScreen> {
                           foregroundColor: Colors.white,
                           minimumSize: const Size.fromHeight(52),
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
                           ),
                         ),
                         child: Text(_saving ? 'Saving...' : 'Save Area'),
@@ -1658,6 +1763,7 @@ Widget _providerFormField({
   required TextEditingController controller,
   required String label,
   int maxLines = 1,
+  ValueChanged<String>? onChanged,
 }) {
   return Container(
     padding: const EdgeInsets.all(AppSpacing.sm),
@@ -1669,6 +1775,7 @@ Widget _providerFormField({
     child: TextField(
       controller: controller,
       maxLines: maxLines,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         border: InputBorder.none,
@@ -1691,22 +1798,14 @@ Widget _providerNoticeCard(String message, Color color, Color background) {
     ),
     child: Text(
       message,
-      style: TextStyle(
-        color: color,
-        fontWeight: FontWeight.w600,
-      ),
+      style: TextStyle(color: color, fontWeight: FontWeight.w600),
     ),
   );
 }
 
 class ProviderMoreScreen extends StatelessWidget {
-  const ProviderMoreScreen({
-    super.key,
-    this.onLogOut,
-    this.onOpenProfile,
-  });
+  const ProviderMoreScreen({super.key, this.onOpenProfile});
 
-  final VoidCallback? onLogOut;
   final VoidCallback? onOpenProfile;
 
   @override
@@ -1744,14 +1843,6 @@ class ProviderMoreScreen extends StatelessWidget {
                 subtitle: 'Manage services and pricing',
                 onTap: () =>
                     Navigator.of(context).pushNamed(AppRoutes.providerServices),
-              ),
-              _moreTile(
-                context,
-                icon: Icons.calendar_month_outlined,
-                title: 'Availability',
-                subtitle: 'Edit provider schedule',
-                onTap: () => Navigator.of(context)
-                    .pushNamed(AppRoutes.providerAvailability),
               ),
               _moreTile(
                 context,
@@ -1800,24 +1891,27 @@ class ProviderMoreScreen extends StatelessWidget {
                 icon: Icons.mail_outline_rounded,
                 title: 'Email Verification',
                 subtitle: 'Add and verify your email address',
-                onTap: () => Navigator.of(context)
-                    .pushNamed(AppRoutes.providerVerificationEmail),
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.providerVerificationEmail),
               ),
               _moreTile(
                 context,
                 icon: Icons.phone_outlined,
                 title: 'Phone Verification',
                 subtitle: 'Verify your phone number with OTP',
-                onTap: () => Navigator.of(context)
-                    .pushNamed(AppRoutes.providerVerificationPhone),
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.providerVerificationPhone),
               ),
               _moreTile(
                 context,
                 icon: Icons.badge_outlined,
                 title: 'IC / Passport Verification',
                 subtitle: 'Upload identity documents for review',
-                onTap: () => Navigator.of(context)
-                    .pushNamed(AppRoutes.providerVerificationIdentity),
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(AppRoutes.providerVerificationIdentity),
                 isLast: true,
               ),
             ],
@@ -1828,60 +1922,21 @@ class ProviderMoreScreen extends StatelessWidget {
   }
 
   Widget _paymentsHeader(BuildContext context) {
-    return Row(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Payments',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                'Banking, services, and support',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
+        Text(
+          'Payments',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
           ),
         ),
-        InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onLogOut ??
-              () async {
-                await Supabase.instance.client.auth.signOut();
-                if (!context.mounted) {
-                  return;
-                }
-                Navigator.of(context).pushNamedAndRemoveUntil(
-                  AppRoutes.login,
-                  (route) => false,
-                );
-              },
-          child: Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFFE8E3F3)),
-            ),
-            child: const Icon(
-              Icons.logout_rounded,
-              size: 18,
-              color: AppColors.textPrimary,
-            ),
-          ),
+        SizedBox(height: 2),
+        Text(
+          'Banking, services, and support',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -1938,12 +1993,14 @@ class ProviderEmailVerificationScreen extends StatefulWidget {
 class _ProviderEmailVerificationScreenState
     extends State<ProviderEmailVerificationScreen> {
   static const _service = ProviderWorkspaceService();
+  static const OtpService _otpService = DevelopmentOtpService();
   late Future<ProviderWorkspaceProfile> _future;
   final _emailController = TextEditingController();
   final _otpController = TextEditingController();
   bool _otpSent = false;
   int _countdown = 30;
   String _notice = '';
+  bool _verifying = false;
 
   @override
   void initState() {
@@ -1956,6 +2013,54 @@ class _ProviderEmailVerificationScreenState
     _emailController.dispose();
     _otpController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSendOtp() async {
+    await _otpService.sendOtp(_emailController.text.trim());
+    if (!mounted) return;
+    setState(() {
+      _otpSent = true;
+      _countdown = 30;
+      _notice = 'We sent a 6-digit code to your email.';
+    });
+  }
+
+  Future<void> _handleVerify() async {
+    final email = _emailController.text.trim();
+    setState(() => _verifying = true);
+    try {
+      // The dev OTP service keys off a normalized-phone-shaped string in its
+      // interface, but only checks the code value — reusing it here for
+      // email avoids a second parallel OTP mechanism.
+      final matched = await _otpService.verifyOtp(
+        email,
+        _otpController.text.trim(),
+      );
+      if (!matched) {
+        if (!mounted) return;
+        setState(() {
+          _verifying = false;
+          _notice = 'Incorrect code. Please try again.';
+        });
+        return;
+      }
+
+      await _service.updateProfile(email: email, emailVerified: true);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email verified successfully.')),
+      );
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _verifying = false;
+        _notice = error is Exception
+            ? error.toString().replaceFirst('Exception: ', '')
+            : 'Unable to verify email.';
+      });
+    }
   }
 
   @override
@@ -1979,16 +2084,11 @@ class _ProviderEmailVerificationScreenState
       countdown: _countdown,
       idleMessage: 'We sent a 6-digit code to your email',
       notice: _notice,
-      onSendOtp: () => setState(() {
-        _otpSent = true;
-        _countdown = 30;
-        _notice = 'We sent a 6-digit code to your email.';
-      }),
+      onSendOtp: () {
+        _handleSendOtp();
+      },
       onVerify: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Email verification submitted successfully.')),
-        );
-        Navigator.of(context).pop();
+        if (!_verifying) _handleVerify();
       },
     );
   }
@@ -2044,8 +2144,10 @@ class _ProviderPhoneVerificationScreenState
       statusSelector: (profile) => profile.phoneVerified,
       onSeedValue: (profile) {
         if (_phoneController.text.isEmpty) {
-          _phoneController.text =
-              profile.phone.replaceFirst(RegExp(r'^\+?60\s?'), '');
+          _phoneController.text = profile.phone.replaceFirst(
+            RegExp(r'^\+?60\s?'),
+            '',
+          );
         }
       },
       fieldController: _phoneController,
@@ -2061,7 +2163,9 @@ class _ProviderPhoneVerificationScreenState
       }),
       onVerify: () {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Phone verification submitted successfully.')),
+          const SnackBar(
+            content: Text('Phone verification submitted successfully.'),
+          ),
         );
         Navigator.of(context).pop();
       },
@@ -2081,11 +2185,17 @@ class _ProviderIdentityVerificationScreenState
     extends State<ProviderIdentityVerificationScreen> {
   static const _service = ProviderWorkspaceService();
   late Future<ProviderWorkspaceProfile> _future;
-  String _documentType = 'ic';
+  // Nationality drives the document type: Malaysian providers verify with an
+  // IC (front + back required); foreigners verify with a passport (one
+  // photo page is enough).
+  String _nationality = 'malaysian';
+  final _documentNumberController = TextEditingController();
   PickedBrowserFile? _front;
   PickedBrowserFile? _back;
   bool _submitting = false;
   String _error = '';
+
+  String get _documentType => _nationality == 'foreigner' ? 'passport' : 'ic';
 
   @override
   void initState() {
@@ -2093,8 +2203,18 @@ class _ProviderIdentityVerificationScreenState
     _future = _service.fetchProfile();
   }
 
+  @override
+  void dispose() {
+    _documentNumberController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickFront() async {
-    final file = await pickSingleBrowserFile(accept: 'image/*');
+    final file = await pickAndCropImage(
+      toolbarTitle: _nationality == 'foreigner'
+          ? 'Crop Passport Photo Page'
+          : 'Crop IC Front',
+    );
     if (!mounted || file == null) {
       return;
     }
@@ -2102,7 +2222,7 @@ class _ProviderIdentityVerificationScreenState
   }
 
   Future<void> _pickBack() async {
-    final file = await pickSingleBrowserFile(accept: 'image/*');
+    final file = await pickAndCropImage(toolbarTitle: 'Crop IC Back');
     if (!mounted || file == null) {
       return;
     }
@@ -2110,7 +2230,11 @@ class _ProviderIdentityVerificationScreenState
   }
 
   Future<void> _submit() async {
-    if (_front == null || _back == null) {
+    final documentNumber = _documentNumberController.text.trim();
+    final requiresBack = _nationality != 'foreigner';
+    if (_front == null ||
+        (requiresBack && _back == null) ||
+        documentNumber.isEmpty) {
       return;
     }
     setState(() {
@@ -2122,19 +2246,26 @@ class _ProviderIdentityVerificationScreenState
         identityVerified: false,
         identityVerificationStatus: 'processing',
         identityDocumentType: _documentType,
+        nationality: _nationality,
+        identityDocumentNumber: documentNumber,
         identityFrontImageUrl: _front!.dataUrl,
-        identityBackImageUrl: _back!.dataUrl,
+        identityBackImageUrl: _back?.dataUrl ?? '',
       );
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Your ${_documentType == 'passport' ? 'Passport' : 'IC / Passport'} successfully submitted for verification. It will take 24 hrs to activate.',
-          ),
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _SubmissionSuccessDialog(
+          title: 'Details Submitted',
+          message:
+              'Your ${_documentType == 'passport' ? 'Passport' : 'IC'} has been submitted for verification. Your status will show as Processing until our team reviews it.',
         ),
       );
+      if (!mounted) {
+        return;
+      }
       Navigator.of(context).pop();
     } catch (error) {
       if (!mounted) {
@@ -2160,7 +2291,9 @@ class _ProviderIdentityVerificationScreenState
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const LoadingState(label: 'Loading identity verification...');
+            return const LoadingState(
+              label: 'Loading identity verification...',
+            );
           }
           if (snapshot.hasError || snapshot.data == null) {
             return const EmptyState(
@@ -2171,10 +2304,18 @@ class _ProviderIdentityVerificationScreenState
           }
           final profile = snapshot.data!;
           final identityStatus = profile.identityVerificationStatus;
-          final locked = profile.identityVerified || identityStatus == 'processing';
-          _documentType = profile.identityDocumentType.isNotEmpty
-              ? profile.identityDocumentType
-              : _documentType;
+          final locked =
+              profile.identityVerified || identityStatus == 'processing';
+          if (profile.nationality.isNotEmpty) {
+            _nationality = profile.nationality;
+          } else if (profile.identityDocumentType == 'passport') {
+            _nationality = 'foreigner';
+          }
+          if (_documentNumberController.text.isEmpty &&
+              profile.identityDocumentNumber.isNotEmpty) {
+            _documentNumberController.text = profile.identityDocumentNumber;
+          }
+          final isForeigner = _nationality == 'foreigner';
 
           return ListView(
             padding: AppSpacing.screenPadding,
@@ -2186,7 +2327,8 @@ class _ProviderIdentityVerificationScreenState
                   const Color(0xFFECFDF3),
                 ),
               if (identityStatus == 'processing') ...[
-                if (profile.identityVerified) const SizedBox(height: AppSpacing.sm),
+                if (profile.identityVerified)
+                  const SizedBox(height: AppSpacing.sm),
                 _notice(
                   'Your IC / Passport successfully submitted for verification. It will take up to 24 hours to activate.',
                   const Color(0xFF4338CA),
@@ -2208,31 +2350,31 @@ class _ProviderIdentityVerificationScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Document Type',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w800),
+                      'Nationality',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Row(
                       children: [
                         Expanded(
                           child: _docTypeButton(
-                            label: 'IC',
-                            active: _documentType == 'ic',
+                            label: 'Malaysian',
+                            active: !isForeigner,
                             disabled: locked,
-                            onTap: () => setState(() => _documentType = 'ic'),
+                            onTap: () =>
+                                setState(() => _nationality = 'malaysian'),
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: _docTypeButton(
-                            label: 'Passport',
-                            active: _documentType == 'passport',
+                            label: 'Foreigner',
+                            active: isForeigner,
                             disabled: locked,
                             onTap: () =>
-                                setState(() => _documentType = 'passport'),
+                                setState(() => _nationality = 'foreigner'),
                           ),
                         ),
                       ],
@@ -2243,32 +2385,60 @@ class _ProviderIdentityVerificationScreenState
               const SizedBox(height: AppSpacing.lg),
               _card(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isForeigner ? 'Passport Number' : 'IC Number',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextField(
+                      controller: _documentNumberController,
+                      enabled: !locked,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: isForeigner
+                            ? 'Enter passport number'
+                            : 'Enter IC number',
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _card(
+                child: Column(
                   children: [
                     _docUploadCard(
                       context,
-                      title: _documentType == 'passport'
-                          ? 'Passport Main Page'
-                          : 'IC Front',
-                      subtitle: _documentType == 'passport'
-                          ? 'Upload clear image of passport page'
+                      title: isForeigner ? 'Passport Photo Page' : 'IC Front',
+                      subtitle: isForeigner
+                          ? 'Upload clear image of the passport photo page'
                           : 'Upload clear image of front side',
                       file: _front,
                       locked: locked,
                       onTap: _pickFront,
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    _docUploadCard(
-                      context,
-                      title: _documentType == 'passport'
-                          ? 'Passport Supporting Page'
-                          : 'IC Back',
-                      subtitle: _documentType == 'passport'
-                          ? 'Upload clear image of supporting page'
-                          : 'Upload clear image of back side',
-                      file: _back,
-                      locked: locked,
-                      onTap: _pickBack,
-                    ),
+                    if (!isForeigner) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      _docUploadCard(
+                        context,
+                        title: 'IC Back',
+                        subtitle: 'Upload clear image of back side',
+                        file: _back,
+                        locked: locked,
+                        onTap: _pickBack,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2285,7 +2455,9 @@ class _ProviderIdentityVerificationScreenState
                       ),
                     ),
                     SizedBox(height: AppSpacing.sm),
-                    Text('Ensure the full IC or passport page is visible within the frame'),
+                    Text(
+                      'Ensure the full IC or passport page is visible within the frame',
+                    ),
                     SizedBox(height: 4),
                     Text('All text must be clear and readable'),
                     SizedBox(height: 4),
@@ -2301,7 +2473,12 @@ class _ProviderIdentityVerificationScreenState
               ],
               const SizedBox(height: AppSpacing.lg),
               FilledButton(
-                onPressed: locked || _front == null || _back == null || _submitting
+                onPressed:
+                    locked ||
+                        _front == null ||
+                        (!isForeigner && _back == null) ||
+                        _documentNumberController.text.trim().isEmpty ||
+                        _submitting
                     ? null
                     : _submit,
                 style: FilledButton.styleFrom(
@@ -2316,8 +2493,8 @@ class _ProviderIdentityVerificationScreenState
                   locked
                       ? 'Submitted for Review'
                       : _submitting
-                          ? 'Submitting...'
-                          : 'Submit for Verification',
+                      ? 'Submitting...'
+                      : 'Submit for Verification',
                 ),
               ),
             ],
@@ -2338,12 +2515,44 @@ class _ProviderIdentityVerificationScreenState
       style: OutlinedButton.styleFrom(
         backgroundColor: active ? AppColors.primarySoft : Colors.white,
         foregroundColor: active ? AppColors.primary : AppColors.textSecondary,
-        side: BorderSide(
-          color: active ? AppColors.primary : AppColors.border,
-        ),
+        side: BorderSide(color: active ? AppColors.primary : AppColors.border),
         minimumSize: const Size.fromHeight(48),
       ),
       child: Text(label),
+    );
+  }
+
+  /// Locally-picked files carry a `data:<mime>;base64,...` URL, not a real
+  /// network URL — rendering that through [Image.network] either fails to
+  /// load or, for a multi-hundred-KB base64 string, can crash the app. Only
+  /// already-uploaded/stored files (a real https URL) go through
+  /// [Image.network]; anything else is decoded and shown via [Image.memory].
+  Widget _buildDocPreview(String dataUrl) {
+    if (dataUrl.startsWith('http://') || dataUrl.startsWith('https://')) {
+      return Image.network(
+        dataUrl,
+        width: 110,
+        height: 90,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) =>
+            _docPreviewFallback(Icons.image_not_supported_outlined),
+      );
+    }
+
+    final bytes = _decodeDataUrlBytes(dataUrl);
+    if (bytes == null) {
+      return _docPreviewFallback(Icons.image_not_supported_outlined);
+    }
+    return Image.memory(bytes, width: 110, height: 90, fit: BoxFit.cover);
+  }
+
+  Widget _docPreviewFallback(IconData icon) {
+    return Container(
+      width: 110,
+      height: 90,
+      color: const Color(0xFFF8F4FF),
+      alignment: Alignment.center,
+      child: Icon(icon, color: AppColors.primary),
     );
   }
 
@@ -2378,22 +2587,7 @@ class _ProviderIdentityVerificationScreenState
                       size: 32,
                     ),
                   )
-                : Image.network(
-                    file.dataUrl,
-                    width: 110,
-                    height: 90,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 110,
-                      height: 90,
-                      color: const Color(0xFFF8F4FF),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.image_not_supported_outlined,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
+                : _buildDocPreview(file.dataUrl),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -2402,18 +2596,16 @@ class _ProviderIdentityVerificationScreenState
               children: [
                 Text(
                   title,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppColors.textSecondary),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 if (file != null) ...[
                   const SizedBox(height: AppSpacing.xs),
@@ -2422,9 +2614,9 @@ class _ProviderIdentityVerificationScreenState
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
                 const SizedBox(height: AppSpacing.sm),
@@ -2437,6 +2629,138 @@ class _ProviderIdentityVerificationScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A modal, non-dismissible-by-tapping-outside confirmation shown right
+/// after a successful submission — closed only via its own small close
+/// button, at which point the caller pops back to wherever shows the
+/// resulting status (e.g. the Verification hub).
+class _SubmissionSuccessDialog extends StatefulWidget {
+  const _SubmissionSuccessDialog({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  State<_SubmissionSuccessDialog> createState() =>
+      _SubmissionSuccessDialogState();
+}
+
+class _SubmissionSuccessDialogState extends State<_SubmissionSuccessDialog>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) {
+      return;
+    }
+    _started = true;
+    if (AppMotion.reduceMotion(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final iconScale = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutBack,
+    );
+    final textFade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.35, 1.0, curve: Curves.easeOut),
+    );
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: AppColors.textSecondary,
+                ),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            ScaleTransition(
+              scale: Tween<double>(begin: 0.5, end: 1.0).animate(iconScale),
+              child: Container(
+                width: 84,
+                height: 84,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.successSurface,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: AppColors.success,
+                  size: 46,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FadeTransition(
+              opacity: textFade,
+              child: Text(
+                widget.title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FadeTransition(
+              opacity: textFade,
+              child: Text(
+                widget.message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2516,7 +2840,8 @@ class _ProviderOtpVerificationScaffoldState
           final canSend = widget.keyboardType == TextInputType.emailAddress
               ? RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)
               : value.length >= 7;
-          final canVerify = canSend && widget.otpController.text.trim().length == 6;
+          final canVerify =
+              canSend && widget.otpController.text.trim().length == 6;
 
           return ListView(
             padding: AppSpacing.screenPadding,
@@ -2527,9 +2852,8 @@ class _ProviderOtpVerificationScaffoldState
                     Expanded(
                       child: Text(
                         verified ? 'Verified' : 'Pending',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                     ),
                     SwiperStatusBadge(
@@ -2549,8 +2873,8 @@ class _ProviderOtpVerificationScaffoldState
                     Text(
                       widget.fieldLabel,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextField(
@@ -2571,8 +2895,9 @@ class _ProviderOtpVerificationScaffoldState
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                       ),
                     ),
@@ -2589,8 +2914,8 @@ class _ProviderOtpVerificationScaffoldState
                     Text(
                       'Enter OTP',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextField(
@@ -2604,25 +2929,28 @@ class _ProviderOtpVerificationScaffoldState
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      widget.notice.isEmpty ? widget.idleMessage : widget.notice,
+                      widget.notice.isEmpty
+                          ? widget.idleMessage
+                          : widget.notice,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Resend code in 00:${widget.countdown.toString().padLeft(2, '0')}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
@@ -2640,8 +2968,8 @@ class _ProviderOtpVerificationScaffoldState
                             ? 'Your email address will be used for account verification and important updates.'
                             : 'Your phone number will be used for account verification and important security alerts.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -2734,6 +3062,8 @@ Widget _moreTile(
   required String title,
   required String subtitle,
   required VoidCallback onTap,
+  String? statusLabel,
+  Color? statusColor,
   bool isLast = false,
 }) {
   return Container(
@@ -2759,20 +3089,31 @@ Widget _moreTile(
       ),
       title: Text(
         title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
       ),
       subtitle: Text(
         subtitle,
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: AppColors.textSecondary),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
       ),
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-        color: AppColors.primary,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (statusLabel != null) ...[
+            Text(
+              statusLabel,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: statusColor ?? AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+        ],
       ),
     ),
   );
@@ -2780,9 +3121,7 @@ Widget _moreTile(
 
 class _CalendarCell {
   const _CalendarCell({required this.day, required this.key});
-  const _CalendarCell.empty()
-      : day = null,
-        key = null;
+  const _CalendarCell.empty() : day = null, key = null;
 
   final int? day;
   final String? key;
@@ -2813,8 +3152,8 @@ class _CalendarDateCell extends StatelessWidget {
           color: cell.key == null
               ? Colors.transparent
               : active
-                  ? AppColors.success
-                  : const Color(0xFFF8FBF9),
+              ? AppColors.success
+              : const Color(0xFFF8FBF9),
           borderRadius: BorderRadius.circular(14),
         ),
         child: cell.key == null
@@ -2837,8 +3176,8 @@ class _CalendarDateCell extends StatelessWidget {
                       color: active
                           ? Colors.white70
                           : count > 0
-                              ? AppColors.success
-                              : const Color(0xFFCBD5E1),
+                          ? AppColors.success
+                          : const Color(0xFFCBD5E1),
                     ),
                   ),
                 ],
@@ -2859,9 +3198,9 @@ class _WeekLabel extends StatelessWidget {
         label,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: const Color(0xFF94A3B8),
-              fontWeight: FontWeight.w700,
-            ),
+          color: const Color(0xFF94A3B8),
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -2951,5 +3290,22 @@ String _messageTime(String value) {
     return DateFormat('d MMM, h:mm a').format(DateTime.parse(value));
   } catch (_) {
     return value;
+  }
+}
+
+/// Decodes a `data:<mime>;base64,<...>` URL into raw bytes for
+/// [Image.memory]. Returns null for anything else.
+Uint8List? _decodeDataUrlBytes(String? dataUrl) {
+  if (dataUrl == null) {
+    return null;
+  }
+  final commaIndex = dataUrl.indexOf(',');
+  if (!dataUrl.startsWith('data:') || commaIndex == -1) {
+    return null;
+  }
+  try {
+    return base64Decode(dataUrl.substring(commaIndex + 1));
+  } catch (_) {
+    return null;
   }
 }

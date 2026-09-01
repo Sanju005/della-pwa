@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -7,6 +5,8 @@ import '../../../core/routing/app_routes.dart';
 import '../../../models/notification_item.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../services/customer_profile_api_service.dart';
+import '../../../services/otp_service.dart';
+import '../../auth/presentation/otp_step_view.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/empty_state.dart';
@@ -151,13 +151,12 @@ class CustomerEmailVerificationScreen extends StatefulWidget {
 class _CustomerEmailVerificationScreenState
     extends State<CustomerEmailVerificationScreen> {
   static const _service = CustomerProfileApiService();
+  final _otpService = RealOtpService(purpose: 'email');
 
   final _emailController = TextEditingController();
-  String _otp = '';
-  int _countdown = 30;
-  Timer? _timer;
+  bool _codeSent = false;
   bool _saving = false;
-  String _notice = '';
+  bool _sendingCode = false;
   String _error = '';
   CustomerProfileApiModel? _profile;
 
@@ -169,7 +168,6 @@ class _CustomerEmailVerificationScreenState
 
   @override
   void dispose() {
-    _timer?.cancel();
     _emailController.dispose();
     super.dispose();
   }
@@ -194,39 +192,51 @@ class _CustomerEmailVerificationScreenState
     }
   }
 
-  void _startOtp() {
-      _timer?.cancel();
-      setState(() {
-        _otp = '';
-        _countdown = 30;
-        _notice = 'We sent a 6-digit code to your email.';
-      _error = '';
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted || _countdown <= 1) {
-        timer.cancel();
-        if (mounted) {
-          setState(() => _countdown = 0);
-        }
-        return;
-      }
-      setState(() => _countdown -= 1);
-    });
-  }
-
-  Future<void> _verify() async {
-    if (_emailController.text.trim().isEmpty || _otp.length != 6) {
+  Future<void> _startOtp() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
       return;
     }
+    setState(() {
+      _sendingCode = true;
+      _error = '';
+      _codeSent = false;
+    });
+    try {
+      await _otpService.sendOtp(email);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = '';
+        _codeSent = true;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _sendingCode = false);
+      }
+    }
+  }
+
+  // The OTP box widget already verified the code server-side before calling
+  // this — it never decides "correct" on its own. This just persists the
+  // (possibly changed) email address itself; the client never sends
+  // emailVerified: true directly.
+  Future<void> _onEmailVerified(String code) async {
+    final email = _emailController.text.trim();
     setState(() {
       _saving = true;
       _error = '';
     });
     try {
-      final profile = await _service.updateProfile({
-        'email': _emailController.text.trim(),
-        'emailVerified': true,
-      });
+      final profile = await _service.updateProfile({'email': email});
       if (!mounted) {
         return;
       }
@@ -287,7 +297,8 @@ class _CustomerEmailVerificationScreenState
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'Add your email address and verify it with a one-time code.',
+            'Add your email address and verify it with a one-time code. '
+            "We'll use it for login alerts and occasional marketing updates.",
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF7B728A),
@@ -302,23 +313,18 @@ class _CustomerEmailVerificationScreenState
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             placeholder: 'Enter email address',
-            sendLabel: 'Send Code',
+            sendLabel: _sendingCode ? 'Sending...' : 'Send Code',
+            isSending: _sendingCode,
             onSend: _startOtp,
           ),
           const SizedBox(height: AppSpacing.lg),
           _securityCard(
-            'Your email address will be used for account verification and important updates.',
+            'Your email is used for login alerts and marketing updates. We will never share it with providers.',
           ),
           if (_error.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             _errorBanner(_error),
           ],
-          const SizedBox(height: AppSpacing.lg),
-          SwiperButton(
-            label: _saving ? 'Verifying...' : 'Verify Email',
-            isLoading: _saving,
-            onPressed: _otp.length == 6 ? _verify : null,
-          ),
         ],
       ),
     );
@@ -333,6 +339,7 @@ class _CustomerEmailVerificationScreenState
     required String placeholder,
     required String sendLabel,
     required VoidCallback onSend,
+    bool isSending = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -342,9 +349,9 @@ class _CustomerEmailVerificationScreenState
         children: [
           Text(
             label,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: AppSpacing.md),
           TextField(
@@ -359,38 +366,45 @@ class _CustomerEmailVerificationScreenState
           SwiperButton(
             label: sendLabel,
             isSecondary: true,
-            onPressed: controller.text.trim().isNotEmpty ? onSend : null,
+            isLoading: isSending,
+            onPressed: (controller.text.trim().isNotEmpty && !isSending)
+                ? onSend
+                : null,
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Enter OTP',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _OtpSlots(
-            value: _otp,
-            onChanged: (value) => setState(() => _otp = value),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            _notice.isNotEmpty
-                ? _notice
-                : 'We sent a 6-digit code to your email.',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6F6681),
+          if (_codeSent) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'Enter the 6-digit code sent to ${controller.text.trim()}',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Resend code in 00:${_countdown.toString().padLeft(2, '0')}',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6F6681),
+            const SizedBox(height: AppSpacing.md),
+            OtpStepView(
+              key: ValueKey(controller.text.trim()),
+              contactValue: controller.text.trim(),
+              otpService: _otpService,
+              onVerified: _onEmailVerified,
             ),
-          ),
+            if (_saving) ...[
+              const SizedBox(height: AppSpacing.md),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: AppSpacing.sm),
+                  Text(
+                    'Saving...',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF6F6681)),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ],
       ),
     );
@@ -415,16 +429,20 @@ class CustomerPhoneVerificationScreen extends StatefulWidget {
 class _CustomerPhoneVerificationScreenState
     extends State<CustomerPhoneVerificationScreen> {
   static const _service = CustomerProfileApiService();
+  final _otpService = RealOtpService(purpose: 'phone');
+  final _phoneController = TextEditingController();
 
   String _countryCode = '+60';
   String _phoneNumber = '';
-  String _otp = '';
-  int _countdown = 30;
-  Timer? _timer;
+  String _originalPhoneNumber = '';
+  bool _codeSent = false;
   bool _saving = false;
-  String _notice = '';
+  bool _sendingCode = false;
   String _error = '';
   CustomerProfileApiModel? _profile;
+
+  String get _target =>
+      '$_countryCode${_phoneNumber.trim()}'.replaceAll(RegExp(r'\s+'), '');
 
   @override
   void initState() {
@@ -434,7 +452,7 @@ class _CustomerPhoneVerificationScreenState
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -448,6 +466,8 @@ class _CustomerPhoneVerificationScreenState
         _profile = profile;
         _countryCode = profile.countryCode;
         _phoneNumber = profile.phoneNumber;
+        _originalPhoneNumber = profile.phoneNumber;
+        _phoneController.text = profile.phoneNumber;
       });
     } catch (error) {
       if (!mounted) {
@@ -459,30 +479,43 @@ class _CustomerPhoneVerificationScreenState
     }
   }
 
-  void _startOtp() {
-    _timer?.cancel();
-    setState(() {
-      _otp = '';
-      _countdown = 30;
-      _notice = 'We sent a 6-digit code by SMS to your phone.';
-      _error = '';
-    });
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted || _countdown <= 1) {
-        timer.cancel();
-        if (mounted) {
-          setState(() => _countdown = 0);
-        }
-        return;
-      }
-      setState(() => _countdown -= 1);
-    });
-  }
-
-  Future<void> _verify() async {
-    if (_phoneNumber.trim().length < 7 || _otp.length != 6) {
+  Future<void> _startOtp() async {
+    if (_phoneNumber.trim().length < 7) {
       return;
     }
+    setState(() {
+      _sendingCode = true;
+      _error = '';
+      _codeSent = false;
+    });
+    try {
+      await _otpService.sendOtp(_target);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = '';
+        _codeSent = true;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _sendingCode = false);
+      }
+    }
+  }
+
+  // The OTP box widget already verified the code server-side before calling
+  // this — it never decides "correct" on its own. This just persists the
+  // (possibly changed) phone number itself; the client never sends
+  // phoneVerified: true directly.
+  Future<void> _onPhoneVerified(String code) async {
     setState(() {
       _saving = true;
       _error = '';
@@ -491,13 +524,13 @@ class _CustomerPhoneVerificationScreenState
       final profile = await _service.updateProfile({
         'phoneNumber': _phoneNumber.trim(),
         'countryCode': _countryCode,
-        'phoneVerified': true,
       });
       if (!mounted) {
         return;
       }
       setState(() {
         _profile = profile;
+        _originalPhoneNumber = _phoneNumber;
       });
       Navigator.of(context).pop();
     } catch (error) {
@@ -558,7 +591,8 @@ class _CustomerPhoneVerificationScreenState
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'We use the phone number from your profile. Update it in personal details if you need to change it, then verify again.',
+            'Verify your current number, or type a new one to change it. '
+            'Changing your number always requires a fresh OTP.',
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF7B728A),
@@ -575,8 +609,8 @@ class _CustomerPhoneVerificationScreenState
                 Text(
                   'Phone Number',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Row(
@@ -600,74 +634,101 @@ class _CustomerPhoneVerificationScreenState
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
-                      child: Container(
+                      child: SizedBox(
                         height: 52,
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8F5FF),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE7DEF4)),
-                        ),
-                        child: Text(
-                          _phoneNumber.isEmpty ? 'No phone number saved' : _phoneNumber,
-                          style: TextStyle(
+                        child: TextField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: _phoneNumber.isEmpty
-                                ? const Color(0xFF9B93AA)
-                                : const Color(0xFF1F1630),
+                            color: Color(0xFF1F1630),
                           ),
+                          decoration: const InputDecoration(
+                            hintText: 'Enter phone number',
+                            filled: true,
+                            fillColor: Color(0xFFF8F5FF),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _phoneNumber = value.trim();
+                              _codeSent = false;
+                            });
+                          },
                         ),
                       ),
                     ),
                   ],
                 ),
+                if (_phoneNumber.trim() != _originalPhoneNumber.trim() &&
+                    _phoneNumber.trim().isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    "You're changing your number — verify it with OTP to save it.",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFB45309),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.md),
                 SwiperButton(
-                  label: 'Send OTP',
+                  label: _sendingCode ? 'Sending...' : 'Send OTP',
                   isSecondary: true,
-                  onPressed: _phoneNumber.trim().length >= 7 ? _startOtp : null,
+                  isLoading: _sendingCode,
+                  onPressed: (_phoneNumber.trim().length >= 7 && !_sendingCode)
+                      ? _startOtp
+                      : null,
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  'Enter OTP',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _OtpSlots(
-                  value: _otp,
-                  onChanged: (value) => setState(() => _otp = value),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  _notice.isNotEmpty ? _notice : 'We sent a 6-digit code by SMS.',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF6F6681)),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Resend code in 00:${_countdown.toString().padLeft(2, '0')}',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF6F6681)),
-                ),
+                if (_codeSent) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    'Enter the 6-digit code sent to $_target',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  OtpStepView(
+                    key: ValueKey(_target),
+                    contactValue: _target,
+                    otpService: _otpService,
+                    onVerified: _onPhoneVerified,
+                  ),
+                  if (_saving) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: AppSpacing.sm),
+                        Text(
+                          'Saving...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6F6681),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
           _securityCard(
-            'Your phone number is managed from your profile and will be used for account verification and important security alerts.',
+            'Changing your number updates your profile automatically once verified, and is used for account verification and important security alerts.',
           ),
           if (_error.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             _errorBanner(_error),
           ],
-          const SizedBox(height: AppSpacing.lg),
-          SwiperButton(
-            label: _saving ? 'Verifying...' : 'Verify Number',
-            isLoading: _saving,
-            onPressed: _otp.length == 6 ? _verify : null,
-          ),
         ],
       ),
     );
@@ -893,10 +954,7 @@ class _CustomerIdentityVerificationScreenState
         ),
         Text(
           value,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
       ],
     );
@@ -907,7 +965,8 @@ class CustomerAddressesScreen extends StatefulWidget {
   const CustomerAddressesScreen({super.key});
 
   @override
-  State<CustomerAddressesScreen> createState() => _CustomerAddressesScreenState();
+  State<CustomerAddressesScreen> createState() =>
+      _CustomerAddressesScreenState();
 }
 
 class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
@@ -1040,7 +1099,9 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                 OutlinedButton.icon(
                   onPressed: () => setState(() => _showForm = !_showForm),
                   icon: const Icon(Icons.add_rounded),
-                  label: Text(_showForm ? 'Hide Address Form' : 'Add New Address'),
+                  label: Text(
+                    _showForm ? 'Hide Address Form' : 'Add New Address',
+                  ),
                 ),
                 if (_showForm) ...[
                   const SizedBox(height: AppSpacing.md),
@@ -1109,8 +1170,8 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                       child: Text(
                         address.label,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     if (address.isDefault)
@@ -1123,9 +1184,9 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   address.fullAddress,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        height: 1.5,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(height: 1.5),
                 ),
               ],
             ),
@@ -1203,10 +1264,13 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
     }
 
     final filteredPayments = _filterPayments(items ?? const []);
-    final leadPayment =
-        filteredPayments.isNotEmpty ? filteredPayments.first : (items?.isNotEmpty == true ? items!.first : null);
-    final totalPaid =
-        filteredPayments.fold<double>(0, (sum, payment) => sum + payment.amount);
+    final leadPayment = filteredPayments.isNotEmpty
+        ? filteredPayments.first
+        : (items?.isNotEmpty == true ? items!.first : null);
+    final totalPaid = filteredPayments.fold<double>(
+      0,
+      (sum, payment) => sum + payment.amount,
+    );
 
     return Scaffold(
       appBar: const SwiperAppBar(
@@ -1263,10 +1327,7 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF221531),
-            AppColors.primary,
-          ],
+          colors: [Color(0xFF221531), AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1370,10 +1431,7 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
           const SizedBox(height: AppSpacing.sm),
           _summaryRow('Last Payment', 'RM${amount.toStringAsFixed(2)}'),
           const Divider(height: 24),
-          _summaryRow(
-            'Total Paid',
-            'RM${amount.toStringAsFixed(2)}',
-          ),
+          _summaryRow('Total Paid', 'RM${amount.toStringAsFixed(2)}'),
         ],
       ),
     );
@@ -1506,10 +1564,7 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
               ),
             ),
             if (selected)
-              const Icon(
-                Icons.check_circle_rounded,
-                color: AppColors.primary,
-              ),
+              const Icon(Icons.check_circle_rounded, color: AppColors.primary),
           ],
         ),
       ),
@@ -1524,8 +1579,7 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
       for (final payment in items)
         if (DateTime.tryParse(payment.paidAt) != null)
           DateFormat('yyyy-MM').format(DateTime.parse(payment.paidAt)),
-    }.toList()
-      ..sort((a, b) => b.compareTo(a));
+    }.toList()..sort((a, b) => b.compareTo(a));
 
     return _sectionCard(
       title: 'Filter',
@@ -1573,9 +1627,9 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
                     (month) => DropdownMenuItem(
                       value: month,
                       child: Text(
-                        DateFormat('MMMM yyyy').format(
-                          DateTime.parse('$month-01'),
-                        ),
+                        DateFormat(
+                          'MMMM yyyy',
+                        ).format(DateTime.parse('$month-01')),
                       ),
                     ),
                   )
@@ -1630,7 +1684,8 @@ class _CustomerPaymentsScreenState extends State<CustomerPaymentsScreen> {
           if (items.isEmpty)
             const EmptyState(
               title: 'No payment records found',
-              subtitle: 'No payment records were found for the selected period.',
+              subtitle:
+                  'No payment records were found for the selected period.',
               icon: Icons.receipt_long_outlined,
             )
           else
@@ -1721,7 +1776,8 @@ class CustomerFavoritesScreen extends StatefulWidget {
   const CustomerFavoritesScreen({super.key});
 
   @override
-  State<CustomerFavoritesScreen> createState() => _CustomerFavoritesScreenState();
+  State<CustomerFavoritesScreen> createState() =>
+      _CustomerFavoritesScreenState();
 }
 
 class _CustomerFavoritesScreenState extends State<CustomerFavoritesScreen> {
@@ -1884,10 +1940,7 @@ class _CustomerFavoritesScreenState extends State<CustomerFavoritesScreen> {
 }
 
 class CustomerNotificationsScreen extends StatefulWidget {
-  const CustomerNotificationsScreen({
-    super.key,
-    required this.repository,
-  });
+  const CustomerNotificationsScreen({super.key, required this.repository});
 
   final DemoRepository repository;
 
@@ -2073,10 +2126,7 @@ class CustomerCouponsScreen extends StatelessWidget {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFFFF7ED),
-                  Color(0xFFFFEDD5),
-                ],
+                colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
               ),
               border: Border.all(color: const Color(0xFFF4D6A8)),
             ),
@@ -2104,91 +2154,101 @@ class CustomerCouponsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          for (final coupon in coupons) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: AppSpacing.md),
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: _cardDecoration(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF1DE),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: const Icon(
-                          Icons.local_offer_outlined,
-                          color: Color(0xFFEA7A00),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              coupon.title,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF24193A),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              coupon.expiry,
-                              style: const TextStyle(
-                                color: Color(0xFF9A3412),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SwiperStatusBadge(
-                        label: 'Demo',
-                        tone: SwiperStatusTone.info,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBF5),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFF4D6A8)),
-                    ),
-                    child: Text(
-                      'Code: ${coupon.code}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF7C2D12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    coupon.note,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6F6681),
-                      height: 1.5,
-                    ),
-                  ),
-                ],
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: AppSpacing.sm,
+            crossAxisSpacing: AppSpacing.sm,
+            childAspectRatio: 0.92,
+            children: [
+              for (final coupon in coupons)
+                _CouponBox(
+                  title: coupon.title,
+                  code: coupon.code,
+                  expiry: coupon.expiry,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CouponBox extends StatelessWidget {
+  const _CouponBox({
+    required this.title,
+    required this.code,
+    required this.expiry,
+  });
+
+  final String title;
+  final String code;
+  final String expiry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+        ),
+        border: Border.all(color: const Color(0xFFF4D6A8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF1DE),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: const Icon(
+              Icons.local_offer_outlined,
+              color: Color(0xFFEA7A00),
+              size: 18,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF7C2D12),
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              code,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF7C2D12),
               ),
             ),
-          ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            expiry,
+            style: const TextStyle(fontSize: 10.5, color: Color(0xFF9A3412)),
+          ),
         ],
       ),
     );
@@ -2213,9 +2273,7 @@ class _VerificationStatusTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = verified ? 'Verified' : 'Pending';
-    final tone = verified
-        ? SwiperStatusTone.success
-        : SwiperStatusTone.warning;
+    final tone = verified ? SwiperStatusTone.success : SwiperStatusTone.warning;
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),
@@ -2271,49 +2329,10 @@ class _VerificationStatusTile extends StatelessWidget {
             ),
             SwiperStatusBadge(label: label, tone: tone),
             const SizedBox(width: AppSpacing.sm),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF98A2B3),
-            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF98A2B3)),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _OtpSlots extends StatelessWidget {
-  const _OtpSlots({
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(6, (index) {
-        final char = index < value.length ? value[index] : '';
-        return SizedBox(
-          width: 46,
-          child: TextFormField(
-            initialValue: char,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            onChanged: (next) {
-              final digit = next.replaceAll(RegExp(r'\D'), '');
-              final chars = value.padRight(6).split('');
-              chars[index] = digit.isEmpty ? '' : digit.characters.last;
-              onChanged(chars.join().trimRight());
-            },
-            decoration: const InputDecoration(counterText: ''),
-            maxLength: 1,
-          ),
-        );
-      }),
     );
   }
 }
@@ -2340,10 +2359,7 @@ Widget _securityCard(String message) {
       borderRadius: BorderRadius.circular(22),
       border: Border.all(color: const Color(0xFFEADFF8)),
       gradient: const LinearGradient(
-        colors: [
-          Color(0xFFFBF8FF),
-          Color(0xFFF5EFFF),
-        ],
+        colors: [Color(0xFFFBF8FF), Color(0xFFF5EFFF)],
       ),
     ),
     child: Row(
@@ -2461,10 +2477,7 @@ class _WalletAmountChip extends StatelessWidget {
   }
 }
 
-Widget _sectionCard({
-  required String title,
-  required Widget child,
-}) {
+Widget _sectionCard({required String title, required Widget child}) {
   return Container(
     padding: const EdgeInsets.all(AppSpacing.md),
     decoration: _cardDecoration(),

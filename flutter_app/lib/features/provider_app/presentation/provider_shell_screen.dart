@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/routing/app_routes.dart';
 import '../../../repositories/demo_repository.dart';
 import '../../../widgets/native_tab_scaffold.dart';
 import '../../../widgets/swiper_bottom_nav.dart';
@@ -11,10 +9,7 @@ import 'provider_jobs_screen.dart';
 import 'provider_profile_demo_screen.dart';
 
 class ProviderShellScreen extends StatefulWidget {
-  const ProviderShellScreen({
-    super.key,
-    required this.repository,
-  });
+  const ProviderShellScreen({super.key, required this.repository});
 
   final DemoRepository repository;
 
@@ -25,23 +20,15 @@ class ProviderShellScreen extends StatefulWidget {
 class _ProviderShellScreenState extends State<ProviderShellScreen> {
   int _currentIndex = 0;
 
-  Future<void> _logOut() async {
-    await Supabase.instance.client.auth.signOut();
-    if (!mounted) {
-      return;
-    }
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.login,
-      (route) => false,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final pages = [
-      ProviderDashboardScreen(repository: widget.repository),
+      ProviderDashboardScreen(
+        repository: widget.repository,
+        onNavigateToTab: (index) => setState(() => _currentIndex = index),
+      ),
       ProviderJobsScreen(repository: widget.repository),
-      ProviderEarningsScreen(onLogOut: _logOut),
+      const ProviderEarningsScreen(),
       ProviderProfileDemoScreen(repository: widget.repository),
     ];
 
@@ -61,18 +48,17 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
       showAppBar: _currentIndex != 0 && _currentIndex != 2,
       items: const [
         SwiperBottomNavItem(label: 'Home', icon: Icons.home_work_rounded),
-        SwiperBottomNavItem(label: 'Bookings', icon: Icons.calendar_month_rounded),
-        SwiperBottomNavItem(label: 'Payments', icon: Icons.account_balance_outlined),
-        SwiperBottomNavItem(label: 'Profile', icon: Icons.person_outline_rounded),
+        SwiperBottomNavItem(
+          label: 'Bookings',
+          icon: Icons.calendar_month_rounded,
+        ),
+        SwiperBottomNavItem(
+          label: 'Payments',
+          icon: Icons.account_balance_rounded,
+        ),
+        SwiperBottomNavItem(label: 'Profile', icon: Icons.person_rounded),
       ],
       onTabSelected: (index) => setState(() => _currentIndex = index),
-      actions: [
-        IconButton(
-          tooltip: 'Log Out',
-          onPressed: _logOut,
-          icon: const Icon(Icons.logout_rounded),
-        ),
-      ],
     );
   }
 }
