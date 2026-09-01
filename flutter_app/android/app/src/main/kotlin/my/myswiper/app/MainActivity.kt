@@ -1,4 +1,4 @@
-package com.example.flutter_app
+package my.myswiper.app
 
 import io.flutter.embedding.android.FlutterActivity
 

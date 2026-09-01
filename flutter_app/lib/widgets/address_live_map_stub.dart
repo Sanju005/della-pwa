@@ -250,7 +250,7 @@ class _AddressLiveMapState extends State<AddressLiveMap> {
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.flutter_app',
+          userAgentPackageName: 'my.myswiper.app',
         ),
         if (!widget.interactive)
           MarkerLayer(

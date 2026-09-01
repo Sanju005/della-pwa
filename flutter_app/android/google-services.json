@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1049370077159",
+    "project_id": "myswiper-app",
+    "storage_bucket": "myswiper-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1049370077159:android:2c23672e829f3c0c1cbf42",
+        "android_client_info": {
+          "package_name": "my.myswiper.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLCg70SzpdaDD32OFfcM7LL_8uuLOFyBs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
