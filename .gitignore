@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 /admin-dashboard/node_modules
+/marketing-site/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -22,6 +23,9 @@
 /build
 /admin-dashboard/dist
 /admin-dashboard/.wrangler
+/marketing-site/out
+/marketing-site/.next
+/marketing-site/.wrangler
 
 # misc
 .DS_Store

@@ -5,6 +5,7 @@ import '../models/provider_summary.dart';
 import '../previews/widget_preview_helpers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import 'cached_image.dart';
 
 String providerHeroTag(ProviderSummary provider) {
   final normalizedId = provider.id.trim().isNotEmpty
@@ -229,24 +230,26 @@ class ProviderCard extends StatelessWidget {
                 icon: Icons.star_rounded,
                 iconColor: const Color(0xFFF5B301),
                 value: provider.rating.toStringAsFixed(1),
-                suffix: '(${provider.reviewCount} Reviews)',
               ),
               const _Metric(
                 icon: Icons.thumb_up_alt_rounded,
                 iconColor: AppColors.primary,
                 value: '98%',
-                suffix: 'On-Time',
               ),
               _Metric(
                 icon: Icons.place_outlined,
                 iconColor: const Color(0xFF667085),
-                value: provider.distanceLabel,
+                value: provider.distanceLabel.replaceFirst(
+                  RegExp(r'\s*away$', caseSensitive: false),
+                  '',
+                ),
               ),
               _Metric(
                 icon: Icons.work_outline_rounded,
                 iconColor: const Color(0xFF667085),
-                value:
-                    '${provider.yearsExperience.isEmpty ? 'New' : provider.yearsExperience} Experience',
+                value: provider.yearsExperience.isEmpty
+                    ? 'New'
+                    : provider.yearsExperience,
               ),
             ],
           ),
@@ -351,10 +354,10 @@ class _Portrait extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
           ),
           child: imageUrl.isNotEmpty
-              ? Image.network(
-                  imageUrl,
+              ? CachedImage(
+                  url: imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
+                  errorWidget: (context, error) =>
                       _PortraitFallback(name: provider.name),
                 )
               : _PortraitFallback(name: provider.name),
@@ -434,13 +437,11 @@ class _Metric extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.value,
-    this.suffix,
   });
 
   final IconData icon;
   final Color iconColor;
   final String value;
-  final String? suffix;
 
   @override
   Widget build(BuildContext context) {
@@ -449,25 +450,14 @@ class _Metric extends StatelessWidget {
         Icon(icon, size: 18, color: iconColor),
         const SizedBox(width: 8),
         Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF1F2C44),
-                fontWeight: FontWeight.w700,
-              ),
-              children: [
-                TextSpan(text: value),
-                if (suffix != null)
-                  TextSpan(
-                    text: ' $suffix',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFF475467),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-              ],
+          child: Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFF1F2C44),
+              fontWeight: FontWeight.w700,
             ),
-            maxLines: 2,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

@@ -1,27 +1,18 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../services/browser_file_picker.dart';
+import '../../../services/image_optimization_service.dart';
 import '../../../services/provider_workspace_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
+import '../../../widgets/cached_image.dart';
+import '../../../widgets/compact_media_picker.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/loading_state.dart';
+import '../../../widgets/service_category_picker.dart';
+import '../../../widgets/specialty_chip_field.dart';
 import '../../../widgets/swiper_app_bar.dart';
-
-const List<String> _providerServiceOptions = [
-  'Chef',
-  'Maid',
-  'Tutor',
-  'Driver',
-  'Cleaner',
-  'Babysitter',
-  'Plumber',
-  'Electrician',
-  'Other',
-];
 
 const List<String> _availabilityDays = [
   'Monday',
@@ -49,7 +40,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
   final _yearsController = TextEditingController();
   final _hourlyController = TextEditingController();
   final _dailyController = TextEditingController();
-  final _specialtiesController = TextEditingController();
+  final _aboutController = TextEditingController();
+  List<String> _specialties = [];
   List<String> _serviceImageDataUrls = const [];
   List<String> _serviceImageCaptions = const [];
   List<String> _serviceImageFileNames = const [];
@@ -75,7 +67,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     _yearsController.dispose();
     _hourlyController.dispose();
     _dailyController.dispose();
-    _specialtiesController.dispose();
+    _aboutController.dispose();
     super.dispose();
   }
 
@@ -93,7 +85,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       _yearsController.clear();
       _hourlyController.clear();
       _dailyController.clear();
-      _specialtiesController.clear();
+      _aboutController.clear();
+      _specialties = [];
       _serviceImageDataUrls = const [];
       _serviceImageCaptions = const [];
       _serviceImageFileNames = const [];
@@ -113,7 +106,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       _yearsController.clear();
       _hourlyController.clear();
       _dailyController.clear();
-      _specialtiesController.clear();
+      _aboutController.clear();
+      _specialties = [];
       _serviceImageDataUrls = const [];
       _serviceImageCaptions = const [];
       _serviceImageFileNames = const [];
@@ -133,7 +127,8 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       _yearsController.text = service.yearsExperience;
       _hourlyController.text = service.hourlyRate.toStringAsFixed(0);
       _dailyController.text = service.dailyRate.toStringAsFixed(0);
-      _specialtiesController.text = service.specialties.join(', ');
+      _aboutController.text = service.aboutService;
+      _specialties = List<String>.from(service.specialties);
       _serviceImageDataUrls = List<String>.from(service.imageDataUrls);
       _serviceImageCaptions = service.imageCaptions.isNotEmpty
           ? List<String>.from(service.imageCaptions)
@@ -168,10 +163,18 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     if (!mounted || picked.isEmpty) {
       return;
     }
+    final optimized = await Future.wait(
+      picked.map(
+        (file) => optimizePublicImage(file, maxDimension: kMediumImageMaxDimension),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _serviceImageDataUrls = [
         ..._serviceImageDataUrls,
-        ...picked.map((file) => file.dataUrl),
+        ...optimized.map((file) => file.dataUrl),
       ];
       _serviceImageCaptions = List<String>.generate(
         _serviceImageDataUrls.length,
@@ -179,7 +182,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       );
       _serviceImageFileNames = [
         ..._serviceImageFileNames,
-        ...picked.map((file) => file.name),
+        ...optimized.map((file) => file.name),
       ];
       _error = '';
       _message = '';
@@ -199,10 +202,20 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     if (!mounted || picked.isEmpty) {
       return;
     }
+    // Certificates can be a PDF or an image (accept above) -- optimizePublicImage
+    // only ever touches actual raster images and returns PDFs unchanged.
+    final optimized = await Future.wait(
+      picked.map(
+        (file) => optimizePublicImage(file, maxDimension: kMediumImageMaxDimension),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _certificateDataUrls = [
         ..._certificateDataUrls,
-        ...picked.map((file) => file.dataUrl),
+        ...optimized.map((file) => file.dataUrl),
       ];
       _certificateCaptions = List<String>.generate(
         _certificateDataUrls.length,
@@ -210,7 +223,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       );
       _certificateFileNames = [
         ..._certificateFileNames,
-        ...picked.map((file) => file.name),
+        ...optimized.map((file) => file.name),
       ];
       _error = '';
       _message = '';
@@ -263,11 +276,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     try {
       final hourlyRate = double.tryParse(_hourlyController.text.trim()) ?? 0;
       final dailyRate = double.tryParse(_dailyController.text.trim()) ?? 0;
-      final specialties = _specialtiesController.text
-          .split(',')
-          .map((item) => item.trim())
-          .where((item) => item.isNotEmpty)
-          .toList(growable: false);
+      final specialties = List<String>.from(_specialties);
       final imageDataUrls = List<String>.from(_serviceImageDataUrls);
       final imageCaptions = List<String>.from(_serviceImageCaptions);
       final certificateDataUrls = List<String>.from(_certificateDataUrls);
@@ -280,6 +289,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           yearsExperience: _yearsController.text.trim(),
           hourlyRate: hourlyRate,
           dailyRate: dailyRate,
+          aboutService: _aboutController.text.trim(),
           specialties: specialties,
           imageDataUrls: imageDataUrls,
           imageCaptions: imageCaptions,
@@ -292,6 +302,7 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           yearsExperience: _yearsController.text.trim(),
           hourlyRate: hourlyRate,
           dailyRate: dailyRate,
+          aboutService: _aboutController.text.trim(),
           specialties: specialties,
           imageDataUrls: imageDataUrls,
           imageCaptions: imageCaptions,
@@ -484,158 +495,146 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                   ),
                 )
               else
-                _reactSection(
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                    border: Border.all(color: AppColors.border),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFF8F4FF), Colors.white],
-                          ),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.10),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _editingServiceId.isEmpty
-                                        ? 'Add New Service'
-                                        : 'Edit Service',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w900),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  Text(
-                                    _editingServiceId.isEmpty
-                                        ? 'Create another listing with pricing, specialties, photos, and certificates.'
-                                        : 'Update this service and save changes directly to your live provider listing.',
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: AppColors.textSecondary,
-                                          height: 1.45,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: _startNewService,
-                              child: const Text('Cancel'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      DropdownButtonFormField<String>(
-                        value: _serviceType.isEmpty ? null : _serviceType,
-                        decoration: _cleanFieldDecoration(
-                          'Service Type',
-                          prefixIcon: Icons.work_outline_rounded,
-                        ),
-                        items: _providerServiceOptions
-                            .map(
-                              (option) => DropdownMenuItem<String>(
-                                value: option,
-                                child: Text(option),
-                              ),
-                            )
-                            .toList(growable: false),
-                        onChanged: _editingServiceId.isNotEmpty
-                            ? null
-                            : (value) =>
-                                  setState(() => _serviceType = value ?? ''),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
                       Row(
                         children: [
                           Expanded(
-                            child: TextField(
-                              controller: _hourlyController,
-                              keyboardType: TextInputType.number,
-                              decoration: _cleanFieldDecoration(
-                                'Hourly Rate',
-                                prefixIcon: Icons.payments_outlined,
-                                hint: '40',
+                            child: Text(
+                              _editingServiceId.isEmpty
+                                  ? 'Add New Service'
+                                  : 'Edit Service',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: TextField(
-                              controller: _dailyController,
-                              keyboardType: TextInputType.number,
-                              decoration: _cleanFieldDecoration(
-                                'Daily Rate',
-                                prefixIcon: Icons.calendar_today_outlined,
-                                hint: '250',
-                              ),
+                          TextButton(
+                            onPressed: _startNewService,
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 32),
+                              visualDensity: VisualDensity.compact,
                             ),
+                            child: const Text('Cancel'),
                           ),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      TextField(
-                        controller: _yearsController,
-                        decoration: _cleanFieldDecoration(
-                          'Experience',
-                          prefixIcon: Icons.timeline_rounded,
-                          hint: '5 Years',
-                        ),
+                      ServiceCategoryPicker(
+                        categories: providerServiceCategories,
+                        selectedCategory: _serviceType.isEmpty ? null : _serviceType,
+                        enabled: _editingServiceId.isEmpty,
+                        onSelect: (category) =>
+                            setState(() => _serviceType = category),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      TextField(
-                        controller: _specialtiesController,
-                        decoration: _cleanFieldDecoration(
-                          'Specialties',
-                          prefixIcon: Icons.star_outline_rounded,
-                          hint: 'Deep tissue, Prenatal, Sports massage',
-                        ),
+                      const SizedBox(height: AppSpacing.md),
+                      _CompactField(
+                        label: 'Years of Experience',
+                        controller: _yearsController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      SpecialtyChipField(
+                        specialties: _specialties,
+                        onChanged: () => setState(() {}),
+                        category: _serviceType,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      CompactMediaPicker(
+                        title: 'Service Images',
+                        subtitle: 'Upload up to 3 photos of your work.',
+                        emptyLabel: 'Tap to upload work photos',
+                        dataUrls: _serviceImageDataUrls,
+                        onPick: _pickServiceImages,
+                        onRemove: _removeServiceImage,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'About the Service',
+                              style: _compactLabelStyle,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _aboutController.text = generateServiceAboutText(
+                                  category: _serviceType,
+                                  yearsExperience: _yearsController.text,
+                                  specialties: _specialties,
+                                );
+                              });
+                            },
+                            icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                            label: const Text('Auto-generate'),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        'Separate each specialty with a comma — e.g. Deep tissue, Prenatal, Sports massage.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                      TextField(
+                        controller: _aboutController,
+                        maxLines: 3,
+                        style: const TextStyle(fontSize: 15),
+                        decoration: _compactDecoration(),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      _uploadCard(
-                        context,
-                        title: 'Service Images',
-                        subtitle:
-                            'Upload up to 3 service images. Remove old images and upload new images anytime.',
-                        dataUrls: _serviceImageDataUrls,
-                        fileNames: _serviceImageFileNames,
-                        emptyLabel: 'No service images selected',
-                        onUpload: _pickServiceImages,
-                        onRemove: _removeServiceImage,
-                        uploadLabel: 'Upload Photos',
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Optional. Shown on your public profile for this service.',
+                        style: _compactHelperStyle,
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      _uploadCard(
-                        context,
+                      const SizedBox(height: AppSpacing.md),
+                      CompactMediaPicker(
                         title: 'Certificates',
-                        subtitle:
-                            'Upload up to 3 certificates or proof files. Remove old files and upload new ones anytime.',
+                        subtitle: 'Upload up to 3 certificates or proof files.',
+                        emptyLabel: 'Tap to upload certificates',
                         dataUrls: _certificateDataUrls,
-                        fileNames: _certificateFileNames,
-                        emptyLabel: 'No certificates selected',
-                        onUpload: _pickCertificates,
+                        onPick: _pickCertificates,
                         onRemove: _removeCertificate,
-                        uploadLabel: 'Upload Certificates',
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _CompactField(
+                              label: 'Rate per Hour',
+                              controller: _hourlyController,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              prefixText: 'RM ',
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: _CompactField(
+                              label: 'Rate per Day',
+                              controller: _dailyController,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              prefixText: 'RM ',
+                            ),
+                          ),
+                        ],
                       ),
                       if (_error.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.md),
@@ -760,12 +759,12 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
                     const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, index) => ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Image.network(
-                    service.imageDataUrls[index],
+                  child: CachedImage(
+                    url: service.imageDataUrls[index],
                     height: 96,
                     width: 112,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                    errorWidget: (_, _) => _imagePlaceholder(),
                   ),
                 ),
               ),
@@ -789,18 +788,22 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
     BuildContext context,
     ProviderWorkspaceServiceModel service,
   ) {
-    final chipStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+    final theme = Theme.of(context);
+    final mutedStyle = theme.textTheme.bodySmall?.copyWith(
       color: AppColors.textSecondary,
-      fontWeight: FontWeight.w700,
+      height: 1.45,
     );
+    final sectionLabelStyle = theme.textTheme.labelSmall?.copyWith(
+      color: AppColors.textSecondary,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.8,
+    );
+    final about = service.aboutService.trim();
+    final deleting = _deleting == service.id;
+
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFFFFF), Color(0xFFFCFAFF)],
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE9E1F4)),
         boxShadow: const [
@@ -814,146 +817,216 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _toTitleCase(service.serviceType),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.textPrimary,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _toTitleCase(service.serviceType),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'RM${service.hourlyRate.toStringAsFixed(0)}/hr  •  RM${service.dailyRate.toStringAsFixed(0)}/day',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                _miniChip(
+                  label: service.yearsExperience.isEmpty
+                      ? 'Experience not set'
+                      : service.yearsExperience,
+                  background: const Color(0xFFF4EDFF),
+                  foreground: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+          if (service.imageDataUrls.isNotEmpty)
+            SizedBox(
+              height: 104,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                scrollDirection: Axis.horizontal,
+                itemCount: service.imageDataUrls.length,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: AppSpacing.sm),
+                itemBuilder: (context, index) => ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: CachedImage(
+                    url: service.imageDataUrls[index],
+                    height: 104,
+                    width: 128,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, _) => _imagePlaceholder(),
+                  ),
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAF7FF),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE9E1F4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.photo_library_outlined,
+                      color: AppColors.primary,
+                      size: 20,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'RM${service.hourlyRate.toStringAsFixed(0)}/hr - RM${service.dailyRate.toStringAsFixed(0)}/day',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'No photos yet. Tap Edit to add work photos.',
+                        style: mutedStyle,
                       ),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: _deleting == service.id
-                    ? null
-                    : () => _confirmDeleteService(service),
-                icon: _deleting == service.id
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(
-                        Icons.delete_outline_rounded,
-                        color: AppColors.error,
-                      ),
-                visualDensity: VisualDensity.compact,
-              ),
-              const SizedBox(width: 4),
-              FilledButton.tonal(
-                onPressed: () => _editService(service),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primarySoft,
-                  foregroundColor: AppColors.primary,
-                  visualDensity: VisualDensity.compact,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text('Edit'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              _miniChip(
-                label: service.yearsExperience.isEmpty
-                    ? 'Experience not set'
-                    : service.yearsExperience,
-                background: const Color(0xFFF4EDFF),
-                foreground: AppColors.primary,
-              ),
-              _miniChip(
-                label:
-                    '${service.imageDataUrls.length} image${service.imageDataUrls.length == 1 ? '' : 's'}',
-                background: const Color(0xFFEFFAF5),
-                foreground: AppColors.success,
-              ),
-              if (service.certificateDataUrls.isNotEmpty)
-                _miniChip(
-                  label:
-                      '${service.certificateDataUrls.length} certificate${service.certificateDataUrls.length == 1 ? '' : 's'}',
-                  background: const Color(0xFFFFF4E8),
-                  foreground: AppColors.warning,
-                ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (service.specialties.isEmpty)
-            Text('No specialties added yet.', style: chipStyle)
-          else
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: service.specialties
-                  .map(
-                    (item) => Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8F4FF),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.10),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('ABOUT THIS SERVICE', style: sectionLabelStyle),
+                const SizedBox(height: 6),
+                Text(
+                  about.isEmpty ? 'No description added yet.' : about,
+                  style: about.isEmpty
+                      ? mutedStyle
+                      : theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textPrimary,
+                          height: 1.5,
                         ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text('SPECIALTIES', style: sectionLabelStyle),
+                const SizedBox(height: 8),
+                if (service.specialties.isEmpty)
+                  Text('No specialties added yet.', style: mutedStyle)
+                else
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: service.specialties
+                        .map(
+                          (item) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8F4FF),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.10,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              item,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                if (service.certificateDataUrls.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.verified_outlined,
+                        size: 16,
+                        color: AppColors.warning,
                       ),
-                      child: Text(item, style: chipStyle),
-                    ),
-                  )
-                  .toList(growable: false),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${service.certificateDataUrls.length} certificate${service.certificateDataUrls.length == 1 ? '' : 's'} attached',
+                        style: mutedStyle,
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
-          if (service.imageDataUrls.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              height: 96,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: service.imageDataUrls.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(width: AppSpacing.sm),
-                itemBuilder: (context, index) => ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Image.network(
-                    service.imageDataUrls[index],
-                    height: 96,
-                    width: 112,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _imagePlaceholder(),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Divider(height: 1, color: Color(0xFFF0EAF8)),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: deleting
+                        ? null
+                        : () => _confirmDeleteService(service),
+                    icon: deleting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline_rounded, size: 20),
+                    label: const Text('Delete'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      minimumSize: const Size.fromHeight(44),
+                    ),
                   ),
                 ),
-              ),
+                Container(width: 1, height: 24, color: const Color(0xFFF0EAF8)),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => _editService(service),
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    label: const Text('Edit'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-          if (service.certificateDataUrls.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              '${service.certificateDataUrls.length} certificate file${service.certificateDataUrls.length == 1 ? '' : 's'} attached',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
+          ),
         ],
       ),
     );
@@ -1013,260 +1086,6 @@ class _ProviderServicesScreenState extends State<ProviderServicesScreen> {
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
-      ),
-    );
-  }
-
-  Widget _uploadCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required List<String> dataUrls,
-    required List<String> fileNames,
-    required String emptyLabel,
-    required VoidCallback onUpload,
-    required void Function(int index) onRemove,
-    required String uploadLabel,
-  }) {
-    return _inputCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.collections_outlined,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${dataUrls.length}/3 uploaded',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (dataUrls.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFF8F4FF), Color(0xFFFFFFFF)],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE7DDF7)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.add_photo_alternate_outlined,
-                      color: AppColors.primary,
-                      size: 34,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    emptyLabel,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Add sharp, clear files to improve your listing quality.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: dataUrls.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: AppSpacing.sm,
-                crossAxisSpacing: AppSpacing.sm,
-                childAspectRatio: 0.92,
-              ),
-              itemBuilder: (context, index) {
-                final url = dataUrls[index];
-                final isPdf = url.startsWith('data:application/pdf');
-                final fileName = index < fileNames.length
-                    ? fileNames[index]
-                    : '';
-                return Container(
-                  padding: const EdgeInsets.all(AppSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFE7DDF7)),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x0D0F0B1F),
-                        blurRadius: 16,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: isPdf
-                                  ? Container(
-                                      width: double.infinity,
-                                      decoration: const BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            Color(0xFFF8F4FF),
-                                            Color(0xFFFFFFFF),
-                                          ],
-                                        ),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: const Icon(
-                                        Icons.picture_as_pdf_outlined,
-                                        color: AppColors.primary,
-                                        size: 42,
-                                      ),
-                                    )
-                                  : _uploadPreviewImage(url),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            fileName.isEmpty ? 'Uploaded file' : fileName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ],
-                      ),
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () => onRemove(index),
-                            borderRadius: BorderRadius.circular(999),
-                            child: Ink(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.92),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: AppColors.error.withValues(
-                                    alpha: 0.20,
-                                  ),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: AppColors.error,
-                                size: 18,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          const SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: dataUrls.length >= 3 ? null : onUpload,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: BorderSide(
-                  color: AppColors.primary.withValues(alpha: 0.24),
-                ),
-                minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                backgroundColor: const Color(0xFFFCFAFF),
-              ),
-              icon: const Icon(Icons.cloud_upload_outlined),
-              label: Text(uploadLabel),
-            ),
-          ),
-          if (dataUrls.length >= 3) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Maximum 3 files reached. Remove one to upload a new file.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
-        ],
       ),
     );
   }
@@ -1858,53 +1677,6 @@ Widget _reactSection({required Widget child}) {
   );
 }
 
-Widget _inputCard({required Widget child}) {
-  return Container(
-    padding: const EdgeInsets.all(AppSpacing.sm),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFBFFFC),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: const Color(0xFFE7EEE8)),
-    ),
-    child: child,
-  );
-}
-
-/// Matches `_personalFieldDecoration` in the Personal Details screen —
-/// bordered, roomy fields with an icon prefix, rather than the compact
-/// borderless fields nested inside `_inputCard`.
-InputDecoration _cleanFieldDecoration(
-  String label, {
-  IconData? prefixIcon,
-  String? hint,
-}) {
-  return InputDecoration(
-    labelText: label,
-    hintText: hint,
-    prefixIcon: prefixIcon == null
-        ? null
-        : Icon(prefixIcon, size: 20, color: AppColors.primary),
-    filled: true,
-    fillColor: Colors.white,
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: AppSpacing.md,
-      vertical: AppSpacing.md,
-    ),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AppSpacing.lg),
-      borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.14)),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AppSpacing.lg),
-      borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.14)),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AppSpacing.lg),
-      borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
-    ),
-  );
-}
-
 Widget _noticeCard(String message, Color color, Color background) {
   return Container(
     padding: const EdgeInsets.symmetric(
@@ -1937,42 +1709,6 @@ Widget _imagePlaceholder() {
   );
 }
 
-/// A freshly-picked (not yet saved) service image or certificate carries a
-/// `data:<mime>;base64,...` URL, not a real network URL — rendering that
-/// through [Image.network] either fails silently or, for a large base64
-/// string, can crash the app. Only an already-saved http(s) URL goes through
-/// [Image.network]; anything else is decoded and shown via [Image.memory].
-Widget _uploadPreviewImage(String url) {
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return Image.network(
-      url,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _imagePlaceholder(),
-    );
-  }
-
-  final bytes = _decodeDataUrlBytes(url);
-  if (bytes == null) {
-    return _imagePlaceholder();
-  }
-  return Image.memory(bytes, width: double.infinity, fit: BoxFit.cover);
-}
-
-/// Decodes a `data:<mime>;base64,<...>` URL into raw bytes for
-/// [Image.memory]. Returns null for anything else.
-Uint8List? _decodeDataUrlBytes(String dataUrl) {
-  final commaIndex = dataUrl.indexOf(',');
-  if (!dataUrl.startsWith('data:') || commaIndex == -1) {
-    return null;
-  }
-  try {
-    return base64Decode(dataUrl.substring(commaIndex + 1));
-  } catch (_) {
-    return null;
-  }
-}
-
 String _normalizeServiceType(String value) {
   return value.trim().toLowerCase().replaceAll(' ', '_');
 }
@@ -1984,4 +1720,84 @@ String _toTitleCase(String value) {
       .where((part) => part.isNotEmpty)
       .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
       .join(' ');
+}
+
+
+// ---------------------------------------------------------------------------
+// Compact form controls for the Add / Edit Service form — same look as the
+// service step of provider registration: label above the field, dense
+// outlined inputs, and small photo thumbnails with a remove badge and an
+// "n/3" counter.
+// ---------------------------------------------------------------------------
+
+const double _compactFieldRadius = 13;
+
+const TextStyle _compactLabelStyle = TextStyle(
+  fontSize: 13,
+  fontWeight: FontWeight.w700,
+  color: AppColors.textPrimary,
+);
+
+const TextStyle _compactHelperStyle = TextStyle(
+  fontSize: 11.5,
+  color: AppColors.textMuted,
+);
+
+OutlineInputBorder _compactBorder(Color color, {double width = 1}) {
+  return OutlineInputBorder(
+    borderRadius: BorderRadius.circular(_compactFieldRadius),
+    borderSide: BorderSide(color: color, width: width),
+  );
+}
+
+InputDecoration _compactDecoration({String? prefixText}) {
+  return InputDecoration(
+    isDense: true,
+    filled: true,
+    fillColor: Colors.white,
+    prefixText: prefixText,
+    prefixStyle: const TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+    border: _compactBorder(AppColors.border),
+    enabledBorder: _compactBorder(AppColors.border),
+    focusedBorder: _compactBorder(AppColors.primary, width: 1.4),
+  );
+}
+
+class _CompactField extends StatelessWidget {
+  const _CompactField({
+    required this.label,
+    required this.controller,
+    this.keyboardType,
+    this.inputFormatters,
+    this.prefixText,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final String? prefixText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: _compactLabelStyle),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          style: const TextStyle(fontSize: 15),
+          decoration: _compactDecoration(prefixText: prefixText),
+        ),
+      ],
+    );
+  }
 }

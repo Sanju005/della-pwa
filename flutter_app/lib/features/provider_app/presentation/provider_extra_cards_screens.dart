@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/browser_file_picker.dart';
+import '../../../services/provider_support_documents_service.dart';
 import '../../../services/provider_workspace_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
@@ -862,6 +863,246 @@ class _ProviderHelpCentreScreenState extends State<ProviderHelpCentreScreen> {
           Icons.add_photo_alternate_outlined,
           color: AppColors.primary,
         ),
+      ),
+    );
+  }
+}
+
+/// Support Documents (driving license, other certificates) — a provider
+/// self-service upload list. Deliberately independent of identity/phone/
+/// email verification: nothing here ever changes a Verified/Pending badge.
+class ProviderSupportDocumentsScreen extends StatefulWidget {
+  const ProviderSupportDocumentsScreen({super.key});
+
+  @override
+  State<ProviderSupportDocumentsScreen> createState() =>
+      _ProviderSupportDocumentsScreenState();
+}
+
+class _ProviderSupportDocumentsScreenState
+    extends State<ProviderSupportDocumentsScreen> {
+  static const _service = ProviderSupportDocumentsService();
+
+  late Future<List<ProviderSupportDocument>> _future;
+  bool _uploading = false;
+  String _error = '';
+  String _message = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _service.fetchDocuments();
+  }
+
+  Future<void> _upload() async {
+    final picked = await pickSingleBrowserFile(
+      accept: 'image/*,application/pdf',
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+    setState(() {
+      _uploading = true;
+      _error = '';
+      _message = '';
+    });
+    try {
+      final documents = await _service.uploadDocument(
+        fileName: picked.name,
+        dataUrl: picked.dataUrl,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _future = Future.value(documents);
+        _message = 'Document uploaded.';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _uploading = false);
+      }
+    }
+  }
+
+  Future<void> _delete(String id) async {
+    setState(() {
+      _error = '';
+      _message = '';
+    });
+    try {
+      final documents = await _service.deleteDocument(id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _future = Future.value(documents);
+        _message = 'Document removed.';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Support Documents',
+        subtitle: 'Driving license, certificates, and other proof files',
+        showBack: true,
+      ),
+      body: FutureBuilder<List<ProviderSupportDocument>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const LoadingState(label: 'Loading support documents...');
+          }
+          if (snapshot.hasError) {
+            return const EmptyState(
+              title: 'Unable to load support documents',
+              subtitle: 'Please try again.',
+              icon: Icons.error_outline_rounded,
+            );
+          }
+
+          final documents = snapshot.data ?? const [];
+
+          return ListView(
+            padding: AppSpacing.screenPadding,
+            children: [
+              _panel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Icons.badge_outlined,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Text(
+                            'Upload a driving license, certificate, or other supporting document. This does not affect your verification status.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    if (_error.isNotEmpty) ...[
+                      _panelNotice(
+                        _error,
+                        AppColors.error,
+                        const Color(0xFFFFF1F2),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                    if (_message.isNotEmpty) ...[
+                      _panelNotice(
+                        _message,
+                        AppColors.success,
+                        const Color(0xFFF0FDF4),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _uploading ? null : _upload,
+                        icon: _uploading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.upload_file_rounded),
+                        label: Text(
+                          _uploading ? 'Uploading...' : 'Upload Document',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (documents.isEmpty)
+                const EmptyState(
+                  title: 'No documents yet',
+                  subtitle: 'Uploaded documents will appear here.',
+                  icon: Icons.folder_open_outlined,
+                )
+              else
+                ...documents.map(
+                  (document) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _panel(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3EBFC),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              document.isPdf
+                                  ? Icons.picture_as_pdf_outlined
+                                  : Icons.image_outlined,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Text(
+                              document.fileName.isEmpty
+                                  ? document.label
+                                  : document.fileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => _delete(document.id),
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -1,7 +1,15 @@
 import { bookings, payments, users } from "../data/mock-data";
 import { userDetailRecords } from "../data/user-detail-mocks";
 import { isSupabaseConfigured, supabase } from "./supabase";
-import type { DashboardBooking, PaymentRow, UserAddress, UserDetailRecord, UserMetric, UserRow } from "../types";
+import type {
+  DashboardBooking,
+  PaymentRow,
+  UserAddress,
+  UserDetailRecord,
+  UserMetric,
+  UserReportItem,
+  UserRow,
+} from "../types";
 
 type ProfileRelation =
   | {
@@ -123,11 +131,18 @@ type AdminCustomerStatusPayload = {
   emailVerifiedAt: string;
   phoneVerifiedAt: string;
   kycVerifiedAt: string;
+  identityDocumentType: string;
+  identityFrontImageUrl: string;
+  identityBackImageUrl: string;
+  identityReviewNote: string;
 };
 
 type IssueReportRecord = {
   id: string;
   reporterUserId: string;
+  bookingTitle?: string;
+  createdAt?: string;
+  status?: "new";
 };
 
 const APP_BASE_URL =
@@ -201,6 +216,10 @@ async function fetchAdminCustomerStatus(userId: string) {
             emailVerifiedAt?: string | null;
             phoneVerifiedAt?: string | null;
             kycVerifiedAt?: string | null;
+            identityDocumentType?: string | null;
+            identityFrontImageUrl?: string | null;
+            identityBackImageUrl?: string | null;
+            identityReviewNote?: string | null;
           };
         }
       | { error?: string };
@@ -216,15 +235,19 @@ async function fetchAdminCustomerStatus(userId: string) {
       emailVerifiedAt: formatVerificationDate(result.status.emailVerifiedAt) || "",
       phoneVerifiedAt: formatVerificationDate(result.status.phoneVerifiedAt) || "",
       kycVerifiedAt: formatVerificationDate(result.status.kycVerifiedAt) || "",
+      identityDocumentType: result.status.identityDocumentType?.trim() || "",
+      identityFrontImageUrl: result.status.identityFrontImageUrl?.trim() || "",
+      identityBackImageUrl: result.status.identityBackImageUrl?.trim() || "",
+      identityReviewNote: result.status.identityReviewNote?.trim() || "",
     } satisfies AdminCustomerStatusPayload;
   } catch {
     return null;
   }
 }
 
-async function fetchIssueReportCountForUser(userId: string) {
+async function fetchIssueReportsForUser(userId: string): Promise<UserReportItem[]> {
   if (!supabase) {
-    return 0;
+    return [];
   }
 
   const {
@@ -232,7 +255,7 @@ async function fetchIssueReportCountForUser(userId: string) {
   } = await supabase.auth.getSession();
 
   if (!session?.access_token) {
-    return 0;
+    return [];
   }
 
   try {
@@ -243,16 +266,23 @@ async function fetchIssueReportCountForUser(userId: string) {
     });
 
     if (!response.ok) {
-      return 0;
+      return [];
     }
 
     const result = (await response.json()) as {
       reports?: IssueReportRecord[];
     };
 
-    return (result.reports ?? []).filter((report) => report.reporterUserId === userId).length;
+    return (result.reports ?? [])
+      .filter((report) => report.reporterUserId === userId)
+      .map((report) => ({
+        id: report.id,
+        title: report.bookingTitle?.trim() || "Booking issue",
+        status: report.status === "new" ? "Open" : "In Progress",
+        submitted: formatDate(report.createdAt),
+      }));
   } catch {
-    return 0;
+    return [];
   }
 }
 
@@ -277,15 +307,8 @@ async function resolveCompletionImageUrl(value?: string | null) {
     return trimmed;
   }
 
-  const signed = await supabase.storage
-    .from("job-completion-images")
-    .createSignedUrl(trimmed, 60 * 60);
-
-  if (signed.error || !signed.data?.signedUrl) {
-    return "";
-  }
-
-  return signed.data.signedUrl;
+  const { data } = supabase.storage.from("job-completion-images").getPublicUrl(trimmed);
+  return data.publicUrl;
 }
 
 function relationItem<T>(value: T | T[] | null | undefined) {
@@ -863,7 +886,6 @@ function buildMetrics(
       { id: "live-2", label: "Completed", value: String(completedCount), note: completionRate, tone: "emerald" },
       { id: "live-3", label: "Cancelled", value: String(cancelledCount), note: cancellationRate, tone: "rose" },
       { id: "live-4", label: "Lifetime Earnings", value: formatCurrency(totalAmount), note: "All time", tone: "violet" },
-      { id: "live-5", label: "Wallet Balance", value: "RM0.00", note: "Available", tone: "amber" },
       { id: "live-6", label: "Reviews", value: String(reviewCount), note: `Average: ${averageRating}`, tone: "sky" },
       { id: "live-7", label: "Reports", value: String(issueReportCount), note: issueReportCount ? "View reports" : "No issues", tone: "amber" },
     ] satisfies UserMetric[];
@@ -874,7 +896,6 @@ function buildMetrics(
     { id: "live-2", label: "Completed Bookings", value: String(completedCount), note: completionRate, tone: "emerald" },
     { id: "live-3", label: "Cancelled Bookings", value: String(cancelledCount), note: cancellationRate, tone: "rose" },
     { id: "live-4", label: "Total Spent", value: formatCurrency(totalAmount), note: "All time", tone: "violet" },
-    { id: "live-5", label: "Wallet Balance", value: "RM0.00", note: "Available", tone: "amber" },
     { id: "live-6", label: "Reviews Given", value: String(reviewCount), note: `Average: ${averageRating}`, tone: "sky" },
     { id: "live-7", label: "Reports Submitted", value: String(issueReportCount), note: issueReportCount ? "View reports" : "No reports", tone: "amber" },
   ] satisfies UserMetric[];
@@ -974,27 +995,22 @@ async function fetchProfileById(userId: string) {
 }
 
 export async function listUsersWithFallback() {
-  const liveProfiles = await fetchProfiles();
-
-  if (!liveProfiles?.length) {
+  // Mock data only stands in when there's no real backend configured at
+  // all — once Supabase is configured, an empty/failed live query must
+  // return an honest empty result instead of padding it with fake users.
+  if (!isSupabaseConfigured) {
     return users.filter((row) => isCustomerRole(row.role));
   }
 
-  const liveRows = liveProfiles
+  const liveProfiles = await fetchProfiles();
+
+  if (!liveProfiles?.length) {
+    return [];
+  }
+
+  return liveProfiles
     .filter((profile) => isCustomerRole(profile.role))
     .map(mapProfileToUserRow);
-  const seen = new Set(
-    liveRows.flatMap((row) => [row.id.trim().toLowerCase(), row.email.trim().toLowerCase()])
-  );
-
-  const mockRemainder = users.filter(
-    (row) =>
-      isCustomerRole(row.role) &&
-      !seen.has(row.id.trim().toLowerCase()) &&
-      !seen.has(row.email.trim().toLowerCase())
-  );
-
-  return [...liveRows, ...mockRemainder];
 }
 
 export function buildUserStats(rows: UserRow[]) {
@@ -1054,7 +1070,8 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
   const liveReviews = await tryFetchLiveReviews(userId, role, profileNames);
   const savedAddresses = role === "provider" ? [] : await fetchSavedAddressesForUser(userId);
   const customerStatus = role === "provider" ? null : await fetchAdminCustomerStatus(userId);
-  const issueReportCount = role === "provider" ? 0 : await fetchIssueReportCountForUser(userId);
+  const issueReports = role === "provider" ? [] : await fetchIssueReportsForUser(userId);
+  const issueReportCount = issueReports.length;
   const relatedBookings = liveBookings?.length ? liveBookings : getMockBookings(name, role);
   const relatedPayments = livePayments?.length ? livePayments : getMockPayments(name, role);
   const defaultDetail = Object.values(userDetailRecords)[0]!;
@@ -1085,11 +1102,15 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
       role,
       status,
       phone: liveProfile.phone?.trim() || baseDetail.phone,
-      emailVerified: role === "provider" ? baseDetail.emailVerified ?? true : customerStatus?.emailVerified ?? false,
-      phoneVerified: role === "provider" ? baseDetail.phoneVerified ?? true : customerStatus?.phoneVerified ?? false,
+      // Providers viewed through this (customer-focused) profile page never
+      // get a real verification check run — defaulting to "verified" here
+      // would show an unverified provider as fully verified. Default to the
+      // honest "unknown" state instead.
+      emailVerified: role === "provider" ? false : customerStatus?.emailVerified ?? false,
+      phoneVerified: role === "provider" ? false : customerStatus?.phoneVerified ?? false,
       identityVerificationStatus:
         role === "provider"
-          ? baseDetail.identityVerificationStatus ?? "verified"
+          ? "pending"
           : customerStatus?.identityVerificationStatus ?? "pending",
       dob: formatDateOfBirth(customerProfile?.date_of_birth) || baseDetail.dob,
       gender:
@@ -1110,12 +1131,100 @@ export async function getUserProfileWithFallback(userId: string): Promise<UserPr
       emailVerifiedAt: role === "provider" ? baseDetail.emailVerifiedAt : customerStatus?.emailVerifiedAt ?? "",
       phoneVerifiedAt: role === "provider" ? baseDetail.phoneVerifiedAt : customerStatus?.phoneVerifiedAt ?? "",
       kycVerifiedAt: role === "provider" ? baseDetail.kycVerifiedAt : customerStatus?.kycVerifiedAt ?? "",
+      identityDocumentType: role === "provider" ? "" : customerStatus?.identityDocumentType ?? "",
+      identityReviewNote: role === "provider" ? "" : customerStatus?.identityReviewNote ?? "",
+      identityDocuments:
+        role === "provider"
+          ? []
+          : [
+              customerStatus?.identityFrontImageUrl
+                ? {
+                    id: "identity-front",
+                    label:
+                      customerStatus.identityDocumentType === "passport"
+                        ? "Passport Main Page"
+                        : "IC Front",
+                    fileName: "identity-front",
+                    previewUrl: customerStatus.identityFrontImageUrl,
+                  }
+                : null,
+              customerStatus?.identityBackImageUrl
+                ? {
+                    id: "identity-back",
+                    label:
+                      customerStatus.identityDocumentType === "passport"
+                        ? "Passport Supporting Page"
+                        : "IC Back",
+                    fileName: "identity-back",
+                    previewUrl: customerStatus.identityBackImageUrl,
+                  }
+                : null,
+            ].filter((item): item is NonNullable<typeof item> => Boolean(item)),
       recentReviews,
+      reports: issueReports,
       metrics,
     },
     relatedBookings,
     relatedPayments,
   };
+}
+
+export async function setCustomerIdentityVerified(customerId: string, verified: boolean, note?: string) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return { error: "Admin session is required." };
+  }
+
+  try {
+    const response = await fetch(`${APP_BASE_URL}/api/admin/customer-status/${customerId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ action: "verify", verified, note }),
+    });
+    const result = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      return { error: result.error || "Unable to update customer identity verification." };
+    }
+
+    return { error: null };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to update customer identity verification.",
+    };
+  }
+}
+
+export async function sendCustomerPasswordReset(email: string) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const trimmedEmail = email.trim();
+  if (!trimmedEmail || trimmedEmail.toLowerCase() === "no email") {
+    return { error: "This user has no email on file to send a reset link to." };
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+    redirectTo: `${APP_BASE_URL}/reset-password`,
+  });
+
+  if (error) {
+    return { error: error.message || "Unable to send password reset email." };
+  }
+
+  return { error: null };
 }
 
 export async function suspendCustomer(customerId: string, reason: string) {

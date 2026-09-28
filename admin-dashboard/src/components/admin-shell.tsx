@@ -1,5 +1,4 @@
 import {
-  Bell,
   BriefcaseBusiness,
   CircleDollarSign,
   ClipboardList,
@@ -7,17 +6,15 @@ import {
   Menu,
   MessageSquareHeart,
   MessageSquareWarning,
-  Percent,
-  Search,
   Settings,
   ShieldCheck,
-  Ticket,
   Users,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider";
+import { isSupabaseConfigured } from "../lib/supabase";
 import type { NavItem } from "../types";
 
 const navigation: NavItem[] = [
@@ -28,10 +25,7 @@ const navigation: NavItem[] = [
   { label: "Payments", to: "/payments", icon: CircleDollarSign },
   { label: "Services", to: "/provider-approvals", icon: ShieldCheck },
   { label: "Reviews", to: "/reviews", icon: MessageSquareHeart },
-  { label: "Reports", to: "/complaints", icon: MessageSquareWarning, count: 5 },
-  { label: "Coupons", to: "/settings", icon: Percent },
-  { label: "Support Tickets", to: "/settings", icon: Ticket },
-  { label: "Notifications", to: "/settings", icon: Bell },
+  { label: "Reports", to: "/complaints", icon: MessageSquareWarning },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
 
@@ -193,32 +187,15 @@ export function AdminShell() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <label className="flex min-w-[280px] items-center gap-3 rounded-2xl border border-[#e8def6] bg-white px-4 py-3 text-sm text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
-                <Search className="size-4" />
-                <input
-                  type="text"
-                  placeholder="Search anything..."
-                  className="w-full bg-transparent outline-none placeholder:text-slate-400"
-                />
-              </label>
-              <button
-                type="button"
-                className="relative grid size-11 place-items-center rounded-2xl border border-[#e8def6] bg-white text-[#645394]"
-              >
-                <Bell className="size-5" />
-                <span className="absolute right-2 top-2 size-2 rounded-full bg-rose-500" />
-              </button>
-              <button
-                type="button"
-                className="grid size-11 place-items-center rounded-2xl border border-[#e8def6] bg-white text-[#645394]"
-              >
-                <Menu className="size-5" />
-              </button>
-            </div>
           </header>
 
           <main className="mt-4 flex-1">
+            {!isSupabaseConfigured ? (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                Demo data mode — Supabase is not configured. Everything shown
+                on this screen is sample data, not real records.
+              </div>
+            ) : null}
             <Outlet />
           </main>
         </div>

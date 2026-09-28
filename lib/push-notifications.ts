@@ -15,6 +15,15 @@ type PushNotificationInput = {
   bookingId?: string;
   path?: string;
   title: string;
+  // Structured fields for native (Flutter) clients to route a tap without
+  // parsing the web `path`. `type` is the broad category the client
+  // switches on ("booking" | "payment" | "message"); `event` is the exact
+  // underlying event name — reuses the same status/event identifiers the
+  // backend already uses internally, no second naming scheme.
+  type?: string;
+  event?: string;
+  conversationId?: string;
+  senderId?: string;
 };
 
 type DeviceRow = {
@@ -155,20 +164,25 @@ async function loadDeviceTokensForUser(userId: string) {
     return [];
   }
 
+  // No platform filter: a user can have web, Android, and iOS devices at
+  // once, and every registered token should receive the push.
   const { data, error } = await adminClient
     .from("user_devices")
     .select("fcm_token")
-    .eq("user_id", userId)
-    .eq("platform", "web");
+    .eq("user_id", userId);
 
   if (error) {
     console.error("[Push] Failed to load user device tokens:", error);
     return [];
   }
 
-  return ((data ?? []) as DeviceRow[])
+  const tokens = ((data ?? []) as DeviceRow[])
     .map((row) => row.fcm_token?.trim() ?? "")
     .filter(Boolean);
+
+  // Dedupe in case stale/duplicate rows exist so we never send the same
+  // push twice to the same token.
+  return [...new Set(tokens)];
 }
 
 async function removeDeviceToken(token: string) {
@@ -216,7 +230,7 @@ export async function sendPushNotificationToUser(
   const tokens = await loadDeviceTokensForUser(userId);
 
   if (tokens.length === 0) {
-    console.log(`[Push] No web device tokens found for user ${userId}.`);
+    console.log(`[Push] No device tokens found for user ${userId}.`);
     return { delivered: 0, failed: 0 };
   }
 
@@ -249,6 +263,14 @@ export async function sendPushNotificationToUser(
             data: {
               bookingId: notification.bookingId ?? "",
               path: pathOrFallback(notification),
+              ...(notification.type ? { type: notification.type } : {}),
+              ...(notification.event ? { event: notification.event } : {}),
+              ...(notification.conversationId
+                ? { conversationId: notification.conversationId }
+                : {}),
+              ...(notification.senderId
+                ? { senderId: notification.senderId }
+                : {}),
             },
             webpush: {
               fcmOptions: targetLink

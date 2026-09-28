@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/profile/phone/change/recovery-email/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"D:\\della-pwa\\app\\api\\profile\\phone\\change\\recovery-email\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

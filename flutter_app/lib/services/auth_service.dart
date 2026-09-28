@@ -1,10 +1,32 @@
+import 'local_notification_service.dart';
+import 'push_notification_service.dart';
+import 'device_identity_service.dart';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
 import 'demo_customer_auth_store.dart';
+
+/// Debug-build-only visibility into a phone-login response, for real-device
+/// testing. Only ever logs the response's boolean flags — never the
+/// password, PIN, or OTP code that may also be in [body]. A no-op in any
+/// release build (kDebugMode is compiled out entirely, not just false).
+void _debugLogPhoneLoginResponse(String route, Map<String, dynamic>? body) {
+  if (!kDebugMode || body == null) {
+    return;
+  }
+  debugPrint(
+    '[AuthDebug] $route -> success=${body['success'] == true} '
+    'requiresPin=${body['requiresPin'] == true} '
+    'pinFailed=${body['pinFailed'] == true} '
+    'accountRecoveryRequired=${body['accountRecoveryRequired'] == true} '
+    'pinSetupRequired=${body['pinSetupRequired'] == true} '
+    'pinSetupMandatory=${body['pinSetupMandatory'] == true}',
+  );
+}
 
 /// Thrown by [AuthService.signInProviderWithVerifiedPhone] when no provider
 /// account exists for the given phone number, so callers (the login screen)
@@ -20,6 +42,66 @@ class ProviderPhoneAccountNotFoundException implements Exception {
 class CustomerPhoneAccountNotFoundException implements Exception {
   const CustomerPhoneAccountNotFoundException();
 }
+
+/// Thrown when phone OTP alone was not enough — this device has never been
+/// trusted for this account, and the account already has a Swiper PIN, so
+/// the caller must collect a PIN and retry the same sign-in call with it.
+/// This is the exception that makes the recycled-number attack fail: an
+/// attacker who receives the SMS but doesn't know the PIN gets stuck here.
+class PhoneLoginPinRequiredException implements Exception {
+  const PhoneLoginPinRequiredException();
+}
+
+/// Thrown when a supplied PIN was wrong. Distinct from a generic Exception
+/// so the PIN-entry step can retry in place (like OtpStepView does for a
+/// wrong code) instead of resetting the whole login flow.
+class PhoneLoginPinIncorrectException implements Exception {
+  const PhoneLoginPinIncorrectException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// Thrown for Case B: an unknown device signing into an account that has no
+/// Swiper PIN yet. Phone OTP alone is never enough here — this is exactly
+/// the recycled-number scenario, so no session and no device trust are
+/// granted. [recoveryEmail] is the account's own verified recovery email,
+/// revealed only because phone ownership was already proven by the OTP
+/// that got the caller this far; it's null when the account has no
+/// verified recovery email at all, meaning there is no self-service path
+/// and manual account recovery is required.
+class AccountRecoveryRequiredException implements Exception {
+  const AccountRecoveryRequiredException({this.recoveryEmail});
+  final String? recoveryEmail;
+}
+
+/// The result of a successful phone-login call.
+///
+/// [pinSetupRequired] + [pinSetupMandatory] both true = Case A: this was
+/// already a trusted device, but the account predates the PIN system —
+/// the caller MUST show a non-skippable Create PIN screen right after this
+/// returns, before any other navigation. [pinSetupRequired] true with
+/// [pinSetupMandatory] false doesn't currently occur (kept distinct from
+/// the mandatory case so a future soft-prompt path has somewhere to live
+/// without another shape change).
+typedef PhoneLoginResult = ({
+  String? role,
+  bool pinSetupRequired,
+  bool pinSetupMandatory,
+});
+
+/// The shape of [AuthService.signInProviderWithVerifiedPhone] /
+/// [AuthService.signInCustomerWithVerifiedPhone] — captured as a value so
+/// the login screen can pick the right one (provider vs customer) once and
+/// have both the PIN step and [AccountRecoveryRequiredException] handling
+/// retry the exact same call with different follow-up fields.
+typedef PendingPhoneSignIn =
+    Future<PhoneLoginResult> Function({
+      String? pin,
+      String? emailChallengeId,
+      String? newPin,
+    });
 
 class AuthService {
   const AuthService();
@@ -57,6 +139,8 @@ class AuthService {
         return null;
       }
 
+      await _completeSuccessfulLogin(response.user!);
+
       return getCurrentUserRole();
     } on AuthException catch (error) {
       if (!_isInvalidLoginCredentials(error)) {
@@ -92,31 +176,44 @@ class AuthService {
       return null;
     }
 
+    await _completeSuccessfulLogin(response.user!);
+
     return getCurrentUserRole();
   }
 
-  /// Signs a returning provider in using just their phone number. Providers
-  /// never see/choose a password (a random one is generated once at
-  /// registration), so this can't be a normal password prompt — the caller
-  /// (the login screen) must already have checked the phone-OTP locally
-  /// (same dev-mode check used at registration) before calling this. The
-  /// backend resets the matched account's password to a fresh value it
-  /// knows and hands it back here so we can sign in with it immediately;
-  /// the password is never shown to the provider or stored anywhere.
+  /// Signs a returning provider in using their phone number. Providers never
+  /// see/choose a password (a random one is generated once at registration),
+  /// so this can't be a normal password prompt — the caller (the login
+  /// screen) must first redeem a real, server-verified OTP challenge (see
+  /// [RealOtpService]) and pass the resulting [challengeId], which the
+  /// backend independently re-verifies before doing anything. The backend
+  /// then resets the matched account's password to a fresh value it knows
+  /// and hands it back here so we can sign in with it immediately; the
+  /// password is never shown to the provider or stored anywhere.
   /// Throws [ProviderPhoneAccountNotFoundException] if no provider account
   /// exists for this phone number, so the caller can fall back to the
-  /// customer demo-phone path.
-  Future<String?> signInProviderWithVerifiedPhone({
+  /// customer login path.
+  Future<PhoneLoginResult> signInProviderWithVerifiedPhone({
     required String phoneCountryCode,
     required String phoneNumber,
+    required String challengeId,
+    String? pin,
+    String? emailChallengeId,
+    String? newPin,
   }) async {
     final uri = Uri.parse('${AppConfig.appBaseUrl}/api/provider/login/phone');
+    final deviceContext = await _deviceLoginContext();
     final response = await http.post(
       uri,
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'phoneCountryCode': phoneCountryCode,
         'phoneNumber': phoneNumber,
+        'challengeId': challengeId,
+        if (pin != null) 'pin': pin,
+        if (emailChallengeId != null) 'emailChallengeId': emailChallengeId,
+        if (newPin != null) 'newPin': newPin,
+        ...deviceContext,
       }),
     );
 
@@ -134,10 +231,28 @@ class AuthService {
     } catch (_) {
       body = null;
     }
+    _debugLogPhoneLoginResponse('provider/login/phone', body);
 
     if (response.statusCode == 404 && body != null) {
       throw const ProviderPhoneAccountNotFoundException();
     }
+
+    if (response.statusCode == 200 && body?['requiresPin'] == true) {
+      throw const PhoneLoginPinRequiredException();
+    }
+
+    if (response.statusCode == 401 && body?['pinFailed'] == true) {
+      throw PhoneLoginPinIncorrectException(
+        body?['error']?.toString() ?? 'Incorrect PIN.',
+      );
+    }
+
+    if (response.statusCode == 409 && body?['accountRecoveryRequired'] == true) {
+      throw AccountRecoveryRequiredException(
+        recoveryEmail: body?['recoveryEmail'] as String?,
+      );
+    }
+
     if (response.statusCode < 200 ||
         response.statusCode >= 300 ||
         body == null) {
@@ -149,30 +264,71 @@ class AuthService {
 
     final normalizedPhone = body['phone'] as String;
     final password = body['password'] as String;
-    return signInWithPhone(
+    final pinSetupRequired = body['pinSetupRequired'] == true;
+    final pinSetupMandatory = body['pinSetupMandatory'] == true;
+    final role = await signInWithPhone(
       normalizedPhone: normalizedPhone,
       password: password,
     );
+    return (
+      role: role,
+      pinSetupRequired: pinSetupRequired,
+      pinSetupMandatory: pinSetupMandatory,
+    );
   }
 
-  /// Signs a returning customer in using just their phone number — the real
+  /// Gathers the deviceId (stable, app-generated, never a hardware serial),
+  /// a best-effort friendly device name, platform, and current FCM token —
+  /// sent with every phone-login attempt so the backend can decide whether
+  /// this device has been trusted for this account before.
+  Future<Map<String, dynamic>> _deviceLoginContext() async {
+    const deviceIdentity = DeviceIdentityService();
+    final deviceId = await deviceIdentity.getDeviceId();
+    final deviceName = await deviceIdentity.getDeviceName();
+    String? fcmToken;
+    try {
+      fcmToken = await PushNotificationService().getToken();
+    } catch (_) {
+      fcmToken = null;
+    }
+
+    return {
+      'deviceId': deviceId,
+      'deviceName': deviceName,
+      'platform': deviceIdentity.platform,
+      if (fcmToken != null) 'fcmToken': fcmToken,
+    };
+  }
+
+  /// Signs a returning customer in using their phone number — the real
   /// replacement for the old fake `signInWithDemoPhone`/`DemoCustomerAuthStore`
   /// path. Mirrors [signInProviderWithVerifiedPhone]'s exact trust model and
-  /// backend contract (see /api/customer/login/phone), applied to customers:
-  /// the caller must already have checked the phone-OTP locally before
-  /// calling this. Throws [CustomerPhoneAccountNotFoundException] if no
-  /// customer account exists for this phone number.
-  Future<String?> signInCustomerWithVerifiedPhone({
+  /// backend contract (see /api/customer/login/phone): the caller must first
+  /// redeem a real, server-verified OTP challenge and pass the resulting
+  /// [challengeId], which the backend independently re-verifies. Throws
+  /// [CustomerPhoneAccountNotFoundException] if no customer account exists
+  /// for this phone number.
+  Future<PhoneLoginResult> signInCustomerWithVerifiedPhone({
     required String phoneCountryCode,
     required String phoneNumber,
+    required String challengeId,
+    String? pin,
+    String? emailChallengeId,
+    String? newPin,
   }) async {
     final uri = Uri.parse('${AppConfig.appBaseUrl}/api/customer/login/phone');
+    final deviceContext = await _deviceLoginContext();
     final response = await http.post(
       uri,
       headers: const {'Content-Type': 'application/json'},
       body: jsonEncode({
         'phoneCountryCode': phoneCountryCode,
         'phoneNumber': phoneNumber,
+        'challengeId': challengeId,
+        if (pin != null) 'pin': pin,
+        if (emailChallengeId != null) 'emailChallengeId': emailChallengeId,
+        if (newPin != null) 'newPin': newPin,
+        ...deviceContext,
       }),
     );
 
@@ -185,10 +341,28 @@ class AuthService {
     } catch (_) {
       body = null;
     }
+    _debugLogPhoneLoginResponse('customer/login/phone', body);
 
     if (response.statusCode == 404 && body != null) {
       throw const CustomerPhoneAccountNotFoundException();
     }
+
+    if (response.statusCode == 200 && body?['requiresPin'] == true) {
+      throw const PhoneLoginPinRequiredException();
+    }
+
+    if (response.statusCode == 401 && body?['pinFailed'] == true) {
+      throw PhoneLoginPinIncorrectException(
+        body?['error']?.toString() ?? 'Incorrect PIN.',
+      );
+    }
+
+    if (response.statusCode == 409 && body?['accountRecoveryRequired'] == true) {
+      throw AccountRecoveryRequiredException(
+        recoveryEmail: body?['recoveryEmail'] as String?,
+      );
+    }
+
     if (response.statusCode < 200 ||
         response.statusCode >= 300 ||
         body == null) {
@@ -200,22 +374,29 @@ class AuthService {
 
     final normalizedPhone = body['phone'] as String;
     final password = body['password'] as String;
-    return signInWithPhone(
+    final pinSetupRequired = body['pinSetupRequired'] == true;
+    final pinSetupMandatory = body['pinSetupMandatory'] == true;
+    final role = await signInWithPhone(
       normalizedPhone: normalizedPhone,
       password: password,
     );
+    return (
+      role: role,
+      pinSetupRequired: pinSetupRequired,
+      pinSetupMandatory: pinSetupMandatory,
+    );
   }
 
-  Future<String> signInWithDemoPhone({
-    required String phoneNumber,
-    required String otpCode,
-  }) async {
-    if (otpCode != '123456') {
-      throw Exception('Use OTP code `123456` to continue.');
-    }
 
-    await DemoCustomerAuthStore.signInWithPhone(phoneNumber);
-    return 'customer';
+  /// Runs once, right after Supabase confirms a genuine, successful sign-in
+  /// (never on app-startup session restore, since that path never calls
+  /// this): registers this device's FCM token and shows the one-time
+  /// local "Welcome back" notification.
+  Future<void> _completeSuccessfulLogin(User user) async {
+    await PushNotificationService().registerCurrentDevice();
+
+    final name = (user.userMetadata?['full_name'] as String?)?.trim();
+    await LocalNotificationService().showLoginWelcomeNotification(name);
   }
 
   bool isProviderRole(String? role) {
@@ -276,6 +457,8 @@ class AuthService {
         email: normalizedEmail,
         legacyProvider: legacyProvider,
       );
+
+      await _completeSuccessfulLogin(sessionUser);
 
       return getCurrentUserRole();
     } on AuthException {

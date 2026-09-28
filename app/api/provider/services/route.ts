@@ -21,6 +21,7 @@ type ServicePayload = {
   hourlyRate?: number;
   dailyRate?: number;
   specialties?: string[];
+  aboutService?: string;
   imageDataUrls?: string[];
   imageCaptions?: string[];
 };
@@ -145,6 +146,7 @@ export async function POST(request: Request) {
       years_experience: payload.yearsExperience?.trim() || "",
       hourly_rate: Number(payload.hourlyRate ?? 0),
       daily_rate: Number(payload.dailyRate ?? 0),
+      about_service: payload.aboutService?.trim() || null,
       is_active: true,
     })
     .select("id")
@@ -161,6 +163,7 @@ export async function POST(request: Request) {
         years_experience: payload.yearsExperience?.trim() || "",
         hourly_rate: Number(payload.hourlyRate ?? 0),
         daily_rate: Number(payload.dailyRate ?? 0),
+        about_service: payload.aboutService?.trim() || null,
       })
       .select("id")
       .single();

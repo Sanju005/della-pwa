@@ -97,7 +97,7 @@ export function PaymentDetailPage() {
             <InfoRow label="Amount" value={payment.amount} icon={<CircleDollarSign className="size-4" />} />
             <InfoRow label="Method" value={payment.method} icon={<CreditCard className="size-4" />} />
             <InfoRow label="Payment Status" value={payment.status} icon={<FileText className="size-4" />} />
-            <InfoRow label="Settlement Status" value={payment.settlementStatus || "Pending"} icon={<FileText className="size-4" />} />
+            <InfoRow label="Settlement Status" value={payment.settlementStatus} icon={<FileText className="size-4" />} />
             <InfoRow label="Date" value={payment.date} icon={<FileText className="size-4" />} />
           </div>
 

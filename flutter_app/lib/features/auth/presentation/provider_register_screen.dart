@@ -10,10 +10,12 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/animation/app_motion.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/utils/phone_number.dart';
+import '../../../core/utils/support_contact.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/browser_file_picker.dart';
 import '../../../services/device_location_service.dart';
 import '../../../services/image_crop_service.dart';
+import '../../../services/image_optimization_service.dart';
 import '../../../services/otp_service.dart';
 import '../../../services/provider_registration_service.dart';
 import '../../../theme/app_colors.dart';
@@ -21,7 +23,10 @@ import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
 import '../../../widgets/malaysia_state_autocomplete_field.dart';
 import '../../../widgets/service_radius_map.dart';
+import '../../../widgets/service_category_picker.dart';
+import '../../../widgets/specialty_chip_field.dart';
 import 'auth_flow_scaffold.dart';
+import 'create_pin_screen.dart';
 import 'otp_step_view.dart';
 
 enum _ProviderStep {
@@ -62,7 +67,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   final _customEndTimeController = TextEditingController(text: '09:00 PM');
   final _providerRegistrationService = const ProviderRegistrationService();
   final _authService = const AuthService();
-  final OtpService _otpService = const DevelopmentOtpService();
+  final RealOtpService _otpService = RealOtpService(purpose: 'phone');
 
   _ProviderStep _step = _ProviderStep.phoneNumber;
   // Set only when a step was entered via an Edit tap from Review — the next
@@ -81,6 +86,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
   String? _normalizedPhone;
   bool _phoneVerified = false;
   String _enteredOtpCode = '';
+  String? _phoneVerificationChallengeId;
   LatLng? _providerLatLng;
   bool _fetchingLocation = false;
   final Set<String> _availabilityDays = {
@@ -304,7 +310,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         _submitting = true;
       });
       try {
-        await _otpService.sendOtp(normalized);
+        await _otpService.sendOtp(normalized, checkNotRegistered: true);
       } finally {
         if (mounted) {
           setState(() => _submitting = false);
@@ -354,6 +360,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     setState(() {
       _phoneVerified = true;
       _enteredOtpCode = enteredCode;
+      _phoneVerificationChallengeId = _otpService.lastChallengeId;
       if (_returnToStepAfterEdit != null) {
         _step = _returnToStepAfterEdit!;
         _returnToStepAfterEdit = null;
@@ -507,7 +514,14 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     if (!mounted || picked == null) {
       return;
     }
-    setState(() => _profileImage = picked);
+    final optimized = await optimizePublicImage(
+      picked,
+      maxDimension: kAvatarMaxDimension,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _profileImage = optimized);
   }
 
   void _removeProfileImage() {
@@ -526,7 +540,14 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
     if (!mounted || picked == null) {
       return;
     }
-    setState(() => entry.images = [...entry.images, picked]);
+    final optimized = await optimizePublicImage(
+      picked,
+      maxDimension: kMediumImageMaxDimension,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => entry.images = [...entry.images, optimized]);
   }
 
   void _removeServiceImage(_ServiceEntry entry, int index) {
@@ -696,6 +717,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             onRemoveImage: (imgIndex) =>
                 _removeServiceImage(_serviceEntries[i], imgIndex),
             onRemoveEntry: () => _removeServiceEntry(_serviceEntries[i]),
+            providerName: _icNameController.text,
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
@@ -1042,6 +1064,14 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
             ),
             const SizedBox(height: 4),
             const Text('e.g. 12 345 6789', style: _regHelperStyle),
+            const SizedBox(height: AppSpacing.lg),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => emailSwiperSupport(subject: 'Help with registration'),
+                icon: const Icon(Icons.email_outlined, size: 18),
+                label: const Text('Need help? Contact Support'),
+              ),
+            ),
           ],
         );
       case _ProviderStep.phoneOtp:
@@ -1222,6 +1252,20 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         return;
       }
 
+      // Mandatory, non-skippable — provider registration is not security-
+      // complete until this succeeds. The device is marked trusted server-
+      // side only once the PIN is actually saved (see
+      // /api/auth/pin/create), never before. Provider accounts hold
+      // identity documents and earnings, so this matters at least as much
+      // here as for customers.
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const CreatePinScreen(canSkip: false)),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() => _step = _ProviderStep.submitted);
     } catch (error) {
       if (!mounted) {
@@ -1284,12 +1328,10 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         'country': _countryController.text.trim(),
         'serviceLocation': _areaLabelController.text.trim(),
         'serviceRadius': _radiusKm.round(),
-        // Emergency contact is collected later in Profile — the provider's
-        // own verified phone satisfies the backend's required-field check
-        // in the meantime.
-        'emergencyContact': _normalizedPhone ?? _phoneController.text.trim(),
-        'emergencyContactNumber':
-            _normalizedPhone ?? _phoneController.text.trim(),
+        // Emergency contact is intentionally left empty here — it's
+        // collected later from Profile, not at registration.
+        'emergencyContact': '',
+        'emergencyContactNumber': '',
       },
       'account': {
         // No email at registration — collected and verified later in
@@ -1337,6 +1379,7 @@ class _ProviderRegisterScreenState extends State<ProviderRegisterScreen> {
         'phoneOtp': _enteredOtpCode.isEmpty
             ? const ['', '', '', '', '', '']
             : _enteredOtpCode.split(''),
+        'phoneVerificationChallengeId': _phoneVerificationChallengeId ?? '',
         'emailOtp': const ['', '', '', '', '', ''],
         'documentType': '',
         'frontImageName': '',
@@ -1781,7 +1824,6 @@ class _RegField extends StatelessWidget {
     this.validator,
     this.helperText,
     this.inputFormatters,
-    this.maxLines = 1,
     this.prefixText,
   });
 
@@ -1792,7 +1834,6 @@ class _RegField extends StatelessWidget {
   final FormFieldValidator<String>? validator;
   final String? helperText;
   final List<TextInputFormatter>? inputFormatters;
-  final int maxLines;
   final String? prefixText;
 
   @override
@@ -1808,7 +1849,6 @@ class _RegField extends StatelessWidget {
           textCapitalization: textCapitalization,
           validator: validator,
           inputFormatters: inputFormatters,
-          maxLines: maxLines,
           style: const TextStyle(fontSize: 15),
           decoration: _regDecoration(prefixText: prefixText),
         ),
@@ -2094,29 +2134,6 @@ class _ServiceEntry {
       images.isNotEmpty;
 }
 
-IconData _serviceCategoryIcon(String category) {
-  switch (category) {
-    case 'Chef':
-      return Icons.restaurant_rounded;
-    case 'Maid':
-      return Icons.cleaning_services_rounded;
-    case 'Driver':
-      return Icons.directions_car_filled_rounded;
-    case 'Tutor':
-      return Icons.menu_book_rounded;
-    case 'Cleaner':
-      return Icons.cleaning_services_rounded;
-    case 'Babysitter':
-      return Icons.child_care_rounded;
-    case 'Plumber':
-      return Icons.plumbing_rounded;
-    case 'Electrician':
-      return Icons.electrical_services_rounded;
-    default:
-      return Icons.more_horiz_rounded;
-  }
-}
-
 class _ServiceEntryCard extends StatelessWidget {
   const _ServiceEntryCard({
     required this.entry,
@@ -2127,6 +2144,7 @@ class _ServiceEntryCard extends StatelessWidget {
     required this.onPickImage,
     required this.onRemoveImage,
     required this.onRemoveEntry,
+    required this.providerName,
   });
 
   final _ServiceEntry entry;
@@ -2137,6 +2155,16 @@ class _ServiceEntryCard extends StatelessWidget {
   final VoidCallback onPickImage;
   final ValueChanged<int> onRemoveImage;
   final VoidCallback onRemoveEntry;
+  final String providerName;
+
+  String _generateAboutText() {
+    return generateServiceAboutText(
+      providerName: providerName,
+      yearsExperience: entry.experienceController.text,
+      category: entry.category ?? '',
+      specialties: entry.specialties,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2179,56 +2207,13 @@ class _ServiceEntryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          const Text('Service Category', style: _regLabelStyle),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: categories.map((category) {
-              final selected = entry.category == category;
-              return InkWell(
-                onTap: () {
-                  entry.category = category;
-                  onChanged();
-                },
-                borderRadius: BorderRadius.circular(_regFieldRadius),
-                child: Container(
-                  width: 84,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: selected ? AppColors.primarySoft : Colors.white,
-                    borderRadius: BorderRadius.circular(_regFieldRadius),
-                    border: Border.all(
-                      color: selected ? AppColors.primary : AppColors.border,
-                      width: selected ? 1.4 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _serviceCategoryIcon(category),
-                        color: selected
-                            ? AppColors.primary
-                            : AppColors.textSecondary,
-                        size: 22,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        category,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: selected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+          ServiceCategoryPicker(
+            categories: categories,
+            selectedCategory: entry.category,
+            onSelect: (category) {
+              entry.category = category;
+              onChanged();
+            },
           ),
           const SizedBox(height: AppSpacing.md),
           _RegField(
@@ -2238,9 +2223,10 @@ class _ServiceEntryCard extends StatelessWidget {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: AppSpacing.md),
-          _SpecialtyChipField(
+          SpecialtyChipField(
             specialties: entry.specialties,
             onChanged: onChanged,
+            category: entry.category,
           ),
           const SizedBox(height: AppSpacing.md),
           _MultiImagePickerCard(
@@ -2252,12 +2238,34 @@ class _ServiceEntryCard extends StatelessWidget {
             onRemove: onRemoveImage,
           ),
           const SizedBox(height: AppSpacing.md),
-          _RegField(
-            label: 'About the Service',
+          Row(
+            children: [
+              const Expanded(
+                child: Text('About the Service', style: _regLabelStyle),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  entry.aboutController.text = _generateAboutText();
+                  onChanged();
+                },
+                icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                label: const Text('Auto-generate'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
             controller: entry.aboutController,
             maxLines: 3,
-            helperText: 'Optional',
+            style: const TextStyle(fontSize: 15),
+            decoration: _regDecoration(),
           ),
+          const SizedBox(height: 4),
+          const Text('Optional', style: _regHelperStyle),
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
@@ -2286,100 +2294,6 @@ class _ServiceEntryCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SpecialtyChipField extends StatefulWidget {
-  const _SpecialtyChipField({
-    required this.specialties,
-    required this.onChanged,
-  });
-
-  final List<String> specialties;
-  final VoidCallback onChanged;
-
-  @override
-  State<_SpecialtyChipField> createState() => _SpecialtyChipFieldState();
-}
-
-class _SpecialtyChipFieldState extends State<_SpecialtyChipField> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _commitPending() {
-    final raw = _controller.text.trim();
-    _controller.clear();
-    if (raw.isEmpty) {
-      return;
-    }
-    final normalized = raw.toLowerCase();
-    final isDuplicate = widget.specialties.any(
-      (existing) => existing.toLowerCase() == normalized,
-    );
-    if (isDuplicate) {
-      return;
-    }
-    setState(() => widget.specialties.add(raw));
-    widget.onChanged();
-  }
-
-  void _removeAt(int index) {
-    setState(() => widget.specialties.removeAt(index));
-    widget.onChanged();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Specialities', style: _regLabelStyle),
-        const SizedBox(height: 6),
-        if (widget.specialties.isNotEmpty) ...[
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: List.generate(widget.specialties.length, (index) {
-              return Chip(
-                label: Text(widget.specialties[index]),
-                deleteIcon: const Icon(Icons.close_rounded, size: 15),
-                onDeleted: () => _removeAt(index),
-                backgroundColor: AppColors.primarySoft,
-                side: BorderSide.none,
-                labelStyle: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 8),
-        ],
-        TextField(
-          controller: _controller,
-          onChanged: (value) {
-            if (value.endsWith(',')) {
-              _controller.text = value.substring(0, value.length - 1);
-              _commitPending();
-            }
-          },
-          onSubmitted: (_) => _commitPending(),
-          style: const TextStyle(fontSize: 15),
-          decoration: _regDecoration(),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Type a specialty, then a comma to add it — e.g. Deep tissue, Prenatal, Sports massage.',
-          style: _regHelperStyle,
-        ),
-      ],
     );
   }
 }

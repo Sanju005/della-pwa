@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ResourcePage } from "./resource-page";
+import { StatusBadge } from "../components/status-badge";
 import { buildComplaintStats, listComplaintsWithFallback } from "../lib/admin-complaints";
 import type { ComplaintRow } from "../types";
 
@@ -48,7 +49,11 @@ export function ComplaintsPage() {
         { key: "customer", label: "Customer" },
         { key: "owner", label: "Owner" },
         { key: "status", label: "Status" },
-        { key: "priority", label: "Priority" },
+        {
+          key: "priority",
+          label: "Priority",
+          render: (row) => <StatusBadge status={row.priority} />,
+        },
         { key: "updated", label: "Updated" },
       ]}
       statusKey="status"

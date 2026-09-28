@@ -17,6 +17,23 @@ import type {
   UserReviewItem,
 } from "../types";
 
+type ProviderVerificationFields = {
+  phone_verified?: boolean | null;
+  email_verified?: boolean | null;
+  identity_verified?: boolean | null;
+  kyc_verified?: boolean | null;
+  background_check_verified?: boolean | null;
+  document_type?: string | null;
+  document_front_url?: string | null;
+  document_back_url?: string | null;
+  identity_document_type?: string | null;
+  identity_front_image_url?: string | null;
+  identity_back_image_url?: string | null;
+  created_at?: string | null;
+  reviewed_at?: string | null;
+  last_reviewed_at?: string | null;
+};
+
 type ProviderProfileRow = {
   id: string;
   marketing_name?: string | null;
@@ -53,38 +70,7 @@ type ProviderProfileRow = {
         provider_service_specialties?: Array<{ specialty?: string | null }> | null;
       }>
     | null;
-  provider_verifications?:
-    | {
-        phone_verified?: boolean | null;
-        identity_verified?: boolean | null;
-        kyc_verified?: boolean | null;
-        background_check_verified?: boolean | null;
-        document_type?: string | null;
-        document_front_url?: string | null;
-        document_back_url?: string | null;
-        identity_document_type?: string | null;
-        identity_front_image_url?: string | null;
-        identity_back_image_url?: string | null;
-        created_at?: string | null;
-        reviewed_at?: string | null;
-        last_reviewed_at?: string | null;
-      }
-    | Array<{
-        phone_verified?: boolean | null;
-        identity_verified?: boolean | null;
-        kyc_verified?: boolean | null;
-        background_check_verified?: boolean | null;
-        document_type?: string | null;
-        document_front_url?: string | null;
-        document_back_url?: string | null;
-        identity_document_type?: string | null;
-        identity_front_image_url?: string | null;
-        identity_back_image_url?: string | null;
-        created_at?: string | null;
-        reviewed_at?: string | null;
-        last_reviewed_at?: string | null;
-      }>
-    | null;
+  provider_verifications?: ProviderVerificationFields | ProviderVerificationFields[] | null;
 };
 
 type ProviderAccountRow = {
@@ -143,24 +129,7 @@ type ProviderAdminDebugPayload = {
     providerRegistrationSnapshot?: ProviderRegistrationSnapshot | null;
     profile?: ProviderAccountRow | null;
     providerProfile?: Omit<ProviderProfileRow, "provider_services" | "provider_verifications"> | null;
-    providerVerification?:
-      | {
-          phone_verified?: boolean | null;
-          email_verified?: boolean | null;
-          identity_verified?: boolean | null;
-          kyc_verified?: boolean | null;
-          background_check_verified?: boolean | null;
-          document_type?: string | null;
-          document_front_url?: string | null;
-          document_back_url?: string | null;
-          identity_document_type?: string | null;
-          identity_front_image_url?: string | null;
-          identity_back_image_url?: string | null;
-          created_at?: string | null;
-          reviewed_at?: string | null;
-          last_reviewed_at?: string | null;
-        }
-      | null;
+    providerVerification?: ProviderVerificationFields | null;
     providerServices?:
       | Array<{
           id?: string | null;
@@ -302,6 +271,7 @@ const providerProfileSelectWithAddress = `
   ),
   provider_verifications (
     phone_verified,
+    email_verified,
     identity_verified,
     kyc_verified,
     background_check_verified,
@@ -345,6 +315,7 @@ const providerProfileSelectBase = `
   ),
   provider_verifications (
     phone_verified,
+    email_verified,
     identity_verified,
     kyc_verified,
     background_check_verified,
@@ -684,7 +655,6 @@ function createEmptyProviderDetail(providerId: string, name?: string | null, ema
       { id: "live-pm-2", label: "Completed Tasks", value: "0", note: "0.0%", tone: "emerald" },
       { id: "live-pm-3", label: "Upcoming Tasks", value: "0", note: "Next 7 days", tone: "violet" },
       { id: "live-pm-4", label: "Active Time", value: "0h 0m", note: "Total logged hours", tone: "sky" },
-      { id: "live-pm-5", label: "Service Areas", value: "1", note: "Areas covered", tone: "amber" },
       { id: "live-pm-6", label: "Total Earnings", value: "RM0.00", note: "All time", tone: "emerald" },
       { id: "live-pm-7", label: "Withdrawn", value: "RM0.00", note: "Total withdrawn", tone: "violet" },
       { id: "live-pm-8", label: "Reviews", value: "0", note: "0.0 average", tone: "amber" },
@@ -770,12 +740,18 @@ function buildProviderPersonName(
     metadataText(authMetadata, "last_name"),
   );
 
+  // Live sources (the `profiles` table and the Auth user's own metadata,
+  // both of which the provider's own profile edits actually update) must
+  // win over `snapshot` — a one-time, never-updated capture of what was
+  // submitted at registration. Snapshot is a last-resort fallback only, for
+  // the brief window before handle_new_user/registration has written
+  // anything live yet — it must never mask a later edit.
   return (
     profileName ||
-    snapshotName ||
     metadataName ||
     account?.full_name?.trim() ||
-    metadataText(authMetadata, "full_name")
+    metadataText(authMetadata, "full_name") ||
+    snapshotName
   );
 }
 
@@ -1195,7 +1171,12 @@ function buildTaskRows(liveRows: LiveBookingRow[], customerNames: Map<string, st
 }
 
 function buildPayoutRows(livePayments: LivePaymentRow[]): ProviderPayoutRow[] {
-  return livePayments.slice(0, 5).map((row) => ({
+  // Cash payments already have their own dedicated "Cash" table above this
+  // list, so including them here too just duplicates the same rows.
+  return livePayments
+    .filter((row) => row.payment_method?.trim().toLowerCase() !== "cash")
+    .slice(0, 5)
+    .map((row) => ({
     id: row.id.startsWith("#") ? row.id : `#${row.id.slice(0, 8).toUpperCase()}`,
     type: row.payment_method?.trim() || "Payment",
     amount: formatCurrency(row.amount ?? 0),
@@ -1248,7 +1229,7 @@ function buildCommissionRows(
       submittedAt: formatDateTime(row.submitted_at ?? row.reviewed_at),
       status: row.status === "paid" ? "paid" : "processing",
       proofName: row.proof_file_name?.trim() || "No slip uploaded",
-      proofUrl: await resolveAdminPaymentProofUrl(row.proof_data_url),
+      proofUrl: await resolveAdminMediaUrl("payment-proofs", row.proof_data_url, "private"),
       proofMimeType: row.proof_mime_type?.trim() || undefined,
     })),
   );
@@ -1260,24 +1241,6 @@ function isDataUrl(value: string) {
 
 function isHttpUrl(value: string) {
   return value.startsWith("http://") || value.startsWith("https://");
-}
-
-async function resolveAdminPaymentProofUrl(value?: string | null) {
-  const trimmed = value?.trim() ?? "";
-
-  if (!trimmed || isDataUrl(trimmed) || isHttpUrl(trimmed) || !supabase) {
-    return trimmed;
-  }
-
-  const signed = await supabase.storage
-    .from("payment-proofs")
-    .createSignedUrl(trimmed, 60 * 60);
-
-  if (signed.error || !signed.data?.signedUrl) {
-    return "";
-  }
-
-  return signed.data.signedUrl;
 }
 
 type AdminMediaBucket =
@@ -1417,7 +1380,7 @@ async function buildProviderMediaItemsFromServices(
   });
 
   const bucket = kind === "work" ? "provider-work-images" : "certificates";
-  const visibility = kind === "work" ? "public" : "private";
+  const visibility = "public";
 
   const resolved = await Promise.all(
     items.map(async (item) => ({
@@ -1451,7 +1414,11 @@ async function buildCommissionRowsFromPayments(
         submittedAt: formatDateTime(row.company_payment_requested_at ?? row.created_at),
         status: row.company_payment_status === "paid" ? "paid" : "processing",
         proofName: row.provider_company_payment_proof_file_name?.trim() || "No slip uploaded",
-        proofUrl: await resolveAdminPaymentProofUrl(row.provider_company_payment_proof_data_url),
+        proofUrl: await resolveAdminMediaUrl(
+          "payment-proofs",
+          row.provider_company_payment_proof_data_url,
+          "private",
+        ),
         proofMimeType: row.provider_company_payment_proof_mime_type?.trim() || undefined,
       })),
   );
@@ -1514,9 +1481,8 @@ function buildMetrics(
     { id: "lpm-2", label: "Completed Tasks", value: String(completedTasks), note: completionRate, tone: "emerald" },
     { id: "lpm-3", label: "Upcoming Tasks", value: String(upcomingTasks), note: "Next 7 days", tone: "violet" },
     fallbackMetrics[3] ?? { id: "lpm-4", label: "Active Time", value: "0h 0m", note: "Total logged hours", tone: "sky" },
-    { id: "lpm-5", label: "Service Areas", value: String(serviceAreaCount || 1), note: "Areas covered", tone: "amber" },
     { id: "lpm-6", label: "Total Earnings", value: formatCurrency(totalEarnings), note: "All time", tone: "emerald" },
-    fallbackMetrics[6] ?? { id: "lpm-7", label: "Withdrawn", value: "RM0.00", note: "Total withdrawn", tone: "violet" },
+    fallbackMetrics[5] ?? { id: "lpm-7", label: "Withdrawn", value: "RM0.00", note: "Total withdrawn", tone: "violet" },
     {
       id: "lpm-8",
       label: "Reviews",
@@ -1528,21 +1494,24 @@ function buildMetrics(
 }
 
 export async function listProvidersWithFallback() {
+  // Mock data is only a legitimate stand-in when there's no real backend to
+  // talk to at all. Once Supabase is configured, a failed or empty live
+  // query must return an honest empty result — silently substituting mock
+  // rows made a real admin unable to tell a genuinely empty/broken query
+  // apart from live data.
+  if (!isSupabaseConfigured) {
+    return mockProviders;
+  }
+
   const liveProfiles = await fetchProviderProfiles();
 
   if (!liveProfiles?.length) {
-    return mockProviders;
+    return [];
   }
 
   const liveAccounts = await Promise.all(liveProfiles.map((profile) => fetchProviderAccountById(profile.id)));
   const latestTaskDates = await fetchLatestTaskDatesByProvider(liveProfiles.map((profile) => profile.id));
-  const liveRows = liveProfiles.map((profile, index) => mapProviderRow(profile, liveAccounts[index] ?? null, latestTaskDates));
-  const seen = new Set(liveRows.flatMap((row) => [row.id.trim().toLowerCase(), row.provider.trim().toLowerCase()]));
-  const mockRemainder = mockProviders.filter(
-    (row) => !seen.has(row.id.trim().toLowerCase()) && !seen.has(row.provider.trim().toLowerCase())
-  );
-
-  return [...liveRows, ...mockRemainder];
+  return liveProfiles.map((profile, index) => mapProviderRow(profile, liveAccounts[index] ?? null, latestTaskDates));
 }
 
 export function buildProviderStats(rows: ProviderRow[]) {
@@ -1779,6 +1748,12 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
     approvalStatus: formatStatus(liveProfile.approval_status),
     backgroundCheck: verification?.background_check_verified ? "Verified" : fallback.backgroundCheck,
     kycStatus: verification?.kyc_verified || verification?.identity_verified ? "Verified" : fallback.kycStatus,
+    emailVerified: Boolean(effectiveLiveAccount?.email?.trim()) && Boolean(verification?.email_verified),
+    phoneVerified: Boolean(verification?.phone_verified),
+    serviceRadiusKm:
+      typeof liveProfile.service_radius_km === "number"
+        ? `${liveProfile.service_radius_km} km`
+        : fallback.serviceRadiusKm ?? "Not set",
     memberSince: formatDate(effectiveLiveAccount?.created_at) || fallback.memberSince,
     completedJobs:
       taskRows?.completedTaskRows.length ? String(taskRows.completedTaskRows.length) : fallback.completedJobs,
@@ -1843,7 +1818,8 @@ export async function getProviderProfileWithFallback(providerId: string): Promis
           ];
         })
         .filter(
-          (item): item is { id: string; label: string; serviceLabel?: string } => Boolean(item),
+          (item): item is { id: string; label: string; serviceLabel: string | undefined } =>
+            Boolean(item),
         )
         .slice(0, 24),
     documents: [
@@ -1918,6 +1894,27 @@ export async function suspendProvider(providerId: string, reason: string) {
 
   if (error) {
     return { error: error.message || "Unable to suspend provider." };
+  }
+
+  return { error: null };
+}
+
+export async function sendProviderPasswordReset(email: string) {
+  if (!supabase) {
+    return { error: "Supabase is not configured." };
+  }
+
+  const trimmedEmail = email.trim();
+  if (!trimmedEmail || trimmedEmail.toLowerCase() === "no email") {
+    return { error: "This provider has no email on file to send a reset link to." };
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+    redirectTo: `${APP_BASE_URL}/reset-password`,
+  });
+
+  if (error) {
+    return { error: error.message || "Unable to send password reset email." };
   }
 
   return { error: null };
@@ -2060,11 +2057,13 @@ export async function deleteProviderIdentityDocument(
   providerId: string,
   side: IdentityDocumentSide,
   documentType?: string,
+  note?: string,
 ) {
   return postProviderIdentityDocumentAction(providerId, {
     action: "delete",
     side,
     documentType,
+    note,
   });
 }
 
@@ -2155,123 +2154,44 @@ export async function markCompanyPaymentReceived(
     return { error: "Received amount is required." };
   }
 
-  if (submissionId.startsWith("payment:")) {
-    const paymentId = submissionId.slice("payment:".length).trim();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-    if (!paymentId) {
-      return { error: "Company payment reference is invalid." };
+  if (!session?.access_token) {
+    return { error: "Admin session is required." };
+  }
+
+  // Goes through the backend's service-role client rather than writing to
+  // `payments`/`provider_company_payment_submissions` directly from this
+  // browser session — direct UPDATE on `payments` was revoked from the
+  // `authenticated` role by a September 2026 lockdown migration, which made
+  // the old direct-write version of this function fail on every real
+  // approval.
+  try {
+    const response = await fetch(
+      `${APP_BASE_URL}/api/admin/company-payments/${encodeURIComponent(submissionId)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ providerId, receivedAmount: safeAmount }),
+      },
+    );
+    const result = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      return { error: result.error || "Unable to mark company payment as received." };
     }
-
-    const { data: paymentRow, error: paymentReadError } = await supabase
-      .from("payments")
-      .select("id, provider_id, company_payment_submission_id")
-      .eq("id", paymentId)
-      .eq("provider_id", providerId)
-      .maybeSingle();
-
-    if (paymentReadError || !paymentRow) {
-      return { error: paymentReadError?.message || "Company payment row was not found." };
-    }
-
-    const { error: paymentUpdateError } = await supabase
-      .from("payments")
-      .update({
-        company_payment_status: "paid",
-        admin_company_received_amount: safeAmount,
-        company_paid_at: new Date().toISOString(),
-      })
-      .eq("id", paymentId)
-      .eq("provider_id", providerId);
-
-    if (paymentUpdateError) {
-      return { error: paymentUpdateError.message || "Unable to mark company payment as received." };
-    }
-
-    // Modern rows carry a link back to the submission the provider created
-    // in Flutter. Keep that row in sync so Flutter's GET (which reads only
-    // provider_company_payment_submissions) reflects the verified state
-    // instead of staying stuck on "processing" forever. Legacy rows have no
-    // link — leave them on the payments-only behavior above.
-    const linkedSubmissionId = (paymentRow as { company_payment_submission_id?: string | null })
-      .company_payment_submission_id;
-
-    if (linkedSubmissionId) {
-      const { error: linkedSubmissionUpdateError } = await supabase
-        .from("provider_company_payment_submissions")
-        .update({
-          status: "paid",
-          admin_received_amount: safeAmount,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", linkedSubmissionId)
-        .eq("provider_id", providerId);
-
-      if (linkedSubmissionUpdateError) {
-        return {
-          error:
-            linkedSubmissionUpdateError.message ||
-            "Payment was recorded but the linked submission could not be updated.",
-        };
-      }
-    }
-
-    await supabase.from("notifications").insert({
-      user_id: providerId,
-      booking_id: null,
-      notification_type: "company_payment_received",
-      title: "Company payment approved",
-      body: `Admin recorded RM ${safeAmount.toFixed(2)} and marked your company payment as received.`,
-    });
 
     return { error: null };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Unable to mark company payment as received.",
+    };
   }
-
-  const { data: submissionRow, error: submissionReadError } = await supabase
-    .from("provider_company_payment_submissions")
-    .select("id, provider_id")
-    .eq("id", submissionId)
-    .eq("provider_id", providerId)
-    .maybeSingle();
-
-  if (submissionReadError || !submissionRow) {
-    return { error: submissionReadError?.message || "Company payment submission was not found." };
-  }
-
-  const { error: submissionUpdateError } = await supabase
-    .from("provider_company_payment_submissions")
-    .update({
-      status: "paid",
-      admin_received_amount: safeAmount,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", submissionId)
-    .eq("provider_id", providerId);
-
-  if (submissionUpdateError) {
-    return { error: submissionUpdateError.message || "Unable to mark company payment as received." };
-  }
-
-  const { error: paymentUpdateError } = await supabase
-    .from("payments")
-    .update({
-      company_payment_status: "paid",
-    })
-    .eq("provider_id", providerId)
-    .eq("company_payment_submission_id", submissionId);
-
-  if (paymentUpdateError) {
-    return { error: paymentUpdateError.message || "Submission saved but linked payable rows could not be updated." };
-  }
-
-  await supabase.from("notifications").insert({
-    user_id: providerId,
-    booking_id: null,
-    notification_type: "company_payment_received",
-    title: "Company payment approved",
-    body: `Admin recorded RM ${safeAmount.toFixed(2)} and marked your company payment as received.`,
-  });
-
-  return { error: null };
 }
 
 export async function updateProviderAvailability(

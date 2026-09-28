@@ -140,17 +140,24 @@ export function PillBadge({
 
 export function TableShell({
   title,
+  description,
   action,
   children,
 }: {
   title: string;
+  description?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-[24px] border border-[#E7ECE7] bg-white px-4 py-4 shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-display text-[1.1rem] font-bold text-slate-950">{title}</h3>
+        <div>
+          <h3 className="font-display text-[1.1rem] font-bold text-slate-950">{title}</h3>
+          {description ? (
+            <p className="mt-1 text-[12px] text-slate-500">{description}</p>
+          ) : null}
+        </div>
         {action}
       </div>
       <div className="mt-4 overflow-x-auto">{children}</div>

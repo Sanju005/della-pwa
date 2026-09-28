@@ -71,6 +71,7 @@ class CustomerBookingDetail {
     required this.providerCompanyPaymentProofDataUrl,
     required this.providerCompanyPaymentProofFileName,
     required this.providerCompanyPaymentProofMimeType,
+    required this.workFinishedImages,
     required this.activitySteps,
   });
 
@@ -106,6 +107,7 @@ class CustomerBookingDetail {
   final String providerCompanyPaymentProofDataUrl;
   final String providerCompanyPaymentProofFileName;
   final String providerCompanyPaymentProofMimeType;
+  final List<String> workFinishedImages;
   final List<BookingTimelineStep> activitySteps;
 }
 
@@ -307,6 +309,10 @@ class BookingOverviewService {
           match['providerCompanyPaymentProofFileName']?.toString() ?? '',
       providerCompanyPaymentProofMimeType:
           match['providerCompanyPaymentProofMimeType']?.toString() ?? '',
+      workFinishedImages: (match['workFinishedImages'] as List<dynamic>? ?? const [])
+          .map((item) => item.toString())
+          .where((item) => item.trim().isNotEmpty)
+          .toList(growable: false),
       activitySteps: steps,
     );
   }
@@ -339,6 +345,28 @@ class BookingOverviewService {
         debugPrint(response.body);
       }
       throw Exception(_readError(body, fallback: 'Unable to confirm payment.'));
+    }
+  }
+
+  Future<void> cancelBooking(String bookingId, {String? reason}) async {
+    final accessToken = _currentAccessToken;
+    if (accessToken == null) {
+      throw Exception('Please sign in again.');
+    }
+
+    final response = await http.post(
+      Uri.parse('${AppConfig.appBaseUrl}/api/bookings/$bookingId/cancel'),
+      headers: _authHeaders(accessToken),
+      body: jsonEncode(<String, dynamic>{'reason': reason ?? ''}),
+    );
+
+    final body = _decode(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (kDebugMode) {
+        debugPrint('Cancel booking request failed: ${response.statusCode}');
+        debugPrint(response.body);
+      }
+      throw Exception(_readError(body, fallback: 'Unable to cancel booking.'));
     }
   }
 

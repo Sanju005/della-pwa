@@ -2,6 +2,10 @@ import { payments as mockPayments } from "../data/mock-data";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import type { PaymentRow } from "../types";
 
+const APP_BASE_URL =
+  (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
+  "https://app.myswiper.my";
+
 type LivePaymentRecord = {
   id: string;
   amount?: number | null;
@@ -73,6 +77,10 @@ function isHttpUrl(value: string) {
   return value.startsWith("http://") || value.startsWith("https://");
 }
 
+// payment-proofs is a private bucket — signing goes through the backend's
+// service-role /api/admin/media-sign endpoint (same trusted path used for
+// identity-documents/certificates) instead of the admin's own anon-key
+// session, which has no direct storage.objects access to this bucket.
 async function resolvePaymentProofUrl(value?: string | null) {
   const trimmed = value?.trim() ?? "";
 
@@ -80,15 +88,34 @@ async function resolvePaymentProofUrl(value?: string | null) {
     return trimmed;
   }
 
-  const signed = await supabase.storage
-    .from("payment-proofs")
-    .createSignedUrl(trimmed, 60 * 60);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (signed.error || !signed.data?.signedUrl) {
+  if (!session?.access_token) {
     return "";
   }
 
-  return signed.data.signedUrl;
+  const response = await fetch(`${APP_BASE_URL}/api/admin/media-sign`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      bucket: "payment-proofs",
+      path: trimmed,
+      expiresInSeconds: 60 * 60,
+    }),
+  });
+
+  const result = (await response.json()) as { signedUrl?: string; error?: string };
+
+  if (!response.ok || !result.signedUrl) {
+    return "";
+  }
+
+  return result.signedUrl;
 }
 
 async function fetchProfileNames(ids: string[]) {
@@ -162,8 +189,15 @@ export async function listPaymentsWithFallback() {
     .order("created_at", { ascending: false })
     .limit(100);
 
-  if (error || !data || data.length === 0) {
-    return mockPayments;
+  if (error || !data) {
+    // Supabase is configured but the query itself failed — an honest empty
+    // result is safer than silently substituting fake payments for a real
+    // admin session.
+    return [];
+  }
+
+  if (data.length === 0) {
+    return [];
   }
 
   const paymentRows = data as LivePaymentRecord[];

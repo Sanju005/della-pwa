@@ -1,6 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+import { sendPushNotificationToUser } from "@/lib/push-notifications";
+
 import {
   getSupabaseServiceKey,
   getSupabaseUrl,
@@ -432,10 +434,17 @@ async function buildCustomerProfile(
       "Malaysia",
     emailVerified: Boolean(metadata?.email_verified),
     phoneVerified: Boolean(metadata?.phone_verified),
-    identityVerificationStatus:
-      metadata?.identity_verification_status === "processing" ||
-      metadata?.identity_verification_status === "verified" ||
-      metadata?.identity_verification_status === "rejected"
+    // customer_profiles.verified and metadata.identity_verification_status
+    // are always written together by the admin review route (see
+    // app/api/admin/customer-status/[id]/route.ts, POST), but this OR
+    // guards against the two ever silently disagreeing — the boolean wins
+    // if it's true, exactly like the provider route's
+    // normalizeIdentityVerificationStatus does.
+    identityVerificationStatus: customerProfile?.verified
+      ? "verified"
+      : metadata?.identity_verification_status === "processing" ||
+          metadata?.identity_verification_status === "verified" ||
+          metadata?.identity_verification_status === "rejected"
         ? metadata.identity_verification_status
         : "pending",
     identityDocumentType:
@@ -553,6 +562,7 @@ export async function GET(request: Request) {
         verified.profile,
         customerProfile,
         {
+          ...verified.authUser.user_metadata,
           email: verified.authUser.email ?? "",
           phone: verified.authUser.phone ?? "",
         },
@@ -602,6 +612,11 @@ type UpdatePayload = {
   // client can never assert its own verified status. The only way these
   // flip to true is server-side, via a successful call to
   // /api/auth/otp/verify (see lib/otp-verification.ts).
+  // identityVerificationStatus: only "processing" is ever honored from the
+  // client (self-report: "I submitted documents"); "verified"/"rejected"
+  // are ignored, since no trusted admin/backend flow exists yet to set
+  // them for customers (see SWIPER_CRITICAL_SECURITY_REMEDIATION.md,
+  // SWP-012). `verified` below is never accepted from the client at all.
   identityVerificationStatus?: "pending" | "processing" | "verified" | "rejected";
   identityDocumentType?: "ic" | "passport";
   identityFrontImageUrl?: string;
@@ -675,9 +690,12 @@ export async function PATCH(request: Request) {
     : (currentCustomerProfile?.identity_document_type === "ic" || currentCustomerProfile?.identity_document_type === "passport"
         ? currentCustomerProfile.identity_document_type
         : null);
-  const verifiedFlag = payload.verified !== undefined
-    ? payload.verified
-    : (currentCustomerProfile?.verified ?? false);
+  // payload.verified is intentionally never trusted — there is currently no
+  // trusted server/admin flow that sets a customer's KYC-verified state at
+  // all (see identityVerificationStatus below and the SWP-012 writeup in
+  // SWIPER_CRITICAL_SECURITY_REMEDIATION.md), so this always preserves
+  // whatever is already stored rather than accepting a client assertion.
+  const verifiedFlag = currentCustomerProfile?.verified ?? false;
   const completion = typeof payload.completion === "number" && Number.isFinite(payload.completion)
     ? payload.completion
     : (currentCustomerProfile?.completion ?? 80);
@@ -778,9 +796,13 @@ export async function PATCH(request: Request) {
       // never taken from the client payload (see UpdatePayload above).
       email_verified: Boolean(currentMetadata.email_verified),
       phone_verified: Boolean(currentMetadata.phone_verified),
+      // "processing" (self-report: "I submitted documents") is the only
+      // client-settable value — "verified"/"rejected" require a trusted
+      // admin/backend flow, which does not exist yet for customers (see
+      // SWIPER_CRITICAL_SECURITY_REMEDIATION.md, SWP-012).
       identity_verification_status:
-        typeof payload.identityVerificationStatus === "string"
-          ? payload.identityVerificationStatus
+        payload.identityVerificationStatus === "processing"
+          ? "processing"
           : typeof currentMetadata.identity_verification_status === "string"
             ? currentMetadata.identity_verification_status
             : "pending",
@@ -847,6 +869,7 @@ export async function PATCH(request: Request) {
   }
 
   if (payload.identityVerificationStatus === "processing") {
+    const customerTitle = "Identity verification submitted";
     const customerMessage =
       "Your IC / Passport successfully submitted for verification. It will take up to 24 hours to activate.";
 
@@ -854,24 +877,53 @@ export async function PATCH(request: Request) {
       user_id: verified.profile.id,
       booking_id: null,
       notification_type: "identity_verification_submitted",
-      title: "Identity verification submitted",
+      title: customerTitle,
       body: customerMessage,
     });
+
+    try {
+      await sendPushNotificationToUser(verified.profile.id, {
+        title: customerTitle,
+        body: customerMessage,
+        path: "/profile/verification/identity",
+        type: "booking",
+        event: "identity_verification_submitted",
+      });
+    } catch (pushError) {
+      console.error("[Profile update] Failed to send customer push notification:", pushError);
+    }
 
     const { data: adminProfiles } = await verified.adminClient
       .from("profiles")
       .select("id")
-      .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+      .in("role", ["super_admin"]);
 
     if (adminProfiles?.length) {
+      const adminTitle = "Customer identity verification submitted";
+      const adminBody = `${fullName || verified.profile.full_name?.trim() || "A customer"} submitted IC / Passport for verification review.`;
+
       await verified.adminClient.from("notifications").insert(
         adminProfiles.map((admin) => ({
           user_id: admin.id,
           booking_id: null,
           notification_type: "identity_verification_submitted",
-          title: "Customer identity verification submitted",
-          body: `${fullName || verified.profile.full_name?.trim() || "A customer"} submitted IC / Passport for verification review.`,
+          title: adminTitle,
+          body: adminBody,
         })),
+      );
+
+      await Promise.all(
+        adminProfiles.map((admin) =>
+          sendPushNotificationToUser(admin.id, {
+            title: adminTitle,
+            body: adminBody,
+            path: "/admin/customers",
+            type: "booking",
+            event: "identity_verification_submitted",
+          }).catch((pushError) => {
+            console.error("[Profile update] Failed to send admin push notification:", pushError);
+          })
+        ),
       );
     }
   }
@@ -907,8 +959,8 @@ export async function PATCH(request: Request) {
               email_verified: Boolean(currentMetadata.email_verified),
               phone_verified: Boolean(currentMetadata.phone_verified),
               identity_verification_status:
-                typeof payload.identityVerificationStatus === "string"
-                  ? payload.identityVerificationStatus
+                payload.identityVerificationStatus === "processing"
+                  ? "processing"
                   : typeof currentMetadata.identity_verification_status === "string"
                     ? currentMetadata.identity_verification_status
                     : "pending",
@@ -920,9 +972,7 @@ export async function PATCH(request: Request) {
               email_verified: false,
               phone_verified: false,
               identity_verification_status:
-                typeof payload.identityVerificationStatus === "string"
-                  ? payload.identityVerificationStatus
-                  : "pending",
+                payload.identityVerificationStatus === "processing" ? "processing" : "pending",
               identity_document_type: identityDocumentType ?? "",
             },
         firstName,

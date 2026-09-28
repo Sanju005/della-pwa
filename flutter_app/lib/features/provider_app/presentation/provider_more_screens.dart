@@ -7,10 +7,14 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/animation/app_motion.dart';
 import '../../../core/routing/app_routes.dart';
+import '../../../core/utils/phone_number.dart';
+import '../../../core/utils/support_contact.dart';
 import '../../../services/browser_file_picker.dart';
+import '../../../services/image_optimization_service.dart';
 import '../../../services/device_location_service.dart';
 import '../../../services/image_crop_service.dart';
 import '../../../services/otp_service.dart';
+import '../../../services/pin_service.dart';
 import '../../../services/provider_workspace_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
@@ -19,8 +23,12 @@ import '../../../widgets/loading_state.dart';
 import '../../../widgets/malaysia_state_autocomplete_field.dart';
 import '../../../widgets/profile_avatar.dart';
 import '../../../widgets/service_radius_map.dart';
+import '../../../widgets/support_dead_end_notice.dart';
 import '../../../widgets/swiper_app_bar.dart';
+import '../../../widgets/swiper_button.dart';
 import '../../../widgets/swiper_status_badge.dart';
+import '../../auth/presentation/otp_step_view.dart';
+import '../../auth/presentation/pin_step_view.dart';
 
 class ProviderCalendarScreen extends StatefulWidget {
   const ProviderCalendarScreen({super.key});
@@ -925,8 +933,15 @@ class _ProviderPersonalDetailsScreenState
     if (!mounted || picked == null) {
       return;
     }
+    final optimized = await optimizePublicImage(
+      picked,
+      maxDimension: kAvatarMaxDimension,
+    );
+    if (!mounted) {
+      return;
+    }
     setState(() {
-      _avatarFile = picked;
+      _avatarFile = optimized;
       _message = '';
       _error = '';
     });
@@ -1993,7 +2008,7 @@ class ProviderEmailVerificationScreen extends StatefulWidget {
 class _ProviderEmailVerificationScreenState
     extends State<ProviderEmailVerificationScreen> {
   static const _service = ProviderWorkspaceService();
-  static const OtpService _otpService = DevelopmentOtpService();
+  static final RealOtpService _otpService = RealOtpService(purpose: 'email');
   late Future<ProviderWorkspaceProfile> _future;
   final _emailController = TextEditingController();
   final _otpController = TextEditingController();
@@ -2029,9 +2044,6 @@ class _ProviderEmailVerificationScreenState
     final email = _emailController.text.trim();
     setState(() => _verifying = true);
     try {
-      // The dev OTP service keys off a normalized-phone-shaped string in its
-      // interface, but only checks the code value — reusing it here for
-      // email avoids a second parallel OTP mechanism.
       final matched = await _otpService.verifyOtp(
         email,
         _otpController.text.trim(),
@@ -2045,7 +2057,11 @@ class _ProviderEmailVerificationScreenState
         return;
       }
 
-      await _service.updateProfile(email: email, emailVerified: true);
+      await _service.updateProfile(
+        email: email,
+        emailVerified: true,
+        emailVerificationChallengeId: _otpService.lastChallengeId,
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2094,6 +2110,26 @@ class _ProviderEmailVerificationScreenState
   }
 }
 
+enum _ProviderPhoneChangeStep {
+  display,
+  pin,
+  currentOtp,
+  checkingRecoveryEmail,
+  currentEmailOtp,
+  noRecoveryOption,
+  newPhone,
+  newOtp,
+}
+
+/// Secure phone-number change for providers, mirroring
+/// [CustomerPhoneVerificationScreen] exactly: requires an authenticated
+/// session, the account's own Swiper PIN, a fresh OTP to the CURRENT phone,
+/// and a fresh OTP to the NEW phone before anything is touched. The old
+/// version of this screen never called any real API at all (it just
+/// flipped local booleans and showed a snackbar) — this replaces it with
+/// the same `/api/profile/phone/change` flow customers already have, since
+/// that endpoint is role-agnostic (keyed off the session's user id, not
+/// role).
 class ProviderPhoneVerificationScreen extends StatefulWidget {
   const ProviderPhoneVerificationScreen({super.key});
 
@@ -2105,71 +2141,496 @@ class ProviderPhoneVerificationScreen extends StatefulWidget {
 class _ProviderPhoneVerificationScreenState
     extends State<ProviderPhoneVerificationScreen> {
   static const _service = ProviderWorkspaceService();
-  late Future<ProviderWorkspaceProfile> _future;
-  final _phoneController = TextEditingController();
-  final _otpController = TextEditingController();
-  bool _otpSent = false;
-  int _countdown = 30;
-  String _notice = '';
+  static const _pinService = PinService();
+  final _currentPhoneOtpService = RealOtpService(purpose: 'phone_change_current');
+  final _currentEmailOtpService = RealOtpService(purpose: 'email');
+  final _newPhoneOtpService = RealOtpService(purpose: 'phone_change_new');
+  final _newPhoneController = TextEditingController();
+  final _newCountryCodeController = TextEditingController(text: '60');
+
+  _ProviderPhoneChangeStep _step = _ProviderPhoneChangeStep.display;
+  bool _saving = false;
+  bool _sendingCode = false;
+  String _error = '';
+  ProviderWorkspaceProfile? _profile;
+  String? _currentPhoneChallengeId;
+  String? _currentEmailChallengeId;
+  String? _recoveryEmail;
+  String? _normalizedNewPhone;
+  String? _pendingPin;
 
   @override
   void initState() {
     super.initState();
-    _future = _service.fetchProfile();
+    _load();
   }
 
   @override
   void dispose() {
-    _phoneController.dispose();
-    _otpController.dispose();
+    _newPhoneController.dispose();
+    _newCountryCodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final profile = await _service.fetchProfile();
+      if (!mounted) return;
+      setState(() => _profile = profile);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  void _beginChange() {
+    setState(() {
+      _error = '';
+      _step = _ProviderPhoneChangeStep.pin;
+    });
+  }
+
+  Future<void> _handlePinSubmitted(String pin) async {
+    _pendingPin = pin;
+    setState(() => _step = _ProviderPhoneChangeStep.currentOtp);
+    await _currentPhoneOtpService.sendOtp(_profile?.phone ?? '');
+  }
+
+  Future<void> _handleCurrentPhoneVerified(String code) async {
+    _currentPhoneChallengeId = _currentPhoneOtpService.lastChallengeId;
+    if (_currentPhoneChallengeId == null) {
+      setState(() {
+        _step = _ProviderPhoneChangeStep.pin;
+        _error = 'Verification expired. Please try again.';
+      });
+      return;
+    }
+    setState(() => _step = _ProviderPhoneChangeStep.newPhone);
+  }
+
+  /// "I don't have access to my current number" — checks whether this
+  /// account has a verified recovery email that can stand in for the
+  /// current-phone OTP instead. Never a silent bypass: no email on file
+  /// means no self-service path at all, same posture as the login-time
+  /// account-recovery flow.
+  Future<void> _checkLostNumberRecovery() async {
+    setState(() {
+      _error = '';
+      _step = _ProviderPhoneChangeStep.checkingRecoveryEmail;
+    });
+    try {
+      final email = await _pinService.fetchPhoneChangeRecoveryEmail();
+      if (!mounted) return;
+      if (email == null || email.isEmpty) {
+        setState(() => _step = _ProviderPhoneChangeStep.noRecoveryOption);
+        return;
+      }
+      _recoveryEmail = email;
+      setState(() => _step = _ProviderPhoneChangeStep.currentEmailOtp);
+      await _currentEmailOtpService.sendOtp(email);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _step = _ProviderPhoneChangeStep.currentOtp;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _handleCurrentEmailVerified(String code) async {
+    _currentEmailChallengeId = _currentEmailOtpService.lastChallengeId;
+    if (_currentEmailChallengeId == null) {
+      setState(() {
+        _step = _ProviderPhoneChangeStep.pin;
+        _error = 'Verification expired. Please try again.';
+      });
+      return;
+    }
+    setState(() => _step = _ProviderPhoneChangeStep.newPhone);
+  }
+
+  Future<void> _sendNewPhoneOtp() async {
+    // Must match the server's own normalizePhone() exactly (strips a
+    // redundant leading 0/country code) — otherwise the OTP challenge gets
+    // created for a different target string than what /api/profile/phone/
+    // change later checks against, and the change silently fails at the
+    // very last step no matter how correct the code entered was.
+    final normalized = normalizePhoneNumber(
+      _newCountryCodeController.text,
+      _newPhoneController.text,
+    );
+    if (normalized == null) {
+      setState(() => _error = 'Enter a valid new mobile number.');
+      return;
+    }
+    setState(() {
+      _sendingCode = true;
+      _error = '';
+    });
+    try {
+      _normalizedNewPhone = normalized;
+      await _newPhoneOtpService.sendOtp(normalized);
+      if (!mounted) return;
+      setState(() => _step = _ProviderPhoneChangeStep.newOtp);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _sendingCode = false);
+      }
+    }
+  }
+
+  Future<void> _handleNewPhoneVerified(String code) async {
+    final newPhoneChallengeId = _newPhoneOtpService.lastChallengeId;
+    final pin = _pendingPin;
+    final currentPhoneChallengeId = _currentPhoneChallengeId;
+    final currentEmailChallengeId = _currentEmailChallengeId;
+    if (newPhoneChallengeId == null ||
+        pin == null ||
+        (currentPhoneChallengeId == null && currentEmailChallengeId == null)) {
+      setState(() {
+        _step = _ProviderPhoneChangeStep.pin;
+        _error = 'Something expired. Please start over.';
+      });
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = '';
+    });
+    try {
+      await _pinService.changePhoneNumber(
+        pin: pin,
+        currentPhoneChallengeId: currentPhoneChallengeId,
+        currentEmailChallengeId: currentEmailChallengeId,
+        newPhoneCountryCode:
+            '+${_newCountryCodeController.text.replaceAll(RegExp(r'\D'), '')}',
+        newPhoneNumber: _newPhoneController.text.trim(),
+        newPhoneChallengeId: newPhoneChallengeId,
+      );
+      final profile = await _service.fetchProfile();
+      if (!mounted) return;
+      setState(() => _profile = profile);
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _step = _ProviderPhoneChangeStep.pin;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return _ProviderOtpVerificationScaffold(
-      title: 'Phone Verification',
-      description: 'Add your phone number and verify it with a one-time code.',
-      future: _future,
-      fieldLabel: 'Phone Number',
-      fieldHint: 'Enter phone number',
-      keyboardType: TextInputType.phone,
-      leadingPrefix: const Text(
-        '+60',
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+    final profile = _profile;
+    if (profile == null && _error.isEmpty) {
+      return const Scaffold(
+        appBar: SwiperAppBar(
+          title: 'Phone Verification',
+          subtitle: 'Verify your saved phone number',
+          showBack: true,
         ),
+        body: LoadingState(label: 'Loading phone verification...'),
+      );
+    }
+
+    if (profile == null) {
+      return Scaffold(
+        appBar: const SwiperAppBar(
+          title: 'Phone Verification',
+          subtitle: 'Verify your saved phone number',
+          showBack: true,
+        ),
+        body: EmptyState(
+          title: 'Unable to load profile',
+          subtitle: _error,
+          icon: Icons.error_outline_rounded,
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: const SwiperAppBar(
+        title: 'Phone Verification',
+        subtitle: 'Verify your saved phone number',
+        showBack: true,
       ),
-      statusSelector: (profile) => profile.phoneVerified,
-      onSeedValue: (profile) {
-        if (_phoneController.text.isEmpty) {
-          _phoneController.text = profile.phone.replaceFirst(
-            RegExp(r'^\+?60\s?'),
-            '',
-          );
-        }
-      },
-      fieldController: _phoneController,
-      otpController: _otpController,
-      otpSent: _otpSent,
-      countdown: _countdown,
-      idleMessage: 'We sent a 6-digit code by SMS',
-      notice: _notice,
-      onSendOtp: () => setState(() {
-        _otpSent = true;
-        _countdown = 30;
-        _notice = 'We sent a 6-digit code by SMS to your phone.';
-      }),
-      onVerify: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Phone verification submitted successfully.'),
+      body: ListView(
+        padding: AppSpacing.screenPadding,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: SwiperStatusBadge(
+              label: profile.phoneVerified ? 'Verified' : 'Pending',
+              tone: profile.phoneVerified
+                  ? SwiperStatusTone.success
+                  : SwiperStatusTone.warning,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'Phone Verification',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1F1630),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            _step == _ProviderPhoneChangeStep.display
+                ? 'Changing your phone number requires your Swiper PIN, plus a fresh OTP to both your current and new number.'
+                : _stepDescription(profile),
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF7B728A),
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFEDE7F6)),
+            ),
+            child: _buildStepBody(profile),
+          ),
+          if (_saving) ...[
+            const SizedBox(height: AppSpacing.md),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: AppSpacing.sm),
+                Text('Saving...', style: TextStyle(fontSize: 13, color: Color(0xFF6F6681))),
+              ],
+            ),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          _notice(
+            'Changing your number requires your Swiper PIN and a fresh code sent to both your current and new phone — this protects your account even if someone else later receives calls/SMS on your old number.',
+            AppColors.textSecondary,
+            const Color(0xFFF5F2FB),
+          ),
+          if (_error.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _notice(_error, AppColors.error, const Color(0xFFFFF1F2)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _stepDescription(ProviderWorkspaceProfile profile) {
+    switch (_step) {
+      case _ProviderPhoneChangeStep.pin:
+        return 'Enter your Swiper Security PIN to continue.';
+      case _ProviderPhoneChangeStep.currentOtp:
+        return 'Enter the 6-digit code sent to your current number, ${profile.phone}.';
+      case _ProviderPhoneChangeStep.checkingRecoveryEmail:
+        return 'Checking your account for a verified recovery email...';
+      case _ProviderPhoneChangeStep.currentEmailOtp:
+        return 'Enter the 6-digit code sent to your recovery email, ${_recoveryEmail ?? ''}.';
+      case _ProviderPhoneChangeStep.noRecoveryOption:
+        return '';
+      case _ProviderPhoneChangeStep.newPhone:
+        return 'Enter the new phone number you want to use.';
+      case _ProviderPhoneChangeStep.newOtp:
+        return 'Enter the 6-digit code sent to your new number.';
+      case _ProviderPhoneChangeStep.display:
+        return '';
+    }
+  }
+
+  Widget _buildStepBody(ProviderWorkspaceProfile profile) {
+    switch (_step) {
+      case _ProviderPhoneChangeStep.display:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Current number',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(profile.phone),
+            const SizedBox(height: AppSpacing.lg),
+            SwiperButton(label: 'Change phone number', onPressed: _beginChange),
+          ],
+        );
+      case _ProviderPhoneChangeStep.pin:
+        return PinStepView(
+          key: const ValueKey('provider-phone-change-pin'),
+          title: '',
+          subtitle: '',
+          onSubmit: _handlePinSubmitted,
+        );
+      case _ProviderPhoneChangeStep.currentOtp:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            OtpStepView(
+              key: const ValueKey('provider-current-phone-otp'),
+              contactValue: profile.phone,
+              otpService: _currentPhoneOtpService,
+              onVerified: _handleCurrentPhoneVerified,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Center(
+              child: TextButton(
+                onPressed: _checkLostNumberRecovery,
+                child: const Text("I don't have access to my current number"),
+              ),
+            ),
+          ],
+        );
+      case _ProviderPhoneChangeStep.checkingRecoveryEmail:
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
         );
-        Navigator.of(context).pop();
-      },
-    );
+      case _ProviderPhoneChangeStep.currentEmailOtp:
+        return OtpStepView(
+          key: ValueKey('provider-current-email-otp-$_recoveryEmail'),
+          contactValue: _recoveryEmail ?? '',
+          otpService: _currentEmailOtpService,
+          onVerified: _handleCurrentEmailVerified,
+        );
+      case _ProviderPhoneChangeStep.noRecoveryOption:
+        return const SupportDeadEndNotice(
+          message:
+              "This account has no verified recovery email on file, so we can't confirm your identity without your current phone.",
+          emailSubject: 'Help changing my phone number',
+        );
+      case _ProviderPhoneChangeStep.newPhone:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Builder(
+                          builder: (context) {
+                            final matched = matchCountryCode(
+                              _newCountryCodeController.text,
+                            );
+                            if (matched == null) {
+                              return const Icon(
+                                Icons.public_rounded,
+                                size: 18,
+                                color: AppColors.textMuted,
+                              );
+                            }
+                            return Text(
+                              matched.flag,
+                              style: const TextStyle(fontSize: 18),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          '+',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 34,
+                          child: TextField(
+                            controller: _newCountryCodeController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 4,
+                            enableInteractiveSelection: false,
+                            onChanged: (_) => setState(() {}),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                            decoration: const InputDecoration(
+                              counterText: '',
+                              filled: false,
+                              isCollapsed: true,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              focusedErrorBorder: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: TextField(
+                      controller: _newPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(hintText: 'New phone number'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SwiperButton(
+              label: 'Send OTP',
+              isLoading: _sendingCode,
+              onPressed: _sendingCode ? null : _sendNewPhoneOtp,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Center(
+              child: TextButton.icon(
+                onPressed: () =>
+                    emailSwiperSupport(subject: 'Help changing my phone number'),
+                icon: const Icon(Icons.email_outlined, size: 18),
+                label: const Text('Need help? Contact Support'),
+              ),
+            ),
+          ],
+        );
+      case _ProviderPhoneChangeStep.newOtp:
+        return OtpStepView(
+          key: ValueKey(_normalizedNewPhone),
+          contactValue: _normalizedNewPhone ?? '',
+          otpService: _newPhoneOtpService,
+          onVerified: _handleNewPhoneVerified,
+        );
+    }
   }
 }
 
@@ -2266,7 +2727,7 @@ class _ProviderIdentityVerificationScreenState
       if (!mounted) {
         return;
       }
-      Navigator.of(context).pop();
+      await Navigator.of(context).maybePop();
     } catch (error) {
       if (!mounted) {
         return;
@@ -2287,7 +2748,8 @@ class _ProviderIdentityVerificationScreenState
         subtitle: 'Upload identity documents for review',
         showBack: true,
       ),
-      body: FutureBuilder<ProviderWorkspaceProfile>(
+      body: SafeArea(
+        child: FutureBuilder<ProviderWorkspaceProfile>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -2500,6 +2962,7 @@ class _ProviderIdentityVerificationScreenState
             ],
           );
         },
+        ),
       ),
     );
   }

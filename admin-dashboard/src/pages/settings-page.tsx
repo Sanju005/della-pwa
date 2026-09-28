@@ -16,7 +16,7 @@ const settingsGroups = [
     items: [
       "Review approval queues before exposing new provider listings.",
       "Use complaints and reviews to monitor trust and quality signals.",
-      "Keep payout review tightly scoped to finance and management roles.",
+      "All admin roles (super_admin, admin, manager, customer_care) currently share full payment and payout access — there is no separate finance-only role.",
     ],
   },
   {

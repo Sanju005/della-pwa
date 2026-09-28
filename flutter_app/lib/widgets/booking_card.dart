@@ -5,6 +5,7 @@ import '../core/config/app_config.dart';
 import '../models/booking_item.dart';
 import '../previews/widget_preview_helpers.dart';
 import '../theme/app_spacing.dart';
+import 'cached_image.dart';
 import 'swiper_status_badge.dart';
 
 class BookingCard extends StatelessWidget {
@@ -116,12 +117,12 @@ class _BookingProviderAvatar extends StatelessWidget {
     if (imageUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: Image.network(
-          imageUrl,
+        child: CachedImage(
+          url: imageUrl,
           width: 64,
           height: 64,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallbackAvatar(context),
+          errorWidget: (_, _) => _fallbackAvatar(context),
         ),
       );
     }

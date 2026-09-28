@@ -3,13 +3,10 @@ import {
   Ban,
   CalendarDays,
   CheckCircle2,
-  CreditCard,
-  FileClock,
   FileText,
   KeyRound,
   Mail,
   MapPin,
-  MonitorSmartphone,
   Phone,
   Shield,
   ShieldCheck,
@@ -33,6 +30,8 @@ import { userDetailRecords } from "../data/user-detail-mocks";
 import {
   getUserProfileWithFallback,
   reactivateCustomer,
+  sendCustomerPasswordReset,
+  setCustomerIdentityVerified,
   suspendCustomer,
 } from "../lib/admin-users";
 import type { DashboardBooking, PaymentRow, UserDetailRecord } from "../types";
@@ -52,7 +51,6 @@ const metricIcons = [
   <CheckCircle2 className="size-5" />,
   <Ban className="size-5" />,
   <Wallet className="size-5" />,
-  <CreditCard className="size-5" />,
   <Star className="size-5" />,
   <FileText className="size-5" />,
 ];
@@ -143,6 +141,8 @@ export function UserProfilePage() {
   const [status, setStatus] = useState(record?.status ?? "Active");
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [identityNote, setIdentityNote] = useState("");
+  const [verifyingIdentity, setVerifyingIdentity] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -245,7 +245,61 @@ export function UserProfilePage() {
     flash("User restored.");
   }
 
+  async function handleResetPassword() {
+    setSaving(true);
+    const result = await sendCustomerPasswordReset(detail.email);
+    setSaving(false);
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    flash(`Password reset email sent to ${detail.email}.`);
+  }
+
+  async function reloadUserProfile() {
+    const payload = await getUserProfileWithFallback(userId);
+    setRecord(payload.detail);
+    setRelatedBookings(payload.relatedBookings);
+    setRelatedPayments(payload.relatedPayments);
+  }
+
+  async function handleIdentityVerification(verified: boolean) {
+    if (verifyingIdentity || !record) {
+      return;
+    }
+
+    if (!verified && !identityNote.trim()) {
+      flash("Please add a reason before rejecting this customer's identity documents.");
+      return;
+    }
+
+    setVerifyingIdentity(true);
+    const result = await setCustomerIdentityVerified(
+      record.userId,
+      verified,
+      identityNote.trim() || undefined,
+    );
+    setVerifyingIdentity(false);
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    setIdentityNote("");
+    await reloadUserProfile();
+    flash(verified ? "Identity documents verified." : "Identity verification rejected.");
+  }
+
   function renderOverview() {
+    // The Bookings/Payments/Reviews tabs already show the full lists — these
+    // are just a quick-glance preview, not a second copy of the same data.
+    const overviewBookings = relatedBookings.slice(0, 5);
+    const overviewPayments = relatedPayments.slice(0, 5);
+    const overviewReviews = recentReviews.slice(0, 5);
+
     return (
       <>
         <section className="grid gap-4 xl:grid-cols-[1.02fr_1.28fr_1.02fr]">
@@ -261,10 +315,7 @@ export function UserProfilePage() {
               </div>
             </SurfaceCard>
 
-            <SurfaceCard
-              title="Saved Addresses"
-              action={<button className="text-xs font-semibold text-emerald-700">View all</button>}
-            >
+            <SurfaceCard title="Saved Addresses">
               <div className="space-y-4">
                 {detail.addresses.map((address) => (
                   <div key={address.id} className="flex items-start justify-between gap-3">
@@ -293,6 +344,7 @@ export function UserProfilePage() {
                 {[
                   ["Email Verification", emailStatus, detail.emailVerifiedAt],
                   ["Phone Verification", phoneStatus, detail.phoneVerifiedAt],
+                  ["Identity Verification (KYC)", detail.identityVerificationStatus, detail.kycVerifiedAt],
                 ].map(([label, statusValue, date]) => {
                   const normalizedStatus = normalizeVerificationStatus(statusValue);
 
@@ -307,6 +359,67 @@ export function UserProfilePage() {
                 )})}
               </div>
             </SurfaceCard>
+
+            {detail.role !== "provider" ? (
+              <SurfaceCard title="Identity Documents (KYC Review)">
+                <div className="space-y-4">
+                  {detail.identityDocuments && detail.identityDocuments.length > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {detail.identityDocuments.map((doc) => (
+                        <div key={doc.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                          {isPdfDataUrl(doc.previewUrl) ? (
+                            <div className="grid h-40 place-items-center text-sm font-semibold text-slate-500">
+                              PDF document
+                            </div>
+                          ) : (
+                            <img src={doc.previewUrl} alt={doc.label} className="h-40 w-full object-cover" />
+                          )}
+                          <p className="px-3 py-2 text-[12px] font-semibold text-slate-600">{doc.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">This customer hasn't submitted identity documents yet.</p>
+                  )}
+
+                  {detail.identityReviewNote ? (
+                    <p className="rounded-xl bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                      Last admin note: {detail.identityReviewNote}
+                    </p>
+                  ) : null}
+
+                  {detail.identityDocuments && detail.identityDocuments.length > 0 ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={identityNote}
+                        onChange={(event) => setIdentityNote(event.target.value)}
+                        placeholder="Reason (required to reject, optional to approve)"
+                        rows={2}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-400"
+                      />
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          disabled={verifyingIdentity || detail.identityVerificationStatus === "verified"}
+                          onClick={() => void handleIdentityVerification(true)}
+                          className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          disabled={verifyingIdentity || detail.identityVerificationStatus === "rejected"}
+                          onClick={() => void handleIdentityVerification(false)}
+                          className="flex-1 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </SurfaceCard>
+            ) : null}
           </div>
 
           <div className="space-y-4">
@@ -324,43 +437,24 @@ export function UserProfilePage() {
                   <span className="text-slate-500">Member Since</span>
                   <span className="font-medium text-slate-900">{detail.joined}</span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Last Login</span>
-                  <span className="font-medium text-slate-900">{detail.lastLogin}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Login Count</span>
-                  <span className="font-medium text-slate-900">{detail.loginCount}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Failed Login Attempts</span>
-                  <span className="font-medium text-slate-900">{detail.failedLogins}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Two Factor Auth</span>
-                  <span className="font-medium text-slate-900">{detail.twoFactorAuth}</span>
-                </div>
-              </div>
-            </SurfaceCard>
-
-            <SurfaceCard title="Recent Actions">
-              <div className="space-y-3">
-                {detail.recentActions.map((action) => (
-                  <div key={action.id} className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm text-slate-700">
-                      <FileClock className="size-4 text-slate-400" />
-                      <span>{action.label}</span>
-                    </div>
-                    <span className="text-[12px] text-slate-400">{action.time}</span>
-                  </div>
-                ))}
               </div>
             </SurfaceCard>
           </div>
         </section>
 
         <section className="grid gap-4 xl:grid-cols-3">
-          <TableShell title="Recent Bookings" action={<button className="text-xs font-semibold text-emerald-700">View all bookings</button>}>
+          <TableShell
+            title="Recent Bookings"
+            action={
+              <button
+                type="button"
+                onClick={() => setActiveTab("Bookings")}
+                className="text-xs font-semibold text-emerald-700"
+              >
+                View all bookings
+              </button>
+            }
+          >
             <table className="min-w-full text-left text-[13px]">
               <thead>
                 <tr className="border-b border-slate-100 text-slate-400">
@@ -373,7 +467,7 @@ export function UserProfilePage() {
                 </tr>
               </thead>
               <tbody>
-                {relatedBookings.map((booking) => (
+                {overviewBookings.map((booking) => (
                   <tr key={booking.id} className="border-b border-slate-50 align-top">
                     <td className="py-3 font-semibold text-emerald-700">{booking.id}</td>
                     <td className="py-3 text-slate-700">{booking.service}</td>
@@ -387,7 +481,18 @@ export function UserProfilePage() {
             </table>
           </TableShell>
 
-          <TableShell title="Recent Payments" action={<button className="text-xs font-semibold text-emerald-700">View all payments</button>}>
+          <TableShell
+            title="Recent Payments"
+            action={
+              <button
+                type="button"
+                onClick={() => setActiveTab("Payments")}
+                className="text-xs font-semibold text-emerald-700"
+              >
+                View all payments
+              </button>
+            }
+          >
             <table className="min-w-full text-left text-[13px]">
               <thead>
                 <tr className="border-b border-slate-100 text-slate-400">
@@ -399,7 +504,7 @@ export function UserProfilePage() {
                 </tr>
               </thead>
               <tbody>
-                {relatedPayments.map((payment) => (
+                {overviewPayments.map((payment) => (
                   <tr key={payment.id} className="border-b border-slate-50 align-top">
                     <td className="py-3 font-semibold text-slate-700">{payment.id}</td>
                     <td className="py-3 text-slate-700">{payment.method}</td>
@@ -412,7 +517,18 @@ export function UserProfilePage() {
             </table>
           </TableShell>
 
-          <TableShell title="Recent Reviews" action={<button className="text-xs font-semibold text-emerald-700">View all reviews</button>}>
+          <TableShell
+            title="Recent Reviews"
+            action={
+              <button
+                type="button"
+                onClick={() => setActiveTab("Reviews")}
+                className="text-xs font-semibold text-emerald-700"
+              >
+                View all reviews
+              </button>
+            }
+          >
             {recentReviews.length ? (
               <table className="min-w-full text-left text-[13px]">
                 <thead>
@@ -424,7 +540,7 @@ export function UserProfilePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentReviews.map((review) => (
+                  {overviewReviews.map((review) => (
                     <tr key={review.id} className="border-b border-slate-50 align-top">
                       <td className="py-3 text-slate-700">{review.provider}</td>
                       <td className="py-3"><ReviewStars rating={review.rating} /></td>
@@ -608,34 +724,6 @@ export function UserProfilePage() {
                     <p className="mt-1 font-medium text-slate-900">{detail.registeredAt}</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-0.5 size-4 text-slate-400" />
-                  <div>
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Last Login</p>
-                    <p className="mt-1 font-medium text-slate-900">{detail.lastLogin}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MonitorSmartphone className="mt-0.5 size-4 text-slate-400" />
-                  <div>
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Device</p>
-                    <p className="mt-1 font-medium text-slate-900">{detail.device}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MapPin className="mt-0.5 size-4 text-slate-400" />
-                  <div>
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">IP Address</p>
-                    <p className="mt-1 font-medium text-slate-900">{detail.ipAddress}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FileText className="mt-0.5 size-4 text-slate-400" />
-                  <div>
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Referrer</p>
-                    <p className="mt-1 font-medium text-slate-900">{detail.referrer}</p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -652,7 +740,7 @@ export function UserProfilePage() {
             </button>
             <button
               type="button"
-              onClick={() => flash("Password reset link sent.")}
+              onClick={() => void handleResetPassword()}
               disabled={saving}
               className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 px-5 py-3 text-sm font-semibold text-blue-700"
             >

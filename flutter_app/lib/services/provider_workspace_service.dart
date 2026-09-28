@@ -34,6 +34,7 @@ class ProviderWorkspaceServiceModel {
     required this.yearsExperience,
     required this.hourlyRate,
     required this.dailyRate,
+    required this.aboutService,
     required this.specialties,
     required this.imageDataUrls,
     required this.imageCaptions,
@@ -46,6 +47,7 @@ class ProviderWorkspaceServiceModel {
   final String yearsExperience;
   final double hourlyRate;
   final double dailyRate;
+  final String aboutService;
   final List<String> specialties;
   final List<String> imageDataUrls;
   final List<String> imageCaptions;
@@ -59,6 +61,7 @@ class ProviderWorkspaceServiceModel {
       yearsExperience: json['yearsExperience'] as String? ?? '',
       hourlyRate: (json['hourlyRate'] as num?)?.toDouble() ?? 0,
       dailyRate: (json['dailyRate'] as num?)?.toDouble() ?? 0,
+      aboutService: json['aboutService'] as String? ?? '',
       specialties: _providerWorkspaceStringList(json['specialties']),
       imageDataUrls: _providerWorkspaceStringList(json['imageDataUrls']),
       imageCaptions: _providerWorkspaceStringList(json['imageCaptions']),
@@ -934,6 +937,7 @@ class ProviderWorkspaceService {
     String? gender,
     String? email,
     bool? emailVerified,
+    String? emailVerificationChallengeId,
     String? phone,
     String? avatarUrl,
     String? marketingName,
@@ -964,6 +968,9 @@ class ProviderWorkspaceService {
     if (gender != null) payload['gender'] = gender;
     if (email != null) payload['email'] = email;
     if (emailVerified != null) payload['emailVerified'] = emailVerified;
+    if (emailVerificationChallengeId != null) {
+      payload['emailVerificationChallengeId'] = emailVerificationChallengeId;
+    }
     if (phone != null) payload['phone'] = phone;
     if (avatarUrl != null) payload['avatarUrl'] = avatarUrl;
     if (marketingName != null) payload['marketingName'] = marketingName;
@@ -1264,6 +1271,7 @@ class ProviderWorkspaceService {
     required List<String> specialties,
     required List<String> imageDataUrls,
     required List<String> imageCaptions,
+    String aboutService = '',
     List<String> certificateDataUrls = const [],
     List<String> certificateCaptions = const [],
   }) async {
@@ -1275,6 +1283,7 @@ class ProviderWorkspaceService {
         'yearsExperience': yearsExperience,
         'hourlyRate': hourlyRate,
         'dailyRate': dailyRate,
+        'aboutService': aboutService,
         'specialties': specialties,
         'imageDataUrls': imageDataUrls,
         'imageCaptions': imageCaptions,
@@ -1296,6 +1305,7 @@ class ProviderWorkspaceService {
     required List<String> specialties,
     required List<String> imageDataUrls,
     required List<String> imageCaptions,
+    String aboutService = '',
     List<String> certificateDataUrls = const [],
     List<String> certificateCaptions = const [],
   }) async {
@@ -1306,6 +1316,7 @@ class ProviderWorkspaceService {
         'yearsExperience': yearsExperience,
         'hourlyRate': hourlyRate,
         'dailyRate': dailyRate,
+        'aboutService': aboutService,
         'specialties': specialties,
         'imageDataUrls': imageDataUrls,
         'imageCaptions': imageCaptions,

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
 import { createOtpChallenge, type OtpPurpose } from "@/lib/otp-verification";
+import { checkAndRecordRateLimit } from "@/lib/auth-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ async function resolveOptionalUserId(
   }
 }
 
-type SendPayload = { purpose?: OtpPurpose; target?: string };
+type SendPayload = { purpose?: OtpPurpose; target?: string; context?: string };
 
 export async function POST(request: Request) {
   const adminClient = getAdminSupabaseClient();
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
   const purpose = payload.purpose;
   const target = payload.target?.trim() ?? "";
 
-  if (purpose !== "phone" && purpose !== "email") {
+  const validPurposes: OtpPurpose[] = ["phone", "email", "phone_change_current", "phone_change_new"];
+  if (!purpose || !validPurposes.includes(purpose)) {
     return NextResponse.json({ error: "Invalid verification purpose." }, { status: 400 });
   }
 
@@ -73,6 +75,55 @@ export async function POST(request: Request) {
   }
 
   const userId = await resolveOptionalUserId(adminClient, request);
+
+  if (payload.context === "register" && purpose === "phone") {
+    const { data: existingProfile } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("phone", target)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return NextResponse.json(
+        { error: "An account already exists with this phone number. Try logging in instead." },
+        { status: 409 },
+      );
+    }
+  }
+
+  // "phone_change_new" only ever means "prove control of the number I want
+  // to switch to" — unlike plain "phone", this purpose is never shared with
+  // login/registration, so it's safe to always check here (no separate
+  // context flag needed). Same conflict check /api/profile/phone/change
+  // does at the end, just surfaced before wasting an OTP send.
+  if (purpose === "phone_change_new") {
+    const { data: existingProfile } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("phone", target)
+      .maybeSingle();
+
+    if (existingProfile && existingProfile.id !== userId) {
+      return NextResponse.json(
+        { error: "That phone number is already linked to another account." },
+        { status: 409 },
+      );
+    }
+  }
+
+  const rateLimit = await checkAndRecordRateLimit(adminClient, `otp_send:${purpose}:${target}`, {
+    maxAttempts: 5,
+    windowMinutes: 15,
+    lockoutMinutes: 15,
+  });
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many verification codes requested. Please try again later." },
+      { status: 429 },
+    );
+  }
+
   const result = await createOtpChallenge(adminClient, { purpose, target, userId });
 
   if (!result.ok) {

@@ -1,13 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 
-export type AdminRole =
-  | "super_admin"
-  | "admin"
-  | "manager"
-  | "customer_care"
-  | "customer"
-  | "provider"
-  | string;
+// Swiper uses only super_admin/provider/customer as real roles today — admin,
+// manager, and customer_care were never assigned to any live account (see
+// SWIPER_CRITICAL_SECURITY_REMEDIATION.md in the repo root). The `| string`
+// fallback stays so this type never needs to reject whatever the database
+// actually returns.
+export type AdminRole = "super_admin" | "customer" | "provider" | string;
 
 export type AdminProfile = {
   id: string;
@@ -263,6 +261,9 @@ export type UserDetailRecord = {
   emailVerifiedAt: string;
   phoneVerifiedAt: string;
   kycVerifiedAt: string;
+  identityDocumentType?: string;
+  identityReviewNote?: string;
+  identityDocuments?: ProviderIdentityDocument[];
   addresses: UserAddress[];
   timeline: UserTimelineItem[];
   recentActions: UserActionItem[];
@@ -392,6 +393,9 @@ export type ProviderDetailRecord = {
   approvalStatus: string;
   backgroundCheck: string;
   kycStatus: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  serviceRadiusKm?: string;
   memberSince: string;
   device: string;
   completedJobs: string;

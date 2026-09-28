@@ -9,25 +9,47 @@ import '../../../repositories/demo_repository.dart';
 import '../../../services/provider_detail_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
+import '../../../widgets/cached_image.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/loading_state.dart';
 import '../../../widgets/provider_card.dart';
 import '../../../widgets/swiper_button.dart';
 import '../../../widgets/swiper_app_bar.dart';
 
-class ProviderProfileScreen extends StatelessWidget {
+class ProviderProfileScreen extends StatefulWidget {
   const ProviderProfileScreen({
     super.key,
     required this.repository,
   });
 
   final DemoRepository repository;
+
+  @override
+  State<ProviderProfileScreen> createState() => _ProviderProfileScreenState();
+}
+
+class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   static const _detailService = ProviderDetailService();
+
+  ProviderSummary? _provider;
+  Future<ProviderDetailModel>? _detailFuture;
 
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments;
     final provider = args is ProviderSummary ? args : null;
+
+    // Only re-fetch when the route actually hands us a different provider —
+    // not on every rebuild (theme changes, ancestor setState, navigation
+    // transition frames), which previously re-issued the network call and
+    // could rotate the profile/gallery image URLs mid-session for no reason.
+    if (provider != null && provider != _provider) {
+      _provider = provider;
+      _detailFuture = _detailService.fetchProviderDetail(
+        id: provider.id,
+        service: provider.serviceKey,
+      );
+    }
 
     return Scaffold(
       appBar: const SwiperAppBar(
@@ -74,10 +96,7 @@ class ProviderProfileScreen extends StatelessWidget {
               icon: Icons.storefront_outlined,
             )
           : FutureBuilder<ProviderDetailModel>(
-              future: _detailService.fetchProviderDetail(
-                id: provider.id,
-                service: provider.serviceKey,
-              ),
+              future: _detailFuture,
               builder: (context, snapshot) {
                 Widget child;
                 if (snapshot.connectionState != ConnectionState.done) {
@@ -108,13 +127,12 @@ class ProviderProfileScreen extends StatelessWidget {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(22),
                               child: detail.profileImage.trim().isNotEmpty
-                                  ? Image.network(
-                                      _resolveImageUrl(detail.profileImage),
+                                  ? CachedImage(
+                                      url: _resolveImageUrl(detail.profileImage),
                                       width: 118,
                                       height: 162,
                                       fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
+                                      errorWidget: (context, error) =>
                                           _profileFallback(detail),
                                     )
                                   : _profileFallback(detail),
@@ -282,11 +300,11 @@ class ProviderProfileScreen extends StatelessWidget {
                                       children: [
                                         Positioned.fill(
                                           child: imageSrc.isNotEmpty
-                                              ? Image.network(
-                                                  imageSrc,
+                                              ? CachedImage(
+                                                  url: imageSrc,
                                                   fit: BoxFit.cover,
-                                                  errorBuilder:
-                                                      (context, error, stackTrace) {
+                                                  errorWidget:
+                                                      (context, error) {
                                                     return const Center(
                                                       child: Icon(
                                                         Icons

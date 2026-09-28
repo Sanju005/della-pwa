@@ -34,10 +34,10 @@ class ProviderDashboardScreen extends StatefulWidget {
 
   @override
   State<ProviderDashboardScreen> createState() =>
-      _ProviderDashboardScreenState();
+      ProviderDashboardScreenState();
 }
 
-class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
+class ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     with SingleTickerProviderStateMixin {
   static const _workspaceService = ProviderWorkspaceService();
 
@@ -94,6 +94,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     super.dispose();
   }
 
+  /// Called by the shell when the Home tab becomes active again (e.g. after
+  /// editing something on the Profile tab and switching back) — the
+  /// existing 30s auto-refresh timer already keeps this eventually
+  /// consistent, but a stale name/avatar/task list for up to 30s right
+  /// after an edit is confusing, so this makes the correction immediate.
+  Future<void> refresh() => _loadDashboard(isInitial: false);
+
   Future<void> _loadDashboard({required bool isInitial}) async {
     try {
       final results = await Future.wait<Object>([
@@ -146,6 +153,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         final dashboard = _data!;
         final workspace = dashboard.workspace;
         final profile = workspace.profile;
+
+        if (profile.accountStatus.toLowerCase() == 'suspended') {
+          return _ProviderDisabledView(
+            onRefresh: () => _loadDashboard(isInitial: false),
+          );
+        }
+
         final bookings = workspace.bookings;
         final reviews = dashboard.reviews;
         final unreadMessages = dashboard.threads.fold<int>(
@@ -202,10 +216,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           0,
           (sum, booking) => sum + booking.quotedAmount,
         );
-        final companyPayable = paidBookings.fold<double>(
-          0,
-          (sum, booking) => sum + booking.companyCommissionAmount,
-        );
+        // Excludes anything already settled with the company — without
+        // this, a booking's commission stayed in this total forever, even
+        // after the provider submitted the payment slip and admin approved
+        // it (companyPaymentStatus becomes "paid"), so the card never went
+        // down no matter how much was actually paid.
+        final companyPayable = paidBookings
+            .where((booking) => booking.companyPaymentStatus != 'paid')
+            .fold<double>(0, (sum, booking) => sum + booking.companyCommissionAmount);
         final todayEarnings = todayBookings
             .where((booking) => _isCompletedStatus(booking.bookingStatus))
             .fold<double>(0, (sum, booking) => sum + booking.quotedAmount);
@@ -1895,6 +1913,103 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       'declined_by_provider',
       'cancelled',
     ].contains(status);
+  }
+}
+
+/// Shown in place of the normal dashboard when the provider's account has
+/// been disabled by an admin. The provider can still log in and reach this
+/// screen (per product decision) — it just blocks the working dashboard
+/// until an admin reinstates the account.
+class _ProviderDisabledView extends StatelessWidget {
+  const _ProviderDisabledView({required this.onRefresh});
+
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(color: AppColors.background),
+      child: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: onRefresh,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          height: 84,
+                          width: 84,
+                          decoration: BoxDecoration(
+                            color: AppColors.errorSurface,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: const Icon(
+                            Icons.block_rounded,
+                            size: 40,
+                            color: AppColors.error,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Account Disabled',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Your provider account has been disabled by our '
+                          'admin team. You are not visible to customers and '
+                          'cannot accept new bookings while this is in effect.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        SizedBox(
+                          width: double.infinity,
+                          child: SwiperButton(
+                            label: 'Message Support',
+                            onPressed: () => Navigator.of(
+                              context,
+                            ).pushNamed(AppRoutes.providerMessages),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => onRefresh(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(color: AppColors.border),
+                              minimumSize: const Size.fromHeight(46),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text('Check Status Again'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -22,6 +22,16 @@ export function normalizeBookingWorkflowStatus(status: string | null | undefined
       return "accepted";
     case "canceled":
       return "cancelled";
+    // "declined" (above) is the legacy string this same case list once
+    // mapped from. Every real decline written today
+    // (app/api/provider/bookings/[id]/route.ts) stores the canonical
+    // "declined_by_provider" value directly — which was never added to this
+    // pass-through list, so it fell through to the `default` case below and
+    // silently normalized back to "pending_provider_response". That is the
+    // exact bug that made a decline invisible everywhere this function is
+    // used (every booking list/detail endpoint, on both apps): the write
+    // was always correct, but every read re-labeled it back to pending.
+    case "declined_by_provider":
     case "accepted":
     case "on_the_way":
     case "arrived":

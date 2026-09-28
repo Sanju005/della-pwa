@@ -90,21 +90,29 @@ function getAdminSupabaseClient() {
   });
 }
 
+// Must produce byte-identical output to the Flutter client's own
+// normalizePhoneNumber (flutter_app/lib/core/utils/phone_number.dart) —
+// that's the target string already stored on the OTP challenge from
+// /api/auth/otp/send /verify. Diverging here (e.g. by not stripping a
+// Malaysian local-format leading 0) makes isChallengeRecentlyVerified look
+// up the wrong target and silently leave phone_verified false even for a
+// genuinely-verified phone.
 function normalizePhone(countryCode: string, phoneNumber: string) {
-  const digits = phoneNumber.replace(/[^\d]/g, "");
-  const normalizedCountryCode = countryCode.trim() || "+60";
+  const countryDigits =
+    (countryCode.trim() || "+60").replace(/[^\d]/g, "") || "60";
+  let subscriber = phoneNumber.replace(/[^\d]/g, "");
 
-  if (!digits) {
-    return normalizedCountryCode;
+  if (!subscriber) {
+    return `+${countryDigits}`;
   }
 
-  if (digits.startsWith("60")) {
-    return `+${digits}`;
+  if (subscriber.startsWith(countryDigits)) {
+    subscriber = subscriber.slice(countryDigits.length);
+  } else if (countryDigits === "60" && subscriber.startsWith("0")) {
+    subscriber = subscriber.slice(1);
   }
 
-  const countryDigits = normalizedCountryCode.replace(/[^\d]/g, "");
-
-  return `+${countryDigits}${digits}`;
+  return `+${countryDigits}${subscriber}`;
 }
 
 // Same complexity contract used by the provider/customer phone-login

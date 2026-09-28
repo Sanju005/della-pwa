@@ -128,8 +128,14 @@ class AppRouter {
           settings: settings,
         );
       case AppRoutes.providerShell:
+        final initialIndex = settings.arguments is int
+            ? settings.arguments as int
+            : 0;
         return buildAppPageRoute<void>(
-          builder: (_) => ProviderShellScreen(repository: _repository),
+          builder: (_) => ProviderShellScreen(
+            repository: _repository,
+            initialIndex: initialIndex,
+          ),
           settings: settings,
         );
       case AppRoutes.providerServices:
@@ -175,6 +181,11 @@ class AppRouter {
       case AppRoutes.providerEmergencyContact:
         return buildAppPageRoute<void>(
           builder: (_) => const ProviderEmergencyContactScreen(),
+          settings: settings,
+        );
+      case AppRoutes.providerSupportDocuments:
+        return buildAppPageRoute<void>(
+          builder: (_) => const ProviderSupportDocumentsScreen(),
           settings: settings,
         );
       case AppRoutes.providerWallet:

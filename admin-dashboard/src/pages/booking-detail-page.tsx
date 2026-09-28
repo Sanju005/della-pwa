@@ -85,9 +85,6 @@ export function BookingTaskDetails({
             <InfoRow label="Duration" value={booking.durationHours ?? "-"} icon={<Clock3 className="size-4" />} />
             <InfoRow label="Hourly Rate" value={booking.hourlyRate ?? "RM0.00"} icon={<CircleDollarSign className="size-4" />} />
             <InfoRow label="Daily Rate" value={booking.dailyRate ?? "RM0.00"} icon={<CircleDollarSign className="size-4" />} />
-            <InfoRow label="Fixed Amount" value={booking.fixedAmount ?? booking.amount} icon={<CircleDollarSign className="size-4" />} />
-            <InfoRow label="Additional Amount" value={booking.additionalAmount ?? "RM0.00"} icon={<CircleDollarSign className="size-4" />} />
-            <InfoRow label="Total Amount" value={booking.totalAmount ?? booking.amount} icon={<CircleDollarSign className="size-4" />} />
             <InfoRow label="Location" value={booking.location ?? "No location stored."} icon={<MapPin className="size-4" />} />
           </div>
 
@@ -153,12 +150,6 @@ export function BookingTaskDetails({
           </div>
 
           <MediaGrid title="Completion Images" images={booking.completionImages} empty="No completion images attached." />
-          <MediaGrid title="Customer Payment Proof" images={booking.paymentProofImages} empty="No customer payment proof attached." />
-          <MediaGrid
-            title="Provider Company Payment Proof"
-            images={booking.companyPaymentProofUrl ? [booking.companyPaymentProofUrl] : []}
-            empty="No provider company payment proof attached."
-          />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-2xl bg-[#fff8fb] px-4 py-4">

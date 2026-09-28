@@ -51,6 +51,7 @@ type ProviderCatalogRow = {
         hourly_rate: number | null;
         daily_rate: number | null;
         years_experience: string | null;
+        about_service?: string | null;
         image_data_urls?: string[] | null;
         image_captions?: string[] | null;
         provider_service_specialties: ProviderServiceSpecialtyRow[] | null;
@@ -92,6 +93,7 @@ export type ProviderListing = {
   dailyRate: number;
   yearsExperience: string;
   specialties: string[];
+  aboutService: string;
   bio: string;
   availabilityLabel: string;
   imageTone: string;
@@ -273,6 +275,7 @@ const providerCatalogSelectWithMedia = `
     hourly_rate,
     daily_rate,
     years_experience,
+    about_service,
     image_data_urls,
     image_captions,
     provider_service_specialties (
@@ -467,6 +470,7 @@ export const getProviderCatalog = cache(
                   ?.map((item) => item.specialty)
                   .filter((item): item is string => Boolean(item))
                   .slice(0, 2) ?? [],
+              aboutService: serviceRow.about_service?.trim() ?? "",
               bio: row.bio ?? "Trusted services available through DELLA.",
               availabilityLabel: computeAvailabilityLabel(
                 availabilityMap.get(row.id) ?? [],

@@ -9,23 +9,46 @@ import 'provider_jobs_screen.dart';
 import 'provider_profile_demo_screen.dart';
 
 class ProviderShellScreen extends StatefulWidget {
-  const ProviderShellScreen({super.key, required this.repository});
+  const ProviderShellScreen({
+    super.key,
+    required this.repository,
+    this.initialIndex = 0,
+  });
 
   final DemoRepository repository;
+
+  /// Which bottom-nav tab to land on. Defaults to Home (0) so every
+  /// existing call site is unaffected; a notification deep link can pass
+  /// 1 (Bookings) or 2 (Payments) to open a specific tab directly.
+  final int initialIndex;
 
   @override
   State<ProviderShellScreen> createState() => _ProviderShellScreenState();
 }
 
 class _ProviderShellScreenState extends State<ProviderShellScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex = widget.initialIndex;
+  final _dashboardKey = GlobalKey<ProviderDashboardScreenState>();
+
+  void _selectTab(int index) {
+    final enteringHome = index == 0 && _currentIndex != 0;
+    setState(() => _currentIndex = index);
+    // The Dashboard tab is kept alive in the background (its own 30s timer
+    // already keeps it eventually consistent), but switching back to it
+    // right after editing something elsewhere (e.g. your name on the
+    // Profile tab) should show the update immediately, not up to 30s late.
+    if (enteringHome) {
+      _dashboardKey.currentState?.refresh();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
       ProviderDashboardScreen(
+        key: _dashboardKey,
         repository: widget.repository,
-        onNavigateToTab: (index) => setState(() => _currentIndex = index),
+        onNavigateToTab: (index) => _selectTab(index),
       ),
       ProviderJobsScreen(repository: widget.repository),
       const ProviderEarningsScreen(),
@@ -58,7 +81,7 @@ class _ProviderShellScreenState extends State<ProviderShellScreen> {
         ),
         SwiperBottomNavItem(label: 'Profile', icon: Icons.person_rounded),
       ],
-      onTabSelected: (index) => setState(() => _currentIndex = index),
+      onTabSelected: _selectTab,
     );
   }
 }

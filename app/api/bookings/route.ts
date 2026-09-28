@@ -468,10 +468,6 @@ function getWeekdayKeyFromIsoDate(value: string) {
   }).trim().toLowerCase();
 }
 
-function startOfDay(value: Date) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-}
-
 async function validateProviderAvailabilityAndConflicts(
   adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
   providerId: string,
@@ -825,7 +821,7 @@ async function mapLiveBookingToUi(
       adminClient,
       "job-completion-images",
       Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
-      "private",
+      "public",
     ),
     cashPaymentProofImages: await resolveStoredMediaUrlList(
       adminClient,
@@ -1072,20 +1068,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const scheduledDay = startOfDay(new Date(`${scheduledDate}T00:00:00`));
-  const today = startOfDay(new Date());
-  const maxAdvanceDay = startOfDay(new Date());
-  maxAdvanceDay.setDate(maxAdvanceDay.getDate() + 30);
+  // "Today" must be Malaysia's today, not the server's (UTC) — otherwise
+  // between 00:00 and 08:00 Malaysia time a customer could book the day that
+  // just ended. All three values are YYYY-MM-DD strings, which compare
+  // correctly as plain strings.
   const nowInKl = getCurrentKualaLumpurDateTime();
+  const todayInKl = nowInKl.date;
+  const maxAdvanceDate = new Date(`${todayInKl}T00:00:00Z`);
+  maxAdvanceDate.setUTCDate(maxAdvanceDate.getUTCDate() + 30);
+  const maxAdvanceInKl = maxAdvanceDate.toISOString().slice(0, 10);
 
-  if (scheduledDay.getTime() < today.getTime()) {
+  if (scheduledDate < todayInKl) {
     return NextResponse.json(
       { error: "Bookings must be scheduled for today or a future date." },
       { status: 400 }
     );
   }
 
-  if (scheduledDay.getTime() > maxAdvanceDay.getTime()) {
+  if (scheduledDate > maxAdvanceInKl) {
     return NextResponse.json(
       { error: "Bookings can only be made up to 30 days in advance." },
       { status: 400 }
@@ -1096,6 +1096,34 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "This time has already passed. Please choose a future time today." },
       { status: 400 }
+    );
+  }
+
+  // Only approved, visible, active providers can be booked. Hiding a provider
+  // from the lists is not enough on its own — a saved link, a favourite or a
+  // direct API call would otherwise still reach a Pending/rejected/suspended
+  // provider.
+  const { data: bookableProvider } = await verified.adminClient
+    .from("provider_profiles")
+    .select("approval_status, is_visible")
+    .eq("id", payload.providerId)
+    .maybeSingle();
+  const { data: bookableAccount } = await verified.adminClient
+    .from("profiles")
+    .select("status")
+    .eq("id", payload.providerId)
+    .maybeSingle();
+  const accountStatus = (bookableAccount?.status ?? "").toString().trim().toLowerCase();
+
+  if (
+    !bookableProvider ||
+    bookableProvider.approval_status !== "approved" ||
+    bookableProvider.is_visible === false ||
+    (accountStatus !== "" && accountStatus !== "active")
+  ) {
+    return NextResponse.json(
+      { error: "This provider is not available for booking right now." },
+      { status: 400 },
     );
   }
 
@@ -1293,6 +1321,8 @@ export async function POST(request: Request) {
     body: `${verified.profile.full_name?.trim() || "A customer"} requested ${payload.serviceLabel} service.`,
     bookingId: insertedBooking.id,
     path: `/provider/dashboard?booking=${insertedBooking.id}`,
+    type: "booking",
+    event: "booking_created",
   });
 
   const booking = await mapLiveBookingToUi(

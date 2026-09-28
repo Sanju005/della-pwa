@@ -1,8 +1,31 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+import { sendPushNotificationToUser } from "@/lib/push-notifications";
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
 import { uploadStoredMedia } from "@/lib/server-media-storage";
+
+async function notifyAdminsOfCompanyPaymentSubmission(
+  adminIds: string[],
+  amount: number,
+) {
+  const title = "Company payment submitted";
+  const body = `Provider submitted RM ${amount.toFixed(2)} for company payable review.`;
+
+  await Promise.all(
+    adminIds.map((adminId) =>
+      sendPushNotificationToUser(adminId, {
+        title,
+        body,
+        path: "/admin/company-payments",
+        type: "payment",
+        event: "company_payment_submitted",
+      }).catch((pushError) => {
+        console.error("[Company payments] Failed to send admin push notification:", pushError);
+      })
+    ),
+  );
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -385,7 +408,7 @@ export async function POST(request: Request) {
     const { data: adminProfiles } = await verified.adminClient
       .from("profiles")
       .select("id")
-      .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+      .in("role", ["super_admin"]);
 
     if (adminProfiles?.length) {
       await verified.adminClient.from("notifications").insert(
@@ -396,6 +419,10 @@ export async function POST(request: Request) {
           title: "Company payment submitted",
           body: `Provider submitted RM ${depositedAmount.toFixed(2)} for company payable review.`,
         })),
+      );
+      await notifyAdminsOfCompanyPaymentSubmission(
+        adminProfiles.map((admin) => admin.id),
+        depositedAmount,
       );
     }
 
@@ -458,7 +485,7 @@ export async function POST(request: Request) {
   const { data: adminProfiles } = await verified.adminClient
     .from("profiles")
     .select("id")
-    .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+    .in("role", ["super_admin"]);
 
   if (adminProfiles?.length) {
     await verified.adminClient.from("notifications").insert(
@@ -469,6 +496,10 @@ export async function POST(request: Request) {
         title: "Company payment submitted",
         body: `Provider submitted RM ${depositedAmount.toFixed(2)} for company payable review.`,
       })),
+    );
+    await notifyAdminsOfCompanyPaymentSubmission(
+      adminProfiles.map((admin) => admin.id),
+      depositedAmount,
     );
   }
 

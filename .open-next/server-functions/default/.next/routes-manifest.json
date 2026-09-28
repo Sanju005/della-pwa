@@ -23,6 +23,14 @@
   },
   "dynamicRoutes": [
     {
+      "page": "/api/admin/company-payments/[id]",
+      "regex": "^/api/admin/company\\-payments/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/company\\-payments/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/api/admin/customer-status/[id]",
       "regex": "^/api/admin/customer\\-status/([^/]+?)(?:/)?$",
       "routeKeys": {
@@ -61,6 +69,14 @@
         "nxtPid": "nxtPid"
       },
       "namedRegex": "^/api/admin/provider\\-registration\\-debug/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/bookings/[id]/cancel",
+      "regex": "^/api/bookings/([^/]+?)/cancel(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/bookings/(?<nxtPid>[^/]+?)/cancel(?:/)?$"
     },
     {
       "page": "/api/bookings/[id]/cash-pay",
@@ -141,14 +157,6 @@
         "nxtPbookingId": "nxtPbookingId"
       },
       "namedRegex": "^/api/provider/messages/(?<nxtPbookingId>[^/]+?)(?:/)?$"
-    },
-    {
-      "page": "/api/provider/register/[id]",
-      "regex": "^/api/provider/register/([^/]+?)(?:/)?$",
-      "routeKeys": {
-        "nxtPid": "nxtPid"
-      },
-      "namedRegex": "^/api/provider/register/(?<nxtPid>[^/]+?)(?:/)?$"
     },
     {
       "page": "/api/provider/services/[id]",
@@ -268,6 +276,24 @@
       "namedRegex": "^/api/auth/otp/verify(?:/)?$"
     },
     {
+      "page": "/api/auth/pin/create",
+      "regex": "^/api/auth/pin/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/pin/create(?:/)?$"
+    },
+    {
+      "page": "/api/auth/pin/reset",
+      "regex": "^/api/auth/pin/reset(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/pin/reset(?:/)?$"
+    },
+    {
+      "page": "/api/auth/pin/reset/lookup",
+      "regex": "^/api/auth/pin/reset/lookup(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/pin/reset/lookup(?:/)?$"
+    },
+    {
       "page": "/api/auth/register/customer",
       "regex": "^/api/auth/register/customer(?:/)?$",
       "routeKeys": {},
@@ -346,6 +372,18 @@
       "namedRegex": "^/api/profile/payments(?:/)?$"
     },
     {
+      "page": "/api/profile/phone/change",
+      "regex": "^/api/profile/phone/change(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/profile/phone/change(?:/)?$"
+    },
+    {
+      "page": "/api/profile/phone/change/recovery-email",
+      "regex": "^/api/profile/phone/change/recovery\\-email(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/profile/phone/change/recovery\\-email(?:/)?$"
+    },
+    {
       "page": "/api/provider/availability",
       "regex": "^/api/provider/availability(?:/)?$",
       "routeKeys": {},
@@ -404,6 +442,12 @@
       "regex": "^/api/provider/services(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/provider/services(?:/)?$"
+    },
+    {
+      "page": "/api/provider/support-documents",
+      "regex": "^/api/provider/support\\-documents(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/provider/support\\-documents(?:/)?$"
     },
     {
       "page": "/api/providers",

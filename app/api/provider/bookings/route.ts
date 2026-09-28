@@ -609,7 +609,7 @@ export async function GET(request: Request) {
           verified.adminClient,
           "job-completion-images",
           Array.isArray(row.work_finished_images) ? row.work_finished_images : [],
-          "private",
+          "public",
         ),
         cashPaymentProofImages: await resolveStoredMediaUrlList(
           verified.adminClient,

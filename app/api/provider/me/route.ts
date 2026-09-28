@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+import { sendPushNotificationToUser } from "@/lib/push-notifications";
 import {
   getSupabaseServiceKey,
   getSupabaseUrl,
@@ -10,6 +11,7 @@ import {
   resolveStoredMediaUrlList,
   uploadStoredMedia,
 } from "@/lib/server-media-storage";
+import { isChallengeRecentlyVerified } from "@/lib/otp-verification";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +26,7 @@ type ProviderServiceRow = {
   years_experience: string | null;
   hourly_rate: number | null;
   daily_rate: number | null;
+  about_service?: string | null;
   image_data_urls?: string[] | null;
   image_captions?: string[] | null;
   certificate_data_urls?: string[] | null;
@@ -416,6 +419,7 @@ async function fetchProviderSnapshot(
       years_experience,
       hourly_rate,
       daily_rate,
+      about_service,
       image_data_urls,
       image_captions,
       certificate_data_urls,
@@ -578,9 +582,27 @@ async function buildResponse(
     visibility: "private",
   });
 
+  const fullName = profile.full_name ?? "";
+  const [derivedFirstName = "", ...derivedRestName] = fullName.split(/\s+/).filter(Boolean);
   const response = {
     providerId: profile.id,
-    fullName: profile.full_name ?? "",
+    fullName,
+    // Sourced from the same fresh, server-side Auth metadata read used
+    // throughout this response (never the client's locally cached
+    // Supabase session, which admin-API metadata writes never push to) —
+    // without these, the Flutter client's own stale-metadata fallback
+    // (ProviderWorkspaceService._hydrateProfile) could show a name from
+    // before the provider's last edit. Falls back to splitting fullName
+    // when metadata hasn't been written yet (e.g. right after registration
+    // via a path that didn't set first_name/last_name in metadata).
+    firstName:
+      typeof metadata.first_name === "string" && metadata.first_name.trim()
+        ? metadata.first_name.trim()
+        : derivedFirstName,
+    lastName:
+      typeof metadata.last_name === "string" && metadata.last_name.trim()
+        ? metadata.last_name.trim()
+        : derivedRestName.join(" "),
     email: profile.email ?? "",
     phone: profile.phone ?? "",
     emergencyContactNumber: getEmergencyContactNumber(metadata),
@@ -626,6 +648,7 @@ async function buildResponse(
         yearsExperience: service.years_experience ?? "",
         hourlyRate: Number(service.hourly_rate ?? 0),
         dailyRate: Number(service.daily_rate ?? 0),
+        aboutService: service.about_service ?? "",
         specialties:
           service.provider_service_specialties
             ?.map((item) => item.specialty)
@@ -650,7 +673,7 @@ async function buildResponse(
       adminClient,
       "certificates",
       service.certificateDataUrls,
-      "private",
+      "public",
     );
   }
 
@@ -704,7 +727,19 @@ type UpdatePayload = {
   // succeeds, and is what confirms the email on this same Supabase Auth
   // user — saving `email` alone never verifies it.
   email?: string;
+  // emailVerified is intentionally NOT trusted as an assertion — a client
+  // can never flip its own verified state. The only way this becomes true
+  // is by redeeming a real emailVerificationChallengeId from a successful
+  // POST /api/auth/otp/verify call (see isChallengeRecentlyVerified usage
+  // below). phoneVerified/identityVerified/identityVerificationStatus are
+  // handled the same way: phone/identity verification can only ever be
+  // raised by a trusted server flow (OTP redemption for phone; the
+  // super_admin-only /api/admin/provider-identity-documents review flow for
+  // identity), never by a value the client sends here. "processing" is the
+  // one exception — a provider can self-report "I submitted my documents",
+  // which only queues an admin review and grants no trust on its own.
   emailVerified?: boolean;
+  emailVerificationChallengeId?: string;
   phoneVerified?: boolean;
   identityVerified?: boolean;
   identityVerificationStatus?: "pending" | "processing" | "verified" | "rejected";
@@ -745,6 +780,18 @@ export async function PATCH(request: Request) {
     : "";
 
   const trimmedEmail = payload.email?.trim().toLowerCase();
+  // Redeem the challengeId from a real POST /api/auth/otp/verify call —
+  // payload.emailVerified itself is never trusted (mirrors the phone-login
+  // and provider-registration fixes for SWP-001/SWP-002). Matched against
+  // the exact (non-lowercased) string the client used for the OTP
+  // send/verify calls, since otp-verification.ts does no case-folding.
+  const emailVerifiedByChallenge = payload.emailVerificationChallengeId && payload.email?.trim()
+    ? await isChallengeRecentlyVerified(verified.adminClient, {
+        challengeId: payload.emailVerificationChallengeId,
+        purpose: "email",
+        target: payload.email.trim(),
+      })
+    : false;
 
   const profilePayload = Object.fromEntries(
     Object.entries({
@@ -769,9 +816,9 @@ export async function PATCH(request: Request) {
   }
 
   // Attach/confirm the email on this same Supabase Auth user. Saving the
-  // email alone (emailVerified not true) never confirms it — email_confirm
-  // only flips to true once the OTP step actually succeeds, so a later
-  // read of `authUser.email_confirmed_at` (used below for
+  // email alone never confirms it — email_confirm only flips to true when
+  // emailVerifiedByChallenge is true (a real, just-redeemed OTP challenge),
+  // so a later read of `authUser.email_confirmed_at` (used below for
   // provider_verifications.email_verified) reflects the real state, not a
   // client-asserted flag.
   if (trimmedEmail) {
@@ -779,7 +826,7 @@ export async function PATCH(request: Request) {
       verified.profile.id,
       {
         email: trimmedEmail,
-        email_confirm: payload.emailVerified === true,
+        email_confirm: emailVerifiedByChallenge,
       },
     );
 
@@ -832,16 +879,17 @@ export async function PATCH(request: Request) {
             typeof payload.emergencyContactNumber === "string"
               ? payload.emergencyContactNumber.trim()
               : getEmergencyContactNumber(currentMetadata),
+          // "verified"/"rejected" can only be set by the super_admin-only
+          // /api/admin/provider-identity-documents review flow (action:
+          // "verify"), never by this client-facing route — "processing" is
+          // the one client-settable value, meaning "I submitted documents,
+          // awaiting review", and grants no trust by itself.
           identity_verification_status:
-            typeof payload.identityVerificationStatus === "string"
-              ? payload.identityVerificationStatus
-              : typeof payload.identityVerified === "boolean"
-                ? payload.identityVerified
-                  ? "verified"
-                  : "pending"
-                : typeof currentMetadata.identity_verification_status === "string"
-                  ? currentMetadata.identity_verification_status
-                  : "pending",
+            payload.identityVerificationStatus === "processing"
+              ? "processing"
+              : typeof currentMetadata.identity_verification_status === "string"
+                ? currentMetadata.identity_verification_status
+                : "pending",
           identity_document_type:
             payload.identityDocumentType === "ic" || payload.identityDocumentType === "passport"
               ? payload.identityDocumentType
@@ -944,15 +992,17 @@ export async function PATCH(request: Request) {
           visibility: "private",
         })
       : payload.identityBackImageUrl?.trim();
+    // phone_verified/identity_verified/kyc_verified are deliberately absent
+    // here — none of them can be set by this client-facing route. phone
+    // verification has no re-verify-while-logged-in flow today; identity/kyc
+    // approval only ever happens through the super_admin-only
+    // /api/admin/provider-identity-documents review flow. Omitting a key
+    // from this upsert leaves the existing stored value untouched.
     const verificationPayload = {
-      phone_verified: payload.phoneVerified,
-      // `payload.emailVerified` reflects an update made earlier in this same
-      // request — verified.authUser was fetched before that, so it wouldn't
-      // otherwise see it until the next request.
-      email_verified:
-        payload.emailVerified === true || Boolean(verified.authUser.email_confirmed_at),
-      identity_verified: payload.identityVerified,
-      kyc_verified: payload.identityVerified,
+      // emailVerifiedByChallenge reflects a challenge redeemed earlier in
+      // this same request — verified.authUser was fetched before that, so
+      // it wouldn't otherwise see it until the next request.
+      email_verified: emailVerifiedByChallenge || Boolean(verified.authUser.email_confirmed_at),
       identity_document_type: payload.identityDocumentType,
       identity_front_image_url: storedIdentityFrontImageUrl,
       identity_back_image_url: storedIdentityBackImageUrl,
@@ -1087,6 +1137,7 @@ export async function PATCH(request: Request) {
   }
 
   if (payload.identityVerificationStatus === "processing") {
+    const providerTitle = "Identity verification submitted";
     const providerMessage =
       "Your IC / Passport successfully submitted for verification. It will take up to 24 hours to activate.";
 
@@ -1094,30 +1145,58 @@ export async function PATCH(request: Request) {
       user_id: verified.profile.id,
       booking_id: null,
       notification_type: "identity_verification_submitted",
-      title: "Identity verification submitted",
+      title: providerTitle,
       body: providerMessage,
     });
+
+    try {
+      await sendPushNotificationToUser(verified.profile.id, {
+        title: providerTitle,
+        body: providerMessage,
+        path: "/profile/verification/identity",
+        type: "booking",
+        event: "identity_verification_submitted",
+      });
+    } catch (pushError) {
+      console.error("[Provider update] Failed to send provider push notification:", pushError);
+    }
 
     const { data: adminProfiles } = await verified.adminClient
       .from("profiles")
       .select("id")
-      .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+      .in("role", ["super_admin"]);
 
     if (adminProfiles?.length) {
+      const adminTitle = "Provider identity verification submitted";
+      const adminBody = `${verified.profile.full_name?.trim() || "A provider"} submitted IC / Passport for verification review.`;
+
       await verified.adminClient.from("notifications").insert(
         adminProfiles.map((admin) => ({
           user_id: admin.id,
           booking_id: null,
           notification_type: "identity_verification_submitted",
-          title: "Provider identity verification submitted",
-          body: `${verified.profile.full_name?.trim() || "A provider"} submitted IC / Passport for verification review.`,
+          title: adminTitle,
+          body: adminBody,
         })),
+      );
+
+      await Promise.all(
+        adminProfiles.map((admin) =>
+          sendPushNotificationToUser(admin.id, {
+            title: adminTitle,
+            body: adminBody,
+            path: "/admin/providers",
+            type: "booking",
+            event: "identity_verification_submitted",
+          }).catch((pushError) => {
+            console.error("[Provider update] Failed to send admin push notification:", pushError);
+          })
+        ),
       );
     }
   }
 
-  const emailVerified =
-    payload.emailVerified === true || Boolean(verified.authUser.email_confirmed_at);
+  const emailVerified = emailVerifiedByChallenge || Boolean(verified.authUser.email_confirmed_at);
   await syncEmailVerification(verified.adminClient, verified.profile.id, emailVerified);
 
   const refreshedProfile = await verified.adminClient

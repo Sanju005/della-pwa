@@ -161,10 +161,6 @@ const router = createBrowserRouter([
     element: <BlockedPage />,
   },
   {
-    path: "/blokced",
-    element: <Navigate to="/login" replace />,
-  },
-  {
     path: "/forgot-password",
     element: withSuspense(<ForgotPasswordPage />),
   },

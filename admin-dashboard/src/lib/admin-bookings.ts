@@ -2,6 +2,10 @@ import { bookings as mockBookings } from "../data/mock-data";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import type { DashboardBooking } from "../types";
 
+const APP_BASE_URL =
+  (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
+  "https://app.myswiper.my";
+
 type LiveBookingRecord = {
   id: string;
   booking_status?: string | null;
@@ -153,11 +157,48 @@ async function resolveStorageUrl(
 }
 
 async function resolveCompletionImageUrl(value?: string | null) {
-  return resolveStorageUrl("job-completion-images", value, "private");
+  return resolveStorageUrl("job-completion-images", value, "public");
 }
 
+// payment-proofs is a private bucket — signing goes through the backend's
+// service-role /api/admin/media-sign endpoint (same trusted path used for
+// identity-documents/certificates) instead of the admin's own anon-key
+// session, which has no direct storage.objects access to this bucket.
 async function resolvePaymentProofUrl(value?: string | null) {
-  return resolveStorageUrl("payment-proofs", value, "private");
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed || isDataUrl(trimmed) || isHttpUrl(trimmed) || !supabase) {
+    return trimmed;
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    return "";
+  }
+
+  const response = await fetch(`${APP_BASE_URL}/api/admin/media-sign`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      bucket: "payment-proofs",
+      path: trimmed,
+      expiresInSeconds: 60 * 60,
+    }),
+  });
+
+  const result = (await response.json()) as { signedUrl?: string; error?: string };
+
+  if (!response.ok || !result.signedUrl) {
+    return "";
+  }
+
+  return result.signedUrl;
 }
 
 async function resolveReviewImageUrl(value?: string | null) {
@@ -423,8 +464,14 @@ export async function listBookingsWithFallback() {
     .order("scheduled_date", { ascending: false })
     .limit(100);
 
-  if (error || !data || data.length === 0) {
-    return mockBookings;
+  if (error || !data) {
+    // Supabase is configured but the query itself failed — an honest empty
+    // result is safer than silently substituting fake bookings.
+    return [];
+  }
+
+  if (data.length === 0) {
+    return [];
   }
 
   const rows = data as LiveBookingRecord[];

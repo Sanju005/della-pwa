@@ -731,9 +731,13 @@ function buildDetailFromListing(
     jobsCompleted: Math.max(listing.reviews, 12),
     locationFull: `${listing.location}, Malaysia`,
     online: true,
-    verified: listing.isApproved,
+    // Matches the same "Verified" badge shown on the provider card
+    // (identity + phone) rather than admin listing-approval status — those
+    // are different concepts and using isApproved here made this screen
+    // show "Pending" for providers the card already marked verified.
+    verified: listing.identityVerified && listing.phoneVerified,
     backgroundChecked: listing.isApproved,
-    about: providerDescriptions[listing.serviceKey],
+    about: listing.aboutService?.trim() || providerDescriptions[listing.serviceKey],
     specialties: mergeSpecialties(listing),
     gallery: uploadedGallery,
     hasUploadedGallery: uploadedGallery.length > 0,

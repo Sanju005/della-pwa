@@ -9,7 +9,7 @@ import '../core/config/app_config.dart';
 /// depends on how a code is actually sent or checked. Swap the implementation
 /// (e.g. to a future TwilioOtpService) without touching any screen.
 abstract class OtpService {
-  Future<void> sendOtp(String normalizedPhone);
+  Future<void> sendOtp(String normalizedPhone, {bool checkNotRegistered = false});
   Future<bool> verifyOtp(String normalizedPhone, String code);
 }
 
@@ -23,7 +23,7 @@ class DevelopmentOtpService implements OtpService {
   static const validCode = '123456';
 
   @override
-  Future<void> sendOtp(String normalizedPhone) async {}
+  Future<void> sendOtp(String normalizedPhone, {bool checkNotRegistered = false}) async {}
 
   @override
   Future<bool> verifyOtp(String normalizedPhone, String code) async {
@@ -41,20 +41,33 @@ class DevelopmentOtpService implements OtpService {
 /// which redeems it server-side.
 class RealOtpService implements OtpService {
   RealOtpService({required this.purpose})
-    : assert(purpose == 'phone' || purpose == 'email');
+    : assert(
+        purpose == 'phone' ||
+            purpose == 'email' ||
+            purpose == 'phone_change_current' ||
+            purpose == 'phone_change_new',
+      );
 
-  /// `'phone'` or `'email'`.
+  /// `'phone'`, `'email'`, or one of the phone-change-specific purposes
+  /// (`'phone_change_current'` / `'phone_change_new'`) — kept distinct from
+  /// plain `'phone'` so a login OTP can never be replayed to satisfy the
+  /// phone-number-change flow, and the two phone-change OTPs can't be
+  /// swapped for each other either.
   final String purpose;
 
   /// Set by a successful [verifyOtp] call.
   String? lastChallengeId;
 
   @override
-  Future<void> sendOtp(String target) async {
+  Future<void> sendOtp(String target, {bool checkNotRegistered = false}) async {
     final response = await http.post(
       Uri.parse('${AppConfig.appBaseUrl}/api/auth/otp/send'),
       headers: await _headers(),
-      body: jsonEncode({'purpose': purpose, 'target': target}),
+      body: jsonEncode({
+        'purpose': purpose,
+        'target': target,
+        if (checkNotRegistered) 'context': 'register',
+      }),
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {

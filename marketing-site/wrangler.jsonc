@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "della-marketing-site",
+  "compatibility_date": "2026-05-31",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "www.myswiper.my",
+      "custom_domain": true
+    },
+    {
+      "pattern": "myswiper.my",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./out"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

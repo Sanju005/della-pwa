@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
@@ -34,95 +36,63 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
   DateTime? _customStartDate;
   DateTime? _customEndDate;
 
+  BookingOverviewData? _data;
+  bool _isLoading = true;
+  bool _hasError = false;
+  Timer? _pollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+    // This screen previously fetched once via a FutureBuilder and never
+    // again -- a provider accepting/declining/progressing a booking while
+    // the customer was sitting on this exact list never showed up until
+    // they left and reopened it. Polling (same 5s interval already used by
+    // BookingDetailScreen) keeps it live without needing a push notification
+    // to arrive and be tapped first.
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      unawaited(_load(silent: true));
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent && mounted) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final data = await _bookingService.fetchCustomerBookings();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _data = data;
+        _isLoading = false;
+        _hasError = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments;
     final created = args is Map && args['created'] == true;
 
-    final content = FutureBuilder<BookingOverviewData?>(
-      future: _bookingService.fetchCustomerBookings(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const LoadingState(label: 'Loading bookings...');
-        }
-
-        if (snapshot.hasError) {
-          return const EmptyState(
-            title: 'Unable to load bookings',
-            subtitle: 'Please try again.',
-            icon: Icons.error_outline_rounded,
-          );
-        }
-
-        final data = snapshot.data;
-        if (data == null) {
-          return const EmptyState(
-            title: 'No bookings yet',
-            subtitle: 'Your latest bookings will appear here.',
-            icon: Icons.calendar_month_outlined,
-          );
-        }
-
-        final allRecords = [
-          ...data.upcomingBookings,
-          ...data.pastBookings,
-        ]..sort((a, b) {
-            final first = b.booking.createdAt ?? b.booking.scheduledAt ?? DateTime(2000);
-            final second = a.booking.createdAt ?? a.booking.scheduledAt ?? DateTime(2000);
-            return first.compareTo(second);
-          });
-
-        final scopedRecords = widget.activeOnly
-            ? allRecords.where((record) => !record.isPast).toList()
-            : allRecords;
-        final visibleRecords = scopedRecords.where(_matchesFilter).toList();
-
-        return ListView(
-          padding: AppSpacing.screenPadding,
-          children: [
-            if (created) ...[
-              Container(
-                margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF2FBF5),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFCBE8D2)),
-                ),
-                child: const Text(
-                  'Booking created successfully.',
-                  style: TextStyle(
-                    color: Color(0xFF138A36),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-            if (!widget.activeOnly) ...[
-              _filterCard(),
-              const SizedBox(height: AppSpacing.lg),
-            ],
-            if (visibleRecords.isEmpty)
-              EmptyState(
-                title: widget.activeOnly
-                    ? 'No ongoing tasks'
-                    : 'No bookings for this filter',
-                subtitle: widget.activeOnly
-                    ? 'Your pending and ongoing tasks will appear here.'
-                    : 'Try another booking date filter.',
-                icon: widget.activeOnly
-                    ? Icons.task_alt_outlined
-                    : Icons.filter_alt_off_outlined,
-              )
-            else
-              for (final record in visibleRecords) ...[
-                _bookingCard(context, record),
-                const SizedBox(height: AppSpacing.lg),
-              ],
-          ],
-        );
-      },
-    );
+    final content = _buildContent(created);
 
     if (widget.embedded) {
       return content;
@@ -137,6 +107,95 @@ class _BookingOverviewScreenState extends State<BookingOverviewScreen> {
         showBack: true,
       ),
       body: content,
+    );
+  }
+
+  Widget _buildContent(bool created) {
+    // Only show the full-screen loading/error state on the very first load
+    // -- a silent background poll (or a poll that happens to fail once)
+    // must never yank away an already-visible list.
+    if (_isLoading && _data == null) {
+      return const LoadingState(label: 'Loading bookings...');
+    }
+
+    if (_hasError && _data == null) {
+      return const EmptyState(
+        title: 'Unable to load bookings',
+        subtitle: 'Please try again.',
+        icon: Icons.error_outline_rounded,
+      );
+    }
+
+    final data = _data;
+    if (data == null) {
+      return const EmptyState(
+        title: 'No bookings yet',
+        subtitle: 'Your latest bookings will appear here.',
+        icon: Icons.calendar_month_outlined,
+      );
+    }
+
+    final allRecords = [
+      ...data.upcomingBookings,
+      ...data.pastBookings,
+    ]..sort((a, b) {
+        final first = b.booking.createdAt ?? b.booking.scheduledAt ?? DateTime(2000);
+        final second = a.booking.createdAt ?? a.booking.scheduledAt ?? DateTime(2000);
+        return first.compareTo(second);
+      });
+
+    final scopedRecords = widget.activeOnly
+        ? allRecords.where((record) => !record.isPast).toList()
+        : allRecords;
+    final visibleRecords = scopedRecords.where(_matchesFilter).toList();
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: AppSpacing.screenPadding,
+        children: [
+          if (created) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2FBF5),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFCBE8D2)),
+              ),
+              child: const Text(
+                'Booking created successfully.',
+                style: TextStyle(
+                  color: Color(0xFF138A36),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+          if (!widget.activeOnly) ...[
+            _filterCard(),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          if (visibleRecords.isEmpty)
+            EmptyState(
+              title: widget.activeOnly
+                  ? 'No ongoing tasks'
+                  : 'No bookings for this filter',
+              subtitle: widget.activeOnly
+                  ? 'Your pending and ongoing tasks will appear here.'
+                  : 'Try another booking date filter.',
+              icon: widget.activeOnly
+                  ? Icons.task_alt_outlined
+                  : Icons.filter_alt_off_outlined,
+            )
+          else
+            for (final record in visibleRecords) ...[
+              _bookingCard(context, record),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+        ],
+      ),
     );
   }
 

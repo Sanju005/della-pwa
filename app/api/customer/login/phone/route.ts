@@ -5,6 +5,22 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
+import { isChallengeRecentlyVerified } from "@/lib/otp-verification";
+import {
+  authDebugLog,
+  checkAndRecordRateLimit,
+  findDevice,
+  getVerifiedRecoveryEmail,
+  hashPin,
+  ipFromRequest,
+  isDeviceCurrentlyTrusted,
+  isValidPinFormat,
+  markDeviceTrusted,
+  recordSecurityEvent,
+  resetRateLimit,
+  touchDevice,
+  verifyPin,
+} from "@/lib/auth-security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,21 +41,25 @@ function getAdminSupabaseClient() {
   });
 }
 
+// Must match flutter_app/lib/core/utils/phone_number.dart's
+// normalizePhoneNumber exactly — this is the lookup key for the account
+// created at registration, which now normalizes the same way.
 function normalizePhone(countryCode: string, phoneNumber: string) {
-  const digits = phoneNumber.replace(/[^\d]/g, "");
-  const normalizedCountryCode = countryCode.trim() || "+60";
+  const countryDigits =
+    (countryCode.trim() || "+60").replace(/[^\d]/g, "") || "60";
+  let subscriber = phoneNumber.replace(/[^\d]/g, "");
 
-  if (!digits) {
-    return normalizedCountryCode;
+  if (!subscriber) {
+    return `+${countryDigits}`;
   }
 
-  if (digits.startsWith("60")) {
-    return `+${digits}`;
+  if (subscriber.startsWith(countryDigits)) {
+    subscriber = subscriber.slice(countryDigits.length);
+  } else if (countryDigits === "60" && subscriber.startsWith("0")) {
+    subscriber = subscriber.slice(1);
   }
 
-  const countryDigits = normalizedCountryCode.replace(/[^\d]/g, "");
-
-  return `+${countryDigits}${digits}`;
+  return `+${countryDigits}${subscriber}`;
 }
 
 // Same complexity contract as the random password generated for provider
@@ -69,26 +89,43 @@ function generateOneTimePassword() {
 type LoginPhoneBody = {
   phoneCountryCode?: string;
   phoneNumber?: string;
+  challengeId?: string;
+  deviceId?: string;
+  deviceName?: string;
+  platform?: string;
+  fcmToken?: string;
+  pin?: string;
+  // Case B (unknown device, no PIN yet) recovery fields — only meaningful
+  // together, on the follow-up call after the login-only attempt above
+  // returned accountRecoveryRequired.
+  emailChallengeId?: string;
+  newPin?: string;
 };
 
-// Mirrors app/api/provider/login/phone/route.ts's exact trust model, applied
-// to customers instead: customers authenticate by phone and never see their
-// own password (set once at registration and never shown), so returning to
-// log in can't be a normal password prompt. The Flutter app runs the same
-// phone-OTP check already used at registration (client-side dev-mode only —
-// this login path deliberately does NOT route through the hardened
-// /api/auth/otp/verify flow, to avoid changing the shared login screen's
-// behavior for providers too) before ever calling this endpoint; this
-// endpoint then resets the matched account's password to a fresh value it
-// knows and hands it back so the client can immediately sign in with it via
-// Supabase's normal signInWithPassword(phone, password).
+async function issueSession(
+  adminClient: NonNullable<ReturnType<typeof getAdminSupabaseClient>>,
+  userId: string,
+) {
+  const password = generateOneTimePassword();
+  const { error } = await adminClient.auth.admin.updateUserById(userId, { password });
+  authDebugLog("session_created", { success: !error });
+  return { password, error };
+}
+
+// Phase 1 authentication security, closing the "no PIN yet" gap:
 //
-// Known limitation: because OTP delivery on THIS specific path is currently
-// dev-mode only, this endpoint effectively lets anyone who knows a
-// customer's phone number reset that account's password. Before this is
-// relied on with real users, wire the login screen's OTP step through
-// /api/auth/otp/verify (already built and hardened for registration/profile
-// verification) and require a redeemed challengeId here too.
+//   trusted device  + has PIN    -> sign in (unchanged)
+//   trusted device  + no PIN     -> sign in, but flag mandatory PIN setup
+//                                    (Case A — this device is already
+//                                    trusted, so this is a safe migration
+//                                    prompt, not a new access grant)
+//   unknown device  + has PIN    -> require PIN (unchanged)
+//   unknown device  + no PIN     -> Case B: phone OTP alone is NOT enough.
+//                                    No session, no trust, until the caller
+//                                    ALSO proves the account's own
+//                                    pre-existing verified recovery email.
+//                                    No verified email on file -> refuse,
+//                                    accountRecoveryRequired, no fallback.
 export async function POST(request: Request) {
   try {
     const adminClient = getAdminSupabaseClient();
@@ -105,6 +142,8 @@ export async function POST(request: Request) {
       payload.phoneCountryCode ?? "+60",
       payload.phoneNumber ?? "",
     );
+    const deviceId = payload.deviceId?.trim() ?? "";
+    const ipAddress = ipFromRequest(request);
 
     if (normalizedPhone.replace(/[^\d]/g, "").length < 8) {
       return NextResponse.json(
@@ -113,25 +152,329 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!deviceId) {
+      return NextResponse.json(
+        { error: "A device identifier is required to sign in." },
+        { status: 400 },
+      );
+    }
+
+    const challengeId = payload.challengeId?.trim();
+    const phoneVerified =
+      Boolean(challengeId) &&
+      (await isChallengeRecentlyVerified(adminClient, {
+        challengeId: challengeId as string,
+        purpose: "phone",
+        target: normalizedPhone,
+      }));
+
+    if (!phoneVerified) {
+      return NextResponse.json(
+        { error: "Phone verification is required or has expired. Please request a new code." },
+        { status: 401 },
+      );
+    }
+
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
-      .select("id, role, phone")
+      .select("id, role, phone, email, pin_hash")
       .eq("phone", normalizedPhone)
       .maybeSingle();
 
     if (profileError || !profile || profile.role !== "customer") {
+      authDebugLog("account_lookup", { role: "customer", found: false });
       return NextResponse.json(
         { error: "No customer account was found for this phone number." },
         { status: 404 },
       );
     }
 
-    const password = generateOneTimePassword();
-    const { error: updateError } = await adminClient.auth.admin.updateUserById(
-      profile.id,
-      { password },
-    );
+    const userId = profile.id as string;
+    const existingDevice = await findDevice(adminClient, userId, deviceId);
+    const deviceTrusted = isDeviceCurrentlyTrusted(existingDevice);
+    const hasPin = Boolean(profile.pin_hash);
 
+    authDebugLog("account_lookup", {
+      role: "customer",
+      found: true,
+      deviceTrusted,
+      hasPin,
+    });
+
+    // --- trusted device, has PIN: unchanged normal path ---
+    if (deviceTrusted && hasPin) {
+      await touchDevice(adminClient, {
+        userId,
+        deviceId,
+        deviceName: payload.deviceName,
+        platform: payload.platform,
+        fcmToken: payload.fcmToken,
+      });
+
+      const { password, error: updateError } = await issueSession(adminClient, userId);
+      if (updateError) {
+        return NextResponse.json(
+          { error: updateError.message || "Unable to sign in right now." },
+          { status: 500 },
+        );
+      }
+
+      await recordSecurityEvent(adminClient, {
+        userId,
+        eventType: "login_success",
+        deviceId,
+        ipAddress,
+        metadata: { trustedDevice: true },
+      });
+
+      return NextResponse.json({ success: true, phone: normalizedPhone, password });
+    }
+
+    // --- Case A: trusted device, no PIN yet (legacy account) ---
+    // This device is already trusted — sign in, but mandatory PIN setup
+    // follows immediately. No new trust is being granted here.
+    if (deviceTrusted && !hasPin) {
+      await touchDevice(adminClient, {
+        userId,
+        deviceId,
+        deviceName: payload.deviceName,
+        platform: payload.platform,
+        fcmToken: payload.fcmToken,
+      });
+
+      const { password, error: updateError } = await issueSession(adminClient, userId);
+      if (updateError) {
+        return NextResponse.json(
+          { error: updateError.message || "Unable to sign in right now." },
+          { status: 500 },
+        );
+      }
+
+      await recordSecurityEvent(adminClient, {
+        userId,
+        eventType: "legacy_pin_setup_required",
+        deviceId,
+        ipAddress,
+      });
+      await recordSecurityEvent(adminClient, {
+        userId,
+        eventType: "login_success",
+        deviceId,
+        ipAddress,
+        metadata: { trustedDevice: true, pinSetupMandatory: true },
+      });
+
+      return NextResponse.json({
+        success: true,
+        phone: normalizedPhone,
+        password,
+        pinSetupRequired: true,
+        pinSetupMandatory: true,
+      });
+    }
+
+    // --- unknown device, has PIN: unchanged, rate-limited PIN gate ---
+    if (!deviceTrusted && hasPin) {
+      const suppliedPin = payload.pin?.trim() ?? "";
+
+      if (!suppliedPin) {
+        await recordSecurityEvent(adminClient, {
+          userId,
+          eventType: "new_device_detected",
+          deviceId,
+          ipAddress,
+        });
+        return NextResponse.json({ requiresPin: true, newDevice: true });
+      }
+
+      if (!isValidPinFormat(suppliedPin)) {
+        return NextResponse.json({ error: "Enter your 6-digit Swiper PIN." }, { status: 400 });
+      }
+
+      const pinLockKey = `pin_verify:${userId}`;
+      const pinRateLimit = await checkAndRecordRateLimit(adminClient, pinLockKey, {
+        maxAttempts: 5,
+        windowMinutes: 15,
+        lockoutMinutes: 15,
+      });
+
+      if (!pinRateLimit.allowed) {
+        await recordSecurityEvent(adminClient, {
+          userId,
+          eventType: "pin_locked",
+          deviceId,
+          ipAddress,
+        });
+        return NextResponse.json(
+          {
+            error: "Too many incorrect PIN attempts. Please try again later.",
+            retryAfterSeconds: pinRateLimit.retryAfterSeconds,
+          },
+          { status: 429 },
+        );
+      }
+
+      if (!verifyPin(suppliedPin, profile.pin_hash as string | null)) {
+        await recordSecurityEvent(adminClient, {
+          userId,
+          eventType: "pin_failed",
+          deviceId,
+          ipAddress,
+        });
+        return NextResponse.json({ error: "Incorrect PIN.", pinFailed: true }, { status: 401 });
+      }
+
+      await resetRateLimit(adminClient, pinLockKey);
+      await touchDevice(adminClient, {
+        userId,
+        deviceId,
+        deviceName: payload.deviceName,
+        platform: payload.platform,
+        fcmToken: payload.fcmToken,
+      });
+      await markDeviceTrusted(adminClient, userId, deviceId);
+
+      const { password, error: updateError } = await issueSession(adminClient, userId);
+      if (updateError) {
+        return NextResponse.json(
+          { error: updateError.message || "Unable to sign in right now." },
+          { status: 500 },
+        );
+      }
+
+      await recordSecurityEvent(adminClient, {
+        userId,
+        eventType: "new_device_verified",
+        deviceId,
+        ipAddress,
+      });
+      await recordSecurityEvent(adminClient, {
+        userId,
+        eventType: "login_success",
+        deviceId,
+        ipAddress,
+        metadata: { trustedDevice: false, viaPinVerification: true },
+      });
+
+      return NextResponse.json({ success: true, phone: normalizedPhone, password });
+    }
+
+    // --- Case B: unknown device, no PIN yet ---
+    // Phone OTP alone is never enough here — this is exactly the recycled-
+    // number scenario. No session, no device trust, no PIN creation until
+    // the caller ALSO proves control of the account's own pre-existing
+    // verified recovery email.
+    const verifiedEmail = await getVerifiedRecoveryEmail(adminClient, {
+      userId,
+      role: profile.role,
+      email: profile.email as string | null,
+    });
+
+    const emailChallengeId = payload.emailChallengeId?.trim() ?? "";
+    const newPin = payload.newPin?.trim() ?? "";
+
+    // First call reaching Case B (no recovery fields supplied yet), or the
+    // account simply has no verified email at all — either way, refuse and
+    // report what's needed. Deliberately the SAME response shape whether
+    // the account has no verified email or the caller just hasn't started
+    // the recovery step yet, except that a verified email lets the caller
+    // proceed — see below.
+    if (!emailChallengeId || !newPin) {
+      await recordSecurityEvent(adminClient, {
+        userId,
+        eventType: "account_recovery_required",
+        deviceId,
+        ipAddress,
+        metadata: { hasVerifiedEmail: Boolean(verifiedEmail) },
+      });
+
+      if (!verifiedEmail) {
+        await recordSecurityEvent(adminClient, {
+          userId,
+          eventType: "new_device_rejected",
+          deviceId,
+          ipAddress,
+          metadata: { reason: "no_verified_recovery_email" },
+        });
+        return NextResponse.json({ accountRecoveryRequired: true }, { status: 409 });
+      }
+
+      // Phone ownership is already proven at this point (the challenge
+      // check above), so revealing the account's own recovery email here
+      // is safe and necessary — the client needs it to send the second
+      // OTP. This never happens for a phone number nobody has verified.
+      return NextResponse.json(
+        { accountRecoveryRequired: true, recoveryEmail: verifiedEmail },
+        { status: 409 },
+      );
+    }
+
+    if (!verifiedEmail) {
+      // Recovery fields were supplied but there's no verified email to
+      // check them against — refuse, no insecure fallback.
+      return NextResponse.json({ accountRecoveryRequired: true }, { status: 409 });
+    }
+
+    if (!isValidPinFormat(newPin)) {
+      return NextResponse.json({ error: "PIN must be exactly 6 digits." }, { status: 400 });
+    }
+
+    const recoveryLockKey = `account_recovery:${userId}`;
+    const recoveryRateLimit = await checkAndRecordRateLimit(adminClient, recoveryLockKey, {
+      maxAttempts: 5,
+      windowMinutes: 30,
+      lockoutMinutes: 30,
+    });
+
+    if (!recoveryRateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many attempts. Please try again later." },
+        { status: 429 },
+      );
+    }
+
+    const emailVerifiedNow = await isChallengeRecentlyVerified(adminClient, {
+      challengeId: emailChallengeId,
+      purpose: "email",
+      target: verifiedEmail,
+    });
+
+    if (!emailVerifiedNow) {
+      return NextResponse.json(
+        { error: "Email verification is required or has expired. Please request a new code." },
+        { status: 401 },
+      );
+    }
+
+    await resetRateLimit(adminClient, recoveryLockKey);
+
+    const { error: pinUpdateError } = await adminClient
+      .from("profiles")
+      .update({
+        pin_hash: hashPin(newPin),
+        pin_set_at: new Date().toISOString(),
+        pin_failed_attempts: 0,
+        pin_locked_until: null,
+      })
+      .eq("id", userId);
+
+    if (pinUpdateError) {
+      return NextResponse.json(
+        { error: pinUpdateError.message || "Unable to complete account recovery." },
+        { status: 500 },
+      );
+    }
+
+    await touchDevice(adminClient, {
+      userId,
+      deviceId,
+      deviceName: payload.deviceName,
+      platform: payload.platform,
+      fcmToken: payload.fcmToken,
+    });
+    await markDeviceTrusted(adminClient, userId, deviceId);
+
+    const { password, error: updateError } = await issueSession(adminClient, userId);
     if (updateError) {
       return NextResponse.json(
         { error: updateError.message || "Unable to sign in right now." },
@@ -139,11 +482,29 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      phone: normalizedPhone,
-      password,
+    await recordSecurityEvent(adminClient, {
+      userId,
+      eventType: "new_device_verified",
+      deviceId,
+      ipAddress,
+      metadata: { viaAccountRecovery: true },
     });
+    await recordSecurityEvent(adminClient, {
+      userId,
+      eventType: "pin_created",
+      deviceId,
+      ipAddress,
+      metadata: { viaAccountRecovery: true },
+    });
+    await recordSecurityEvent(adminClient, {
+      userId,
+      eventType: "login_success",
+      deviceId,
+      ipAddress,
+      metadata: { trustedDevice: false, viaAccountRecovery: true },
+    });
+
+    return NextResponse.json({ success: true, phone: normalizedPhone, password });
   } catch (error) {
     return NextResponse.json(
       {

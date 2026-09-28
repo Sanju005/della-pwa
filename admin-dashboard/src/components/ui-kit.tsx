@@ -1,9 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowDownRight, ArrowUpRight, LoaderCircle } from "lucide-react";
-
-function cx(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
+import { LoaderCircle } from "lucide-react";
 
 export function SectionTitle({
   title,
@@ -24,48 +20,6 @@ export function SectionTitle({
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
-  );
-}
-
-export function AdminStatCard({
-  title,
-  value,
-  delta,
-  trend,
-  icon,
-  accent,
-}: {
-  title: string;
-  value: string;
-  delta: string;
-  trend: "up" | "down";
-  icon: ReactNode;
-  accent: string;
-}) {
-  const positive = trend === "up";
-
-  return (
-    <article className="rounded-[28px] border border-[#f6d8e7] bg-white/92 p-5 shadow-[0_20px_60px_rgba(214,51,132,0.06)]">
-      <div className="flex items-start justify-between gap-4">
-        <div className={cx("grid size-14 place-items-center rounded-2xl bg-gradient-to-br text-white shadow-lg", accent)}>
-          {icon}
-        </div>
-        <span
-          className={cx(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
-            positive ? "bg-[#fff1f6] text-[#c0266b]" : "bg-[#fff1f2] text-[#e11d48]"
-          )}
-        >
-          {positive ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
-          {delta}
-        </span>
-      </div>
-      <p className="mt-6 text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
-        {title}
-      </p>
-      <p className="mt-2 text-4xl font-extrabold tracking-tight text-slate-950">{value}</p>
-      <p className="mt-2 text-sm text-slate-500">vs last month</p>
-    </article>
   );
 }
 

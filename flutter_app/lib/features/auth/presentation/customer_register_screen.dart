@@ -5,15 +5,18 @@ import 'package:flutter/material.dart';
 
 import '../../../core/routing/app_routes.dart';
 import '../../../core/utils/phone_number.dart';
+import '../../../core/utils/support_contact.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/browser_file_picker.dart';
 import '../../../services/customer_signup_service.dart';
 import '../../../services/image_crop_service.dart';
+import '../../../services/image_optimization_service.dart';
 import '../../../services/otp_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/swiper_button.dart';
 import 'auth_flow_scaffold.dart';
+import 'create_pin_screen.dart';
 import 'otp_step_view.dart';
 
 enum _CustomerStep { phoneNumber, phoneOtp, personalDetails, review }
@@ -29,8 +32,7 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
   final _detailsFormKey = GlobalKey<FormState>();
   final _countryCodeController = TextEditingController(text: '60');
   final _phoneController = TextEditingController();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
+  final _icNameController = TextEditingController();
 
   final _signupService = const CustomerSignupService();
   final _authService = const AuthService();
@@ -57,8 +59,7 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
   void dispose() {
     _countryCodeController.dispose();
     _phoneController.dispose();
-    _firstNameController.dispose();
-    _lastNameController.dispose();
+    _icNameController.dispose();
     super.dispose();
   }
 
@@ -103,7 +104,14 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
     if (!mounted || picked == null) {
       return;
     }
-    setState(() => _avatarImage = picked);
+    final optimized = await optimizePublicImage(
+      picked,
+      maxDimension: kAvatarMaxDimension,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _avatarImage = optimized);
   }
 
   String _heading() {
@@ -156,7 +164,7 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
         _sendingOtp = true;
       });
       try {
-        await _otpService.sendOtp(normalized);
+        await _otpService.sendOtp(normalized, checkNotRegistered: true);
         if (!mounted) {
           return;
         }
@@ -280,10 +288,11 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
     });
 
     try {
+      final splitName = _splitFullName(_icNameController.text);
       final result = await _signupService.registerCustomer(
         CustomerSignupPayload(
-          firstName: _firstNameController.text.trim(),
-          lastName: _lastNameController.text.trim(),
+          firstName: splitName.firstName,
+          lastName: splitName.lastName,
           dateOfBirth: _dobIso,
           sex: _gender,
           phoneCountryCode:
@@ -297,6 +306,18 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
       await _authService.signInWithPhone(
         normalizedPhone: result.normalizedPhone,
         password: result.password,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      // Mandatory, non-skippable — registration is not security-complete
+      // until this succeeds. The device is marked trusted server-side only
+      // once the PIN is actually saved (see /api/auth/pin/create), never
+      // before.
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const CreatePinScreen(canSkip: false)),
       );
 
       if (!mounted) {
@@ -512,6 +533,14 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
             ),
             const SizedBox(height: 4),
             const Text('e.g. 12 345 6789', style: _regHelperStyle),
+            const SizedBox(height: AppSpacing.lg),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => emailSwiperSupport(subject: 'Help with registration'),
+                icon: const Icon(Icons.email_outlined, size: 18),
+                label: const Text('Need help? Contact Support'),
+              ),
+            ),
           ],
         );
       case _CustomerStep.phoneOtp:
@@ -546,17 +575,10 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
             const SizedBox(height: AppSpacing.md),
           ],
           _RegField(
-            label: 'First Name',
-            controller: _firstNameController,
+            label: 'Name as per IC / Passport',
+            controller: _icNameController,
             textCapitalization: TextCapitalization.words,
-            validator: (value) => _validateIcNamePart(value, 'First name'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _RegField(
-            label: 'Last Name',
-            controller: _lastNameController,
-            textCapitalization: TextCapitalization.words,
-            validator: (value) => _validateIcNamePart(value, 'Last name'),
+            validator: _validateIcName,
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
@@ -629,8 +651,7 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
-                          .trim(),
+                      _icNameController.text.trim(),
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
@@ -663,15 +684,37 @@ class _CustomerRegisterScreenState extends State<CustomerRegisterScreen> {
 
   static final RegExp _icNamePattern = RegExp(r"^[a-zA-Z][a-zA-Z\s.@'/-]*$");
 
-  String? _validateIcNamePart(String? value, String label) {
+  String? _validateIcName(String? value) {
     final trimmed = (value ?? '').trim();
     if (trimmed.isEmpty) {
-      return '$label is required.';
+      return 'Name is required.';
+    }
+    if (trimmed.length < 2) {
+      return 'Enter your full name as per IC / Passport.';
     }
     if (!_icNamePattern.hasMatch(trimmed)) {
-      return '$label must match your IC / Passport — letters only, no numbers.';
+      return 'Name must match your IC / Passport — letters only, no numbers.';
     }
     return null;
+  }
+
+  /// Mirrors ProviderRegisterScreen's exact split: the backend registration
+  /// endpoint still stores separate first/last name columns, so the single
+  /// IC-name field gets split at submission time rather than changing the
+  /// backend contract.
+  ({String firstName, String lastName}) _splitFullName(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) {
+      return (firstName: '', lastName: '');
+    }
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      // A single-word name (no space) has no separate last name — the
+      // backend requires both firstName and lastName to be non-empty, so
+      // repeat the one name in both rather than leaving lastName blank.
+      return (firstName: parts.first, lastName: parts.first);
+    }
+    return (firstName: parts.first, lastName: parts.sublist(1).join(' '));
   }
 }
 

@@ -31,6 +31,7 @@ class AppRoutes {
   static const providerVerificationHub = '/provider/profile/verification';
   static const providerServiceArea = '/provider/profile/service-area';
   static const providerEmergencyContact = '/provider/profile/emergency-contact';
+  static const providerSupportDocuments = '/provider/profile/support-documents';
   static const providerWallet = '/provider/profile/wallet';
   static const providerRewards = '/provider/profile/rewards';
   static const providerHelpCentre = '/provider/profile/help-centre';

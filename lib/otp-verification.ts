@@ -20,7 +20,19 @@ function isDevOtpModeEnabled() {
   return process.env.OTP_DEV_MODE === "true";
 }
 
-export type OtpPurpose = "phone" | "email";
+// "phone" / "email" are the original, general-purpose verification
+// channels (registration, login, the profile verification screens).
+// "phone_change_current" / "phone_change_new" are deliberately separate
+// purposes used ONLY by the secure phone-number-change flow — a challenge
+// verified for plain "phone" (e.g. at login) can never satisfy a
+// phone-change check, and vice versa, because `isChallengeRecentlyVerified`
+// matches on purpose exactly. This is what makes an OTP purpose-bound
+// rather than just target-bound.
+export type OtpPurpose = "phone" | "email" | "phone_change_current" | "phone_change_new";
+
+function isPhoneLikePurpose(purpose: OtpPurpose) {
+  return purpose !== "email";
+}
 
 function hashCode(code: string, target: string, purpose: OtpPurpose) {
   return createHash("sha256").update(`${purpose}:${target}:${code}`).digest("hex");
@@ -71,6 +83,38 @@ async function sendPhoneCodeViaTwilio(target: string, code: string) {
   }
 }
 
+function isResendConfiguredForEmail() {
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
+const EMAIL_FROM = "Della Swiper <noreply@myswiper.my>";
+
+// Plain Resend transactional email — same pattern as the Twilio SMS sender
+// above: we already generated and hashed the code, Resend is only used to
+// deliver it.
+async function sendEmailCodeViaResend(target: string, code: string) {
+  const apiKey = process.env.RESEND_API_KEY as string;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: EMAIL_FROM,
+      to: target,
+      subject: `Your Della Swiper verification code: ${code}`,
+      text: `Your Della Swiper verification code is ${code}. It expires in ${CHALLENGE_TTL_MINUTES} minutes. If you didn't request this, you can ignore this email.`,
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Resend email send failed (${response.status}): ${detail.slice(0, 300)}`);
+  }
+}
+
 export type CreateChallengeResult =
   | { ok: true; challengeId: string }
   | { ok: false; error: string };
@@ -104,7 +148,7 @@ export async function createOtpChallenge(
     return { ok: false, error: error?.message || "Unable to start verification." };
   }
 
-  if (params.purpose === "phone" && isTwilioConfiguredForPhone()) {
+  if (isPhoneLikePurpose(params.purpose) && isTwilioConfiguredForPhone() && !isDevOtpModeEnabled()) {
     try {
       await sendPhoneCodeViaTwilio(target, code);
     } catch (sendError) {
@@ -117,11 +161,19 @@ export async function createOtpChallenge(
       };
     }
   }
-  // Email delivery: no email-sending provider is wired into this project yet
-  // (out of Phase A scope — see the login-notification-email discussion).
-  // The generated code above is real and hashed, but with no channel to
-  // deliver it, email verification is only reachable via the explicit
-  // OTP_DEV_MODE bypass below until a real email provider is added.
+  if (params.purpose === "email" && isResendConfiguredForEmail() && !isDevOtpModeEnabled()) {
+    try {
+      await sendEmailCodeViaResend(target, code);
+    } catch (sendError) {
+      return {
+        ok: false,
+        error:
+          sendError instanceof Error
+            ? sendError.message
+            : "Unable to send verification code.",
+      };
+    }
+  }
 
   return { ok: true, challengeId: data.id as string };
 }

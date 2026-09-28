@@ -1,5 +1,6 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { approvalItems, dashboardMetrics } from "../data/mock-data";
 import { DataTable } from "../components/data-table";
 import { StatusBadge, statusToTone } from "../components/status-badge";
@@ -16,6 +17,21 @@ const bookingColumns = [
   { key: "amount", label: "Amount" },
   { key: "schedule", label: "Date & Time" },
 ] as const;
+
+function buildConicGradient(segments: Array<{ value: number; color: string }>, total: number) {
+  if (!total) {
+    return "conic-gradient(#e5e7eb 0deg 360deg)";
+  }
+
+  let cursor = 0;
+  const stops = segments.map(({ value, color }) => {
+    const start = cursor;
+    cursor += (value / total) * 360;
+    return `${color} ${start.toFixed(2)}deg ${cursor.toFixed(2)}deg`;
+  });
+
+  return `conic-gradient(${stops.join(", ")})`;
+}
 
 const paymentColumns = [
   { key: "id", label: "ID" },
@@ -105,6 +121,33 @@ export function DashboardPage() {
     ["Banned users", bannedUsers, totalUsers ? `${((bannedUsers / totalUsers) * 100).toFixed(1)}%` : "0.0%", "bg-[#fb7185]"],
   ] as const;
 
+  const taskMixGradient = buildConicGradient(
+    [
+      { value: pendingTasks, color: "#b19bd8" },
+      { value: acceptedTasks, color: "#8f78c0" },
+      { value: inProgressTasks, color: "#7a65ae" },
+      { value: completedTasks, color: "#645394" },
+    ],
+    totalTasks,
+  );
+
+  const userOverviewGradient = buildConicGradient(
+    [
+      { value: activeUsers, color: "#2563eb" },
+      { value: inactiveUsers, color: "#8b5cf6" },
+      { value: bannedUsers, color: "#fb7185" },
+    ],
+    totalUsers,
+  );
+
+  const taskStatusBars = [
+    { label: "Pending", value: pendingTasks, color: "#b19bd8" },
+    { label: "Accepted", value: acceptedTasks, color: "#8f78c0" },
+    { label: "In Progress", value: inProgressTasks, color: "#7a65ae" },
+    { label: "Completed", value: completedTasks, color: "#645394" },
+  ];
+  const maxTaskStatusValue = Math.max(1, ...taskStatusBars.map((bar) => bar.value));
+
   return (
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -143,44 +186,26 @@ export function DashboardPage() {
         <div className="rounded-[30px] border border-[#e8def6] bg-white/92 p-5 shadow-[0_24px_80px_rgba(100,83,148,0.08)] xl:p-6">
           <SectionTitle
             title="Bookings / tasks overview"
-            description="Service flow over the last seven days."
-            action={<div className="rounded-full bg-[#f4effb] px-3 py-2 text-xs font-semibold text-[#645394]">Last 7 days</div>}
+            description="Current status breakdown across all tasks."
           />
 
-          <div className="mt-8 grid h-[280px] grid-cols-7 items-end gap-3">
-            {[
-              { day: "30 May", active: 56, completed: 24, cancelled: 12 },
-              { day: "31 May", active: 78, completed: 38, cancelled: 18 },
-              { day: "1 Jun", active: 94, completed: 51, cancelled: 24 },
-              { day: "2 Jun", active: 80, completed: 47, cancelled: 19 },
-              { day: "3 Jun", active: 82, completed: 49, cancelled: 18 },
-              { day: "4 Jun", active: 97, completed: 58, cancelled: 23 },
-              { day: "5 Jun", active: 112, completed: 76, cancelled: 31 },
-            ].map((point) => (
-              <div key={point.day} className="flex h-full flex-col justify-end gap-3">
-                <div className="flex h-full items-end gap-1">
-                  <div className="w-full rounded-t-2xl bg-[#8b79bf]" style={{ height: `${point.active}%` }} />
-                  <div className="w-full rounded-t-2xl bg-[#645394]" style={{ height: `${point.completed}%` }} />
-                  <div className="w-full rounded-t-2xl bg-[#c7bcdf]" style={{ height: `${point.cancelled}%` }} />
+          <div className="mt-8 grid h-[280px] grid-cols-4 items-end gap-4">
+            {taskStatusBars.map((bar) => (
+              <div key={bar.label} className="flex h-full flex-col justify-end gap-3">
+                <div className="flex h-full items-end justify-center">
+                  <div
+                    className="w-full max-w-16 rounded-t-2xl"
+                    style={{
+                      height: `${(bar.value / maxTaskStatusValue) * 100}%`,
+                      backgroundColor: bar.color,
+                    }}
+                  />
                 </div>
-                <p className="text-center text-xs font-medium text-slate-400">{point.day}</p>
+                <p className="text-center text-xs font-medium text-slate-400">
+                  {bar.label} ({bar.value})
+                </p>
               </div>
             ))}
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-4 text-xs font-semibold text-slate-500">
-            <span className="inline-flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#8b79bf]" />
-              Active
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#645394]" />
-              Completed
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#c7bcdf]" />
-              Cancelled
-            </span>
           </div>
         </div>
 
@@ -188,7 +213,10 @@ export function DashboardPage() {
           <section className="rounded-[30px] border border-[#e8def6] bg-white/92 p-5 shadow-[0_24px_80px_rgba(100,83,148,0.08)]">
             <SectionTitle title="Task mix" />
             <div className="mt-6 flex items-center justify-center">
-              <div className="relative grid size-52 place-items-center rounded-full bg-[conic-gradient(#b19bd8_0deg_92deg,#8f78c0_92deg_210deg,#7a65ae_210deg_292deg,#645394_292deg_360deg)]">
+              <div
+                className="relative grid size-52 place-items-center rounded-full"
+                style={{ backgroundImage: taskMixGradient }}
+              >
                 <div className="grid size-32 place-items-center rounded-full bg-white shadow-inner">
                   <div className="text-center">
                     <p className="font-display text-4xl font-extrabold text-slate-950">{totalTasks || 0}</p>
@@ -221,7 +249,14 @@ export function DashboardPage() {
           </section>
 
           <section className="rounded-[30px] border border-[#e8def6] bg-white/92 p-5 shadow-[0_24px_80px_rgba(100,83,148,0.08)]">
-            <SectionTitle title="Pending approvals" action={<span className="text-sm font-semibold text-[#645394]">View all</span>} />
+            <SectionTitle
+              title="Pending approvals"
+              action={
+                <Link to="/provider-approvals" className="text-sm font-semibold text-[#645394]">
+                  View all
+                </Link>
+              }
+            />
             <div className="mt-5 space-y-3">
               {approvals.map((item) => (
                 <div
@@ -263,7 +298,14 @@ export function DashboardPage() {
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_1.1fr_0.8fr]">
         <div className="rounded-[30px] border border-[#e8def6] bg-white/92 p-5 shadow-[0_24px_80px_rgba(100,83,148,0.08)]">
-          <SectionTitle title="Recent reviews" action={<span className="text-sm font-semibold text-[#645394]">View all</span>} />
+          <SectionTitle
+            title="Recent reviews"
+            action={
+              <Link to="/reviews" className="text-sm font-semibold text-[#645394]">
+                View all
+              </Link>
+            }
+          />
           <div className="mt-5 space-y-4">
             {reviews.map((review) => (
               <article key={review.id} className="rounded-2xl border border-[#efe7f8] bg-[#fbf8ff] p-4">
@@ -281,7 +323,14 @@ export function DashboardPage() {
         </div>
 
         <div className="rounded-[30px] border border-[#e8def6] bg-white/92 p-5 shadow-[0_24px_80px_rgba(100,83,148,0.08)]">
-          <SectionTitle title="Recent complaints" action={<span className="text-sm font-semibold text-[#645394]">View all</span>} />
+          <SectionTitle
+            title="Recent complaints"
+            action={
+              <Link to="/complaints" className="text-sm font-semibold text-[#645394]">
+                View all
+              </Link>
+            }
+          />
           <div className="mt-5 space-y-3">
             {complaints.map((complaint) => (
               <div
@@ -315,9 +364,19 @@ export function DashboardPage() {
         </div>
 
         <div className="rounded-[30px] border border-[#e8def6] bg-white/92 p-5 shadow-[0_24px_80px_rgba(100,83,148,0.08)]">
-          <SectionTitle title="Users overview" action={<span className="text-sm font-semibold text-[#645394]">View report</span>} />
+          <SectionTitle
+            title="Users overview"
+            action={
+              <Link to="/users" className="text-sm font-semibold text-[#645394]">
+                View report
+              </Link>
+            }
+          />
           <div className="mt-8 flex justify-center">
-            <div className="grid size-52 place-items-center rounded-full bg-[conic-gradient(#2563eb_0deg_276deg,#8b5cf6_276deg_336deg,#fb7185_336deg_360deg)]">
+            <div
+              className="grid size-52 place-items-center rounded-full"
+              style={{ backgroundImage: userOverviewGradient }}
+            >
               <div className="grid size-32 place-items-center rounded-full bg-white shadow-inner">
                   <div className="text-center">
                     <p className="font-display text-4xl font-extrabold text-slate-950">{totalUsers || 0}</p>

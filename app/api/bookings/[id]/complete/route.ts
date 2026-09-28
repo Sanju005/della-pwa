@@ -138,14 +138,18 @@ export async function POST(
 
   const completedAt = new Date().toISOString();
 
-  const { error: updateError } = await verified.adminClient
+  // Only the first request moves the booking on; a double tap gets a 409 and
+  // so never sends duplicate notifications.
+  let { data: confirmedRows, error: updateError } = await verified.adminClient
     .from("bookings")
     .update({
       booking_status: "work_confirmed_by_user",
       work_confirmed_by_user_at: completedAt,
     })
     .eq("id", bookingRow.id)
-    .eq("customer_id", verified.profile.id);
+    .eq("customer_id", verified.profile.id)
+    .eq("booking_status", "work_finished_by_provider")
+    .select("id");
 
   if (updateError) {
     const fallbackWrite = await verified.adminClient
@@ -154,7 +158,9 @@ export async function POST(
         booking_status: "work_confirmed_by_user",
       })
       .eq("id", bookingRow.id)
-      .eq("customer_id", verified.profile.id);
+      .eq("customer_id", verified.profile.id)
+      .eq("booking_status", "work_finished_by_provider")
+      .select("id");
 
     if (fallbackWrite.error) {
       return NextResponse.json(
@@ -162,6 +168,15 @@ export async function POST(
         { status: 500 },
       );
     }
+
+    confirmedRows = fallbackWrite.data;
+  }
+
+  if (!confirmedRows || confirmedRows.length === 0) {
+    return NextResponse.json(
+      { error: "This booking was just updated. Please refresh and try again." },
+      { status: 409 },
+    );
   }
 
   const providerBody = `${verified.profile.full_name?.trim() || "A customer"} confirmed the ${bookingRow.service_label} work is completed.`;
@@ -191,12 +206,16 @@ export async function POST(
         body: providerBody,
         bookingId: bookingRow.id,
         path: `/provider/bookings/${bookingRow.id}`,
+        type: "booking",
+        event: "work_confirmed_by_user",
       }),
       sendPushNotificationToUser(bookingRow.customer_id, {
         title: "Work confirmation saved",
         body: customerBody,
         bookingId: bookingRow.id,
         path: `/profile/bookings/${bookingRow.id}`,
+        type: "booking",
+        event: "work_confirmed_by_user",
       }),
     ]);
   } catch (pushError) {

@@ -15,6 +15,7 @@ export type ProviderService = (typeof providerServices)[number];
 export type ProviderServiceDetails = {
   yearsExperience: string;
   specialties: string[];
+  aboutService?: string;
   imageCaptions: string[];
   imageDataUrls: string[];
   certificateCaptions: string[];
@@ -75,6 +76,11 @@ export type ProviderRegistrationData = {
   };
   verification: {
     phoneOtp: string[];
+    // Real proof of phone ownership: a challengeId returned by a successful
+    // POST /api/auth/otp/verify call, redeemed server-side (see
+    // isChallengeRecentlyVerified in lib/otp-verification.ts) rather than
+    // trusting the phoneOtp digits above, which the server no longer checks.
+    phoneVerificationChallengeId?: string;
     emailOtp: string[];
     documentType: string;
     frontImageName: string;

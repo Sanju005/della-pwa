@@ -613,6 +613,10 @@ export async function sendConversationMessage(
       body: pushBody,
       bookingId,
       path: recipientPath,
+      type: "message",
+      event: "message_received",
+      conversationId: bookingId,
+      senderId: viewer.id,
     });
   } catch (pushError) {
     console.error("[Booking messages] Failed to send push notification:", pushError);

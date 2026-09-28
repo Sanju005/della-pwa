@@ -9,19 +9,19 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ADMIN_ROLES = new Set([
-  "super_admin",
-  "admin",
-  "manager",
-  "customer_care",
-]);
+// Swiper uses only super_admin/provider/customer as real roles today — admin,
+// manager, and customer_care were never assigned to any live account and
+// have been removed from every authorization check (see
+// SWIPER_CRITICAL_SECURITY_REMEDIATION.md).
+const ALLOWED_ADMIN_ROLES = new Set(["super_admin"]);
 
 const ALLOWED_BUCKETS = new Set([
   "certificates",
   "identity-documents",
+  "payment-proofs",
 ] as const);
 
-type AdminMediaBucket = "certificates" | "identity-documents";
+type AdminMediaBucket = "certificates" | "identity-documents" | "payment-proofs";
 
 function getAdminSupabaseClient() {
   const url = getSupabaseUrl();

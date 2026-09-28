@@ -1,29 +1,47 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "della-pwa",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2026-05-31",
-  "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": false,
-  "routes": [
-    {
-      "pattern": "app.myswiper.my",
-      "custom_domain": true
-    }
-  ],
-  "keep_vars": true,
-  // TEMPORARY dev/QA aid — lets the fixed code `123456` work for phone/email
-  // OTP verification instead of requiring Twilio/a real email provider.
-  // Never leave this "true" in a real production deployment: remove this
-  // block (or set to "false") once real OTP delivery is wired up.
-  "vars": {
-    "OTP_DEV_MODE": "true"
-  },
-  "assets": {
-    "directory": ".open-next/assets",
-    "binding": "ASSETS"
-  },
-  "observability": {
-    "enabled": true
-  }
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "della-pwa",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2026-05-31",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"workers_dev": false,
+	"routes": [
+		{
+			"pattern": "app.myswiper.my",
+			"custom_domain": true
+		}
+	],
+	"keep_vars": true,
+	// OTP_DEV_MODE is deliberately NOT set here. This file is what deploys to
+	// production (app.myswiper.my) — isDevOtpModeEnabled() in
+	// lib/otp-verification.ts only ever returns true for the exact string
+	// "true", so an unset var (the default in every environment unless
+	// someone explicitly adds it back) means the fixed 123456 code can never
+	// work in production. If you ever need the dev bypass for local testing,
+	// add OTP_DEV_MODE=true to .env.local (gitignored, read only by `next
+	// dev`, never deployed) — do not add it back here.
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true,
+		"redact_query_string": false
+	},
+	"vars": {
+		"AUTH_DEBUG_LOGS": "true",
+		"NEXT_PUBLIC_APP_URL": "https://app.dellaapp.com",
+		"NEXT_PUBLIC_FIREBASE_API_KEY": "AIzaSyDzEIvnX8cAbWtiCwTt-d4Y2GdOkP7jtns",
+		"NEXT_PUBLIC_FIREBASE_APP_ID": "1:1049370077159:web:f62c6b18618009151cbf42",
+		"NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": "myswiper-app.firebaseapp.com",
+		"NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "1049370077159",
+		"NEXT_PUBLIC_FIREBASE_PROJECT_ID": "myswiper-app",
+		"NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": "myswiper-app.firebasestorage.app",
+		"NEXT_PUBLIC_FIREBASE_VAPID_KEY": "BOmJRIjD5N-6sX-X67CDHW61yCEs9eiyF_mwCnnJxFLmpuyUjU0kCUJVkta-yRrZYT6NC1bcsrDq17VpNfrx9FA",
+		"NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4c29xa3Z3enp3bWFxeGtrb2FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNDU0NzUsImV4cCI6MjA5NTYyMTQ3NX0.xRV4Y4wBM2qicS4HEDQMWXBIfOFDA6tq9svKvVlaKvc",
+		"NEXT_PUBLIC_SUPABASE_URL": "https://exsoqkvwzzwmaqxkkoab.supabase.co",
+		"RESEND_FROM_EMAIL": "noreply@myswiper.my"
+	}
 }

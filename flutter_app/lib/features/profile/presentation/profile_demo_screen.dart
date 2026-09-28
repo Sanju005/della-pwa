@@ -68,6 +68,67 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
       context,
       title: 'Edit personal details',
       subtitle: 'Update the real customer details shown on your profile.',
+      footer: StatefulBuilder(
+        builder: (context, setFooterState) {
+          return SwiperButton(
+            label: 'Save details',
+            isLoading: saving,
+            onPressed: saving
+                ? null
+                : () async {
+                    try {
+                      final isoDate = _normalizeDateForSave(
+                        dateOfBirthController.text,
+                      );
+                      final split = _splitFullName(nameController.text);
+                      setFooterState(() => saving = true);
+                      await _accountService.updatePersonalDetails(
+                        CustomerPersonalDetailsInput(
+                          firstName: split.firstName,
+                          lastName: split.lastName,
+                          dateOfBirth: isoDate,
+                          sex: selectedSex,
+                        ),
+                      );
+                      if (!mounted) {
+                        return;
+                      }
+                      Navigator.of(context).pop();
+                      _refresh();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Profile details updated.'),
+                        ),
+                      );
+                    } catch (error, stackTrace) {
+                      if (kDebugMode) {
+                        debugPrint('Update personal details failed: $error');
+                        debugPrintStack(stackTrace: stackTrace);
+                      }
+                      if (!mounted) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            error is Exception
+                                ? error.toString().replaceFirst(
+                                    'Exception: ',
+                                    '',
+                                  )
+                                : 'Unable to update details.',
+                          ),
+                        ),
+                      );
+                    } finally {
+                      if (mounted) {
+                        setFooterState(() => saving = false);
+                      }
+                    }
+                  },
+          );
+        },
+      ),
       child: StatefulBuilder(
         builder: (context, setSheetState) {
           return Column(
@@ -176,66 +237,6 @@ class _ProfileDemoScreenState extends State<ProfileDemoScreen> {
               const Text(
                 'Changing your phone number requires verifying the new number again.',
                 style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              SwiperButton(
-                label: 'Save details',
-                isLoading: saving,
-                onPressed: saving
-                    ? null
-                    : () async {
-                        try {
-                          final isoDate = _normalizeDateForSave(
-                            dateOfBirthController.text,
-                          );
-                          final split = _splitFullName(nameController.text);
-                          setSheetState(() => saving = true);
-                          await _accountService.updatePersonalDetails(
-                            CustomerPersonalDetailsInput(
-                              firstName: split.firstName,
-                              lastName: split.lastName,
-                              dateOfBirth: isoDate,
-                              sex: selectedSex,
-                            ),
-                          );
-                          if (!mounted) {
-                            return;
-                          }
-                          Navigator.of(context).pop();
-                          _refresh();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profile details updated.'),
-                            ),
-                          );
-                        } catch (error, stackTrace) {
-                          if (kDebugMode) {
-                            debugPrint(
-                              'Update personal details failed: $error',
-                            );
-                            debugPrintStack(stackTrace: stackTrace);
-                          }
-                          if (!mounted) {
-                            return;
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                error is Exception
-                                    ? error.toString().replaceFirst(
-                                        'Exception: ',
-                                        '',
-                                      )
-                                    : 'Unable to update details.',
-                              ),
-                            ),
-                          );
-                        } finally {
-                          if (mounted) {
-                            setSheetState(() => saving = false);
-                          }
-                        }
-                      },
               ),
             ],
           );

@@ -26,6 +26,7 @@ import '../../../services/service_location_store.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/app_reveal.dart';
+import '../../../widgets/cached_image.dart';
 import '../../../widgets/empty_state.dart';
 import '../../../widgets/notification_card.dart';
 import '../../../widgets/provider_card.dart';
@@ -70,6 +71,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   late Future<List<NotificationItem>> _notificationsFuture;
   late Future<CustomerBookingRecord?> _activeBookingFuture;
   late List<Future<List<ProviderSummary>>> _providerFutures;
+  Timer? _activeBookingPollTimer;
 
   @override
   void initState() {
@@ -78,6 +80,34 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     _primeFutures();
     unawaited(_loadPersistedLocation());
     unawaited(_loadFavorites());
+    // The "current task" card only ever fetched once on load — a provider
+    // accepting/declining/progressing this exact booking while the customer
+    // sat on the Home tab never showed up here. Same 5s poll already used on
+    // the Bookings list and booking detail screens; only the active-booking
+    // future is touched, so this never disturbs profile/notifications/
+    // provider sections above.
+    _activeBookingPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _pollActiveBooking();
+    });
+  }
+
+  @override
+  void dispose() {
+    _activeBookingPollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _pollActiveBooking() async {
+    try {
+      final result = await _activeBookingService.fetchActiveBooking();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _activeBookingFuture = Future.value(result));
+    } catch (_) {
+      // Ignored -- a failed background poll must not disturb the card
+      // already on screen; the next 5s tick tries again.
+    }
   }
 
   Future<void> _loadFavorites() async {
@@ -945,7 +975,7 @@ class _ActiveBookingCard extends StatelessWidget {
               radius: 26,
               backgroundColor: AppColors.primarySoft,
               backgroundImage: booking.providerImageUrl.isNotEmpty
-                  ? NetworkImage(booking.providerImageUrl)
+                  ? CachedImage.resolveProvider(booking.providerImageUrl)
                   : null,
               child: booking.providerImageUrl.isEmpty
                   ? const Icon(Icons.person_rounded, color: AppColors.primary)
@@ -1589,13 +1619,18 @@ class _NearbyCategorySectionState extends State<_NearbyCategorySection> {
                 const gap = AppSpacing.md;
                 final itemCount = providers.length.clamp(0, 5) + 1;
 
-                return SizedBox(
-                  height: 380,
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    scrollDirection: Axis.horizontal,
-                    itemCount: itemCount,
-                    itemBuilder: (context, index) {
+                // A scrolling Row (not ListView) so this section sizes
+                // itself to the tallest card's real content height instead
+                // of a guessed fixed height — ListView/Viewport can't
+                // report an intrinsic height, so any fixed SizedBox here
+                // either clips a taller card or leaves dead space below a
+                // shorter one.
+                return SingleChildScrollView(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: List.generate(itemCount, (index) {
                       final itemStart = index * (itemWidth + gap);
                       final child = index >= providers.length.clamp(0, 5)
                           ? _ShowAllProvidersCard(
@@ -1626,26 +1661,53 @@ class _NearbyCategorySectionState extends State<_NearbyCategorySection> {
                         child: AnimatedBuilder(
                           animation: _scrollController,
                           builder: (context, cardChild) {
-                            var distance = 0.0;
+                            var signedDistance = 0.0;
                             if (_scrollController.hasClients &&
                                 _scrollController.position.haveDimensions) {
-                              distance = (_scrollController.offset - itemStart)
-                                  .abs();
+                              signedDistance =
+                                  _scrollController.offset - itemStart;
                             }
-                            final t = (distance / itemWidth).clamp(0.0, 1.0);
-                            return Opacity(
-                              opacity: 1 - (t * 0.35),
-                              child: Transform.scale(
-                                scale: 1 - (t * 0.08),
-                                alignment: Alignment.center,
-                                child: cardChild,
+                            final t = (signedDistance.abs() / itemWidth).clamp(
+                              0.0,
+                              1.0,
+                            );
+                            // How near-centered this card is right now — 1
+                            // when it's the frontmost card, fading to 0 by
+                            // the time the next card takes over.
+                            final focus = (1 - (t * 2)).clamp(0.0, 1.0);
+
+                            // A Container's border always hugs its child's
+                            // real size — unlike the Positioned.fill/Stack
+                            // approach this replaced, which stretched to
+                            // match the tallest card in the row and left
+                            // the border visibly hanging below shorter
+                            // ones.
+                            return Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(
+                                  AppSpacing.radiusLg,
+                                ),
+                                border: Border.all(
+                                  color: AppColors.primary.withValues(
+                                    alpha: focus,
+                                  ),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Opacity(
+                                opacity: 1 - (t * 0.35),
+                                child: Transform.scale(
+                                  scale: 1 - (t * 0.08),
+                                  alignment: Alignment.center,
+                                  child: cardChild,
+                                ),
                               ),
                             );
                           },
                           child: SizedBox(width: itemWidth, child: child),
                         ),
                       );
-                    },
+                    }),
                   ),
                 );
               },

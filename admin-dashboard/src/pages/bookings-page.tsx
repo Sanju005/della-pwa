@@ -47,7 +47,7 @@ export function BookingsPage() {
     const normalized = row.status.trim().toLowerCase();
     return normalized !== "completed" && !isCancelledLikeStatus(row.status);
   }).length;
-  const completedCount = rows.filter((row) => row.status === "Completed").length;
+  const completedCount = rows.filter((row) => row.status.trim().toLowerCase() === "completed").length;
   const cancelledCount = rows.filter((row) => isCancelledLikeStatus(row.status)).length;
 
   return (
@@ -79,7 +79,7 @@ export function BookingsPage() {
       searchPlaceholder="Search bookings, customers, or providers..."
       stats={[
         { label: "Open tasks", value: String(openCount), note: "Pending, accepted, and in progress" },
-        { label: "Completed today", value: String(completedCount), note: "Freshly settled jobs" },
+        { label: "Completed", value: String(completedCount), note: "Freshly settled jobs" },
         { label: "Cancelled / Declined", value: String(cancelledCount), note: "Provider and user cancellations" },
       ]}
     />

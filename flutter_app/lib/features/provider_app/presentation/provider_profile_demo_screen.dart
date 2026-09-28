@@ -32,6 +32,14 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
     _future = _workspaceService.fetchWorkspace();
   }
 
+  Future<void> _openAndRefresh(String route) async {
+    await Navigator.of(context).pushNamed(route);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _future = _workspaceService.fetchWorkspace());
+  }
+
   Future<void> _logOut() async {
     await Supabase.instance.client.auth.signOut();
     if (!mounted) {
@@ -93,9 +101,7 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
               context,
               title: 'Personal Card',
               subtitle: 'Profile picture, provider name, and live location',
-              onTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.providerPersonalDetails),
+              onTap: () => _openAndRefresh(AppRoutes.providerPersonalDetails),
               leading: ProfileAvatar(
                 name: displayName,
                 imageUrl: profile.avatarUrl,
@@ -143,9 +149,7 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
               context,
               title: 'Verification',
               subtitle: 'Check which items are verified or pending',
-              onTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.providerVerificationHub),
+              onTap: () => _openAndRefresh(AppRoutes.providerVerificationHub),
               leading: _iconBadge(
                 icon: Icons.verified_user_outlined,
                 colors: const [Color(0xFFB88CFF), Color(0xFF8E5EB5)],
@@ -169,8 +173,7 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
               context,
               title: 'Services',
               subtitle: 'Manage service items, photos, specialties, and rates',
-              onTap: () =>
-                  Navigator.of(context).pushNamed(AppRoutes.providerServices),
+              onTap: () => _openAndRefresh(AppRoutes.providerServices),
               leading: _iconBadge(
                 icon: Icons.work_outline_rounded,
                 colors: const [Color(0xFFC8F1DE), Color(0xFF7ED7AF)],
@@ -204,9 +207,7 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
               context,
               title: 'Service Area',
               subtitle: 'Radius slider, location pin, and service coverage',
-              onTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.providerServiceArea),
+              onTap: () => _openAndRefresh(AppRoutes.providerServiceArea),
               leading: _iconBadge(
                 icon: Icons.map_outlined,
                 colors: const [Color(0xFFFFE9C8), Color(0xFFFFD89B)],
@@ -240,13 +241,19 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
               context,
               title: 'Emergency Contact',
               subtitle: 'A number we can reach in an emergency',
-              onTap: () => Navigator.of(
-                context,
-              ).pushNamed(AppRoutes.providerEmergencyContact),
+              onTap: () => _openAndRefresh(AppRoutes.providerEmergencyContact),
               leading: _iconBadge(
                 icon: Icons.emergency_share_outlined,
                 colors: const [Color(0xFFFFD7DA), Color(0xFFFFB3BA)],
                 iconColor: const Color(0xFFB3261E),
+              ),
+              trailing: SwiperStatusBadge(
+                label: profile.emergencyContactNumber.trim().isEmpty
+                    ? 'Pending'
+                    : 'Added',
+                tone: profile.emergencyContactNumber.trim().isEmpty
+                    ? SwiperStatusTone.warning
+                    : SwiperStatusTone.success,
               ),
               child: Text(
                 profile.emergencyContactNumber.trim().isEmpty
@@ -261,10 +268,28 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
             const SizedBox(height: AppSpacing.md),
             _profileCard(
               context,
+              title: 'Support Documents',
+              subtitle: 'Driving license, certificates, and other proof files',
+              onTap: () => _openAndRefresh(AppRoutes.providerSupportDocuments),
+              leading: _iconBadge(
+                icon: Icons.badge_outlined,
+                colors: const [Color(0xFFD6E9FF), Color(0xFFA9CDFF)],
+                iconColor: const Color(0xFF1D4ED8),
+              ),
+              child: Text(
+                'Upload optional supporting documents — does not affect your verification status.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.45,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _profileCard(
+              context,
               title: 'Wallet',
               subtitle: 'Earnings and amount payable to company',
-              onTap: () =>
-                  Navigator.of(context).pushNamed(AppRoutes.providerWallet),
+              onTap: () => _openAndRefresh(AppRoutes.providerWallet),
               leading: _iconBadge(
                 icon: Icons.account_balance_wallet_outlined,
                 colors: const [Color(0xFFD8F5E3), Color(0xFFA8E6C1)],
@@ -283,8 +308,7 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
               context,
               title: 'Rewards',
               subtitle: 'Bonus commission for staying active',
-              onTap: () =>
-                  Navigator.of(context).pushNamed(AppRoutes.providerRewards),
+              onTap: () => _openAndRefresh(AppRoutes.providerRewards),
               leading: _iconBadge(
                 icon: Icons.emoji_events_outlined,
                 colors: const [Color(0xFFFFE9C8), Color(0xFFFFD089)],
@@ -303,8 +327,7 @@ class _ProviderProfileDemoScreenState extends State<ProviderProfileDemoScreen> {
               context,
               title: 'Help Centre',
               subtitle: 'Get support and report an issue',
-              onTap: () =>
-                  Navigator.of(context).pushNamed(AppRoutes.providerHelpCentre),
+              onTap: () => _openAndRefresh(AppRoutes.providerHelpCentre),
               leading: _iconBadge(
                 icon: Icons.support_agent_outlined,
                 colors: const [Color(0xFFE5EEFF), Color(0xFFC4D6FF)],

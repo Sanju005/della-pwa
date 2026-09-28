@@ -1,4 +1,3 @@
-import { providers as mockProviders } from "../data/mock-data";
 import { listProvidersWithFallback } from "./admin-providers";
 import type { ProviderRow } from "../types";
 
@@ -14,14 +13,11 @@ function needsApproval(row: ProviderRow) {
 }
 
 export async function listApprovalQueueWithFallback() {
+  // listProvidersWithFallback() already decides mock-vs-live correctly (mock
+  // only when Supabase isn't configured at all) — a genuinely empty real
+  // queue means no pending approvals, not a reason to show fake ones.
   const liveRows = await listProvidersWithFallback();
-  const filtered = liveRows.filter(needsApproval);
-
-  if (filtered.length > 0) {
-    return filtered;
-  }
-
-  return mockProviders.filter(needsApproval);
+  return liveRows.filter(needsApproval);
 }
 
 export function buildApprovalStats(rows: ProviderRow[]) {

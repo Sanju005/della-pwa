@@ -1,6 +1,5 @@
 import {
   BadgeCheck,
-  Ban,
   BriefcaseBusiness,
   CalendarCheck2,
   CalendarDays,
@@ -32,13 +31,17 @@ import {
   getProviderProfileWithFallback,
   markCompanyPaymentReceived,
   reactivateProvider,
-  rejectProviderRegistration,
+  sendProviderPasswordReset,
   setProviderIdentityVerified,
   setProviderVisibility,
   suspendProvider,
   uploadProviderIdentityDocument,
   uploadProviderMedia,
 } from "../lib/admin-providers";
+
+const APP_BASE_URL =
+  (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
+  "https://app.myswiper.my";
 import type { ProviderDetailRecord, ProviderIdentityDocument } from "../types";
 import type { DashboardBooking } from "../types";
 
@@ -54,7 +57,7 @@ function groupByServiceLabel<T extends { serviceLabel?: string }>(items: T[]) {
       indexByLabel.set(label, groups.length);
       groups.push({ serviceLabel: label, items: [item] });
     } else {
-      groups[existingIndex].items.push(item);
+      groups[existingIndex]?.items.push(item);
     }
   }
 
@@ -83,7 +86,6 @@ const metricIcons = [
   <CheckCircle2 className="size-5" />,
   <CalendarCheck2 className="size-5" />,
   <Clock3 className="size-5" />,
-  <MapPin className="size-5" />,
   <Wallet className="size-5" />,
   <FileText className="size-5" />,
   <Star className="size-5" />,
@@ -494,92 +496,94 @@ export function ProviderProfilePage() {
     { gross: 0, commission: 0, net: 0, payable: 0, paid: 0 },
   );
 
-  async function handleSuspend() {
-    if (saving) {
-      return;
-    }
-
-    const suspended = detail.status !== "Suspended";
-
-    if (suspended) {
-      const reason = window.prompt("Enter a reason for suspending this provider:");
-      if (!reason || !reason.trim()) {
-        flash("A suspension reason is required.");
-        return;
-      }
-
-      setSaving(true);
-      const result = await suspendProvider(detail.providerId, reason.trim());
-      setSaving(false);
-
-      if (result.error) {
-        flash(result.error);
-        return;
-      }
-
-      setProvider((current) => (current ? { ...current, status: "Suspended" } : current));
-      flash("Provider suspended.");
-      return;
-    }
-
-    setSaving(true);
-    const result = await reactivateProvider(detail.providerId);
-    setSaving(false);
-
-    if (result.error) {
-      flash(result.error);
-      return;
-    }
-
-    setProvider((current) => (current ? { ...current, status: "Active" } : current));
-    flash("Provider restored.");
-  }
-
-  async function handleDeactivate() {
-    if (saving) {
-      return;
-    }
-
-    const typed = window.prompt('Type "DISABLE" to disable this provider.');
-    if (typed !== "DISABLE") {
-      flash("Provider was not disabled. You must type DISABLE to confirm.");
-      return;
-    }
-
-    setSaving(true);
-    const result = await setProviderVisibility(detail.providerId, false);
-    setSaving(false);
-
-    if (result.error) {
-      flash(result.error);
-      return;
-    }
-
-    setProvider((current) => (current ? { ...current, status: "Paused" } : current));
-    flash("Provider disabled.");
-  }
-
-  async function handleRejectProvider() {
-    if (saving) {
-      return;
-    }
-
+  // Two of the three consolidated provider-status actions (the third,
+  // approve, is handleApproveProvider below — already correct and now
+  // reused as-is). Together these replace the previous scattered
+  // Suspend/Restore, Deactivate, and Reject Registration buttons, each of
+  // which touched a different, independently-mutable field
+  // (profiles.status, provider_profiles.is_visible, provider_verifications)
+  // and could drift out of sync with each other. Each requires the shared
+  // reason field below.
+  async function handleKeepPending() {
     if (!approvalNote.trim()) {
-      flash("Please add a reason before rejecting this provider's registration.");
+      flash("Please add a reason before setting this provider to pending.");
       return;
     }
 
     setSaving(true);
-    const result = await rejectProviderRegistration(detail.providerId, approvalNote.trim());
+    // Clears any prior suspension — "pending" and "disabled" are mutually
+    // exclusive states, so moving to pending must also lift a suspension.
+    // Must run BEFORE the identity step below: reactivating resets the
+    // account status to active, and the identity step is what sets it to
+    // pending, so running it last is what makes "pending" stick.
+    await reactivateProvider(detail.providerId);
+    const visibilityResult = await setProviderVisibility(detail.providerId, false);
+
+    if (visibilityResult.error) {
+      setSaving(false);
+      flash(visibilityResult.error);
+      return;
+    }
+
+    const verifyResult = await setProviderIdentityVerified(
+      detail.providerId,
+      false,
+      detail.identityDocumentType,
+      approvalNote.trim(),
+    );
     setSaving(false);
 
-    if (result.error) {
-      flash(result.error);
+    if (verifyResult.error) {
+      flash(verifyResult.error);
       return;
     }
 
     await reloadProviderDetails();
-    flash("Provider registration rejected.");
+    flash("Provider set to pending — not visible, can re-upload documents.");
+  }
+
+  async function handleDisableProviderAction() {
+    if (!approvalNote.trim()) {
+      flash("Please add a reason before disabling this provider.");
+      return;
+    }
+
+    setSaving(true);
+    const suspendResult = await suspendProvider(detail.providerId, approvalNote.trim());
+
+    if (suspendResult.error) {
+      setSaving(false);
+      flash(suspendResult.error);
+      return;
+    }
+
+    const visibilityResult = await setProviderVisibility(detail.providerId, false);
+    setSaving(false);
+
+    if (visibilityResult.error) {
+      flash(visibilityResult.error);
+      return;
+    }
+
+    await reloadProviderDetails();
+    flash("Provider disabled.");
+  }
+
+  function handleViewProfile() {
+    window.open(`${APP_BASE_URL}/providers/${detail.providerId}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleResetPassword() {
+    setSaving(true);
+    const result = await sendProviderPasswordReset(detail.email);
+    setSaving(false);
+
+    if (result.error) {
+      flash(result.error);
+      return;
+    }
+
+    flash(`Password reset email sent to ${detail.email}.`);
   }
 
   async function handleMarkCompanyPaymentReceived(submissionId: string) {
@@ -616,28 +620,6 @@ export function ProviderProfilePage() {
         : current,
     );
     flash("Company payment marked as received.");
-  }
-
-  async function handleIdentityVerification(verified: boolean) {
-    if (verifyingIdentity) {
-      return;
-    }
-
-    setVerifyingIdentity(true);
-    const result = await setProviderIdentityVerified(
-      detail.providerId,
-      verified,
-      detail.identityDocumentType,
-    );
-    setVerifyingIdentity(false);
-
-    if (result.error) {
-      flash(result.error);
-      return;
-    }
-
-    await reloadProviderDetails();
-    flash(verified ? "Identity documents verified." : "Identity status changed back to pending.");
   }
 
   async function handleApproveProvider() {
@@ -811,8 +793,12 @@ export function ProviderProfilePage() {
       return;
     }
 
-    const confirmed = window.confirm(`Delete the ${side} identity image?`);
-    if (!confirmed) {
+    const reason = window.prompt(
+      `Reason for deleting the ${side} identity image? The provider will be notified with this reason.`,
+    );
+
+    if (!reason || !reason.trim()) {
+      flash("A reason is required to delete an identity document.");
       return;
     }
 
@@ -821,6 +807,7 @@ export function ProviderProfilePage() {
       detail.providerId,
       side,
       detail.identityDocumentType,
+      reason.trim(),
     );
     setIdentityDocumentSaving("");
 
@@ -853,7 +840,7 @@ export function ProviderProfilePage() {
   function renderOverview() {
     return (
       <>
-        <section className="grid gap-4 xl:grid-cols-2">
+        <section className="grid items-start gap-4 xl:grid-cols-2">
           <div className="space-y-4">
             <SurfaceCard title="Personal Details">
               <div className="space-y-4">
@@ -872,9 +859,16 @@ export function ProviderProfilePage() {
                   value={<span className="whitespace-pre-line">{detail.address}</span>}
                   icon={<MapPin className="size-4" />}
                 />
+                <InfoRow label="Service Radius" value={detail.serviceRadiusKm} icon={<MapPin className="size-4" />} />
               </div>
             </SurfaceCard>
 
+            <SurfaceCard title="Availability">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SummaryMetric label="Working Days" value={detail.workingDays} />
+                <SummaryMetric label="Working Hours" value={detail.workingHours} />
+              </div>
+            </SurfaceCard>
           </div>
 
           <div className="space-y-4">
@@ -990,15 +984,6 @@ export function ProviderProfilePage() {
             </SurfaceCard>
           </div>
         </section>
-
-        <section className="grid gap-4 xl:grid-cols-2">
-          <SurfaceCard title="Availability">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SummaryMetric label="Working Days" value={detail.workingDays} />
-              <SummaryMetric label="Working Hours" value={detail.workingHours} />
-            </div>
-          </SurfaceCard>
-        </section>
       </>
     );
   }
@@ -1041,25 +1026,24 @@ export function ProviderProfilePage() {
               <p className="mt-1 text-sm text-slate-500">Provider ID: {detail.providerId}</p>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <PillBadge tone="emerald"><BadgeCheck className="size-3.5" /> Email Verified</PillBadge>
-                <PillBadge tone="emerald"><Phone className="size-3.5" /> Phone Verified</PillBadge>
-                <PillBadge tone="emerald"><ShieldCheck className="size-3.5" /> KYC Verified</PillBadge>
+                {detail.emailVerified ? (
+                  <PillBadge tone="emerald"><BadgeCheck className="size-3.5" /> Email Verified</PillBadge>
+                ) : null}
+                {detail.phoneVerified ? (
+                  <PillBadge tone="emerald"><Phone className="size-3.5" /> Phone Verified</PillBadge>
+                ) : null}
+                {detail.kycStatus === "Verified" ? (
+                  <PillBadge tone="emerald"><ShieldCheck className="size-3.5" /> KYC Verified</PillBadge>
+                ) : null}
                 <PillBadge tone="blue">{detail.roleBadge}</PillBadge>
               </div>
 
-              <div className="mt-5 grid gap-4 text-sm text-slate-500 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="mt-5 grid gap-4 text-sm text-slate-500 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="flex items-start gap-3">
                   <CalendarDays className="mt-0.5 size-4 text-slate-400" />
                   <div>
                     <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Joined</p>
                     <p className="mt-1 font-medium text-slate-900">{detail.joinedAt}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Clock3 className="mt-0.5 size-4 text-slate-400" />
-                  <div>
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-400">Last Login</p>
-                    <p className="mt-1 font-medium text-slate-900">{detail.lastLogin}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -1090,7 +1074,7 @@ export function ProviderProfilePage() {
           <div className="flex flex-wrap gap-3 xl:max-w-[620px] xl:justify-end">
             <button
               type="button"
-              onClick={() => flash("Public provider profile opened.")}
+              onClick={handleViewProfile}
               disabled={saving}
               className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 px-5 py-3 text-sm font-semibold text-emerald-700"
             >
@@ -1099,33 +1083,26 @@ export function ProviderProfilePage() {
             </button>
             <button
               type="button"
-              onClick={handleSuspend}
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 px-5 py-3 text-sm font-semibold text-amber-700"
-            >
-              <Ban className="size-4" />
-              {detail.status === "Suspended" ? "Restore Provider" : "Suspend Provider"}
-            </button>
-            <button
-              type="button"
-              onClick={() => flash("Password reset link sent.")}
+              onClick={() => void handleResetPassword()}
               disabled={saving}
               className="inline-flex items-center gap-2 rounded-2xl border border-blue-200 px-5 py-3 text-sm font-semibold text-blue-700"
             >
               <KeyRound className="size-4" />
               Reset Password
             </button>
-            <button
-              type="button"
-              onClick={handleDeactivate}
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 px-5 py-3 text-sm font-semibold text-rose-600"
-            >
-              <Trash2 className="size-4" />
-              Deactivate
-            </button>
           </div>
         </div>
+        {detail.status === "Suspended" ? (
+          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+            This provider is currently disabled. Use Approve or Keep Pending
+            below (in Approval Checklist) to lift the disable.
+          </div>
+        ) : detail.status === "Paused" ? (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+            This provider is not visible to customers right now. Use Approve
+            below (in Approval Checklist) to make them visible again.
+          </div>
+        ) : null}
 
         {message ? (
           <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
@@ -1245,7 +1222,14 @@ export function ProviderProfilePage() {
                           }`}
                         >
                           <td className="py-3 font-semibold text-emerald-700">
-                            <button type="button" className="font-semibold hover:underline">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedTaskId(taskKey);
+                              }}
+                              className="font-semibold hover:underline"
+                            >
                               {task.id}
                             </button>
                           </td>
@@ -1327,7 +1311,10 @@ export function ProviderProfilePage() {
                 </SurfaceCard>
               </section>
 
-              <TableShell title="Cash">
+              <TableShell
+                title="Payment Ledger"
+                description="Every payment for this provider (any method) with commission and payout breakdown."
+              >
                 <table className="min-w-full text-left text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400">
@@ -1394,7 +1381,10 @@ export function ProviderProfilePage() {
                 ["ID", "Type", "Amount", "Date", "Status"],
                 detail.payoutRows.map((row) => [row.id, row.type, row.amount, row.date, row.status])
               )}
-              <TableShell title="Others: Company Commission Payments">
+              <TableShell
+                title="Others: Company Commission Payments"
+                description="Same payments as the ledger above, filtered to ones still awaiting the company's confirmation of the provider's commission payment."
+              >
                 <table className="min-w-full text-left text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400">
@@ -1717,18 +1707,6 @@ export function ProviderProfilePage() {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <MiniStatus status={detail.identityVerificationStatus ?? "Pending"} />
-                <button
-                  type="button"
-                  onClick={() => void handleIdentityVerification(detail.identityVerificationStatus !== "Verified")}
-                  disabled={verifyingIdentity}
-                  className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 disabled:opacity-60"
-                >
-                  {verifyingIdentity
-                    ? "Saving..."
-                    : detail.identityVerificationStatus === "Verified"
-                      ? "Mark Pending"
-                      : "Mark Verified"}
-                </button>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
@@ -1826,11 +1804,11 @@ export function ProviderProfilePage() {
                     type="checkbox"
                     checked={checklist[key as keyof typeof checklist]}
                     onChange={(event) => {
+                      // Checklist ticks are only an admin-side reminder — nothing
+                      // is saved or sent to the provider until Approve / Keep
+                      // Pending / Disable is clicked with a reason.
                       const checked = event.target.checked;
                       setChecklist((current) => ({ ...current, [key]: checked }));
-                      if (key === "identity") {
-                        void handleIdentityVerification(checked);
-                      }
                     }}
                     className="size-5 accent-emerald-600"
                   />
@@ -1838,7 +1816,7 @@ export function ProviderProfilePage() {
               ))}
             </div>
             <label className="mt-4 block text-sm font-semibold text-slate-700">
-              Admin note (required to approve or reject)
+              Reason (required for every action below)
               <textarea
                 value={approvalNote}
                 onChange={(event) => setApprovalNote(event.target.value)}
@@ -1853,23 +1831,23 @@ export function ProviderProfilePage() {
                 disabled={saving || verifyingIdentity || isProviderApproved || !allChecklistReady}
                 className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
               >
-                {isProviderApproved ? "Approved" : "Approve Provider"}
+                {isProviderApproved ? "Approved" : "Approve"}
               </button>
               <button
                 type="button"
-                onClick={() => void handleRejectProvider()}
-                disabled={saving || isProviderApproved}
+                onClick={() => void handleKeepPending()}
+                disabled={saving || verifyingIdentity}
+                className="rounded-xl border border-amber-200 px-4 py-3 text-sm font-semibold text-amber-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+              >
+                Keep Pending
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDisableProviderAction()}
+                disabled={saving || detail.status === "Suspended"}
                 className="rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
               >
-                Reject Registration
-              </button>
-              <button
-                type="button"
-                onClick={handleDeactivate}
-                disabled={saving || !isProviderApproved}
-                className="px-2 py-2 text-xs font-semibold text-rose-600 underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
-              >
-                Disable provider
+                {detail.status === "Suspended" ? "Disabled" : "Disable"}
               </button>
             </div>
           </div>

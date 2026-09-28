@@ -10,6 +10,7 @@ import '../../../core/config/app_config.dart';
 import '../../../services/booking_overview_service.dart';
 import '../../../services/browser_file_picker.dart';
 import '../../../services/customer_messages_service.dart';
+import '../../../services/image_optimization_service.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../widgets/empty_state.dart';
@@ -43,6 +44,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   bool _isSubmittingPayment = false;
   bool _isSubmittingReview = false;
   bool _isSubmittingIssue = false;
+  bool _isCancelling = false;
   PickedBrowserFile? _paymentProof;
   final TextEditingController _messageController = TextEditingController();
   List<CustomerConversationMessage> _chatMessages = const [];
@@ -52,6 +54,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   DateTime? _lastUpdatedAt;
   Timer? _pollTimer;
   bool _didReadRoute = false;
+  bool _hasAutoPromptedReview = false;
 
   @override
   void didChangeDependencies() {
@@ -136,6 +139,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         ].contains(booking.workflowStatus) &&
         booking.userReviewStatus != 'submitted';
     final isTaskCompleted = booking.workflowStatus == 'completed';
+    final canCancel = const <String>[
+      'pending_provider_response',
+      'accepted',
+    ].contains(booking.workflowStatus);
 
     return RefreshIndicator(
       onRefresh: _loadBooking,
@@ -150,6 +157,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             _InlineNotice(
               message: 'Declined by provider: ${booking.cancellationReason.trim()}',
               tone: AppColors.error,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          if (booking.workflowStatus == 'cancelled') ...[
+            _InlineNotice(
+              message: booking.cancellationReason.trim().isNotEmpty
+                  ? 'Booking cancelled: ${booking.cancellationReason.trim()}'
+                  : 'This booking was cancelled.',
+              tone: AppColors.error,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          if (canCancel) ...[
+            SwiperButton(
+              label: 'Cancel Booking',
+              isSecondary: true,
+              isLoading: _isCancelling,
+              onPressed: _isCancelling ? null : () => _openCancelSheet(booking),
             ),
             const SizedBox(height: AppSpacing.md),
           ],
@@ -239,6 +264,18 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         _errorMessage = null;
         _lastUpdatedAt = DateTime.now();
       });
+
+      if (booking != null &&
+          !_hasAutoPromptedReview &&
+          const <String>[
+            'cash_paid_by_user',
+            'payment_received_by_provider',
+            'completed',
+          ].contains(booking.workflowStatus) &&
+          booking.userReviewStatus != 'submitted') {
+        _hasAutoPromptedReview = true;
+        unawaited(_openReviewSheet(booking));
+      }
     } catch (error, stackTrace) {
       if (kDebugMode) {
         debugPrint('Booking detail refresh failed: $error');
@@ -593,16 +630,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               fileName: booking.customerPaymentProofFileName,
               mimeType: booking.customerPaymentProofMimeType,
             ),
-          if (booking.customerPaymentProofDataUrl.isNotEmpty &&
-              booking.providerCompanyPaymentProofDataUrl.isNotEmpty)
-            const SizedBox(height: AppSpacing.sm),
-          if (booking.providerCompanyPaymentProofDataUrl.isNotEmpty)
-            _ProofPreviewCard(
-              title: 'Provider Company Payment Proof',
-              dataUrl: booking.providerCompanyPaymentProofDataUrl,
-              fileName: booking.providerCompanyPaymentProofFileName,
-              mimeType: booking.providerCompanyPaymentProofMimeType,
-            ),
+          if (booking.workFinishedImages.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _JobCompletionGallery(images: booking.workFinishedImages),
+          ],
         ],
       ),
     );
@@ -894,6 +925,104 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 
+  Future<void> _openCancelSheet(CustomerBookingDetail booking) async {
+    final controller = TextEditingController();
+
+    final shouldCancel = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + AppSpacing.md,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Cancel This Booking?',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                const Text(
+                  'The provider will be notified right away. You can only cancel before the provider is on the way.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: controller,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Reason (optional)',
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SwiperButton(
+                        label: 'Keep Booking',
+                        isSecondary: true,
+                        onPressed: () => Navigator.of(sheetContext).pop(false),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: SwiperButton(
+                        label: 'Cancel Booking',
+                        onPressed: () => Navigator.of(sheetContext).pop(true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (shouldCancel != true) {
+      return;
+    }
+
+    setState(() => _isCancelling = true);
+    try {
+      await _bookingService.cancelBooking(
+        booking.id,
+        reason: controller.text.trim(),
+      );
+      _showNotice('Booking cancelled.');
+      await _loadBooking(silent: true);
+    } catch (error) {
+      _showNotice(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isCancelling = false);
+    }
+  }
+
   Future<void> _openIssueReportSheet(CustomerBookingDetail booking) async {
     final controller = TextEditingController();
     var localError = '';
@@ -1044,10 +1173,19 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               if (newFiles.isEmpty) {
                 return;
               }
+              final toAdd = newFiles.take(4).toList();
+              final optimized = await Future.wait(
+                toAdd.map(
+                  (file) => optimizePublicImage(
+                    file,
+                    maxDimension: kMediumImageMaxDimension,
+                  ),
+                ),
+              );
               setModalState(() {
                 photos
                   ..clear()
-                  ..addAll(newFiles.take(4));
+                  ..addAll(optimized);
               });
             }
 
@@ -1545,8 +1683,16 @@ class _TaskStepConnectorState extends State<_TaskStepConnector>
                           ),
                         ],
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                      // Stack, not Column: the two chevrons are meant to
+                      // overlap (Transform.translate only repaints the
+                      // second one higher, it doesn't shrink the layout
+                      // space Column would reserve for it) — Column summed
+                      // both icons' heights into a taller box than the
+                      // fixed-height Container around it, overflowing by
+                      // exactly the second icon's 18px minus its 8px
+                      // translate, i.e. the "12 pixels" reported here.
+                      child: Stack(
+                        alignment: Alignment.center,
                         children: [
                           Icon(
                             Icons.keyboard_arrow_down_rounded,
@@ -1650,6 +1796,160 @@ class _SelectedFileCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _JobCompletionGallery extends StatelessWidget {
+  const _JobCompletionGallery({required this.images});
+
+  final List<String> images;
+
+  void _openFullScreenGallery(BuildContext context, int initialIndex) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) =>
+            _FullScreenImageGallery(images: images, initialIndex: initialIndex),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Job Completion Photos',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: images.length,
+              separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+              itemBuilder: (context, index) => GestureDetector(
+                onTap: () => _openFullScreenGallery(context, index),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    images[index],
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FullScreenImageGallery extends StatefulWidget {
+  const _FullScreenImageGallery({
+    required this.images,
+    required this.initialIndex,
+  });
+
+  final List<String> images;
+  final int initialIndex;
+
+  @override
+  State<_FullScreenImageGallery> createState() =>
+      _FullScreenImageGalleryState();
+}
+
+class _FullScreenImageGalleryState extends State<_FullScreenImageGallery> {
+  late final PageController _pageController = PageController(
+    initialPage: widget.initialIndex,
+  );
+  late int _currentIndex = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _pageController,
+              itemCount: widget.images.length,
+              onPageChanged: (index) => setState(() => _currentIndex = index),
+              itemBuilder: (context, index) => InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: Center(
+                  child: Image.network(
+                    widget.images[index],
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.broken_image_outlined,
+                      color: Colors.white54,
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: AppSpacing.sm,
+              right: AppSpacing.sm,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+              ),
+            ),
+            if (widget.images.length > 1)
+              Positioned(
+                bottom: AppSpacing.md,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${_currentIndex + 1} / ${widget.images.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

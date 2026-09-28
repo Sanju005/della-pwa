@@ -335,7 +335,7 @@ const allowedTransitions: Record<BookingStatus, BookingStatus[]> = {
   pending_provider_response: ["accepted", "declined_by_provider", "cancelled"],
   accepted: ["on_the_way", "cancelled"],
   on_the_way: ["arrived", "cancelled"],
-  arrived: ["work_finished_by_provider", "final_payment_sent", "cancelled"],
+  arrived: ["work_finished_by_provider", "final_payment_sent"],
   work_finished_by_provider: ["final_payment_sent"],
   work_confirmed_by_user: ["final_payment_sent"],
   final_payment_sent: [],
@@ -371,10 +371,19 @@ function notificationTypeForStatus(status: BookingStatus) {
   }
 }
 
+function formatAmount(amount: number | null) {
+  if (amount === null || !Number.isFinite(amount)) {
+    return null;
+  }
+
+  return `RM${amount.toFixed(2)}`;
+}
+
 function notificationContent(
   status: BookingStatus,
   serviceLabel: string,
   note: string,
+  amount: number | null,
 ) {
   switch (status) {
     case "accepted":
@@ -397,16 +406,24 @@ function notificationContent(
         title: "Provider arrived",
         body: `Your ${serviceLabel} provider has arrived.`,
       };
-    case "work_finished_by_provider":
+    case "work_finished_by_provider": {
+      const formatted = formatAmount(amount);
       return {
         title: "Work finished by provider",
-        body: `Your provider marked the ${serviceLabel} work as finished. Please confirm the work completion.`,
+        body: formatted
+          ? `Your provider marked the ${serviceLabel} work as finished and requested ${formatted}. Please confirm the work completion.`
+          : `Your provider marked the ${serviceLabel} work as finished. Please confirm the work completion.`,
       };
-    case "final_payment_sent":
+    }
+    case "final_payment_sent": {
+      const formatted = formatAmount(amount);
       return {
         title: "Final payment sent",
-        body: `Your provider sent the final cash payment for the ${serviceLabel} booking.`,
+        body: formatted
+          ? `Your provider sent a final cash payment request of ${formatted} for the ${serviceLabel} booking.`
+          : `Your provider sent the final cash payment for the ${serviceLabel} booking.`,
       };
+    }
     case "payment_received_by_provider":
       return {
         title: "Payment received",
@@ -420,7 +437,7 @@ function notificationContent(
     case "cancelled":
       return {
         title: "Booking cancelled",
-        body: `Your ${serviceLabel} booking was cancelled.`,
+        body: `Your ${serviceLabel} booking was cancelled.${note ? ` Reason: ${note}` : ""}`,
       };
     default:
       return null;
@@ -581,17 +598,35 @@ export async function PATCH(
     const { data: adminProfiles } = await verified.adminClient
       .from("profiles")
       .select("id")
-      .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+      .in("role", ["super_admin"]);
 
     if (adminProfiles?.length) {
+      const commissionTitle = "Company payment submitted";
+      const commissionBody = `Provider uploaded a payment slip and submitted RM ${depositedAmount.toFixed(2)} for company commission review.`;
+
       await verified.adminClient.from("notifications").insert(
         adminProfiles.map((admin) => ({
           user_id: admin.id,
           booking_id: current.id,
           notification_type: "company_payment_submitted",
-          title: "Company payment submitted",
-          body: `Provider uploaded a payment slip and submitted RM ${depositedAmount.toFixed(2)} for company commission review.`,
+          title: commissionTitle,
+          body: commissionBody,
         }))
+      );
+
+      await Promise.all(
+        adminProfiles.map((admin) =>
+          sendPushNotificationToUser(admin.id, {
+            title: commissionTitle,
+            body: commissionBody,
+            bookingId: current.id,
+            path: "/admin/company-payments",
+            type: "payment",
+            event: "company_payment_submitted",
+          }).catch((pushError) => {
+            console.error("[Provider booking update] Failed to send admin push notification:", pushError);
+          })
+        )
       );
     }
 
@@ -636,6 +671,13 @@ export async function PATCH(
   if (nextStatus === "final_payment_sent" && paymentTotal === null) {
     return NextResponse.json(
       { error: "Final amount is required before sending the cash payment request." },
+      { status: 400 }
+    );
+  }
+
+  if (nextStatus === "cancelled" && !note) {
+    return NextResponse.json(
+      { error: "A reason is required to cancel this booking." },
       { status: 400 }
     );
   }
@@ -730,13 +772,21 @@ export async function PATCH(
 
   if (nextStatus === "cancelled") {
     updatePayload.cancelled_at = new Date().toISOString();
+    // Reused from the decline flow — clients already read this column as
+    // `cancellationReason` regardless of decline vs. cancel.
+    updatePayload.decline_reason = note;
   }
 
-  let { error: updateError } = await verified.adminClient
+  // The update only applies if the booking is STILL in the status this
+  // request started from. Without that, a customer cancelling at the same
+  // moment (or a double tap) would silently overwrite / repeat a step.
+  let { data: updatedRows, error: updateError } = await verified.adminClient
     .from("bookings")
     .update(updatePayload)
     .eq("id", current.id)
-    .eq("provider_id", verified.profile.id);
+    .eq("provider_id", verified.profile.id)
+    .eq("booking_status", current.booking_status)
+    .select("id");
 
   if (updateError && isUnknownColumnError(updateError.message)) {
     const fallbackPayload = buildFallbackUpdatePayload(
@@ -748,8 +798,11 @@ export async function PATCH(
       .from("bookings")
       .update(fallbackPayload)
       .eq("id", current.id)
-      .eq("provider_id", verified.profile.id);
+      .eq("provider_id", verified.profile.id)
+      .eq("booking_status", current.booking_status)
+      .select("id");
 
+    updatedRows = fallbackWrite.data;
     updateError = fallbackWrite.error;
   }
 
@@ -758,6 +811,13 @@ export async function PATCH(
     return NextResponse.json(
       { error: mapBookingUpdateError(updateError.message) },
       { status: 500 }
+    );
+  }
+
+  if (!updatedRows || updatedRows.length === 0) {
+    return NextResponse.json(
+      { error: "This booking was just updated. Please refresh and try again." },
+      { status: 409 }
     );
   }
 
@@ -810,7 +870,12 @@ export async function PATCH(
     nextStatus,
     current.service_label,
     note,
+    paymentTotal,
   );
+  const nextPushCategory =
+    nextStatus === "final_payment_sent" || nextStatus === "payment_received_by_provider"
+      ? "payment"
+      : "booking";
 
   if (nextNotificationType && nextNotificationContent) {
     const { error: notificationError } = await verified.adminClient
@@ -833,6 +898,8 @@ export async function PATCH(
         body: nextNotificationContent.body,
         bookingId: current.id,
         path: `/profile/notifications?booking=${current.id}`,
+        type: nextPushCategory,
+        event: nextNotificationType,
       });
     } catch (pushError) {
       console.error("[Provider booking update] Failed to send push notification:", pushError);

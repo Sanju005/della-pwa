@@ -21,12 +21,11 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const ALLOWED_ADMIN_ROLES = new Set([
-  "super_admin",
-  "admin",
-  "manager",
-  "customer_care",
-]);
+// Swiper uses only super_admin/provider/customer as real roles today — admin,
+// manager, and customer_care were never assigned to any live account and
+// have been removed from every authorization check (see
+// SWIPER_CRITICAL_SECURITY_REMEDIATION.md in the repo root).
+const ALLOWED_ADMIN_ROLES = new Set(["super_admin"]);
 
 const PROFILE_CACHE_KEY = "della-admin-profile";
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/config/app_config.dart';
 import '../theme/app_colors.dart';
+import 'cached_image.dart';
 
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({
@@ -62,7 +63,9 @@ class ProfileAvatar extends StatelessWidget {
         : '';
     final ImageProvider? backgroundImage = dataUrlBytes != null
         ? MemoryImage(dataUrlBytes)
-        : (resolvedImageUrl.isNotEmpty ? NetworkImage(resolvedImageUrl) : null);
+        : (resolvedImageUrl.isNotEmpty
+              ? CachedImage.resolveProvider(resolvedImageUrl)
+              : null);
 
     return CircleAvatar(
       radius: radius,

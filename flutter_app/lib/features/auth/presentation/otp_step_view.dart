@@ -250,10 +250,37 @@ class _OtpStepViewState extends State<OtpStepView>
     final canResend = _secondsRemaining == 0;
     final minutes = (_secondsRemaining ~/ 60).toString().padLeft(2, '0');
     final seconds = (_secondsRemaining % 60).toString().padLeft(2, '0');
+    final isEmail = widget.contactValue.contains('@');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isEmail ? Icons.mail_outline_rounded : Icons.sms_outlined,
+                size: 16,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              isEmail ? 'EMAIL CODE' : 'SMS CODE',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
         AnimatedBuilder(
           animation: _shakeController,
           builder: (context, child) {

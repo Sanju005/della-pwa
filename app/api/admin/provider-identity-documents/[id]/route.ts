@@ -8,12 +8,11 @@ import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ADMIN_ROLES = new Set([
-  "super_admin",
-  "admin",
-  "manager",
-  "customer_care",
-]);
+// Swiper uses only super_admin/provider/customer as real roles today — admin,
+// manager, and customer_care were never assigned to any live account and
+// have been removed from every authorization check (see
+// SWIPER_CRITICAL_SECURITY_REMEDIATION.md).
+const ALLOWED_ADMIN_ROLES = new Set(["super_admin"]);
 
 type IdentitySide = "front" | "back";
 type IdentityAction = "upload" | "delete" | "verify";
@@ -243,7 +242,12 @@ export async function POST(
       await verified.adminClient.auth.admin.updateUserById(providerId, {
         user_metadata: {
           ...metadata,
-          identity_verification_status: isVerified ? "verified" : "processing",
+          // "processing" locks the provider app's upload screen — only
+          // correct while a real submission is genuinely awaiting review.
+          // Admin explicitly marking pending (without deleting anything)
+          // must still let the provider act, so it uses "pending" instead,
+          // same as the delete action's "rejected" already does.
+          identity_verification_status: isVerified ? "verified" : "pending",
           identity_document_type: documentType,
           admin_approval_note: payload.note?.trim() || metadata.admin_approval_note,
           admin_approval_note_updated_at: payload.note?.trim() ? now : metadata.admin_approval_note_updated_at,
@@ -265,10 +269,30 @@ export async function POST(
           .eq("id", providerId);
       }
 
+      // Mirror of the approve branch above: rejecting / un-verifying a
+      // provider's identity must also pull them out of the live marketplace,
+      // otherwise the admin list keeps showing Active + Approved for a
+      // provider whose IC was just rejected.
+      if (!isVerified) {
+        await verified.adminClient
+          .from("provider_profiles")
+          .update({
+            approval_status: "pending_review",
+            is_visible: false,
+          })
+          .eq("id", providerId);
+
+        await verified.adminClient
+          .from("profiles")
+          .update({ status: "pending" })
+          .eq("id", providerId);
+      }
+
       const notificationTitle = isVerified ? "IC / Passport verified" : "Identity review updated";
+      const adminReason = payload.note?.trim();
       const notificationBody = isVerified
-        ? "Admin has approved your IC / Passport verification."
-        : "Admin changed your IC / Passport verification back to pending review.";
+        ? `Admin has approved your IC / Passport verification.${adminReason ? ` Note: ${adminReason}` : ""}`
+        : `Admin changed your IC / Passport verification back to pending review.${adminReason ? ` Reason: ${adminReason}` : ""}`;
 
       await verified.adminClient.from("notifications").insert({
         user_id: providerId,
@@ -297,6 +321,15 @@ export async function POST(
     const column = sideColumn(side);
 
     if (action === "delete") {
+      const note = payload.note?.trim() ?? "";
+
+      if (!note) {
+        return NextResponse.json(
+          { error: "A reason is required to delete an identity document." },
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
       const existingValue = existing?.[column]?.trim() ?? "";
 
       if (isStoredPath(existingValue)) {
@@ -317,6 +350,45 @@ export async function POST(
         kyc_verified: false,
         reviewed_at: null,
         last_reviewed_at: now,
+      });
+
+      // The provider app's upload screen locks itself whenever
+      // user_metadata.identity_verification_status is "processing" — that
+      // field lives on the auth user, separate from the
+      // provider_verifications row just updated above. Without syncing it
+      // here too, a deleted document leaves the provider permanently unable
+      // to re-upload: the row says "no document", but the metadata still
+      // says "processing" from the original submission.
+      const authUserForDelete = await verified.adminClient.auth.admin.getUserById(providerId);
+      const metadataForDelete =
+        authUserForDelete.data?.user?.user_metadata &&
+        typeof authUserForDelete.data.user.user_metadata === "object"
+          ? authUserForDelete.data.user.user_metadata
+          : {};
+
+      await verified.adminClient.auth.admin.updateUserById(providerId, {
+        user_metadata: {
+          ...metadataForDelete,
+          identity_verification_status: "rejected",
+          admin_approval_note: note,
+          admin_approval_note_updated_at: now,
+        },
+      });
+
+      const deleteNotificationBody = `Your ${side === "front" ? "front" : "back"} IC/passport image was removed by admin: ${note}. Please upload a new photo.`;
+
+      await verified.adminClient.from("notifications").insert({
+        user_id: providerId,
+        booking_id: null,
+        notification_type: "identity_review_rejected",
+        title: "Identity document removed",
+        body: deleteNotificationBody,
+      });
+
+      await sendPushNotificationToUser(providerId, {
+        title: "Identity document removed",
+        body: deleteNotificationBody,
+        path: "/provider/profile/identity-verification",
       });
 
       return NextResponse.json({ ok: true }, { headers: corsHeaders });

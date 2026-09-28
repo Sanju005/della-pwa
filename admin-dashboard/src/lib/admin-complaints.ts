@@ -96,8 +96,14 @@ export async function listComplaintsWithFallback() {
   try {
     const reports = await fetchIssueReports();
 
-    if (!reports?.length) {
-      return mockComplaints;
+    // Supabase is configured — a failed fetch or a genuinely empty report
+    // list should render as empty, not silently substitute fake complaints.
+    if (!reports) {
+      return [];
+    }
+
+    if (reports.length === 0) {
+      return [];
     }
 
     return reports.map((report, index) => ({
@@ -112,7 +118,7 @@ export async function listComplaintsWithFallback() {
       sortOrder: index,
     })) satisfies Array<ComplaintRow & { sortOrder: number }>;
   } catch {
-    return mockComplaints;
+    return [];
   }
 }
 

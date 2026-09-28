@@ -4,7 +4,9 @@ import type { ReviewRow } from "../types";
 
 type LiveReviewRecord = {
   id: string;
-  rating?: number | null;
+  // Postgres `numeric` columns (see reviews.rating, numeric(3,2)) come back
+  // from PostgREST as strings, not JS numbers, to avoid float precision loss.
+  rating?: number | string | null;
   comment?: string | null;
   created_at?: string | null;
   customer_id?: string | null;
@@ -40,12 +42,14 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
-function formatRating(value?: number | null) {
-  if (typeof value !== "number" || Number.isNaN(value)) {
+function formatRating(value?: number | string | null) {
+  const numeric = typeof value === "string" ? Number(value) : value;
+
+  if (typeof numeric !== "number" || Number.isNaN(numeric)) {
     return "0.0";
   }
 
-  return value.toFixed(1);
+  return numeric.toFixed(1);
 }
 
 function mapStatus(row: LiveReviewRecord) {
@@ -131,8 +135,14 @@ export async function listReviewsWithFallback() {
     error = fallback.error;
   }
 
-  if (error || !data || data.length === 0) {
-    return mockReviews;
+  if (error || !data) {
+    // Supabase is configured but both queries failed — an honest empty
+    // result is safer than silently substituting fake reviews.
+    return [];
+  }
+
+  if (data.length === 0) {
+    return [];
   }
 
   const [customerNames, providerNames] = await Promise.all([

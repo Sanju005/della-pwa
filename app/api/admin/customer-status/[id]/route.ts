@@ -1,17 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+import { sendPushNotificationToUser } from "@/lib/push-notifications";
+import { resolveStoredMediaUrl } from "@/lib/server-media-storage";
 import { getSupabaseServiceKey, getSupabaseUrl } from "@/lib/supabase-env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ADMIN_ROLES = new Set([
-  "super_admin",
-  "admin",
-  "manager",
-  "customer_care",
-]);
+// Swiper uses only super_admin/provider/customer as real roles today — admin,
+// manager, and customer_care were never assigned to any live account and
+// have been removed from every authorization check (see
+// SWIPER_CRITICAL_SECURITY_REMEDIATION.md).
+const ALLOWED_ADMIN_ROLES = new Set(["super_admin"]);
 
 function buildCorsHeaders(origin: string | null) {
   const allowedOrigin =
@@ -23,7 +24,7 @@ function buildCorsHeaders(origin: string | null) {
 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     Vary: "Origin",
   };
@@ -93,6 +94,11 @@ async function verifyAdminRequest(request: Request) {
 
 type CustomerProfileStatusRow = {
   verified?: boolean | null;
+  identity_document_type?: string | null;
+  identity_front_image_url?: string | null;
+  identity_back_image_url?: string | null;
+  reviewed_at?: string | null;
+  last_reviewed_at?: string | null;
 };
 
 function readMetadataBoolean(metadata: Record<string, unknown> | null | undefined, key: string) {
@@ -143,7 +149,9 @@ export async function GET(
       verified.adminClient.auth.admin.getUserById(id),
       verified.adminClient
         .from("customer_profiles")
-        .select("verified")
+        .select(
+          "verified, identity_document_type, identity_front_image_url, identity_back_image_url, reviewed_at, last_reviewed_at",
+        )
         .eq("id", id)
         .maybeSingle(),
     ]);
@@ -168,6 +176,19 @@ export async function GET(
     const customerProfile = (customerProfileResult.data ?? null) as CustomerProfileStatusRow | null;
     const identityStatus = readMetadataStatus(metadata);
 
+    const [identityFrontImageUrl, identityBackImageUrl] = await Promise.all([
+      resolveStoredMediaUrl(verified.adminClient, {
+        bucket: "identity-documents",
+        value: customerProfile?.identity_front_image_url,
+        visibility: "private",
+      }),
+      resolveStoredMediaUrl(verified.adminClient, {
+        bucket: "identity-documents",
+        value: customerProfile?.identity_back_image_url,
+        visibility: "private",
+      }),
+    ]);
+
     return NextResponse.json(
       {
         status: {
@@ -183,10 +204,13 @@ export async function GET(
               : identityStatus,
           emailVerifiedAt: authUser.email_confirmed_at || authUser.confirmed_at || null,
           phoneVerifiedAt: authUser.phone_confirmed_at || null,
-          kycVerifiedAt:
-            customerProfile?.verified || identityStatus === "verified"
-              ? authUser.email_confirmed_at || authUser.confirmed_at || null
-              : null,
+          kycVerifiedAt: customerProfile?.reviewed_at ?? null,
+          identityDocumentType: customerProfile?.identity_document_type ?? null,
+          identityFrontImageUrl: identityFrontImageUrl || null,
+          identityBackImageUrl: identityBackImageUrl || null,
+          identityReviewNote:
+            typeof metadata.admin_approval_note === "string" ? metadata.admin_approval_note : null,
+          identityLastReviewedAt: customerProfile?.last_reviewed_at ?? null,
         },
       },
       { headers: corsHeaders },
@@ -196,6 +220,122 @@ export async function GET(
       {
         error:
           error instanceof Error ? error.message : "Unable to load customer verification status.",
+      },
+      { status: 500, headers: corsHeaders },
+    );
+  }
+}
+
+// Admin-only customer identity/KYC review — approve or reject a customer's
+// submitted IC/passport. Mirrors the trusted server-side pattern already
+// used for providers (app/api/admin/provider-identity-documents/[id]),
+// except customers have no separate `*_verifications` table: the same
+// `customer_profiles.verified` boolean and Auth user_metadata fields the
+// client-facing /api/profile/me route already reads are updated here,
+// service-role, after this route's own super_admin gate — the customer
+// client can never set these itself (see SWIPER_CRITICAL_SECURITY_REMEDIATION.md,
+// SWP-012).
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const corsHeaders = buildCorsHeaders(request.headers.get("origin"));
+  const verified = await verifyAdminRequest(request);
+
+  if ("error" in verified && verified.error) {
+    const failureResponse = verified.error;
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      failureResponse.headers.set(key, value);
+    });
+    return failureResponse;
+  }
+
+  try {
+    const { id: customerId } = await params;
+    const payload = (await request.json()) as {
+      action?: "verify";
+      verified?: boolean;
+      note?: string;
+    };
+
+    if (payload.action !== "verify") {
+      return NextResponse.json(
+        { error: "Unsupported customer identity action." },
+        { status: 400, headers: corsHeaders },
+      );
+    }
+
+    const isVerified = Boolean(payload.verified);
+    const now = new Date().toISOString();
+
+    const { error: profileError } = await verified.adminClient
+      .from("customer_profiles")
+      .update({
+        verified: isVerified,
+        reviewed_at: now,
+        last_reviewed_at: now,
+      })
+      .eq("id", customerId);
+
+    if (profileError) {
+      return NextResponse.json(
+        { error: profileError.message || "Unable to update customer verification record." },
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    const authUser = await verified.adminClient.auth.admin.getUserById(customerId);
+    const metadata =
+      authUser.data?.user?.user_metadata && typeof authUser.data.user.user_metadata === "object"
+        ? authUser.data.user.user_metadata
+        : {};
+
+    const { error: authUpdateError } = await verified.adminClient.auth.admin.updateUserById(
+      customerId,
+      {
+        user_metadata: {
+          ...metadata,
+          identity_verification_status: isVerified ? "verified" : "rejected",
+          admin_approval_note: payload.note?.trim() || metadata.admin_approval_note,
+          admin_approval_note_updated_at: payload.note?.trim() ? now : metadata.admin_approval_note_updated_at,
+        },
+      },
+    );
+
+    if (authUpdateError) {
+      return NextResponse.json(
+        { error: authUpdateError.message || "Unable to update customer verification status." },
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    const notificationTitle = isVerified ? "IC / Passport verified" : "Identity verification rejected";
+    const notificationBody = isVerified
+      ? "Admin has approved your IC / Passport verification."
+      : payload.note?.trim()
+        ? `Your IC / Passport verification was rejected: ${payload.note.trim()}`
+        : "Your IC / Passport verification was rejected. Please resubmit clear photos.";
+
+    await verified.adminClient.from("notifications").insert({
+      user_id: customerId,
+      booking_id: null,
+      notification_type: isVerified ? "identity_verified" : "identity_review_rejected",
+      title: notificationTitle,
+      body: notificationBody,
+    });
+
+    await sendPushNotificationToUser(customerId, {
+      title: notificationTitle,
+      body: notificationBody,
+      path: "/profile/verification/identity",
+    });
+
+    return NextResponse.json({ ok: true }, { headers: corsHeaders });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Unable to update customer identity verification.",
       },
       { status: 500, headers: corsHeaders },
     );

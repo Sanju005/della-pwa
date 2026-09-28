@@ -14,6 +14,7 @@ import {
   getSupabaseServiceKey,
   getSupabaseUrl,
 } from "@/lib/supabase-env";
+import { isChallengeRecentlyVerified } from "@/lib/otp-verification";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,21 +54,26 @@ function getAdminSupabaseClient() {
   });
 }
 
+// Must match flutter_app/lib/core/utils/phone_number.dart's
+// normalizePhoneNumber exactly — this is the lookup key used by the
+// provider phone-login route, and the target string OTP challenges were
+// verified against.
 function normalizePhone(countryCode: string, phoneNumber: string) {
-  const digits = phoneNumber.replace(/[^\d]/g, "");
-  const normalizedCountryCode = countryCode.trim() || "+60";
+  const countryDigits =
+    (countryCode.trim() || "+60").replace(/[^\d]/g, "") || "60";
+  let subscriber = phoneNumber.replace(/[^\d]/g, "");
 
-  if (!digits) {
-    return normalizedCountryCode;
+  if (!subscriber) {
+    return `+${countryDigits}`;
   }
 
-  if (digits.startsWith("60")) {
-    return `+${digits}`;
+  if (subscriber.startsWith(countryDigits)) {
+    subscriber = subscriber.slice(countryDigits.length);
+  } else if (countryDigits === "60" && subscriber.startsWith("0")) {
+    subscriber = subscriber.slice(1);
   }
 
-  const countryDigits = normalizedCountryCode.replace(/[^\d]/g, "");
-
-  return `+${countryDigits}${digits}`;
+  return `+${countryDigits}${subscriber}`;
 }
 
 function toServiceType(service: string) {
@@ -377,7 +383,8 @@ function isMissingProviderServiceMediaColumnError(message?: string) {
     (normalized.includes("image_data_urls") ||
       normalized.includes("image_captions") ||
       normalized.includes("certificate_data_urls") ||
-      normalized.includes("certificate_captions"))
+      normalized.includes("certificate_captions") ||
+      normalized.includes("about_service"))
   );
 }
 
@@ -400,6 +407,7 @@ function stripProviderServiceMediaFields(
   delete nextProviderService.image_captions;
   delete nextProviderService.certificate_data_urls;
   delete nextProviderService.certificate_captions;
+  delete nextProviderService.about_service;
   return nextProviderService;
 }
 
@@ -520,11 +528,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // Emergency contact is intentionally optional here — it's collected
+    // later from Profile, and providers can leave it unset until then.
     const emergencyContact = getEmergencyContact(payload);
 
-    if (!payload.basicProfile.country.trim() || !emergencyContact) {
+    if (!payload.basicProfile.country.trim()) {
       return NextResponse.json(
-        { error: "Country and emergency contact are required." },
+        { error: "Country is required." },
         { status: 400 }
       );
     }
@@ -664,7 +674,18 @@ export async function POST(request: Request) {
           visibility: "private",
         })
       : "";
-    const phoneVerified = payload.verification.phoneOtp.join("") === "123456";
+    // Real proof of phone ownership: redeem the challengeId the client got
+    // back from a genuine POST /api/auth/otp/verify call — the literal
+    // digits the OTP box collected are never trusted here (mirrors
+    // app/api/auth/register/customer/route.ts's isChallengeRecentlyVerified
+    // usage exactly).
+    const phoneVerified = payload.verification.phoneVerificationChallengeId
+      ? await isChallengeRecentlyVerified(adminClient, {
+          challengeId: payload.verification.phoneVerificationChallengeId,
+          purpose: "phone",
+          target: normalizedPhone,
+        })
+      : false;
     const hasSubmittedIdentityDocuments = Boolean(
       payload.verification.documentType &&
         payload.verification.frontImageName &&
@@ -860,6 +881,7 @@ export async function POST(request: Request) {
           years_experience: details.yearsExperience,
           hourly_rate: Number(details.hourlyRate || 0),
           daily_rate: Number(details.dailyRate || 0),
+          about_service: details.aboutService?.trim() || null,
           image_data_urls: imageDataUrls,
           image_captions: normalizeStoredCaptions(details.imageCaptions, imageDataUrls),
           certificate_data_urls: certificateDataUrls,

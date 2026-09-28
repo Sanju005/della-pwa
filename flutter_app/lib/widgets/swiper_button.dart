@@ -62,7 +62,19 @@ class SwiperButton extends StatelessWidget {
                     icon!,
                     const SizedBox(width: AppSpacing.xs),
                   ],
-                  Text(label),
+                  // Flexible + ellipsis: a long label (e.g. "Mark Job
+                  // Completed & Send Payment Request") shrinks to fit the
+                  // button's actual width instead of overflowing past its
+                  // right edge — a plain Text here has no width limit of
+                  // its own and just renders past the button.
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ],
               ),
       ),

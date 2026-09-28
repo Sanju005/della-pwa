@@ -202,7 +202,7 @@ export async function POST(
   const { data: adminProfiles } = await verified.adminClient
     .from("profiles")
     .select("id")
-    .in("role", ["super_admin", "admin", "manager", "customer_care"]);
+    .in("role", ["super_admin"]);
 
   if (adminProfiles?.length) {
     await verified.adminClient.from("notifications").insert(

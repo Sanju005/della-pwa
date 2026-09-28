@@ -4,6 +4,10 @@ import { listComplaintsWithFallback } from "./admin-complaints";
 import type { ApprovalItem, ComplaintRow, DashboardBooking, PaymentRow, ReviewRow } from "../types";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
+const APP_BASE_URL =
+  (import.meta.env.VITE_APP_BASE_URL as string | undefined)?.trim() ||
+  "https://app.myswiper.my";
+
 type LiveMetricCard = {
   title: string;
   value: string;
@@ -199,7 +203,7 @@ async function fetchIssueReports() {
   }
 
   try {
-    const response = await fetch("https://app.myswiper.my/api/reports", {
+    const response = await fetch(`${APP_BASE_URL}/api/reports`, {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
@@ -714,19 +718,24 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       row.verification.toLowerCase().includes(value),
     ),
   ).length;
-  const approvals: LiveApprovalItem[] = approvalItems.map((item) => {
-    let pending = item.pending;
+  const approvals: LiveApprovalItem[] = approvalItems
+    // "Withdrawals" has no real backing table/feature anywhere in the app
+    // yet — there's nothing to compute here, so it's dropped from the live
+    // dashboard rather than silently showing its permanent mock count.
+    .filter((item) => item.title !== "Withdrawals")
+    .map((item) => {
+      let pending = item.pending;
 
-    if (item.title === "Service Providers") {
-      pending = liveApprovalRows.length || pendingApprovals || item.pending;
-    } else if (item.title === "Documents") {
-      pending = documentApprovals || item.pending;
-    } else if (item.title === "Listings") {
-      pending = listingApprovals || item.pending;
-    }
+      if (item.title === "Service Providers") {
+        pending = liveApprovalRows.length || pendingApprovals || item.pending;
+      } else if (item.title === "Documents") {
+        pending = documentApprovals || item.pending;
+      } else if (item.title === "Listings") {
+        pending = listingApprovals || item.pending;
+      }
 
-    return { ...item, pending };
-  });
+      return { ...item, pending };
+    });
 
   return {
     metrics,

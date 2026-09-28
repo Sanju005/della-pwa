@@ -205,7 +205,10 @@ export async function POST(
     }
   }
 
-  const { error: bookingUpdateError } = await verified.adminClient
+  // Only the first request moves the booking on. A double tap (or a repeat
+  // call) finds it already past "final_payment_sent", gets a 409 here, and
+  // so never sends the provider a second notification.
+  const { data: paidRows, error: bookingUpdateError } = await verified.adminClient
     .from("bookings")
     .update({
       booking_status: "cash_paid_by_user",
@@ -213,12 +216,21 @@ export async function POST(
       cash_payment_proof_images: storedProofDataUrl ? [storedProofDataUrl] : [],
     })
     .eq("id", bookingRow.id)
-    .eq("customer_id", verified.profile.id);
+    .eq("customer_id", verified.profile.id)
+    .eq("booking_status", "final_payment_sent")
+    .select("id");
 
   if (bookingUpdateError) {
     return NextResponse.json(
       { error: bookingUpdateError.message || "Unable to update booking payment status." },
       { status: 500 },
+    );
+  }
+
+  if (!paidRows || paidRows.length === 0) {
+    return NextResponse.json(
+      { error: "This booking was just updated. Please refresh and try again." },
+      { status: 409 },
     );
   }
 
@@ -236,6 +248,8 @@ export async function POST(
       body: `${verified.profile.full_name?.trim() || "A customer"} marked cash payment as paid for the ${bookingRow.service_label} booking. Please confirm receipt.`,
       bookingId: bookingRow.id,
       path: `/provider/bookings/${bookingRow.id}`,
+      type: "payment",
+      event: "cash_paid_by_user",
     });
   } catch (pushError) {
     console.error("[Cash payment confirm] Failed to send provider push notification:", pushError);

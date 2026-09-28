@@ -20,6 +20,7 @@ type ServicePayload = {
   hourlyRate?: number;
   dailyRate?: number;
   specialties?: string[];
+  aboutService?: string;
   imageDataUrls?: string[];
   imageCaptions?: string[];
 };
@@ -161,6 +162,7 @@ export async function PATCH(
       years_experience: payload.yearsExperience?.trim() || "",
       hourly_rate: Number(payload.hourlyRate ?? 0),
       daily_rate: Number(payload.dailyRate ?? 0),
+      about_service: payload.aboutService?.trim() || null,
       image_data_urls: imageDataUrls,
       image_captions: imageCaptions,
     })
@@ -181,6 +183,7 @@ export async function PATCH(
         years_experience: payload.yearsExperience?.trim() || "",
         hourly_rate: Number(payload.hourlyRate ?? 0),
         daily_rate: Number(payload.dailyRate ?? 0),
+        about_service: payload.aboutService?.trim() || null,
       })
       .eq("id", params.id)
       .eq("provider_id", verified.profile.id);
